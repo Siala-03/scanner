@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "npx vite",
+    "dev:backend": "npm --prefix backend run dev",
+    "db:migrate": "npm --prefix backend run migrate",
     "build": "npx vite build",
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
     "preview": "npx vite preview"
@@ -15,7 +17,8 @@
     "lucide-react": "0.522.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "recharts": "^2.12.7"
+    "recharts": "^2.12.7",
+    "react-qr-code": "^2.0.18"
   },
   "devDependencies": {
     "@types/node": "^20.11.18",

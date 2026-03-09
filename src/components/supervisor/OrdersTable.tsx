@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ChevronUpIcon, ChevronDownIcon } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { Order, SortConfig, SortDirection } from '../../types';
 import { StatusBadge } from '../ui/Badge';
 import { getStaffById } from '../../data/staffData';
@@ -63,25 +64,25 @@ export function OrdersTable({ orders, onSelectOrder }: OrdersTableProps) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full">
-        <thead className="bg-slate-800/50">
+        <thead className="bg-slate-800/50 border-b border-slate-700">
           <tr>
             <HeaderCell field="id">Order #</HeaderCell>
             <HeaderCell field="tableNumber">Table</HeaderCell>
-            <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+            <th className="px-4 py-4 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">
               Waiter
             </th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+            <th className="px-4 py-4 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">
               Items
             </th>
             <HeaderCell field="total">Total</HeaderCell>
-            <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+            <th className="px-4 py-4 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">
               Status
             </th>
             <HeaderCell field="createdAt">Time</HeaderCell>
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-700">
-          {sortedOrders.map((order) => {
+        <tbody className="divide-y divide-slate-700/50">
+          {sortedOrders.map((order, index) => {
             const waiter = order.assignedWaiterId ?
             getStaffById(order.assignedWaiterId) :
             null;
@@ -89,24 +90,27 @@ export function OrdersTable({ orders, onSelectOrder }: OrdersTableProps) {
               (Date.now() - order.createdAt.getTime()) / 60000
             );
             return (
-              <tr
+              <motion.tr
                 key={order.id}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: index * 0.05 }}
                 onClick={() => onSelectOrder(order)}
-                className="hover:bg-slate-800/50 cursor-pointer transition-colors">
+                className="hover:bg-slate-700/30 cursor-pointer transition-all duration-200 hover:shadow-lg">
 
-                <td className="px-4 py-3 text-sm font-medium text-white">
-                  {order.id}
+                <td className="px-4 py-3 text-sm font-bold text-white">
+                  #{order.id.slice(0, 6)}
+                </td>
+                <td className="px-4 py-3 text-sm text-slate-300 font-medium">
+                  {order.tableNumber}
                 </td>
                 <td className="px-4 py-3 text-sm text-slate-300">
-                  Table {order.tableNumber}
+                  <span className="px-2 py-1 bg-slate-700/30 rounded-md">{waiter?.name || 'Unassigned'}</span>
                 </td>
                 <td className="px-4 py-3 text-sm text-slate-300">
-                  {waiter?.name || 'Unassigned'}
+                  <span className="px-2 py-1 bg-slate-700/30 rounded-md">{order.items.length} items</span>
                 </td>
-                <td className="px-4 py-3 text-sm text-slate-300">
-                  {order.items.length} items
-                </td>
-                <td className="px-4 py-3 text-sm font-semibold text-amber-400">
+                <td className="px-4 py-3 text-sm font-bold text-amber-400">
                   {formatPrice(order.total)}
                 </td>
                 <td className="px-4 py-3">
@@ -115,7 +119,7 @@ export function OrdersTable({ orders, onSelectOrder }: OrdersTableProps) {
                 <td className="px-4 py-3 text-sm text-slate-400">
                   {minutesAgo}m ago
                 </td>
-              </tr>);
+              </motion.tr>);
 
           })}
         </tbody>

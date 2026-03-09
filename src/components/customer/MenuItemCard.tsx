@@ -32,9 +32,9 @@ export function MenuItemCard({
         scale: 0.98
       }}
       onClick={() => onViewDetails(item)}
-      className="bg-[#fffdf9] rounded-xl shadow-sm overflow-hidden cursor-pointer hover:shadow-md transition-shadow duration-200">
+      className="bg-[#fffdf9] rounded-xl shadow-sm overflow-hidden cursor-pointer hover:shadow-md transition-shadow duration-200 h-full flex flex-col">
 
-      <div className="p-4">
+      <div className="p-4 flex flex-col flex-1">
         <div className="flex items-start justify-between mb-2">
           {item.isPopular ?
           <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs font-medium rounded-full">
@@ -53,7 +53,7 @@ export function MenuItemCard({
           {item.description}
         </p>
 
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between mt-auto">
           <div>
             <span className="text-lg font-bold text-slate-900">
               {formatPrice(item.price)}

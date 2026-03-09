@@ -5,6 +5,8 @@ import { StaffRole, Staff } from '../../types';
 import { validateLogin } from '../../data/staffData';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
+import { SignUpPage } from './SignUpPage';
+
 interface LoginPageProps {
   role: StaffRole;
   onLogin: (user: Staff) => void;
@@ -15,6 +17,17 @@ export function LoginPage({ role, onLogin, onBack }: LoginPageProps) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [mode, setMode] = useState<'login' | 'signup'>('login');
+
+  if (mode === 'signup') {
+    return (
+      <SignUpPage
+        role={role}
+        onSignedUp={onLogin}
+        onBack={() => setMode('login')}
+      />
+    );
+  }
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -127,6 +140,14 @@ export function LoginPage({ role, onLogin, onBack }: LoginPageProps) {
 
             Sign In
           </Button>
+
+          <button
+            type="button"
+            onClick={() => setMode('signup')}
+            className="w-full text-sm text-amber-400 mt-3 hover:text-amber-300 transition-colors"
+          >
+            Create a new account
+          </button>
 
           {/* Demo helper text */}
           <div className="mt-6 p-4 bg-amber-500/10 border border-amber-500/20 rounded-lg text-sm text-amber-400/80 text-center">

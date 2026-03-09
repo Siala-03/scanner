@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeftIcon } from 'lucide-react';
 import { CartItem, Order, OrderStatus } from './types';
@@ -20,7 +20,7 @@ import { Button } from './components/ui/Button';
 import { Staff } from './types';
 type UserRole = 'customer' | 'waiter' | 'supervisor' | 'manager' | null;
 type ManagerPage = 'dashboard' | 'menu' | 'staff' | 'analytics' | 'qrcodes';
-type SupervisorPage = 'dashboard' | 'revenue' | 'staff';
+type SupervisorPage = 'dashboard' | 'revenue' | 'staff' | 'qrcodes';
 export function App() {
   const [selectedRole, setSelectedRole] = useState<UserRole>(null);
   const [authUser, setAuthUser] = useState<Staff | null>(null);
@@ -32,6 +32,27 @@ export function App() {
   const [scanningTable, setScanningTable] = useState<number | null>(null);
   const [detectedTable, setDetectedTable] = useState<number | null>(null);
   const [showQRGrid, setShowQRGrid] = useState(false);
+  // list of table numbers created by manager
+  const [tables, setTables] = useState<number[]>([]);
+  // persist tables in localStorage
+  React.useEffect(() => {
+    try {
+      const saved = localStorage.getItem('tables');
+      if (saved) {
+        setTables(JSON.parse(saved));
+      }
+    } catch (e) {
+      console.warn('failed to load tables', e);
+    }
+  }, []);
+  React.useEffect(() => {
+    try {
+      localStorage.setItem('tables', JSON.stringify(tables));
+    } catch (e) {
+      console.warn('failed to save tables', e);
+    }
+  }, [tables]);
+
   const [waiterCalls, setWaiterCalls] = useState<
     {
       tableNumber: number;
@@ -86,7 +107,15 @@ export function App() {
     }
   };
   const handleScanQR = (tableNum?: number) => {
-    const targetTable = tableNum || Math.floor(Math.random() * 20) + 1;
+    // if explicit table number provided use it, else pick random from known tables or fall back to 1..20 range
+    let targetTable: number;
+    if (tableNum !== undefined) {
+      targetTable = tableNum;
+    } else if (tables.length > 0) {
+      targetTable = tables[Math.floor(Math.random() * tables.length)];
+    } else {
+      targetTable = Math.floor(Math.random() * 20) + 1;
+    }
     setIsScanning(true);
     setScanningTable(targetTable);
     setDetectedTable(null);
@@ -98,12 +127,26 @@ export function App() {
       setTimeout(() => {
         setSelectedRole('customer');
         setTableNumber(targetTable);
+        // update URL so it matches what a real scan would point to
+        window.history.pushState({}, '', `/t/${targetTable}`);
         setDetectedTable(null);
         setScanningTable(null);
         setShowQRGrid(false);
       }, 1200);
     }, 1500);
   };
+  // check for table number in path (deep linking via QR code)
+  useEffect(() => {
+    const match = window.location.pathname.match(/\/t\/(\d+)/);
+    if (match) {
+      const num = parseInt(match[1], 10);
+      if (!isNaN(num)) {
+        setSelectedRole('customer');
+        setTableNumber(num);
+      }
+    }
+  }, []);
+
   // Auth flow for staff roles
   if (selectedRole && selectedRole !== 'customer' && !authUser) {
     return (
@@ -159,48 +202,65 @@ export function App() {
       <div className="relative">
         <button
           onClick={handleBack}
-          className="fixed top-4 left-4 z-50 p-2 rounded-full bg-slate-800 text-white shadow-md">
-
+          className="fixed top-4 left-4 z-50 p-2 rounded-full bg-slate-800 text-white shadow-md"
+        >
           <ArrowLeftIcon className="w-5 h-5" />
         </button>
 
-        {supervisorPage === 'dashboard' &&
-        <div>
-            <div className="dark bg-slate-900 px-4 pt-16 pb-4">
-              <div className="max-w-7xl mx-auto flex gap-2">
-                <Button
-                variant={supervisorPage === 'dashboard' ? 'primary' : 'ghost'}
-                size="sm"
-                onClick={() => setSupervisorPage('dashboard')}>
-
-                  Dashboard
-                </Button>
-                <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setSupervisorPage('revenue')}>
-
-                  Revenue
-                </Button>
-                <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setSupervisorPage('staff')}>
-
-                  Staff
-                </Button>
-              </div>
-            </div>
-            <SupervisorDashboard
-            orders={orders}
-            onUpdateOrderStatus={handleUpdateOrderStatus} />
-
+        <div className="dark bg-slate-900 px-4 pt-16 pb-4">
+          <div className="max-w-7xl mx-auto flex gap-2">
+            <Button
+              variant={supervisorPage === 'dashboard' ? 'primary' : 'ghost'}
+              size="sm"
+              onClick={() => setSupervisorPage('dashboard')}
+            >
+              Dashboard
+            </Button>
+            <Button
+              variant={supervisorPage === 'revenue' ? 'primary' : 'ghost'}
+              size="sm"
+              onClick={() => setSupervisorPage('revenue')}
+            >
+              Revenue
+            </Button>
+            <Button
+              variant={supervisorPage === 'staff' ? 'primary' : 'ghost'}
+              size="sm"
+              onClick={() => setSupervisorPage('staff')}
+            >
+              Staff
+            </Button>
+            <Button
+              variant={supervisorPage === 'qrcodes' ? 'primary' : 'ghost'}
+              size="sm"
+              onClick={() => setSupervisorPage('qrcodes')}
+            >
+              QR Codes
+            </Button>
           </div>
-        }
+        </div>
+
+        {supervisorPage === 'dashboard' && (
+          <SupervisorDashboard
+            orders={orders}
+            onUpdateOrderStatus={handleUpdateOrderStatus}
+          />
+        )}
         {supervisorPage === 'revenue' && <RevenueReports />}
         {supervisorPage === 'staff' && <StaffPerformance />}
-      </div>);
-
+        {supervisorPage === 'qrcodes' && (
+          <QRCodeGenerator
+            tables={tables}
+            onAddTable={() => {
+              setTables((prev) => {
+                const next = prev.length > 0 ? Math.max(...prev) + 1 : 1;
+                return [...prev, next];
+              });
+            }}
+          />
+        )}
+      </div>
+    );
   }
   // Manager portal
   if (selectedRole === 'manager' && authUser) {
@@ -221,7 +281,17 @@ export function App() {
         {managerPage === 'menu' && <MenuManagement />}
         {managerPage === 'staff' && <StaffManagement />}
         {managerPage === 'analytics' && <AnalyticsPage />}
-        {managerPage === 'qrcodes' && <QRCodeGenerator />}
+        {managerPage === 'qrcodes' && (
+          <QRCodeGenerator
+            tables={tables}
+            onAddTable={() => {
+              setTables((prev) => {
+                const next = prev.length > 0 ? Math.max(...prev) + 1 : 1;
+                return [...prev, next];
+              });
+            }}
+          />
+        )}
       </div>);
 
   }
@@ -406,12 +476,7 @@ export function App() {
                 </p>
               </div>
               <div className="grid grid-cols-4 sm:grid-cols-5 gap-3">
-                {Array.from(
-                {
-                  length: 20
-                },
-                (_, i) => i + 1
-              ).map((num) =>
+                {(tables.length > 0 ? tables : Array.from({length: 5}, (_,i)=>i+1)).map((num) =>
               <motion.button
                 key={num}
                 whileHover={{

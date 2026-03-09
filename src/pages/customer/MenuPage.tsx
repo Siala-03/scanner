@@ -150,7 +150,8 @@ export function MenuPage({ onAddToCart }: MenuPageProps) {
               }}
               transition={{
                 delay: index * 0.05
-              }}>
+              }}
+              className="h-full">
 
                 <MenuItemCard
                 item={item}
