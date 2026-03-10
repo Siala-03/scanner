@@ -4,7 +4,7 @@ import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { SearchBar } from '../../components/ui/SearchBar';
 import { formatPrice } from '../../utils/currency';
-import { menuItems } from '../../data/menuData';
+import { menuItems, menuCategories } from '../../data/menuData';
 import {
   ensureInventoryInitialized,
   listLowStock,
@@ -12,9 +12,14 @@ import {
   saveInventoryMap
 } from '../../utils/inventoryStorage';
 
-export function InventoryManagement() {
+interface InventoryManagementProps {
+  role: 'manager' | 'supervisor';
+}
+
+export function InventoryManagement({ role }: InventoryManagementProps) {
   const [query, setQuery] = useState('');
   const [tick, setTick] = useState(0);
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
 
   useEffect(() => {
     ensureInventoryInitialized(menuItems);
@@ -25,6 +30,7 @@ export function InventoryManagement() {
     const q = query.trim().toLowerCase();
     return menuItems
       .filter((i) => !q || i.name.toLowerCase().includes(q) || i.id.toLowerCase().includes(q))
+      .filter((i) => categoryFilter === 'all' || i.category === categoryFilter)
       .map((item) => {
         const rec = map[item.id]!;
         return {
@@ -40,6 +46,7 @@ export function InventoryManagement() {
   const low = useMemo(() => listLowStock(menuItems), [tick]);
 
   const update = (menuItemId: string, patch: Partial<{ stock: number; lowStockThreshold: number }>) => {
+    if (role !== 'manager') return;
     const map = loadInventoryMap();
     const existing = map[menuItemId];
     if (!existing) return;
@@ -88,8 +95,21 @@ export function InventoryManagement() {
           </div>
         )}
 
-        <div className="mb-4">
+        <div className="mb-4 flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
           <SearchBar value={query} onChange={setQuery} placeholder="Search item..." className="md:w-96" />
+          <div>
+            <select
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+              className="px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500">
+              <option value="all">All categories</option>
+              {menuCategories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
         <Card className="bg-slate-800/50 backdrop-blur border border-slate-700/50" padding="none">
@@ -108,23 +128,16 @@ export function InventoryManagement() {
                 {inventoryRows.map((row) => (
                   <tr key={row.item.id} className={row.isLow ? 'bg-red-500/5' : ''}>
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <span className="text-2xl">{row.item.emoji}</span>
-                        <div>
-                          <p className="text-white font-medium">{row.item.name}</p>
-                          <p className="text-xs text-slate-400">{row.item.id}</p>
-                        </div>
+                      <div>
+                        <p className="text-white font-medium">{row.item.name}</p>
+                        <p className="text-xs text-slate-400">
+                          {row.item.id} • {row.item.category.replace('-', ' ')}
+                        </p>
                       </div>
                     </td>
                     <td className="px-4 py-3 text-slate-200">{formatPrice(row.item.price)}</td>
-                    <td className="px-4 py-3">
-                      <input
-                        type="number"
-                        value={row.stock}
-                        onChange={(e) => update(row.item.id, { stock: parseInt(e.target.value || '0', 10) })}
-                        className="w-24 px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
-                        min={0}
-                      />
+                    <td className="px-4 py-3 text-slate-200">
+                      {row.stock}
                     </td>
                     <td className="px-4 py-3">
                       <input
@@ -133,8 +146,9 @@ export function InventoryManagement() {
                         onChange={(e) =>
                           update(row.item.id, { lowStockThreshold: parseInt(e.target.value || '0', 10) })
                         }
-                        className="w-24 px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+                        className="w-24 px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-white focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:opacity-60"
                         min={0}
+                        disabled={role !== 'manager'}
                       />
                     </td>
                     <td className="px-4 py-3">

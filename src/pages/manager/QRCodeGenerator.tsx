@@ -100,6 +100,8 @@ export function QRCodeGenerator({
                     size={160}
                     level="H"
                     includeMargin={true}
+                  bgColor="#ecfdf3"
+                  fgColor="#16a34a"
                   />
                 </div>
 

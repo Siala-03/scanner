@@ -267,7 +267,7 @@ export function App() {
             }}
           />
         )}
-        {supervisorPage === 'inventory' && <InventoryManagement />}
+        {supervisorPage === 'inventory' && <InventoryManagement role="supervisor" />}
       </div>
     );
   }
@@ -290,7 +290,7 @@ export function App() {
         {managerPage === 'menu' && <MenuManagement />}
         {managerPage === 'staff' && <StaffManagement />}
         {managerPage === 'analytics' && <AnalyticsPage />}
-        {managerPage === 'inventory' && <InventoryManagement />}
+        {managerPage === 'inventory' && <InventoryManagement role="manager" />}
         {managerPage === 'qrcodes' && (
           <QRCodeGenerator
             tables={tables}
