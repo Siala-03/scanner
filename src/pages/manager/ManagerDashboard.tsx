@@ -196,7 +196,6 @@ export function ManagerDashboard({ onNavigate }: ManagerDashboardProps) {
               <div className="space-y-4">
                 {popularItems.slice(0, 5).map((item, index) =>
                 <motion.div key={item.item.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.4 + index * 0.05 }} className="flex items-center gap-3">
-                    <span className="text-2xl">{item.item.emoji}</span>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-white truncate">
                         {item.item.name}

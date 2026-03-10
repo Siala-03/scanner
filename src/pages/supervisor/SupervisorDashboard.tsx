@@ -10,8 +10,9 @@ import {
   CheckCircleIcon,
   ZapIcon,
   StarIcon,
-  AlertCircleIcon } from
-'lucide-react';
+  AlertCircleIcon,
+  FilterIcon as FilterLinesIcon
+} from 'lucide-react';
 import { Order, OrderStatus } from '../../types';
 import { weeklyRevenue, todayKPIs } from '../../data/analyticsData';
 import { Card } from '../../components/ui/Card';
@@ -24,6 +25,8 @@ import { formatPrice } from '../../utils/currency';
 import { getAverageRating } from '../../utils/reviewsStorage';
 import { listLowStock } from '../../utils/inventoryStorage';
 import { menuItems } from '../../data/menuData';
+import { downloadCsv, buildOrdersCsv } from '../../utils/csv';
+import { getStaffById } from '../../data/staffData';
 interface SupervisorDashboardProps {
   orders: Order[];
   onUpdateOrderStatus: (
@@ -56,10 +59,37 @@ export function SupervisorDashboard({
   0;
   const avgRating = getAverageRating();
   const lowStock = listLowStock(menuItems);
+  const [tableFilter, setTableFilter] = useState<string>('all');
+  const [waiterFilter, setWaiterFilter] = useState<string>('all');
   const filteredOrders = useMemo(() => {
-    if (activeTab === 'all') return todaysOrders;
-    return todaysOrders.filter((o) => o.status === activeTab);
-  }, [todaysOrders, activeTab]);
+    let base = todaysOrders;
+    if (activeTab !== 'all') {
+      base = base.filter((o) => o.status === activeTab);
+    }
+    if (tableFilter !== 'all') {
+      const tableNum = parseInt(tableFilter, 10);
+      base = base.filter((o) => o.tableNumber === tableNum);
+    }
+    if (waiterFilter !== 'all') {
+      base = base.filter((o) => o.assignedWaiterId === waiterFilter);
+    }
+    return base;
+  }, [todaysOrders, activeTab, tableFilter, waiterFilter]);
+  const tableOptions = useMemo(
+    () => Array.from(new Set(todaysOrders.map((o) => o.tableNumber))).sort((a, b) => a - b),
+    [todaysOrders]
+  );
+  const waiterOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          todaysOrders
+            .map((o) => o.assignedWaiterId)
+            .filter((id): id is string => !!id)
+        )
+      ),
+    [todaysOrders]
+  );
   const tabs = [
   {
     id: 'all',
@@ -198,6 +228,47 @@ export function SupervisorDashboard({
           </div>
         </motion.div>
         }
+
+        {/* Filters + Download */}
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
+          <div className="flex flex-wrap gap-3 items-center">
+            <FilterLinesIcon className="w-4 h-4 text-slate-400" />
+            <select
+              value={tableFilter}
+              onChange={(e) => setTableFilter(e.target.value)}
+              className="px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-amber-500"
+            >
+              <option value="all">All tables</option>
+              {tableOptions.map((t) => (
+                <option key={t} value={t}>
+                  Table {t}
+                </option>
+              ))}
+            </select>
+            <select
+              value={waiterFilter}
+              onChange={(e) => setWaiterFilter(e.target.value)}
+              className="px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-amber-500"
+            >
+              <option value="all">All waiters</option>
+              {waiterOptions.map((id) => {
+                const s = getStaffById(id);
+                return (
+                  <option key={id} value={id}>
+                    {s?.name ?? id}
+                  </option>
+                );
+              })}
+            </select>
+          </div>
+          <button
+            type="button"
+            onClick={() => downloadCsv('todays-orders.csv', buildOrdersCsv(filteredOrders))}
+            className="self-start px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-xs text-slate-100 hover:bg-slate-700"
+          >
+            Download CSV
+          </button>
+        </div>
 
         {/* Revenue Chart */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="mb-6">

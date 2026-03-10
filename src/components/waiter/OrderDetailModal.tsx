@@ -11,6 +11,7 @@ import { Modal } from '../ui/Modal';
 import { StatusBadge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { formatPrice } from '../../utils/currency';
+import { getEffectivePrice } from '../../utils/pricing';
 interface OrderDetailModalProps {
   order: Order | null;
   isOpen: boolean;
@@ -93,12 +94,12 @@ export function OrderDetailModal({
                       {item.menuItem.name}
                     </p>
                     <p className="text-sm text-slate-400">
-                      {formatPrice(item.menuItem.price)} × {item.quantity}
+                      {formatPrice(getEffectivePrice(item.menuItem))} × {item.quantity}
                     </p>
                   </div>
                 </div>
                 <span className="font-semibold text-amber-400">
-                  {formatPrice(item.menuItem.price * item.quantity)}
+                  {formatPrice(getEffectivePrice(item.menuItem) * item.quantity)}
                 </span>
               </div>
             )}

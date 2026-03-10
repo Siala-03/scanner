@@ -1,6 +1,7 @@
 import { useState, useCallback, useMemo } from 'react';
 import { Order, OrderStatus, CartItem, MenuItem } from '../types';
 import { mockOrders } from '../data/orderData';
+import { getEffectivePrice } from '../utils/pricing';
 import { decrementInventoryForOrder, ensureInventoryInitialized } from '../utils/inventoryStorage';
 
 interface UseOrdersReturn {
@@ -45,7 +46,7 @@ export function useOrders(): UseOrdersReturn {
       );
 
       const subtotal = orderItems.reduce(
-        (sum, item) => sum + item.menuItem.price * item.quantity,
+        (sum, item) => sum + getEffectivePrice(item.menuItem) * item.quantity,
         0
       );
       const serviceCharge = 0;

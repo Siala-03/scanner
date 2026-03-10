@@ -14,6 +14,7 @@ import { MenuItemCard } from '../../components/customer/MenuItemCard';
 import { Modal } from '../../components/ui/Modal';
 import { Button } from '../../components/ui/Button';
 import { formatPrice } from '../../utils/currency';
+import { getEffectivePrice } from '../../utils/pricing';
 interface MenuPageProps {
   onAddToCart: (item: MenuItem, quantity: number) => void;
 }
@@ -122,7 +123,7 @@ export function MenuPage({ onAddToCart }: MenuPageProps) {
                     {item.name}
                   </p>
                   <p className="text-amber-600 font-semibold text-sm">
-                    {formatPrice(item.price)}
+                    {formatPrice(getEffectivePrice(item))}
                   </p>
                 </motion.div>
             )}
@@ -206,7 +207,7 @@ export function MenuPage({ onAddToCart }: MenuPageProps) {
 
             <div className="flex items-center justify-between bg-slate-100 rounded-xl p-4 mb-6">
               <span className="text-2xl font-bold text-slate-900">
-                {formatPrice(selectedItem.price)}
+                {formatPrice(getEffectivePrice(selectedItem))}
               </span>
 
               <div className="flex items-center gap-3">
@@ -236,7 +237,7 @@ export function MenuPage({ onAddToCart }: MenuPageProps) {
             disabled={!selectedItem.isAvailable}>
 
               {selectedItem.isAvailable ?
-            `Add to Cart - ${formatPrice(selectedItem.price * quantity)}` :
+            `Add to Cart - ${formatPrice(getEffectivePrice(selectedItem) * quantity)}` :
             'Currently Unavailable'}
             </Button>
           </div>

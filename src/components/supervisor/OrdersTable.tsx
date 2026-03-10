@@ -78,6 +78,9 @@ export function OrdersTable({ orders, onSelectOrder }: OrdersTableProps) {
             <th className="px-4 py-4 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">
               Status
             </th>
+            <th className="px-4 py-4 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">
+              Date
+            </th>
             <HeaderCell field="createdAt">Time</HeaderCell>
           </tr>
         </thead>
@@ -86,9 +89,7 @@ export function OrdersTable({ orders, onSelectOrder }: OrdersTableProps) {
             const waiter = order.assignedWaiterId ?
             getStaffById(order.assignedWaiterId) :
             null;
-            const minutesAgo = Math.floor(
-              (Date.now() - order.createdAt.getTime()) / 60000
-            );
+            const createdAt = order.createdAt;
             return (
               <motion.tr
                 key={order.id}
@@ -117,7 +118,10 @@ export function OrdersTable({ orders, onSelectOrder }: OrdersTableProps) {
                   <StatusBadge status={order.status} />
                 </td>
                 <td className="px-4 py-3 text-sm text-slate-400">
-                  {minutesAgo}m ago
+                  {createdAt.toLocaleDateString()}
+                </td>
+                <td className="px-4 py-3 text-sm text-slate-400">
+                  {createdAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </td>
               </motion.tr>);
 

@@ -7,6 +7,7 @@ import { Button } from '../../components/ui/Button';
 import { TextArea } from '../../components/ui/Input';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { formatPrice } from '../../utils/currency';
+import { getEffectivePrice } from '../../utils/pricing';
 interface CartPageProps {
   cartItems: CartItem[];
   onUpdateQuantity: (itemId: string, quantity: number) => void;
@@ -25,7 +26,7 @@ export function CartPage({
   const [isOrdering, setIsOrdering] = useState(false);
   const [orderPlaced, setOrderPlaced] = useState(false);
   const subtotal = cartItems.reduce(
-    (sum, item) => sum + item.menuItem.price * item.quantity,
+    (sum, item) => sum + getEffectivePrice(item.menuItem) * item.quantity,
     0
   );
   const total = subtotal;

@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { PlusIcon, ClockIcon } from 'lucide-react';
 import { MenuItem } from '../../types';
 import { formatPrice } from '../../utils/currency';
+import { getEffectivePrice } from '../../utils/pricing';
 interface MenuItemCardProps {
   item: MenuItem;
   onAddToCart: (item: MenuItem) => void;
@@ -56,7 +57,7 @@ export function MenuItemCard({
         <div className="flex items-center justify-between mt-auto">
           <div>
             <span className="text-lg font-bold text-slate-900">
-              {formatPrice(item.price)}
+              {formatPrice(getEffectivePrice(item))}
             </span>
             <div className="flex items-center gap-1 text-xs text-slate-400 mt-0.5">
               <ClockIcon className="w-3 h-3" />
