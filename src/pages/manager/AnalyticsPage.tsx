@@ -71,6 +71,18 @@ export function AnalyticsPage() {
   monthlyComparison.previousMonth.orders *
   100).
   toFixed(1);
+  const currentRevenue =
+    timeRange === 'today'
+      ? weeklyRevenue[weeklyRevenue.length - 1]?.revenue ?? 0
+      : timeRange === 'week'
+      ? weeklyRevenue.reduce((s, d) => s + d.revenue, 0)
+      : monthlyComparison.currentMonth.revenue;
+  const currentOrders =
+    timeRange === 'today'
+      ? weeklyRevenue[weeklyRevenue.length - 1]?.orders ?? 0
+      : timeRange === 'week'
+      ? weeklyRevenue.reduce((s, d) => s + d.orders, 0)
+      : monthlyComparison.currentMonth.orders;
   return (
     <div className="dark min-h-screen bg-slate-900 p-4 md:p-6">
       <div className="max-w-7xl mx-auto">
@@ -97,9 +109,15 @@ export function AnalyticsPage() {
         {/* Month Comparison */}
         <div className="grid md:grid-cols-4 gap-4 mb-6">
           <Card className="bg-slate-800">
-            <p className="text-sm text-slate-400 mb-1">Monthly Revenue</p>
+            <p className="text-sm text-slate-400 mb-1">
+              {timeRange === 'today'
+                ? 'Revenue Today'
+                : timeRange === 'week'
+                ? 'Revenue This Week'
+                : 'Monthly Revenue'}
+            </p>
             <p className="text-2xl font-bold text-white">
-              {formatPrice(monthlyComparison.currentMonth.revenue)}
+              {formatPrice(currentRevenue)}
             </p>
             <div
               className={`flex items-center gap-1 text-sm mt-1 ${parseFloat(revenueChange) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
@@ -113,9 +131,15 @@ export function AnalyticsPage() {
             </div>
           </Card>
           <Card className="bg-slate-800">
-            <p className="text-sm text-slate-400 mb-1">Monthly Orders</p>
+            <p className="text-sm text-slate-400 mb-1">
+              {timeRange === 'today'
+                ? 'Orders Today'
+                : timeRange === 'week'
+                ? 'Orders This Week'
+                : 'Monthly Orders'}
+            </p>
             <p className="text-2xl font-bold text-white">
-              {monthlyComparison.currentMonth.orders.toLocaleString()}
+              {currentOrders.toLocaleString()}
             </p>
             <div
               className={`flex items-center gap-1 text-sm mt-1 ${parseFloat(ordersChange) >= 0 ? 'text-green-400' : 'text-red-400'}`}>

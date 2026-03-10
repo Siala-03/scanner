@@ -187,7 +187,7 @@ export function CustomerApp({
           scale: 0.9
         }}
         onClick={handleCallWaiterClick}
-        className={`fixed bottom-24 right-6 z-40 p-4 rounded-full shadow-xl flex items-center justify-center transition-colors ${waiterCalled ? 'bg-green-500 text-white' : 'bg-amber-500 text-white hover:bg-amber-600'}`}
+        className={`fixed bottom-24 right-6 z-40 px-4 py-3 rounded-full shadow-xl flex items-center gap-2 transition-colors ${waiterCalled ? 'bg-green-500 text-white' : 'bg-amber-500 text-white hover:bg-amber-600'}`}
         animate={
         waiterCalled ?
         {} :
@@ -204,11 +204,17 @@ export function CustomerApp({
           duration: 2
         }}>
 
-        {waiterCalled ?
-        <CheckIcon className="w-6 h-6" /> :
-
-        <BellRingIcon className="w-6 h-6" />
-        }
+        {waiterCalled ? (
+          <>
+            <CheckIcon className="w-5 h-5" />
+            <span className="text-sm font-medium">Waiter called</span>
+          </>
+        ) : (
+          <>
+            <BellRingIcon className="w-5 h-5" />
+            <span className="text-sm font-medium">Call waiter</span>
+          </>
+        )}
       </motion.button>
 
       {/* Bottom navigation */}

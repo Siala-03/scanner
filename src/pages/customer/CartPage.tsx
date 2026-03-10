@@ -28,8 +28,7 @@ export function CartPage({
     (sum, item) => sum + item.menuItem.price * item.quantity,
     0
   );
-  const serviceCharge = subtotal * 0.1;
-  const total = subtotal + serviceCharge;
+  const total = subtotal;
   const handlePlaceOrder = async () => {
     setIsOrdering(true);
     // Simulate API call
@@ -157,10 +156,6 @@ export function CartPage({
           <div className="flex justify-between text-slate-600">
             <span>Subtotal</span>
             <span>{formatPrice(subtotal)}</span>
-          </div>
-          <div className="flex justify-between text-slate-600">
-            <span>Service Charge (10%)</span>
-            <span>{formatPrice(serviceCharge)}</span>
           </div>
           <div className="flex justify-between text-xl font-bold text-slate-900 pt-2 border-t">
             <span>Total</span>

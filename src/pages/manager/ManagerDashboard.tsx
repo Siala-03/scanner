@@ -285,11 +285,7 @@ export function ManagerDashboard({ onNavigate }: ManagerDashboardProps) {
                       </div>
                     </motion.div>
                   )}
-                  {staffOnDuty.length > 4 &&
-                  <p className="text-sm text-slate-400 text-center pt-1">
-                      +{staffOnDuty.length - 4} more
-                    </p>
-                  }
+                  
                 </div>
               </div>
             </Card>

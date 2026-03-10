@@ -58,7 +58,7 @@ export function StaffManagement() {
       setNewUsername(existingCreds.username);
       setNewPassword(existingCreds.password);
     } else {
-      setNewUsername(staffMember.name.split(' ')[0].toLowerCase());
+      setNewUsername(staffMember.phone.replace(/\s+/g, ''));
       setNewPassword('');
     }
     setIsCredentialModalOpen(true);
@@ -375,8 +375,7 @@ export function StaffManagement() {
 
                   setStaff((prev) => [newStaff, ...prev]);
 
-                  const base = addForm.name.split(' ')[0]?.toLowerCase() || 'user';
-                  const username = `${base}${Math.floor(Math.random() * 90 + 10)}`;
+                  const username = addForm.phone.replace(/\s+/g, '');
                   const password = `Rw${Math.random().toString(36).slice(2, 8)}!`;
                   addStaffCredential({ staffId: id, username, password });
 

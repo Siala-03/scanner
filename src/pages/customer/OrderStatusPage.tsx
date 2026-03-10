@@ -77,7 +77,7 @@ export function OrderStatusPage({ orders, tableNumber }: OrderStatusPageProps) {
 
 
             {/* Order details */}
-            <Card className="mt-4">
+            <Card className="mt-4 bg-white">
               <div className="flex items-center justify-between mb-4">
                 <span className="font-medium text-slate-900">
                   {activeOrder.id}
@@ -157,7 +157,7 @@ export function OrderStatusPage({ orders, tableNumber }: OrderStatusPageProps) {
                         {order.items.length > 1 ? 's' : ''}
                       </div>
 
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between mt-2">
                         <div className="flex flex-col">
                           <span className="text-slate-500">Total</span>
                           <span className="font-semibold text-slate-900">

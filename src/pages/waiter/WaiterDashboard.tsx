@@ -6,7 +6,8 @@ import {
   ClockIcon,
   CheckCircleIcon,
   MapIcon,
-  TrendingUpIcon } from
+  TrendingUpIcon,
+  StarIcon } from
 'lucide-react';
 import { Order, Staff } from '../../types';
 import { Tabs } from '../../components/ui/Tabs';
@@ -16,6 +17,7 @@ import { EmptyState } from '../../components/ui/EmptyState';
 import { OrderCard } from '../../components/waiter/OrderCard';
 import { OrderDetailModal } from '../../components/waiter/OrderDetailModal';
 import { TableMapView } from './TableMapView';
+import { loadReviews } from '../../utils/reviewsStorage';
 interface WaiterDashboardProps {
   waiter: Staff;
   orders: Order[];
@@ -51,6 +53,16 @@ export function WaiterDashboard({
   const completedOrders = waiterOrders.filter((o) => o.status === 'served');
   const todayServed = completedOrders.length;
   const avgServiceTime = waiter.performance.avgServiceTime;
+  const waiterReviews = useMemo(
+    () => loadReviews().filter((r) => r.waiterId === waiter.id),
+    [waiter.id]
+  );
+  const waiterAvgRating =
+    waiterReviews.length > 0
+      ? Math.round(
+          (waiterReviews.reduce((s, r) => s + r.rating, 0) / waiterReviews.length) * 10
+        ) / 10
+      : null;
   const tabs = [
   {
     id: 'new',
@@ -173,13 +185,26 @@ export function WaiterDashboard({
         }
 
         {/* Stats */}
-        <div className="grid grid-cols-4 gap-2 mb-4">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-4">
           <Card className="bg-slate-800 p-3" padding="none">
             <div className="text-center">
               <p className="text-2xl font-bold text-amber-400">
                 {newOrders.length}
               </p>
               <p className="text-xs text-slate-400">Pending</p>
+            </div>
+          </Card>
+          <Card className="bg-slate-800 p-3 col-span-2 md:col-span-1" padding="none">
+            <div className="text-center">
+              <div className="flex items-center justify-center gap-1 text-yellow-400 mb-1">
+                <StarIcon className="w-4 h-4" />
+                <p className="text-lg font-bold">
+                  {waiterAvgRating ?? '—'}
+                </p>
+              </div>
+              <p className="text-xs text-slate-400">
+                Your rating {waiterReviews.length > 0 ? `(${waiterReviews.length})` : ''}
+              </p>
             </div>
           </Card>
           <Card className="bg-slate-800 p-3" padding="none">

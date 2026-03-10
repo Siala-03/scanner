@@ -163,8 +163,8 @@ export function App() {
       <div className="relative">
         <button
           onClick={handleBack}
-          className="fixed top-4 left-4 z-50 p-2 rounded-full bg-white shadow-md text-slate-600">
-
+          className="absolute top-4 left-4 md:top-6 md:left-6 z-50 p-2 rounded-full bg-white/90 shadow-md text-slate-600"
+          aria-label="Back">
           <ArrowLeftIcon className="w-5 h-5" />
         </button>
         <CustomerApp
@@ -182,8 +182,8 @@ export function App() {
       <div className="relative">
         <button
           onClick={handleBack}
-          className="fixed top-4 left-4 z-50 p-2 rounded-full bg-slate-800 text-white shadow-md">
-
+          className="absolute top-4 left-4 md:top-6 md:left-6 z-50 p-2 rounded-full bg-slate-800 text-white shadow-md"
+          aria-label="Back">
           <ArrowLeftIcon className="w-5 h-5" />
         </button>
         <WaiterDashboard
@@ -202,8 +202,8 @@ export function App() {
       <div className="relative">
         <button
           onClick={handleBack}
-          className="fixed top-4 left-4 z-50 p-2 rounded-full bg-slate-800 text-white shadow-md"
-        >
+          className="absolute top-4 left-4 md:top-6 md:left-6 z-50 p-2 rounded-full bg-slate-800 text-white shadow-md"
+          aria-label="Back">
           <ArrowLeftIcon className="w-5 h-5" />
         </button>
 
@@ -268,8 +268,8 @@ export function App() {
       <div className="relative">
         <button
           onClick={handleBack}
-          className="fixed top-4 left-4 z-50 p-2 rounded-full bg-slate-800 text-white shadow-md">
-
+          className="absolute top-4 left-4 md:top-6 md:left-6 z-50 p-2 rounded-full bg-slate-800 text-white shadow-md"
+          aria-label="Back">
           <ArrowLeftIcon className="w-5 h-5" />
         </button>
 

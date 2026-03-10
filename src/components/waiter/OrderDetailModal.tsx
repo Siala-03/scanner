@@ -132,6 +132,21 @@ export function OrderDetailModal({
           </div>
         </div>
 
+        {/* Print receipt (POS integration later) */}
+        <div className="flex justify-end">
+          <Button
+            variant="secondary"
+            onClick={() => {
+              try {
+                window.print();
+              } catch {
+                // no-op
+              }
+            }}>
+            Print Receipt
+          </Button>
+        </div>
+
         {/* Timestamps */}
         <div className="text-sm text-slate-400 space-y-1">
           <p>Created: {order.createdAt.toLocaleString()}</p>
