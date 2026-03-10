@@ -206,3 +206,4 @@ export interface SortConfig {
 }
 
 export * from './reviews';
+export * from './inventory';

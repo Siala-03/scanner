@@ -14,7 +14,8 @@ import {
   AlertCircleIcon,
   CheckCircleIcon,
   ChefHatIcon,
-  FlameIcon } from
+  FlameIcon,
+  PackageIcon } from
 'lucide-react';
 import {
   weeklyRevenue,
@@ -31,6 +32,8 @@ import { ActivityFeed } from '../../components/manager/ActivityFeed';
 import { ProgressBar } from '../../components/ui/ProgressBar';
 import { formatPrice } from '../../utils/currency';
 import { getAverageRating } from '../../utils/reviewsStorage';
+import { listLowStock } from '../../utils/inventoryStorage';
+import { menuItems } from '../../data/menuData';
 interface ManagerDashboardProps {
   onNavigate: (page: string) => void;
 }
@@ -50,6 +53,7 @@ export function ManagerDashboard({ onNavigate }: ManagerDashboardProps) {
   // Calculate operational metrics
   const avgServiceTime = 12;
   const operationalHealth = todaysOrders > 50 ? (todaysRevenue / todaysOrders > 15 ? 'excellent' : 'good') : 'fair';
+  const lowStock = listLowStock(menuItems);
   const healthColors = {
     excellent: 'text-green-400',
     good: 'text-blue-400',
@@ -138,6 +142,22 @@ export function ManagerDashboard({ onNavigate }: ManagerDashboardProps) {
         </div>
 
         {/* Alerts/Insights Section */}
+        {lowStock.length > 0 &&
+        <motion.div
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          className="mb-4 p-4 bg-red-500/10 border border-red-500/30 rounded-lg flex items-start gap-3">
+          <AlertCircleIcon className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-semibold text-red-300">Low stock</p>
+            <p className="text-sm text-red-200/80">
+              {lowStock.slice(0, 3).map((x) => `${x.item.name} (${x.stock})`).join(', ')}
+              {lowStock.length > 3 ? ` +${lowStock.length - 3} more` : ''}
+            </p>
+          </div>
+        </motion.div>
+        }
+
         {todaysOrders > 80 &&
         <motion.div
           initial={{ opacity: 0, x: -20 }}
@@ -256,6 +276,14 @@ export function ManagerDashboard({ onNavigate }: ManagerDashboardProps) {
 
                   <QrCodeIcon className="w-5 h-5" />
                   Print Table QRs
+                </Button>
+                <Button
+                  variant="secondary"
+                  fullWidth
+                  onClick={() => onNavigate('inventory')}
+                  className="justify-start">
+                  <PackageIcon className="w-5 h-5" />
+                  Inventory
                 </Button>
               </div>
 

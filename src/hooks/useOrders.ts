@@ -1,6 +1,7 @@
 import { useState, useCallback, useMemo } from 'react';
 import { Order, OrderStatus, CartItem, MenuItem } from '../types';
 import { mockOrders } from '../data/orderData';
+import { decrementInventoryForOrder, ensureInventoryInitialized } from '../utils/inventoryStorage';
 
 interface UseOrdersReturn {
   orders: Order[];
@@ -32,11 +33,16 @@ export function useOrders(): UseOrdersReturn {
     items: CartItem[],
     specialInstructions?: string)
     : Order => {
+      ensureInventoryInitialized();
       const orderItems = items.map((item) => ({
         menuItem: item.menuItem,
         quantity: item.quantity,
         specialInstructions: item.specialInstructions
       }));
+
+      decrementInventoryForOrder(
+        orderItems.map((i) => ({ menuItemId: i.menuItem.id, quantity: i.quantity }))
+      );
 
       const subtotal = orderItems.reduce(
         (sum, item) => sum + item.menuItem.price * item.quantity,

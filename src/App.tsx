@@ -14,13 +14,14 @@ import { MenuManagement } from './pages/manager/MenuManagement';
 import { StaffManagement } from './pages/manager/StaffManagement';
 import { AnalyticsPage } from './pages/manager/AnalyticsPage';
 import { QRCodeGenerator } from './pages/manager/QRCodeGenerator';
+import { InventoryManagement } from './pages/shared/InventoryManagement';
 import { LoginPage } from './pages/auth/LoginPage';
 import { Card } from './components/ui/Card';
 import { Button } from './components/ui/Button';
 import { Staff } from './types';
 type UserRole = 'customer' | 'waiter' | 'supervisor' | 'manager' | null;
-type ManagerPage = 'dashboard' | 'menu' | 'staff' | 'analytics' | 'qrcodes';
-type SupervisorPage = 'dashboard' | 'revenue' | 'staff' | 'qrcodes';
+type ManagerPage = 'dashboard' | 'menu' | 'staff' | 'analytics' | 'qrcodes' | 'inventory';
+type SupervisorPage = 'dashboard' | 'revenue' | 'staff' | 'qrcodes' | 'inventory';
 export function App() {
   const [selectedRole, setSelectedRole] = useState<UserRole>(null);
   const [authUser, setAuthUser] = useState<Staff | null>(null);
@@ -237,6 +238,13 @@ export function App() {
             >
               QR Codes
             </Button>
+            <Button
+              variant={supervisorPage === 'inventory' ? 'primary' : 'ghost'}
+              size="sm"
+              onClick={() => setSupervisorPage('inventory')}
+            >
+              Inventory
+            </Button>
           </div>
         </div>
 
@@ -259,6 +267,7 @@ export function App() {
             }}
           />
         )}
+        {supervisorPage === 'inventory' && <InventoryManagement />}
       </div>
     );
   }
@@ -281,6 +290,7 @@ export function App() {
         {managerPage === 'menu' && <MenuManagement />}
         {managerPage === 'staff' && <StaffManagement />}
         {managerPage === 'analytics' && <AnalyticsPage />}
+        {managerPage === 'inventory' && <InventoryManagement />}
         {managerPage === 'qrcodes' && (
           <QRCodeGenerator
             tables={tables}

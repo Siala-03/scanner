@@ -9,7 +9,8 @@ import {
   AlertTriangleIcon,
   CheckCircleIcon,
   ZapIcon,
-  StarIcon } from
+  StarIcon,
+  AlertCircleIcon } from
 'lucide-react';
 import { Order, OrderStatus } from '../../types';
 import { weeklyRevenue, todayKPIs } from '../../data/analyticsData';
@@ -21,6 +22,8 @@ import { OrdersTable } from '../../components/supervisor/OrdersTable';
 import { OrderDetailModal } from '../../components/waiter/OrderDetailModal';
 import { formatPrice } from '../../utils/currency';
 import { getAverageRating } from '../../utils/reviewsStorage';
+import { listLowStock } from '../../utils/inventoryStorage';
+import { menuItems } from '../../data/menuData';
 interface SupervisorDashboardProps {
   orders: Order[];
   onUpdateOrderStatus: (
@@ -52,6 +55,7 @@ export function SupervisorDashboard({
   todaysRevenue / todaysOrders.filter((o) => o.status === 'served').length :
   0;
   const avgRating = getAverageRating();
+  const lowStock = listLowStock(menuItems);
   const filteredOrders = useMemo(() => {
     if (activeTab === 'all') return todaysOrders;
     return todaysOrders.filter((o) => o.status === activeTab);
@@ -149,6 +153,22 @@ export function SupervisorDashboard({
         </div>
 
         {/* Alerts Section */}
+        {lowStock.length > 0 &&
+        <motion.div
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          className="mb-4 p-4 bg-red-500/10 border border-red-500/30 rounded-lg flex items-start gap-3">
+          <AlertCircleIcon className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-semibold text-red-300">Low stock</p>
+            <p className="text-sm text-red-200/80">
+              {lowStock.slice(0, 3).map((x) => `${x.item.name} (${x.stock})`).join(', ')}
+              {lowStock.length > 3 ? ` +${lowStock.length - 3} more` : ''}
+            </p>
+          </div>
+        </motion.div>
+        }
+
         {todaysOrders.filter((o) => o.status === 'pending').length > 10 &&
         <motion.div
           initial={{ opacity: 0, x: -20 }}
