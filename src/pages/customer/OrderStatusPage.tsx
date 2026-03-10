@@ -3,10 +3,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ClockIcon, ReceiptIcon } from 'lucide-react';
 import { Order, OrderStatus } from '../../types';
 import { OrderTracker } from '../../components/customer/OrderTracker';
+import { ServiceReviewModal } from '../../components/customer/ServiceReviewModal';
 import { Card } from '../../components/ui/Card';
 import { StatusBadge } from '../../components/ui/Badge';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { formatPrice } from '../../utils/currency';
+import { hasReviewForOrder } from '../../utils/reviewsStorage';
 interface OrderStatusPageProps {
   orders: Order[];
   tableNumber: number;
@@ -21,6 +23,7 @@ export function OrderStatusPage({ orders, tableNumber }: OrderStatusPageProps) {
   const pastOrders = tableOrders.filter((order) =>
   ['served', 'cancelled'].includes(order.status)
   );
+  const [reviewingOrder, setReviewingOrder] = useState<Order | null>(null);
   // Simulate order progression for demo
   const [simulatedStatus, setSimulatedStatus] = useState<OrderStatus>(
     activeOrder?.status || 'pending'
@@ -154,11 +157,22 @@ export function OrderStatusPage({ orders, tableNumber }: OrderStatusPageProps) {
                         {order.items.length > 1 ? 's' : ''}
                       </div>
 
-                      <div className="flex justify-between">
-                        <span className="text-slate-500">Total</span>
-                        <span className="font-semibold text-slate-900">
-                          {formatPrice(order.total)}
-                        </span>
+                      <div className="flex items-center justify-between">
+                        <div className="flex flex-col">
+                          <span className="text-slate-500">Total</span>
+                          <span className="font-semibold text-slate-900">
+                            {formatPrice(order.total)}
+                          </span>
+                        </div>
+                        {order.status === 'served' && !hasReviewForOrder(order.id) && (
+                          <button
+                            type="button"
+                            onClick={() => setReviewingOrder(order)}
+                            className="px-3 py-2 rounded-lg bg-amber-500 text-white text-sm font-medium hover:bg-amber-600 transition-colors"
+                          >
+                            Rate service
+                          </button>
+                        )}
                       </div>
                     </Card>
                   </motion.div>
@@ -168,6 +182,11 @@ export function OrderStatusPage({ orders, tableNumber }: OrderStatusPageProps) {
           </div>
         }
       </div>
+      <ServiceReviewModal
+        order={reviewingOrder}
+        isOpen={!!reviewingOrder}
+        onClose={() => setReviewingOrder(null)}
+      />
     </div>);
 
 }

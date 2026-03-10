@@ -67,8 +67,8 @@ export function App() {
     [addOrder]
   );
   const handleUpdateOrderStatus = useCallback(
-    (orderId: string, status: OrderStatus) => {
-      updateOrderStatus(orderId, status);
+    (orderId: string, status: OrderStatus, opts?: { assignedWaiterId?: string }) => {
+      updateOrderStatus(orderId, status, opts);
     },
     [updateOrderStatus]
   );

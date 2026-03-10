@@ -41,7 +41,7 @@ export function KPICard({
     <motion.div
       whileHover={{ scale: 1.02 }}
       transition={{ type: 'spring', stiffness: 400, damping: 10 }}>
-      <Card className={`bg-gradient-to-br from-slate-800 to-slate-800/50 border border-slate-700/50 hover:border-slate-600/50 transition cursor-default ${className}`}>
+      <Card className={`min-h-[110px] bg-gradient-to-br from-slate-800 to-slate-800/50 border border-slate-700/50 hover:border-slate-600/50 transition cursor-default ${className}`}>
         <div className="flex items-start justify-between mb-3">
           {icon &&
           <motion.div

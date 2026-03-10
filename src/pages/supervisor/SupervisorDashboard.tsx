@@ -8,7 +8,8 @@ import {
   FilterIcon,
   AlertTriangleIcon,
   CheckCircleIcon,
-  ZapIcon } from
+  ZapIcon,
+  StarIcon } from
 'lucide-react';
 import { Order, OrderStatus } from '../../types';
 import { weeklyRevenue, todayKPIs } from '../../data/analyticsData';
@@ -19,9 +20,14 @@ import { RevenueChart } from '../../components/supervisor/RevenueChart';
 import { OrdersTable } from '../../components/supervisor/OrdersTable';
 import { OrderDetailModal } from '../../components/waiter/OrderDetailModal';
 import { formatPrice } from '../../utils/currency';
+import { getAverageRating } from '../../utils/reviewsStorage';
 interface SupervisorDashboardProps {
   orders: Order[];
-  onUpdateOrderStatus: (orderId: string, status: OrderStatus) => void;
+  onUpdateOrderStatus: (
+    orderId: string,
+    status: OrderStatus,
+    opts?: { assignedWaiterId?: string }
+  ) => void;
 }
 export function SupervisorDashboard({
   orders,
@@ -45,6 +51,7 @@ export function SupervisorDashboard({
   todaysOrders.length > 0 ?
   todaysRevenue / todaysOrders.filter((o) => o.status === 'served').length :
   0;
+  const avgRating = getAverageRating();
   const filteredOrders = useMemo(() => {
     if (activeTab === 'all') return todaysOrders;
     return todaysOrders.filter((o) => o.status === activeTab);
@@ -95,7 +102,7 @@ export function SupervisorDashboard({
         </div>
 
         {/* KPI Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 md:gap-4 mb-6">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0 }}>
             <KPICard
               label="Revenue Today"
@@ -130,6 +137,14 @@ export function SupervisorDashboard({
               change={-15.3}
               trend="up"
               icon={<ClockIcon className="w-5 h-5" />} />
+          </motion.div>
+
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+            <KPICard
+              label="Customer Rating"
+              value={avgRating ?? '—'}
+              trend="neutral"
+              icon={<StarIcon className="w-5 h-5" />} />
           </motion.div>
         </div>
 

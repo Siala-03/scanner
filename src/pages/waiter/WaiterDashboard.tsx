@@ -21,7 +21,8 @@ interface WaiterDashboardProps {
   orders: Order[];
   onUpdateOrderStatus: (
   orderId: string,
-  status: 'verified' | 'preparing' | 'ready' | 'served' | 'cancelled')
+  status: 'verified' | 'preparing' | 'ready' | 'served' | 'cancelled',
+  opts?: { assignedWaiterId?: string })
   => void;
   waiterCalls?: {
     tableNumber: number;
@@ -68,18 +69,21 @@ export function WaiterDashboard({
   }];
 
   const handleApprove = (orderId: string) => {
-    onUpdateOrderStatus(orderId, 'verified');
+    onUpdateOrderStatus(orderId, 'verified', { assignedWaiterId: waiter.id });
     // Simulate kitchen starting to prepare
-    setTimeout(() => onUpdateOrderStatus(orderId, 'preparing'), 2000);
+    setTimeout(
+      () => onUpdateOrderStatus(orderId, 'preparing', { assignedWaiterId: waiter.id }),
+      2000
+    );
   };
   const handleReject = (orderId: string) => {
-    onUpdateOrderStatus(orderId, 'cancelled');
+    onUpdateOrderStatus(orderId, 'cancelled', { assignedWaiterId: waiter.id });
   };
   const handleMarkReady = (orderId: string) => {
-    onUpdateOrderStatus(orderId, 'ready');
+    onUpdateOrderStatus(orderId, 'ready', { assignedWaiterId: waiter.id });
   };
   const handleMarkServed = (orderId: string) => {
-    onUpdateOrderStatus(orderId, 'served');
+    onUpdateOrderStatus(orderId, 'served', { assignedWaiterId: waiter.id });
   };
   if (showTableMap) {
     return (

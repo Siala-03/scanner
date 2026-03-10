@@ -1,6 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { MenuItem, MenuCategory } from '../../types';
-import { menuCategories } from '../../data/menuData';
+import React, { useEffect, useMemo, useState } from 'react';
+import { MenuItem, MenuCategory, MenuCategoryInfo } from '../../types';
 import { Modal } from '../ui/Modal';
 import { Input, TextArea } from '../ui/Input';
 import { Button } from '../ui/Button';
@@ -9,6 +8,8 @@ interface MenuItemEditorProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (item: Partial<MenuItem>) => void;
+  categories: MenuCategoryInfo[];
+  onAddCategory: (category: { id: string; name: string; emoji: string }) => void;
 }
 const EMOJI_OPTIONS = [
 '🍔',
@@ -34,7 +35,9 @@ export function MenuItemEditor({
   item,
   isOpen,
   onClose,
-  onSave
+  onSave,
+  categories,
+  onAddCategory
 }: MenuItemEditorProps) {
   const [formData, setFormData] = useState({
     name: '',
@@ -46,6 +49,10 @@ export function MenuItemEditor({
     isAvailable: true,
     isPopular: false
   });
+  const [categoryMode, setCategoryMode] = useState<'existing' | 'new'>('existing');
+  const [newCategory, setNewCategory] = useState({ id: '', name: '', emoji: '🍽️' });
+
+  const categoryOptions = useMemo(() => categories, [categories]);
   useEffect(() => {
     if (item) {
       setFormData({
@@ -58,6 +65,8 @@ export function MenuItemEditor({
         isAvailable: item.isAvailable,
         isPopular: item.isPopular
       });
+      setCategoryMode('existing');
+      setNewCategory({ id: '', name: '', emoji: '🍽️' });
     } else {
       setFormData({
         name: '',
@@ -69,15 +78,27 @@ export function MenuItemEditor({
         isAvailable: true,
         isPopular: false
       });
+      setCategoryMode('existing');
+      setNewCategory({ id: '', name: '', emoji: '🍽️' });
     }
   }, [item, isOpen]);
   const handleSubmit = () => {
+    let categoryToSave: MenuCategory = formData.category;
+    if (categoryMode === 'new') {
+      const id = newCategory.id.trim();
+      const name = newCategory.name.trim();
+      const emoji = newCategory.emoji.trim();
+      if (id && name && emoji) {
+        onAddCategory({ id, name, emoji });
+        categoryToSave = id as MenuCategory;
+      }
+    }
     onSave({
       ...item,
       name: formData.name,
       description: formData.description,
       price: parseFloat(formData.price),
-      category: formData.category,
+      category: categoryToSave,
       emoji: formData.emoji,
       prepTime: parseInt(formData.prepTime),
       isAvailable: formData.isAvailable,
@@ -175,6 +196,60 @@ export function MenuItemEditor({
           <label className="block text-sm font-medium text-slate-300 mb-2">
             Category
           </label>
+          <div className="flex gap-2 mb-2">
+            <button
+              type="button"
+              onClick={() => setCategoryMode('existing')}
+              className={`px-3 py-2 rounded-lg text-sm border ${
+                categoryMode === 'existing'
+                  ? 'bg-amber-500/20 border-amber-500 text-amber-300'
+                  : 'bg-slate-700 border-slate-600 text-slate-300 hover:bg-slate-600'
+              }`}
+            >
+              Pick existing
+            </button>
+            <button
+              type="button"
+              onClick={() => setCategoryMode('new')}
+              className={`px-3 py-2 rounded-lg text-sm border ${
+                categoryMode === 'new'
+                  ? 'bg-amber-500/20 border-amber-500 text-amber-300'
+                  : 'bg-slate-700 border-slate-600 text-slate-300 hover:bg-slate-600'
+              }`}
+            >
+              Add new category
+            </button>
+          </div>
+
+          {categoryMode === 'new' && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+              <Input
+                label="Category ID"
+                value={newCategory.id}
+                onChange={(e) =>
+                  setNewCategory((p) => ({ ...p, id: e.target.value }))
+                }
+                placeholder="e.g. desserts"
+              />
+              <Input
+                label="Name"
+                value={newCategory.name}
+                onChange={(e) =>
+                  setNewCategory((p) => ({ ...p, name: e.target.value }))
+                }
+                placeholder="e.g. Desserts"
+              />
+              <Input
+                label="Emoji"
+                value={newCategory.emoji}
+                onChange={(e) =>
+                  setNewCategory((p) => ({ ...p, emoji: e.target.value }))
+                }
+                placeholder="🍰"
+              />
+            </div>
+          )}
+
           <select
             value={formData.category}
             onChange={(e) =>
@@ -185,7 +260,7 @@ export function MenuItemEditor({
             }
             className="w-full px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white focus:outline-none focus:ring-2 focus:ring-amber-500">
 
-            {menuCategories.map((cat) =>
+            {categoryOptions.map((cat) =>
             <option key={cat.id} value={cat.id}>
                 {cat.emoji} {cat.name}
               </option>

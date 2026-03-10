@@ -9,7 +9,11 @@ interface UseOrdersReturn {
   items: CartItem[],
   specialInstructions?: string)
   => Order;
-  updateOrderStatus: (orderId: string, status: OrderStatus) => void;
+  updateOrderStatus: (
+    orderId: string,
+    status: OrderStatus,
+    opts?: { assignedWaiterId?: string }
+  ) => void;
   getOrdersByTable: (tableNumber: number) => Order[];
   getOrdersByWaiter: (waiterId: string) => Order[];
   getPendingOrders: () => Order[];
@@ -38,8 +42,8 @@ export function useOrders(): UseOrdersReturn {
         (sum, item) => sum + item.menuItem.price * item.quantity,
         0
       );
-      const serviceCharge = subtotal * 0.1;
-      const total = subtotal + serviceCharge;
+      const serviceCharge = 0;
+      const total = subtotal;
 
       const requiresKitchen = orderItems.some((item) =>
       ['breakfast', 'lunch', 'dinner'].includes(item.menuItem.category)
@@ -66,14 +70,15 @@ export function useOrders(): UseOrdersReturn {
   );
 
   const updateOrderStatus = useCallback(
-    (orderId: string, status: OrderStatus) => {
+    (orderId: string, status: OrderStatus, opts?: { assignedWaiterId?: string }) => {
       setOrders((prev) =>
       prev.map((order) => {
         if (order.id !== orderId) return order;
 
         const updates: Partial<Order> = {
           status,
-          updatedAt: new Date()
+          updatedAt: new Date(),
+          assignedWaiterId: opts?.assignedWaiterId ?? order.assignedWaiterId
         };
 
         if (status === 'verified') updates.verifiedAt = new Date();

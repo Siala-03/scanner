@@ -24,10 +24,24 @@ export function StaffManagement() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedRole, setSelectedRole] = useState<StaffRole | 'all'>('all');
   const [isCredentialModalOpen, setIsCredentialModalOpen] = useState(false);
+  const [isAddStaffOpen, setIsAddStaffOpen] = useState(false);
   const [selectedStaffForCreds, setSelectedStaffForCreds] =
   useState<Staff | null>(null);
   const [newUsername, setNewUsername] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [addForm, setAddForm] = useState<{
+    name: string;
+    role: StaffRole;
+    email: string;
+    phone: string;
+    assignedTables: string;
+  }>({
+    name: '',
+    role: 'waiter',
+    email: '',
+    phone: '',
+    assignedTables: ''
+  });
   const filteredStaff = staff.filter((s) => {
     const matchesSearch =
     s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -42,7 +56,7 @@ export function StaffManagement() {
     );
     if (existingCreds) {
       setNewUsername(existingCreds.username);
-      setNewPassword('********'); // Don't show actual password
+      setNewPassword(existingCreds.password);
     } else {
       setNewUsername(staffMember.name.split(' ')[0].toLowerCase());
       setNewPassword('');
@@ -53,8 +67,7 @@ export function StaffManagement() {
     if (
     selectedStaffForCreds &&
     newUsername &&
-    newPassword &&
-    newPassword !== '********')
+    newPassword)
     {
       const newCred: StaffCredentials = {
         staffId: selectedStaffForCreds.id,
@@ -85,7 +98,7 @@ export function StaffManagement() {
               {staff.filter((s) => s.isOnDuty).length} staff on duty
             </p>
           </div>
-          <Button variant="primary">
+          <Button variant="primary" onClick={() => setIsAddStaffOpen(true)}>
             <PlusIcon className="w-5 h-5" />
             Add Staff
           </Button>
@@ -120,12 +133,16 @@ export function StaffManagement() {
                 Kitchen
               </Button>
               <Button
-                variant={
-                selectedRole === 'management' ? 'primary' : 'secondary'
-                }
-                onClick={() => setSelectedRole('management')}>
+                variant={selectedRole === 'supervisor' ? 'primary' : 'secondary'}
+                onClick={() => setSelectedRole('supervisor')}>
 
-                Management
+                Supervisors
+              </Button>
+              <Button
+                variant={selectedRole === 'manager' ? 'primary' : 'secondary'}
+                onClick={() => setSelectedRole('manager')}>
+
+                Managers
               </Button>
             </div>
           </div>
@@ -259,6 +276,126 @@ export function StaffManagement() {
                 disabled={!newUsername || !newPassword}>
 
                 Save Credentials
+              </Button>
+            </div>
+          </div>
+        </Modal>
+
+        {/* Add Staff Modal */}
+        <Modal
+          isOpen={isAddStaffOpen}
+          onClose={() => setIsAddStaffOpen(false)}
+          title="Add Staff Member"
+        >
+          <div className="space-y-4">
+            <Input
+              label="Full Name"
+              value={addForm.name}
+              onChange={(e) => setAddForm((p) => ({ ...p, name: e.target.value }))}
+              placeholder="e.g. Aline Mukamana"
+            />
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-2">
+                Role
+              </label>
+              <select
+                value={addForm.role}
+                onChange={(e) =>
+                  setAddForm((p) => ({ ...p, role: e.target.value as StaffRole }))
+                }
+                className="w-full px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+              >
+                <option value="waiter">Waiter</option>
+                <option value="kitchen">Kitchen</option>
+                <option value="supervisor">Supervisor</option>
+                <option value="manager">Manager</option>
+              </select>
+            </div>
+            <Input
+              label="Email"
+              value={addForm.email}
+              onChange={(e) => setAddForm((p) => ({ ...p, email: e.target.value }))}
+              placeholder="e.g. aline@serv.rw"
+            />
+            <Input
+              label="Phone"
+              value={addForm.phone}
+              onChange={(e) => setAddForm((p) => ({ ...p, phone: e.target.value }))}
+              placeholder="e.g. +250 78 123 4567"
+            />
+            {addForm.role === 'waiter' && (
+              <Input
+                label="Assigned Tables (comma separated)"
+                value={addForm.assignedTables}
+                onChange={(e) =>
+                  setAddForm((p) => ({ ...p, assignedTables: e.target.value }))
+                }
+                placeholder="e.g. 1,2,3"
+              />
+            )}
+
+            <div className="flex gap-3 pt-4">
+              <Button
+                variant="secondary"
+                fullWidth
+                onClick={() => setIsAddStaffOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                fullWidth
+                onClick={() => {
+                  if (!addForm.name || !addForm.email || !addForm.phone) return;
+                  const id = `staff-${Date.now()}`;
+                  const assignedTables =
+                    addForm.role === 'waiter'
+                      ? addForm.assignedTables
+                          .split(',')
+                          .map((s) => parseInt(s.trim(), 10))
+                          .filter((n) => !Number.isNaN(n))
+                      : [];
+                  const newStaff: Staff = {
+                    id,
+                    name: addForm.name,
+                    role: addForm.role,
+                    email: addForm.email,
+                    phone: addForm.phone,
+                    isOnDuty: true,
+                    assignedTables,
+                    performance: {
+                      ordersServed: 0,
+                      avgServiceTime: 0,
+                      rating: 5,
+                      totalRevenue: 0,
+                      shiftsThisWeek: 0
+                    },
+                    hireDate: new Date()
+                  };
+
+                  setStaff((prev) => [newStaff, ...prev]);
+
+                  const base = addForm.name.split(' ')[0]?.toLowerCase() || 'user';
+                  const username = `${base}${Math.floor(Math.random() * 90 + 10)}`;
+                  const password = `Rw${Math.random().toString(36).slice(2, 8)}!`;
+                  addStaffCredential({ staffId: id, username, password });
+
+                  setSelectedStaffForCreds(newStaff);
+                  setNewUsername(username);
+                  setNewPassword(password);
+                  setIsAddStaffOpen(false);
+                  setIsCredentialModalOpen(true);
+                  setAddForm({
+                    name: '',
+                    role: 'waiter',
+                    email: '',
+                    phone: '',
+                    assignedTables: ''
+                  });
+                }}
+                disabled={!addForm.name || !addForm.email || !addForm.phone}
+              >
+                Create + Generate Login
               </Button>
             </div>
           </div>

@@ -152,12 +152,12 @@ export function LoginPage({ role, onLogin, onBack }: LoginPageProps) {
           {/* Demo helper text */}
           <div className="mt-6 p-4 bg-amber-500/10 border border-amber-500/20 rounded-lg text-sm text-amber-400/80 text-center">
             <p className="font-medium mb-1">Demo Credentials:</p>
-            {role === 'waiter' && <p>Username: marcus / Password: waiter123</p>}
+            {role === 'waiter' && <p>Username: jeanpaul / Password: waiter123</p>}
             {role === 'supervisor' &&
-            <p>Username: michael / Password: super123</p>
+            <p>Username: diane / Password: super123</p>
             }
             {role === 'manager' &&
-            <p>Username: jennifer / Password: manager123</p>
+            <p>Username: patrick / Password: manager123</p>
             }
           </div>
         </form>

@@ -30,6 +30,7 @@ import { RevenueChart } from '../../components/supervisor/RevenueChart';
 import { ActivityFeed } from '../../components/manager/ActivityFeed';
 import { ProgressBar } from '../../components/ui/ProgressBar';
 import { formatPrice } from '../../utils/currency';
+import { getAverageRating } from '../../utils/reviewsStorage';
 interface ManagerDashboardProps {
   onNavigate: (page: string) => void;
 }
@@ -37,6 +38,7 @@ export function ManagerDashboard({ onNavigate }: ManagerDashboardProps) {
   const staffOnDuty = getStaffOnDuty();
   const todaysRevenue = weeklyRevenue[weeklyRevenue.length - 1]?.revenue || 0;
   const todaysOrders = weeklyRevenue[weeklyRevenue.length - 1]?.orders || 0;
+  const avgRating = getAverageRating();
   const now = new Date();
   const greeting =
   now.getHours() < 12 ?
@@ -119,7 +121,7 @@ export function ManagerDashboard({ onNavigate }: ManagerDashboardProps) {
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
             <KPICard
               label="Customer Rating"
-              value="4.8"
+              value={avgRating ?? '—'}
               change={3.2}
               trend="up"
               icon={<StarIcon className="w-5 h-5" />} />
@@ -186,9 +188,14 @@ export function ManagerDashboard({ onNavigate }: ManagerDashboardProps) {
                       className="mt-1" />
 
                     </div>
-                    <span className="text-sm text-amber-400 font-medium whitespace-nowrap">
-                      {item.orderCount}
-                    </span>
+                    <div className="text-right whitespace-nowrap">
+                      <div className="text-sm text-amber-400 font-semibold">
+                        {formatPrice(item.revenue)}
+                      </div>
+                      <div className="text-xs text-slate-400">
+                        {item.orderCount} orders
+                      </div>
+                    </div>
                   </motion.div>
                 )}
               </div>

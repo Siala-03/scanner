@@ -3,10 +3,10 @@ import { Staff, WaiterAssignment, StaffCredentials } from '../types';
 export const mockStaff: Staff[] = [
 {
   id: 'staff-001',
-  name: 'Marcus Johnson',
+  name: 'Jean Paul Nkurunziza',
   role: 'waiter',
-  email: 'marcus.j@restaurant.com',
-  phone: '+1 555-0101',
+  email: 'jeanpaul@serv.rw',
+  phone: '+250 78 201 0101',
   isOnDuty: true,
   assignedTables: [1, 2, 3, 4, 5],
   performance: {
@@ -20,10 +20,10 @@ export const mockStaff: Staff[] = [
 },
 {
   id: 'staff-002',
-  name: 'Sarah Chen',
+  name: 'Aline Mukamana',
   role: 'waiter',
-  email: 'sarah.c@restaurant.com',
-  phone: '+1 555-0102',
+  email: 'aline@serv.rw',
+  phone: '+250 78 201 0102',
   isOnDuty: true,
   assignedTables: [6, 7, 8, 9, 10],
   performance: {
@@ -37,10 +37,10 @@ export const mockStaff: Staff[] = [
 },
 {
   id: 'staff-003',
-  name: 'David Williams',
+  name: 'Eric Habimana',
   role: 'waiter',
-  email: 'david.w@restaurant.com',
-  phone: '+1 555-0103',
+  email: 'eric.h@serv.rw',
+  phone: '+250 78 201 0103',
   isOnDuty: true,
   assignedTables: [11, 12, 13, 14, 15],
   performance: {
@@ -54,10 +54,10 @@ export const mockStaff: Staff[] = [
 },
 {
   id: 'staff-004',
-  name: 'Emily Rodriguez',
+  name: 'Chantal Uwimana',
   role: 'waiter',
-  email: 'emily.r@restaurant.com',
-  phone: '+1 555-0104',
+  email: 'chantal@serv.rw',
+  phone: '+250 78 201 0104',
   isOnDuty: false,
   assignedTables: [16, 17, 18, 19, 20],
   performance: {
@@ -71,10 +71,10 @@ export const mockStaff: Staff[] = [
 },
 {
   id: 'staff-005',
-  name: 'Michael Thompson',
+  name: 'Diane Uwamahoro',
   role: 'supervisor',
-  email: 'michael.t@restaurant.com',
-  phone: '+1 555-0105',
+  email: 'diane@serv.rw',
+  phone: '+250 78 201 0105',
   isOnDuty: true,
   assignedTables: [],
   performance: {
@@ -88,10 +88,10 @@ export const mockStaff: Staff[] = [
 },
 {
   id: 'staff-006',
-  name: 'Jennifer Martinez',
+  name: 'Patrick Nzabonimpa',
   role: 'manager',
-  email: 'jennifer.m@restaurant.com',
-  phone: '+1 555-0106',
+  email: 'patrick@serv.rw',
+  phone: '+250 78 201 0106',
   isOnDuty: true,
   assignedTables: [],
   performance: {
@@ -105,10 +105,10 @@ export const mockStaff: Staff[] = [
 },
 {
   id: 'staff-007',
-  name: 'Carlos Garcia',
+  name: 'Moses Niyonzima',
   role: 'kitchen',
-  email: 'carlos.g@restaurant.com',
-  phone: '+1 555-0107',
+  email: 'moses.kitchen@serv.rw',
+  phone: '+250 78 201 0107',
   isOnDuty: true,
   assignedTables: [],
   performance: {
@@ -122,10 +122,10 @@ export const mockStaff: Staff[] = [
 },
 {
   id: 'staff-008',
-  name: 'Lisa Park',
+  name: 'Sandrine Ingabire',
   role: 'kitchen',
-  email: 'lisa.p@restaurant.com',
-  phone: '+1 555-0108',
+  email: 'sandrine.kitchen@serv.rw',
+  phone: '+250 78 201 0108',
   isOnDuty: true,
   assignedTables: [],
   performance: {
@@ -167,12 +167,12 @@ export const mockWaiterAssignments: WaiterAssignment[] = [
 
 
 export const staffCredentials: StaffCredentials[] = [
-{ staffId: 'staff-001', username: 'marcus', password: 'waiter123' },
-{ staffId: 'staff-002', username: 'sarah', password: 'waiter123' },
-{ staffId: 'staff-003', username: 'david', password: 'waiter123' },
-{ staffId: 'staff-004', username: 'emily', password: 'waiter123' },
-{ staffId: 'staff-005', username: 'michael', password: 'super123' },
-{ staffId: 'staff-006', username: 'jennifer', password: 'manager123' }];
+{ staffId: 'staff-001', username: 'jeanpaul', password: 'waiter123' },
+{ staffId: 'staff-002', username: 'aline', password: 'waiter123' },
+{ staffId: 'staff-003', username: 'eric', password: 'waiter123' },
+{ staffId: 'staff-004', username: 'chantal', password: 'waiter123' },
+{ staffId: 'staff-005', username: 'diane', password: 'super123' },
+{ staffId: 'staff-006', username: 'patrick', password: 'manager123' }];
 
 
 export const validateLogin = (

@@ -23,6 +23,7 @@ import { formatPrice } from '../../utils/currency';
 export function MenuManagement() {
   const [menuItemsState, setMenuItemsState] =
   useState<MenuItem[]>(initialMenuItems);
+  const [categoriesState, setCategoriesState] = useState(menuCategories);
   const [activeCategory, setActiveCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
@@ -32,7 +33,7 @@ export function MenuManagement() {
     id: 'all',
     label: 'All Items'
   },
-  ...menuCategories.map((c) => ({
+  ...categoriesState.map((c) => ({
     id: c.id,
     label: c.name
   }))];
@@ -197,7 +198,7 @@ export function MenuManagement() {
 
                   <div className="flex items-center justify-between text-sm text-slate-400 mb-4">
                     <span>
-                      {menuCategories.find((c) => c.id === item.category)?.name}
+                      {categoriesState.find((c) => c.id === item.category)?.name}
                     </span>
                     <span>{item.prepTime} min prep</span>
                   </div>
@@ -254,7 +255,15 @@ export function MenuManagement() {
           item={editingItem}
           isOpen={isEditorOpen}
           onClose={() => setIsEditorOpen(false)}
-          onSave={handleSaveItem} />
+          onSave={handleSaveItem}
+          categories={categoriesState}
+          onAddCategory={(cat) => {
+            setCategoriesState((prev) => {
+              if (prev.some((c) => c.id === (cat.id as any))) return prev;
+              return [...prev, { id: cat.id as any, name: cat.name, emoji: cat.emoji }];
+            });
+          }}
+        />
 
       </div>
     </div>);

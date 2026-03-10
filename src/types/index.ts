@@ -16,13 +16,14 @@ export interface MenuItem {
 }
 
 export type MenuCategory =
-'alcoholic-drinks' |
-'beers' |
-'wine' |
-'soft-drinks' |
-'breakfast' |
-'lunch' |
-'dinner';
+  | 'alcoholic-drinks'
+  | 'beers'
+  | 'wine'
+  | 'soft-drinks'
+  | 'breakfast'
+  | 'lunch'
+  | 'dinner'
+  | (string & {});
 
 export interface MenuCategoryInfo {
   id: MenuCategory;
@@ -203,3 +204,5 @@ export interface SortConfig {
   field: string;
   direction: SortDirection;
 }
+
+export * from './reviews';

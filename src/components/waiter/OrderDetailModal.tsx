@@ -125,10 +125,6 @@ export function OrderDetailModal({
               <span>Subtotal</span>
               <span>{formatPrice(order.subtotal)}</span>
             </div>
-            <div className="flex justify-between text-slate-400">
-              <span>Service Charge (10%)</span>
-              <span>{formatPrice(order.serviceCharge)}</span>
-            </div>
             <div className="flex justify-between text-xl font-bold text-white pt-2 border-t border-slate-600">
               <span>Total</span>
               <span className="text-amber-400">{formatPrice(order.total)}</span>
