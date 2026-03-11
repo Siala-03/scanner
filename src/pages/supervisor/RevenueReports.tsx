@@ -246,9 +246,6 @@ export function RevenueReports() {
             <div className="space-y-4">
               {popularItems.slice(0, 5).map((item, index) =>
               <motion.div key={item.item.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.55 + index * 0.05 }} className="flex items-center gap-4 p-3 rounded-lg hover:bg-slate-700/30 transition">
-                  <span className="text-3xl w-10 text-center">
-                    {item.item.emoji}
-                  </span>
                   <div className="flex-1">
                     <div className="flex items-center justify-between mb-1">
                       <span className="font-medium text-white">

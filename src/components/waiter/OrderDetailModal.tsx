@@ -133,15 +133,25 @@ export function OrderDetailModal({
           </div>
         </div>
 
-        {/* Print receipt (POS integration later) */}
+        {/* Print receipt (redirect to POS) */}
         <div className="flex justify-end">
           <Button
             variant="secondary"
             onClick={() => {
               try {
-                window.print();
+                // Example POS URL; replace with your actual POS endpoint
+                const base =
+                  (typeof window !== 'undefined' && (window as Window & { POS_BASE_URL?: string }).POS_BASE_URL) ||
+                  'https://pos.your-restaurant.rw/receipt';
+                const url = `${base}?orderId=${encodeURIComponent(order.id)}&table=${order.tableNumber}`;
+                window.open(url, '_blank');
               } catch {
-                // no-op
+                // Fallback: browser print
+                try {
+                  window.print();
+                } catch {
+                  // no-op
+                }
               }
             }}>
             Print Receipt
