@@ -172,7 +172,10 @@ export const staffCredentials: StaffCredentials[] = [
 { staffId: 'staff-003', username: 'eric', password: 'waiter123' },
 { staffId: 'staff-004', username: 'chantal', password: 'waiter123' },
 { staffId: 'staff-005', username: 'diane', password: 'super123' },
-{ staffId: 'staff-006', username: 'patrick', password: 'manager123' }];
+{ staffId: 'staff-006', username: 'patrick', password: 'manager123' },
+{ staffId: 'staff-007', username: 'moses', password: 'kitchen123' },
+{ staffId: 'staff-008', username: 'sandrine', password: 'kitchen123' }
+];
 
 
 export const validateLogin = (

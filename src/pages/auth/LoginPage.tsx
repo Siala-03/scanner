@@ -167,6 +167,12 @@ export function LoginPage({ role, onLogin, onBack }: LoginPageProps) {
             {role === 'manager' &&
             <p>Username: patrick / Password: manager123</p>
             }
+            {role === 'kitchen' && (
+              <div>
+                <p>Username: moses / Password: kitchen123</p>
+                <p className="text-xs mt-1">or: sandrine / kitchen123</p>
+              </div>
+            )}
           </div>
         </form>
       </motion.div>

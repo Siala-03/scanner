@@ -15,11 +15,12 @@ import { StaffManagement } from './pages/manager/StaffManagement';
 import { AnalyticsPage } from './pages/manager/AnalyticsPage';
 import { QRCodeGenerator } from './pages/manager/QRCodeGenerator';
 import { InventoryManagement } from './pages/shared/InventoryManagement';
+import { KitchenDisplay } from './pages/kitchen/KitchenDisplay';
 import { LoginPage } from './pages/auth/LoginPage';
 import { Card } from './components/ui/Card';
 import { Button } from './components/ui/Button';
 import { Staff } from './types';
-type UserRole = 'customer' | 'waiter' | 'supervisor' | 'manager' | null;
+type UserRole = 'customer' | 'waiter' | 'supervisor' | 'manager' | 'kitchen' | null;
 type ManagerPage = 'dashboard' | 'menu' | 'staff' | 'analytics' | 'qrcodes' | 'inventory';
 type SupervisorPage = 'dashboard' | 'revenue' | 'staff' | 'qrcodes' | 'inventory';
 export function App() {
@@ -305,6 +306,22 @@ export function App() {
       </div>);
 
   }
+
+  // Kitchen portal (requires auth)
+  if (selectedRole === 'kitchen' && authUser) {
+    return (
+      <div className="relative">
+        <button
+          onClick={handleBack}
+          className="absolute top-4 left-4 z-50 p-2 rounded-full bg-slate-800 text-white shadow-md"
+          aria-label="Back">
+          <ArrowLeftIcon className="w-5 h-5" />
+        </button>
+        <KitchenDisplay />
+      </div>
+    );
+  }
+
   // Role selection (landing page)
   return (
     <div className="min-h-screen bg-[#1a1410] flex items-center justify-center p-4">
@@ -619,6 +636,37 @@ export function App() {
               <p className="text-[#a89f91] font-light leading-relaxed">
                 Full system control: manage menu items, assign staff tables, and
                 view deep analytics.
+              </p>
+            </Card>
+          </motion.div>
+
+          {/* Kitchen Card */}
+          <motion.div
+            initial={{
+              opacity: 0,
+              y: 20
+            }}
+            animate={{
+              opacity: 1,
+              y: 0
+            }}
+            transition={{
+              delay: 0.5
+            }}>
+
+            <Card
+              variant="interactive"
+              className="bg-[#2a2018] border border-[#3a2e20] h-full p-8 group"
+              onClick={() => setSelectedRole('kitchen')}>
+
+              <div className="text-4xl font-serif text-amber-500/30 group-hover:text-amber-500/50 transition-colors mb-6">
+                04
+              </div>
+              <h2 className="text-2xl font-medium text-[#e8e4dc] mb-3">
+                Kitchen
+              </h2>
+              <p className="text-[#a89f91] font-light leading-relaxed">
+                Real-time kitchen display system. Track orders and prepare food efficiently.
               </p>
             </Card>
           </motion.div>

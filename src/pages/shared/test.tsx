@@ -1,23 +1,34 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   PackageIcon,
   RefreshCcwIcon,
   AlertTriangleIcon,
   TrendingUpIcon,
+  TrendingDownIcon,
   ShoppingCartIcon,
   TruckIcon,
+  UsersIcon,
   BarChart2Icon,
   PlusIcon,
   EditIcon,
   TrashIcon,
   CheckCircleIcon,
   XCircleIcon,
+  ClockIcon,
   ArrowUpIcon,
   ArrowDownIcon,
+  SearchIcon,
+  FilterIcon,
+  DownloadIcon,
   StarIcon,
   MapPinIcon,
+  PhoneIcon,
   MailIcon,
+  CalendarIcon,
+  AlertCircleIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
   XIcon,
 } from 'lucide-react';
 import { Card } from '../../components/ui/Card';
@@ -31,6 +42,8 @@ import type {
   Supplier,
   PurchaseOrder,
   PurchaseOrderStatus,
+  StockMovement,
+  WasteEntry,
   WasteReason,
 } from '../../types/inventory';
 import {
@@ -43,6 +56,7 @@ import {
   ensureSuppliersInitialized,
   addSupplier,
   updateSupplier,
+  deleteSupplier,
   loadPurchaseOrders,
   ensurePurchaseOrdersInitialized,
   createPurchaseOrder,
