@@ -80,7 +80,59 @@ export function WaiterDashboard({
     count: completedOrders.length
   }];
 
+  // Sync order to kitchen display via localStorage and API
+  const syncToKitchen = async (order: Order) => {
+    try {
+      // Save to localStorage for fallback
+      const existing = JSON.parse(localStorage.getItem('kitchen_orders') || '[]');
+      const newKitchenOrder = {
+        id: order.id,
+        orderNumber: order.id,
+        tableNumber: order.tableNumber,
+        status: 'pending' as const,
+        items: order.items.map((item: any) => ({
+          name: item.menuItem?.name || 'Item',
+          quantity: item.quantity,
+          notes: item.specialInstructions
+        })),
+        createdAt: new Date().toISOString()
+      };
+      const filtered = existing.filter((o: any) => o.id !== order.id);
+      localStorage.setItem('kitchen_orders', JSON.stringify([...filtered, newKitchenOrder]));
+
+      // Also try to sync to backend API
+      const orderNumber = `ORD-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(Math.random() * 10000)}`;
+      await fetch('/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          order_number: orderNumber,
+          table_number: order.tableNumber,
+          items: order.items.map((item: any) => ({
+            menuItemId: item.menuItem?.id || 'unknown',
+            menuItemName: item.menuItem?.name || 'Item',
+            quantity: item.quantity,
+            unitPrice: Math.round((item.menuItem?.price || 0) * 100),
+            totalPrice: Math.round((item.menuItem?.price || 0) * item.quantity * 100),
+            notes: item.specialInstructions
+          })),
+          subtotal: Math.round((order.subtotal || 0) * 100),
+          tax: 0,
+          total: Math.round((order.total || 0) * 100),
+          status: 'pending',
+          notes: order.specialInstructions
+        })
+      });
+    } catch (e) {
+      console.error('Failed to sync to kitchen:', e);
+    }
+  };
+
   const handleApprove = (orderId: string) => {
+    const order = orders.find(o => o.id === orderId);
+    if (order) {
+      syncToKitchen(order);
+    }
     onUpdateOrderStatus(orderId, 'verified', { assignedWaiterId: waiter.id });
     // Simulate kitchen starting to prepare
     setTimeout(

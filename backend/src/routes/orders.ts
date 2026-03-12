@@ -126,6 +126,84 @@ router.get('/kitchen', async (_req: Request, res: Response) => {
   }
 });
 
+// GET kitchen analytics
+router.get('/kitchen/analytics', async (_req: Request, res: Response) => {
+  try {
+    // Get today's date range
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    // Get orders for today
+    const todayOrders = await pool.query(
+      `SELECT * FROM orders WHERE created_at >= $1 AND created_at < $2`,
+      [today.toISOString(), tomorrow.toISOString()]
+    );
+
+    // Calculate stats
+    const orders = todayOrders.rows.map((row: unknown) => ({
+      ...row,
+      items: typeof row.items === 'string' ? JSON.parse(row.items) : row.items
+    }));
+
+    const totalOrders = orders.length;
+    const completedOrders = orders.filter((o: any) => o.status === 'served' || o.status === 'completed').length;
+    const pendingOrders = orders.filter((o: any) => o.status === 'pending').length;
+    const preparingOrders = orders.filter((o: any) => o.status === 'preparing').length;
+    const readyOrders = orders.filter((o: any) => o.status === 'ready').length;
+
+    // Calculate average prep time (from created_at to completed_at)
+    let avgPrepTime = 0;
+    const completedWithTime = orders.filter((o: any) => o.completed_at && o.created_at);
+    if (completedWithTime.length > 0) {
+      const totalPrepTime = completedWithTime.reduce((sum: number, o: any) => {
+        const created = new Date(o.created_at).getTime();
+        const completed = new Date(o.completed_at).getTime();
+        return sum + (completed - created) / 60000; // minutes
+      }, 0);
+      avgPrepTime = Math.round(totalPrepTime / completedWithTime.length);
+    }
+
+    // Calculate popular items
+    const itemCounts: Record<string, number> = {};
+    orders.forEach((order: any) => {
+      if (order.items) {
+        order.items.forEach((item: any) => {
+          const name = item.menuItemName || 'Unknown';
+          itemCounts[name] = (itemCounts[name] || 0) + (item.quantity || 1);
+        });
+      }
+    });
+
+    const popularItems = Object.entries(itemCounts)
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+
+    // Get hourly distribution
+    const hourlyCounts: Record<number, number> = {};
+    orders.forEach((order: any) => {
+      const hour = new Date(order.created_at).getHours();
+      hourlyCounts[hour] = (hourlyCounts[hour] || 0) + 1;
+    });
+
+    res.json({
+      totalOrders,
+      completedOrders,
+      avgPrepTime,
+      pendingOrders,
+      preparingOrders,
+      readyOrders,
+      popularItems,
+      hourlyDistribution: hourlyCounts
+    });
+  } catch (error) {
+    console.error('Error fetching kitchen analytics:', error);
+    res.status(500).json({ error: 'Failed to fetch kitchen analytics' });
+  }
+});
+
 // GET single order
 router.get('/:id', async (req: Request, res: Response) => {
   try {

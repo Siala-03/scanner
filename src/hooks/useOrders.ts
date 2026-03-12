@@ -3,7 +3,9 @@ import { Order, OrderStatus, CartItem, MenuItem } from '../types';
 import { mockOrders } from '../data/orderData';
 import { getEffectivePrice } from '../utils/pricing';
 import { decrementInventoryForOrder, ensureInventoryInitialized } from '../utils/inventoryStorage';
-import { fetchOrders, createOrder as apiCreateOrder, updateOrderStatus as apiUpdateOrderStatus } from '../api/orders';
+
+// Backend API URL
+const API_BASE = '/api';
 
 interface UseOrdersReturn {
   orders: Order[];
@@ -26,47 +28,76 @@ interface UseOrdersReturn {
   getTodaysRevenue: () => number;
 }
 
+// API functions
+async function fetchOrdersAPI(status?: string): Promise<Order[]> {
+  const query = status && status !== 'all' ? `?status=${status}` : '';
+  const res = await fetch(`${API_BASE}/orders${query}`);
+  if (!res.ok) throw new Error('Failed to fetch orders');
+  const data = await res.json();
+  return data.map((o: any) => ({
+    id: o.id,
+    tableNumber: o.table_number,
+    items: Array.isArray(o.items) ? o.items.map((item: any) => ({
+      menuItem: {
+        id: item.menuItemId || 'unknown',
+        name: item.menuItemName || 'Unknown',
+        price: item.unitPrice ? item.unitPrice / 100 : 0,
+        category: 'other',
+        description: '',
+        available: true
+      },
+      quantity: item.quantity,
+      specialInstructions: item.notes
+    })) : [],
+    status: o.status,
+    createdAt: new Date(o.created_at),
+    updatedAt: new Date(o.updated_at),
+    subtotal: o.subtotal ? o.subtotal / 100 : 0,
+    serviceCharge: 0,
+    total: o.total ? o.total / 100 : 0,
+    specialInstructions: o.notes,
+    requiresKitchen: true
+  }));
+}
+
+async function createOrderAPI(order: any): Promise<Order> {
+  const res = await fetch(`${API_BASE}/orders`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(order)
+  });
+  if (!res.ok) throw new Error('Failed to create order');
+  return res.json();
+}
+
+async function updateOrderStatusAPI(orderId: string, status: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/orders/${orderId}/status`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status })
+  });
+  if (!res.ok) throw new Error('Failed to update order');
+}
+
 export function useOrders(): UseOrdersReturn {
   const [orders, setOrders] = useState<Order[]>(mockOrders);
+  const [backendAvailable, setBackendAvailable] = useState(false);
 
-  // Load orders from backend on mount
+  // Try to load from backend on mount
   useEffect(() => {
-    async function loadOrders() {
+    async function loadFromBackend() {
       try {
-        const backendOrders = await fetchOrders('all');
+        const backendOrders = await fetchOrdersAPI('all');
         if (backendOrders.length > 0) {
-          // Convert backend orders to frontend format
-          const convertedOrders: Order[] = (backendOrders as any[]).map((o: any) => ({
-            id: o.id,
-            tableNumber: o.table_number,
-            items: Array.isArray(o.items) ? o.items.map((item: any) => ({
-              menuItem: {
-                id: item.menu_item_id || 'unknown',
-                name: item.menu_item_name || 'Unknown Item',
-                price: item.unit_price ? item.unit_price / 100 : 0,
-                category: 'other',
-                description: '',
-                available: true
-              },
-              quantity: item.quantity,
-              specialInstructions: item.notes
-            })) : [],
-            status: o.status,
-            createdAt: new Date(o.created_at),
-            updatedAt: new Date(o.updated_at),
-            subtotal: o.subtotal ? o.subtotal / 100 : 0,
-            serviceCharge: 0,
-            total: o.total ? o.total / 100 : 0,
-            specialInstructions: o.notes,
-            requiresKitchen: true
-          }));
-          setOrders(convertedOrders);
+          setOrders(backendOrders);
+          setBackendAvailable(true);
         }
-      } catch (err) {
-        console.warn('Failed to load orders from backend, using local data:', err);
+      } catch (e) {
+        console.warn('Backend not available, using local orders');
+        setBackendAvailable(false);
       }
     }
-    loadOrders();
+    loadFromBackend();
   }, []);
 
   const addOrder = useCallback(
@@ -107,37 +138,35 @@ export function useOrders(): UseOrdersReturn {
       };
 
       // Try to sync with backend
-      try {
-        const orderNumber = `ORD-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(Math.random() * 10000)}`;
-        const backendOrder = await apiCreateOrder({
-          order_number: orderNumber,
-          table_number: tableNumber,
-          items: orderItems.map(item => ({
-            menuItemId: item.menuItem.id,
-            menuItemName: item.menuItem.name,
-            quantity: item.quantity,
-            unitPrice: Math.round(getEffectivePrice(item.menuItem) * 100),
-            totalPrice: Math.round(getEffectivePrice(item.menuItem) * item.quantity * 100),
-            notes: item.specialInstructions
-          })),
-          subtotal: Math.round(subtotal * 100),
-          tax: 0,
-          total: Math.round(total * 100),
-          status: 'pending',
-          notes: specialInstructions
-        } as any);
-        // Update with order number from backend
-        newOrder.id = backendOrder.id;
-        setOrders((prev) => [newOrder, ...prev]);
-        return newOrder;
-      } catch (err) {
-        console.warn('Failed to sync order to backend, using local only:', err);
-        // Fall back to local-only order
-        setOrders((prev) => [newOrder, ...prev]);
-        return newOrder;
+      if (backendAvailable) {
+        try {
+          const orderNumber = `ORD-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(Math.random() * 10000)}`;
+          await createOrderAPI({
+            order_number: orderNumber,
+            table_number: tableNumber,
+            items: orderItems.map(item => ({
+              menuItemId: item.menuItem.id,
+              menuItemName: item.menuItem.name,
+              quantity: item.quantity,
+              unitPrice: Math.round(getEffectivePrice(item.menuItem) * 100),
+              totalPrice: Math.round(getEffectivePrice(item.menuItem) * item.quantity * 100),
+              notes: item.specialInstructions
+            })),
+            subtotal: Math.round(subtotal * 100),
+            tax: 0,
+            total: Math.round(total * 100),
+            status: 'pending',
+            notes: specialInstructions
+          });
+        } catch (e) {
+          console.warn('Failed to sync order to backend:', e);
+        }
       }
+
+      setOrders((prev) => [newOrder, ...prev]);
+      return newOrder;
     },
-    []
+    [backendAvailable]
   );
 
   const updateOrderStatus = useCallback(
@@ -145,11 +174,13 @@ export function useOrders(): UseOrdersReturn {
       // Map frontend status to backend status
       const backendStatus = status === 'verified' ? 'preparing' : status;
       
-      // Try to sync with backend first
-      try {
-        await apiUpdateOrderStatus(orderId, { status: backendStatus } as any);
-      } catch (err) {
-        console.warn('Failed to sync order status to backend:', err);
+      // Try to sync with backend
+      if (backendAvailable) {
+        try {
+          await updateOrderStatusAPI(orderId, backendStatus);
+        } catch (e) {
+          console.warn('Failed to sync order status to backend:', e);
+        }
       }
 
       // Always update local state
@@ -163,7 +194,7 @@ export function useOrders(): UseOrdersReturn {
             assignedWaiterId: opts?.assignedWaiterId ?? order.assignedWaiterId
           };
 
-          if (status === 'verified') updates.updatedAt = new Date();
+          if (status === 'verified' || status === 'preparing') updates.updatedAt = new Date();
           if (status === 'ready') updates.updatedAt = new Date();
           if (status === 'served') updates.updatedAt = new Date();
 
@@ -171,7 +202,7 @@ export function useOrders(): UseOrdersReturn {
         })
       );
     },
-    []
+    [backendAvailable]
   );
 
   const getOrdersByTable = useCallback(
