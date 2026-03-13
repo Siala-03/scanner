@@ -13,14 +13,18 @@ export function downloadCsv(filename: string, rows: string[][]) {
 }
 
 export function buildOrdersCsv(orders: Order[]): string[][] {
-  const header = ['Order ID', 'Table', 'Waiter ID', 'Status', 'Date', 'Time', 'Total (RWF)'];
+  const header = ['Order ID', 'Order #', 'Table', 'Waiter', 'Status', 'Date', 'Time', 'Items', 'Subtotal', 'Tax', 'Total (RWF)'];
   const rows = orders.map((o) => [
     o.id,
-    String(o.tableNumber),
-    o.assignedWaiterId ?? '',
+    o.orderNumber,
+    o.tableNumber ? String(o.tableNumber) : '-',
+    o.assignedTo ?? '-',
     o.status,
-    o.createdAt.toLocaleDateString(),
-    o.createdAt.toLocaleTimeString(),
+    new Date(o.createdAt).toLocaleDateString(),
+    new Date(o.createdAt).toLocaleTimeString(),
+    o.items.map(i => `${i.quantity}x ${i.menuItemName}`).join('; '),
+    String(o.subtotal),
+    String(o.tax),
     String(o.total)
   ]);
   return [header, ...rows];

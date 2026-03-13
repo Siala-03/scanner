@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import bcrypt from 'bcryptjs';
 import { withClient } from '../db.js';
@@ -13,6 +13,65 @@ const SignUpSchema = z.object({
   role: z.enum(['waiter', 'supervisor', 'manager', 'kitchen']),
   username: z.string().min(3),
   password: z.string().min(6)
+});
+
+const LoginSchema = z.object({
+  username: z.string().min(1),
+  password: z.string().min(1)
+});
+
+// POST login
+authRouter.post('/login', async (req, res, next) => {
+  try {
+    const body = LoginSchema.parse(req.body);
+    
+    const staff = await withClient(async (client) => {
+      const credResult = await client.query(
+        `SELECT sc.staff_id, sc.username, sc.password_hash 
+         FROM staff_credentials sc 
+         WHERE sc.username = $1`,
+        [body.username]
+      );
+      
+      if (credResult.rows.length === 0) {
+        throw new HttpError(401, 'Invalid username or password');
+      }
+      
+      const cred = credResult.rows[0];
+      const validPassword = await bcrypt.compare(body.password, cred.password_hash);
+      
+      if (!validPassword) {
+        throw new HttpError(401, 'Invalid username or password');
+      }
+      
+      const staffResult = await client.query(
+        `SELECT id, name, role, email, phone, is_on_duty, assigned_tables, performance, hire_date 
+         FROM staff WHERE id = $1`,
+        [cred.staff_id]
+      );
+      
+      if (staffResult.rows.length === 0) {
+        throw new HttpError(401, 'User not found');
+      }
+      
+      const row = staffResult.rows[0];
+      return {
+        id: row.id,
+        name: row.name,
+        role: row.role,
+        email: row.email,
+        phone: row.phone,
+        isOnDuty: row.is_on_duty,
+        assignedTables: row.assigned_tables ?? [],
+        performance: row.performance,
+        hireDate: row.hire_date
+      };
+    });
+    
+    res.json({ staff });
+  } catch (e) {
+    next(e);
+  }
 });
 
 authRouter.post('/signup', async (req, res, next) => {
@@ -84,6 +143,90 @@ authRouter.post('/signup', async (req, res, next) => {
     });
 
     res.status(201).json({ staff });
+  } catch (e) {
+    next(e);
+  }
+});
+
+// GET all staff
+authRouter.get('/staff', async (_req, res, next) => {
+  try {
+    const staff = await withClient(async (client) => {
+      const result = await client.query(
+        `SELECT id, name, role, email, phone, is_on_duty, assigned_tables, performance, hire_date 
+         FROM staff ORDER BY name`
+      );
+      return result.rows.map((row) => ({
+        id: row.id,
+        name: row.name,
+        role: row.role,
+        email: row.email,
+        phone: row.phone,
+        isOnDuty: row.is_on_duty,
+        assignedTables: row.assigned_tables ?? [],
+        performance: row.performance,
+        hireDate: row.hire_date
+      }));
+    });
+    res.json({ staff });
+  } catch (e) {
+    next(e);
+  }
+});
+
+// GET staff by ID
+authRouter.get('/staff/:id', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const staff = await withClient(async (client) => {
+      const result = await client.query(
+        `SELECT id, name, role, email, phone, is_on_duty, assigned_tables, performance, hire_date 
+         FROM staff WHERE id = $1`,
+        [id]
+      );
+      if (result.rows.length === 0) {
+        throw new HttpError(404, 'Staff not found');
+      }
+      const row = result.rows[0];
+      return {
+        id: row.id,
+        name: row.name,
+        role: row.role,
+        email: row.email,
+        phone: row.phone,
+        isOnDuty: row.is_on_duty,
+        assignedTables: row.assigned_tables ?? [],
+        performance: row.performance,
+        hireDate: row.hire_date
+      };
+    });
+    res.json({ staff });
+  } catch (e) {
+    next(e);
+  }
+});
+
+// GET waiters only
+authRouter.get('/waiters', async (_req, res, next) => {
+  try {
+    const staff = await withClient(async (client) => {
+      const result = await client.query(
+        `SELECT id, name, role, email, phone, is_on_duty, assigned_tables, performance, hire_date 
+         FROM staff WHERE role = 'waiter' ORDER BY name`
+      );
+      return result.rows.map((row) => ({
+        id: row.id,
+        name: row.name,
+        role: row.role,
+        email: row.email,
+        phone: row.phone,
+        isOnDuty: row.is_on_duty,
+        assignedTables: row.assigned_tables ?? [],
+        performance: row.performance,
+        hireDate: row.hire_date
+      }));
+    });
+    res.json({ staff });
   } catch (e) {
     next(e);
   }

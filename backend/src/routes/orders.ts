@@ -80,22 +80,36 @@ router.post('/seed', async (_req: Request, res: Response) => {
   }
 });
 
-// GET all orders (with optional status filter)
+// GET all orders (with optional status and date filter)
 router.get('/', async (req: Request, res: Response) => {
   try {
-    const { status } = req.query;
+    const { status, startDate, endDate } = req.query;
     let query = 'SELECT * FROM orders';
     const params: unknown[] = [];
+    const conditions: string[] = [];
 
     if (status && status !== 'all') {
-      query += ' WHERE status = $1';
       params.push(status);
+      conditions.push(`status = $${params.length}`);
+    }
+
+    if (startDate) {
+      params.push(startDate as string);
+      conditions.push(`created_at >= $${params.length}`);
+    }
+
+    if (endDate) {
+      params.push(endDate as string);
+      conditions.push(`created_at <= $${params.length}`);
+    }
+
+    if (conditions.length > 0) {
+      query += ' WHERE ' + conditions.join(' AND ');
     }
 
     query += ' ORDER BY created_at DESC';
 
     const result = await pool.query(query, params);
-    // Parse JSON items
     const orders = result.rows.map((row: unknown) => ({
       ...row,
       items: typeof row.items === 'string' ? JSON.parse(row.items) : row.items
@@ -188,15 +202,23 @@ router.get('/kitchen/analytics', async (_req: Request, res: Response) => {
       hourlyCounts[hour] = (hourlyCounts[hour] || 0) + 1;
     });
 
+    const hourlyDistribution = Object.entries(hourlyCounts)
+      .map(([hour, count]) => ({ hour: parseInt(hour), count }))
+      .sort((a, b) => a.hour - b.hour);
+
+    // Calculate revenue
+    const totalRevenue = orders.reduce((sum: number, o: any) => sum + (o.total || 0), 0);
+
     res.json({
       totalOrders,
       completedOrders,
-      avgPrepTime,
       pendingOrders,
       preparingOrders,
       readyOrders,
+      avgPrepTime,
       popularItems,
-      hourlyDistribution: hourlyCounts
+      hourlyDistribution,
+      totalRevenue
     });
   } catch (error) {
     console.error('Error fetching kitchen analytics:', error);
@@ -209,9 +231,11 @@ router.get('/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const result = await pool.query('SELECT * FROM orders WHERE id = $1', [id]);
+
     if (result.rows.length === 0) {
       throw new HttpError(404, 'Order not found');
     }
+
     const order = {
       ...result.rows[0],
       items: typeof result.rows[0].items === 'string' 

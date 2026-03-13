@@ -284,6 +284,14 @@ export function ManagerDashboard({ onNavigate }: ManagerDashboardProps) {
                   <PackageIcon className="w-5 h-5" />
                   Inventory
                 </Button>
+                <Button
+                  variant="secondary"
+                  fullWidth
+                  onClick={() => onNavigate('history')}
+                  className="justify-start">
+                  <FileTextIcon className="w-5 h-5" />
+                  Order History
+                </Button>
               </div>
 
               <div className="mt-6 pt-6 border-t border-slate-700">

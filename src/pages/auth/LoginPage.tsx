@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { LockIcon, UserIcon, ArrowLeftIcon, EyeIcon, EyeOffIcon } from 'lucide-react';
 import { StaffRole, Staff } from '../../types';
-import { validateLogin } from '../../data/staffData';
+import { loginStaff } from '../../api/auth';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { SignUpPage } from './SignUpPage';
@@ -29,24 +29,22 @@ export function LoginPage({ role, onLogin, onBack }: LoginPageProps) {
       />
     );
   }
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setIsLoading(true);
-    // Simulate network delay
-    setTimeout(() => {
-      const user = validateLogin(username, password);
-      if (user) {
-        if (user.role === role) {
-          onLogin(user);
-        } else {
-          setError(`This account does not have ${role} privileges.`);
-        }
+    try {
+      const user = await loginStaff(username, password);
+      if (user.role === role) {
+        onLogin(user);
       } else {
-        setError('Invalid username or password.');
+        setError(`This account does not have ${role} privileges.`);
       }
+    } catch (err: any) {
+      setError(err.message || 'Invalid username or password.');
+    } finally {
       setIsLoading(false);
-    }, 800);
+    }
   };
   const roleTitle = role.charAt(0).toUpperCase() + role.slice(1);
   return (
@@ -156,24 +154,6 @@ export function LoginPage({ role, onLogin, onBack }: LoginPageProps) {
           >
             Create a new account
           </button>
-
-          {/* Demo helper text */}
-          <div className="mt-6 p-4 bg-amber-500/10 border border-amber-500/20 rounded-lg text-sm text-amber-400/80 text-center">
-            <p className="font-medium mb-1">Demo Credentials:</p>
-            {role === 'waiter' && <p>Username: jeanpaul / Password: waiter123</p>}
-            {role === 'supervisor' &&
-            <p>Username: diane / Password: super123</p>
-            }
-            {role === 'manager' &&
-            <p>Username: patrick / Password: manager123</p>
-            }
-            {role === 'kitchen' && (
-              <div>
-                <p>Username: moses / Password: kitchen123</p>
-                <p className="text-xs mt-1">or: sandrine / kitchen123</p>
-              </div>
-            )}
-          </div>
         </form>
       </motion.div>
     </div>);

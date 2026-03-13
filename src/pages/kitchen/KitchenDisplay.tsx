@@ -327,7 +327,7 @@ export function KitchenDisplay() {
         </div>
       </header>
 
-      <main className="p-6">
+      <main className="p-4">
         {viewMode === 'analytics' ? (
           // Analytics View
           <div className="space-y-6">
@@ -384,13 +384,13 @@ export function KitchenDisplay() {
                 <p className="text-slate-500">No pending orders in the queue</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                 {/* Pending Column */}
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse"></div>
-                    <h2 className="text-lg font-bold text-blue-400 uppercase tracking-wider">New Orders</h2>
-                    <span className="bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded-full text-sm font-bold">{pendingOrders.length}</span>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-2.5 h-2.5 bg-blue-500 rounded-full animate-pulse"></div>
+                    <h2 className="text-sm font-bold text-blue-400 uppercase tracking-wider">New Orders</h2>
+                    <span className="bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded-full text-xs font-bold">{pendingOrders.length}</span>
                   </div>
                   {pendingOrders.map(order => (
                     <OrderCard 
@@ -403,11 +403,11 @@ export function KitchenDisplay() {
                 </div>
 
                 {/* Preparing Column */}
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="w-3 h-3 bg-amber-500 rounded-full"></div>
-                    <h2 className="text-lg font-bold text-amber-400 uppercase tracking-wider">Cooking</h2>
-                    <span className="bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-full text-sm font-bold">{preparingOrders.length}</span>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-2.5 h-2.5 bg-amber-500 rounded-full"></div>
+                    <h2 className="text-sm font-bold text-amber-400 uppercase tracking-wider">Cooking</h2>
+                    <span className="bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded-full text-xs font-bold">{preparingOrders.length}</span>
                   </div>
                   {preparingOrders.map(order => (
                     <OrderCard 
@@ -420,11 +420,11 @@ export function KitchenDisplay() {
                 </div>
 
                 {/* Ready Column */}
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                    <h2 className="text-lg font-bold text-green-400 uppercase tracking-wider">Ready</h2>
-                    <span className="bg-green-500/20 text-green-400 px-2 py-0.5 rounded-full text-sm font-bold">{readyOrders.length}</span>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-2.5 h-2.5 bg-green-500 rounded-full"></div>
+                    <h2 className="text-sm font-bold text-green-400 uppercase tracking-wider">Ready</h2>
+                    <span className="bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded-full text-xs font-bold">{readyOrders.length}</span>
                   </div>
                   {readyOrders.map(order => (
                     <OrderCard 
@@ -465,57 +465,56 @@ function OrderCard({
   const config = STATUS_CONFIG[order.status];
 
   return (
-    <div className={`bg-slate-800 rounded-2xl overflow-hidden border-2 ${config.borderColor} shadow-lg hover:shadow-xl transition-all hover:scale-[1.02]`}>
+    <div className={`bg-slate-800 rounded-lg overflow-hidden border-2 ${config.borderColor} shadow-lg hover:shadow-xl transition-all hover:scale-[1.01]`}>
       {/* Header */}
-      <div className={`${config.color} ${config.textColor} px-4 py-3 flex items-center justify-between`}>
-        <div className="flex items-center gap-3">
-          <span className="text-xl font-bold">{order.orderNumber}</span>
-          <span className="text-lg opacity-90">Table {order.tableNumber}</span>
-        </div>
+      <div className={`${config.color} ${config.textColor} px-3 py-2 flex items-center justify-between`}>
         <div className="flex items-center gap-2">
+          <span className="text-base font-bold">{order.orderNumber}</span>
+          <span className="text-sm opacity-90">T{order.tableNumber}</span>
+        </div>
+        <div className="flex items-center gap-1.5">
           {config.pulse && <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>}
-          <span className="font-bold">{config.label}</span>
+          <span className="font-bold text-xs">{config.label}</span>
         </div>
       </div>
 
       {/* Time & Urgency */}
-      <div className="px-4 py-2 bg-slate-750 flex items-center justify-between border-b border-slate-700">
-        <div className="flex items-center gap-2 text-slate-400">
-          <ClockIcon className="w-4 h-4" />
+      <div className="px-3 py-1.5 bg-slate-750 flex items-center justify-between border-b border-slate-700">
+        <div className="flex items-center gap-1.5 text-slate-400 text-xs">
+          <ClockIcon className="w-3 h-3" />
           <span className="font-mono">{formatTime(order.createdAt)}</span>
         </div>
         {urgency === 'urgent' && (
-          <div className="flex items-center gap-1 text-orange-400 text-sm font-bold animate-pulse">
-            <FlameIcon className="w-4 h-4" />
+          <div className="flex items-center gap-1 text-orange-400 text-xs font-bold animate-pulse">
+            <FlameIcon className="w-3 h-3" />
             <span>WAITING</span>
           </div>
         )}
         {urgency === 'normal' && (
-          <div className="flex items-center gap-1 text-amber-400 text-sm font-bold">
-            <AlertTriangleIcon className="w-4 h-4" />
+          <div className="flex items-center gap-1 text-amber-400 text-xs font-bold">
+            <AlertTriangleIcon className="w-3 h-3" />
             <span>SOON</span>
           </div>
         )}
       </div>
 
       {/* Items */}
-      <div className="p-4 space-y-2">
+      <div className="p-2.5 space-y-1.5">
         {/* Order-level notes (allergies, special requests) */}
         {order.notes && (
-          <div className="bg-red-500/20 border border-red-500 rounded-lg p-3 mb-3">
-            <div className="text-red-400 text-sm font-bold">📋 NOTES:</div>
-            <div className="text-white text-sm">{order.notes}</div>
+          <div className="bg-red-500/20 border border-red-500 rounded p-2 mb-2">
+            <div className="text-red-400 text-xs font-bold">⚠️ {order.notes}</div>
           </div>
         )}
         {order.items.map((item, idx) => (
-          <div key={idx} className="flex items-start gap-3">
-            <span className="bg-slate-700 text-white w-6 h-6 rounded flex items-center justify-center text-sm font-bold">
+          <div key={idx} className="flex items-start gap-2">
+            <span className="bg-slate-700 text-white w-5 h-5 rounded flex items-center justify-center text-xs font-bold">
               {item.quantity}
             </span>
             <div className="flex-1">
-              <div className="text-white font-medium">{item.name}</div>
+              <div className="text-white text-sm font-medium">{item.name}</div>
               {item.notes && (
-                <div className="text-amber-400 text-sm">→ {item.notes}</div>
+                <div className="text-amber-400 text-xs">→ {item.notes}</div>
               )}
             </div>
           </div>
@@ -523,11 +522,11 @@ function OrderCard({
       </div>
 
       {/* Actions */}
-      <div className="p-4 pt-0">
+      <div className="p-2.5 pt-0">
         {order.status === 'pending' && (
           <button
             onClick={() => onStatusChange(order.id, 'preparing')}
-            className="w-full bg-amber-600 hover:bg-amber-500 text-white py-3 rounded-xl font-bold uppercase tracking-wider transition-all hover:scale-[1.02] active:scale-[0.98]"
+            className="w-full bg-amber-600 hover:bg-amber-500 text-white py-2 rounded-lg font-bold text-sm uppercase tracking-wider transition-all hover:scale-[1.02] active:scale-[0.98]"
           >
             Start Cooking
           </button>
@@ -535,7 +534,7 @@ function OrderCard({
         {order.status === 'preparing' && (
           <button
             onClick={() => onStatusChange(order.id, 'ready')}
-            className="w-full bg-green-600 hover:bg-green-500 text-white py-3 rounded-xl font-bold uppercase tracking-wider transition-all hover:scale-[1.02] active:scale-[0.98]"
+            className="w-full bg-green-600 hover:bg-green-500 text-white py-2 rounded-lg font-bold text-sm uppercase tracking-wider transition-all hover:scale-[1.02] active:scale-[0.98]"
           >
             Mark Ready
           </button>
@@ -543,9 +542,9 @@ function OrderCard({
         {order.status === 'ready' && (
           <button
             onClick={() => onComplete(order.id)}
-            className="w-full bg-slate-600 hover:bg-slate-500 text-white py-3 rounded-xl font-bold uppercase tracking-wider transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2"
+            className="w-full bg-slate-600 hover:bg-slate-500 text-white py-2 rounded-lg font-bold text-sm uppercase tracking-wider transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-1.5"
           >
-            <CheckCircleIcon className="w-5 h-5" />
+            <CheckCircleIcon className="w-4 h-4" />
             Complete
           </button>
         )}

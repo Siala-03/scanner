@@ -91,6 +91,18 @@ export function useOrders(): UseOrdersReturn {
         if (backendOrders.length > 0) {
           setOrders(backendOrders);
           setBackendAvailable(true);
+        } else {
+          // No orders in backend - try to seed test orders
+          try {
+            await fetch(`${API_BASE}/orders/seed`, { method: 'POST' });
+            const seededOrders = await fetchOrdersAPI('all');
+            if (seededOrders.length > 0) {
+              setOrders(seededOrders);
+              setBackendAvailable(true);
+            }
+          } catch (seedErr) {
+            console.warn('Could not seed orders:', seedErr);
+          }
         }
       } catch (e) {
         console.warn('Backend not available, using local orders');
