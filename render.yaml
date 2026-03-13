@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: scanner-backend
+    env: node
+    region: oregon
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 4000
+      - key: DATABASE_URL
+        value: postgres://user:pass@host:5432/db
+      - key: WEB_ORIGIN
+        value: https://your-frontend.onrender.com
+
+databases:
+  - name: scanner-db
+    region: oregon
+    plan: free
+    postgresMajorVersion: 15
