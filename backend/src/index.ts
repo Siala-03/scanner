@@ -69,27 +69,27 @@ app.use(
     _next: express.NextFunction
   ) => {
     if (err instanceof HttpError) {
-      logger.warn({ status: err.status, message: err.message, details: err.details }, 'HTTP Error');
+      logger.warn('HTTP Error', { status: err.status, message: err.message, details: err.details });
       res.status(err.status).json({ error: err.message, details: err.details });
       return;
     }
-    logger.error({ err }, 'Unhandled error');
+    logger.error('Unhandled error', { err });
     res.status(500).json({ error: 'Internal Server Error' });
   }
 );
 
 httpServer.listen(env.PORT, () => {
-  logger.info({ port: env.PORT }, 'API server started');
+  logger.info('API server started', { port: env.PORT });
   logger.info('WebSocket server ready');
 });
 
 // Graceful shutdown handling
 function gracefulShutdown(signal: string) {
-  logger.info({ signal }, 'Received shutdown signal, starting graceful shutdown');
+  logger.info('Received shutdown signal, starting graceful shutdown', { signal });
   
   httpServer.close(async (err) => {
     if (err) {
-      logger.error({ err }, 'Error during server close');
+      logger.error('Error during server close', { err });
       process.exit(1);
     }
     
@@ -97,7 +97,7 @@ function gracefulShutdown(signal: string) {
       await pool.end();
       logger.info('Database connections closed');
     } catch (dbErr) {
-      logger.error({ err: dbErr }, 'Error closing database connections');
+      logger.error('Error closing database connections', { err: dbErr });
     }
     
     logger.info('Graceful shutdown complete');

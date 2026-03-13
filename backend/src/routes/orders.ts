@@ -110,7 +110,7 @@ router.get('/', async (req: Request, res: Response) => {
     query += ' ORDER BY created_at DESC';
 
     const result = await pool.query(query, params);
-    const orders = result.rows.map((row: unknown) => ({
+    const orders = result.rows.map((row: any) => ({
       ...row,
       items: typeof row.items === 'string' ? JSON.parse(row.items) : row.items
     }));
@@ -129,7 +129,7 @@ router.get('/kitchen', async (_req: Request, res: Response) => {
        WHERE status IN ('pending', 'preparing', 'ready') 
        ORDER BY created_at ASC`
     );
-    const orders = result.rows.map((row: unknown) => ({
+    const orders = result.rows.map((row: any) => ({
       ...row,
       items: typeof row.items === 'string' ? JSON.parse(row.items) : row.items
     }));
@@ -156,7 +156,7 @@ router.get('/kitchen/analytics', async (_req: Request, res: Response) => {
     );
 
     // Calculate stats
-    const orders = todayOrders.rows.map((row: unknown) => ({
+    const orders = todayOrders.rows.map((row: any) => ({
       ...row,
       items: typeof row.items === 'string' ? JSON.parse(row.items) : row.items
     }));
@@ -387,7 +387,7 @@ router.patch('/:id/items/:itemId', async (req: Request, res: Response) => {
       : orderResult.rows[0].items;
 
     // Update item status
-    const updatedItems = items.map((item: { id: string }) => {
+    const updatedItems = items.map((item: { id: string; startedAt?: string; completedAt?: string }) => {
       if (item.id === itemId) {
         return {
           ...item,

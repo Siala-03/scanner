@@ -185,7 +185,7 @@ router.post('/:id/receive', async (req: Request, res: Response) => {
     }
 
     // Update PO status
-    const allReceived = received_items.every((item: { received_qty: number }) => 
+    const allReceived = received_items.every((item: { menu_item_id: string; received_qty: number }) => 
       items.some((oi: { menuItemId: string; orderedQty: number }) => 
         oi.menuItemId === item.menu_item_id && oi.orderedQty === item.received_qty
       )
