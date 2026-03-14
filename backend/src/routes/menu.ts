@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { pool } from '../db.js';
+import { emitMenuUpdate } from '../socket.js';
 
 export const menuRouter = Router();
 
@@ -51,6 +52,9 @@ menuRouter.post('/', async (req: Request, res: Response) => {
       
       await client.query('COMMIT');
       res.json({ message: 'Menu updated successfully', count: items.length });
+      
+      // Notify all connected clients about menu update
+      emitMenuUpdate({ type: 'change', message: 'Menu updated' });
     } catch (err) {
       await client.query('ROLLBACK');
       throw err;
@@ -68,6 +72,9 @@ menuRouter.delete('/', async (_req: Request, res: Response) => {
   try {
     await pool.query('DELETE FROM menu_items');
     res.json({ message: 'Menu cleared' });
+    
+    // Notify all connected clients about menu update
+    emitMenuUpdate({ type: 'change', message: 'Menu reset to default' });
   } catch (err) {
     console.error('Error clearing menu:', err);
     res.status(500).json({ error: 'Failed to clear menu' });

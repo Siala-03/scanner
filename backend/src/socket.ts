@@ -32,6 +32,12 @@ export function initSocket(httpServer: HTTPServer): SocketServer {
       console.log(`Socket ${socket.id} joined orders room`);
     });
 
+    // Join menu room for real-time updates
+    socket.on('join:menu', () => {
+      socket.join('menu');
+      console.log(`Socket ${socket.id} joined menu room`);
+    });
+
     socket.on('disconnect', () => {
       console.log('Client disconnected:', socket.id);
     });
@@ -101,5 +107,16 @@ export function emitOrderUpdate(data: {
 }) {
   if (io) {
     io.to('orders').emit('order:update', data);
+  }
+}
+
+// Menu events (for real-time menu updates)
+export function emitMenuUpdate(data: {
+  type: 'update' | 'change';
+  message?: string;
+}) {
+  if (io) {
+    io.to('menu').emit('menu:update', data);
+    io.emit('menu:changed', data);
   }
 }
