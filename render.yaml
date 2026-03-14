@@ -9,11 +9,11 @@ services:
       - key: NODE_ENV
         value: production
       - key: PORT
-        value: 4000
-      - key: DATABASE_URL
-        value: postgres://user:pass@host:5432/db
+        value: "4000"
       - key: WEB_ORIGIN
-        value: https://your-frontend.onrender.com
+        value: https://servv-psi.vercel.app
+      - key: DATABASE_URL
+        sync: false
 
 databases:
   - name: scanner-db

@@ -88,7 +88,31 @@ app.use(compression());
 // CORS configuration
 app.use(
   cors({
-    origin: env.WEB_ORIGIN,
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps or curl requests)
+      if (!origin) return callback(null, true);
+      
+      // Normalize origin by removing trailing slash
+      const normalizedOrigin = origin.replace(/\/$/, '');
+      const normalizedAllowedOrigin = env.WEB_ORIGIN.replace(/\/$/, '');
+      
+      // Check if origin matches allowed origin
+      if (normalizedOrigin === normalizedAllowedOrigin) {
+        return callback(null, true);
+      }
+      
+      // Also allow exact match with trailing slash
+      if (origin === env.WEB_ORIGIN) {
+        return callback(null, true);
+      }
+      
+      // In development, allow localhost
+      if (env.NODE_ENV === 'development') {
+        return callback(null, true);
+      }
+      
+      callback(new Error('Not allowed by CORS'));
+    },
     credentials: false
   })
 );
@@ -129,7 +153,18 @@ app.use(
       res.status(err.status).json({ error: err.message, details: err.details });
       return;
     }
-    logger.error('Unhandled error', { err });
+    
+    // Log detailed error information
+    if (err instanceof Error) {
+      logger.error('Unhandled error', { 
+        message: err.message, 
+        stack: err.stack,
+        name: err.name 
+      });
+    } else {
+      logger.error('Unhandled non-error exception', { err });
+    }
+    
     res.status(500).json({ error: 'Internal Server Error' });
   }
 );
