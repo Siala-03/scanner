@@ -1,7 +1,8 @@
 import { useEffect, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:4000';
+// Default to production backend URL
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'https://scanner-3cku.onrender.com';
 
 let socket: Socket | null = null;
 

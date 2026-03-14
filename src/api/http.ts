@@ -9,8 +9,8 @@ export class ApiError extends Error {
   }
 }
 
-// API base URL - uses VITE_API_URL env var in production, defaults to relative path for dev
-const API_BASE = import.meta.env.VITE_API_URL || '';
+// API base URL - defaults to production backend, override with VITE_API_URL if needed
+const API_BASE = import.meta.env.VITE_API_URL || 'https://scanner-3cku.onrender.com';
 
 export async function apiRequest<T>(
   path: string,
