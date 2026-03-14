@@ -57,7 +57,7 @@ export function RevenueReports() {
   useEffect(() => {
     if (activeView === 'orders' && orders.length === 0) {
       setOrdersLoading(true);
-      fetch('/api/orders')
+      fetch('https://scanner-3cku.onrender.com/api/orders')
         .then(res => res.json())
         .then(data => {
           setOrders(data);

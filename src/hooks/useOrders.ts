@@ -4,8 +4,8 @@ import { mockOrders } from '../data/orderData';
 import { getEffectivePrice } from '../utils/pricing';
 import { decrementInventoryForOrder, ensureInventoryInitialized } from '../utils/inventoryStorage';
 
-// Backend API URL
-const API_BASE = '/api';
+// Backend API URL - defaults to production backend
+const API_BASE = 'https://scanner-3cku.onrender.com';
 
 interface UseOrdersReturn {
   orders: Order[];

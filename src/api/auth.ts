@@ -1,7 +1,7 @@
 import { apiRequest } from './http';
 import type { Staff, StaffRole } from '../types';
 
-const API_BASE = '/api/auth';
+const API_BASE = 'https://scanner-3cku.onrender.com/api/auth';
 
 export async function loginStaff(
   username: string,

@@ -102,7 +102,7 @@ export function WaiterDashboard({
 
       // Also try to sync to backend API
       const orderNumber = `ORD-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(Math.random() * 10000)}`;
-      await fetch('/api/orders', {
+      await fetch('https://scanner-3cku.onrender.com/api/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

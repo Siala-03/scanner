@@ -11,7 +11,7 @@ import type {
 } from '../types/inventory';
 
 // Base API URL
-const API_BASE = '/api';
+const API_BASE = 'https://scanner-3cku.onrender.com';
 
 // ── Inventory Records ────────────────────────────────────────────────────────
 

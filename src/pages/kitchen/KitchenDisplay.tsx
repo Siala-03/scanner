@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { ClockIcon, ChefHatIcon, UtensilsIcon, RefreshCwIcon, CheckCircleIcon, FlameIcon, AlertTriangleIcon, BarChart3Icon, ListOrderedIcon } from 'lucide-react';
 
 // Backend API
-const API_BASE = '/api';
+const API_BASE = 'https://scanner-3cku.onrender.com';
 
 interface KitchenOrder {
   id: string;
