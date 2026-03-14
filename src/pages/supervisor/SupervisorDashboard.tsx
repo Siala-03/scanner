@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 import {
   DollarSignIcon,
@@ -11,7 +11,10 @@ import {
   ZapIcon,
   StarIcon,
   AlertCircleIcon,
-  FilterIcon as FilterLinesIcon
+  FilterIcon as FilterLinesIcon,
+  MenuIcon,
+  DownloadIcon,
+  UploadIcon
 } from 'lucide-react';
 import { Order, OrderStatus } from '../../types';
 import { weeklyRevenue, todayKPIs } from '../../data/analyticsData';
@@ -27,6 +30,7 @@ import { listLowStock } from '../../utils/inventoryStorage';
 import { menuItems } from '../../data/menuData';
 import { downloadCsv, buildOrdersCsv } from '../../utils/csv';
 import { getStaffById } from '../../data/staffData';
+import { exportMenuToJson, exportMenuToCsv, importMenuFromJson, saveCustomMenu, hasCustomMenu, resetToDefaultMenu } from '../../utils/menuImportExport';
 interface SupervisorDashboardProps {
   orders: Order[];
   onUpdateOrderStatus: (
@@ -41,6 +45,11 @@ export function SupervisorDashboard({
 }: SupervisorDashboardProps) {
   const [activeTab, setActiveTab] = useState('all');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  
+  // Menu management state
+  const [menuMessage, setMenuMessage] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isCustomMenu, setIsCustomMenu] = useState(hasCustomMenu());
   const todaysOrders = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -75,6 +84,50 @@ export function SupervisorDashboard({
     }
     return base;
   }, [todaysOrders, activeTab, tableFilter, waiterFilter]);
+
+  // Menu management handlers
+  const handleExportJson = () => {
+    const items = isCustomMenu ? JSON.parse(localStorage.getItem('custom_menu_items') || '[]') : menuItems;
+    exportMenuToJson(items);
+    setMenuMessage('Menu exported as JSON');
+    setTimeout(() => setMenuMessage(null), 3000);
+  };
+
+  const handleExportCsv = () => {
+    const items = isCustomMenu ? JSON.parse(localStorage.getItem('custom_menu_items') || '[]') : menuItems;
+    exportMenuToCsv(items);
+    setMenuMessage('Menu exported as CSV');
+    setTimeout(() => setMenuMessage(null), 3000);
+  };
+
+  const handleImportMenu = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    try {
+      const items = await importMenuFromJson(file);
+      saveCustomMenu(items);
+      setIsCustomMenu(true);
+      setMenuMessage(`Imported ${items.length} menu items`);
+      setTimeout(() => setMenuMessage(null), 3000);
+    } catch (err) {
+      setMenuMessage('Failed to import menu');
+      setTimeout(() => setMenuMessage(null), 3000);
+    }
+    // Reset input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  };
+
+  const handleResetMenu = () => {
+    if (confirm('Reset to default menu? This will remove any custom menu items.')) {
+      resetToDefaultMenu();
+      setIsCustomMenu(false);
+      setMenuMessage('Menu reset to default');
+      setTimeout(() => setMenuMessage(null), 3000);
+    }
+  };
   const tableOptions = useMemo(
     () => Array.from(new Set(todaysOrders.map((o) => o.tableNumber))).sort((a, b) => a - b),
     [todaysOrders]
@@ -132,6 +185,55 @@ export function SupervisorDashboard({
             <span className="text-sm font-medium text-blue-300">
               {filteredOrders.length} Active Orders
             </span>
+          </div>
+        </div>
+
+        {/* Menu Management Section */}
+        <div className="mb-6 p-4 bg-slate-700/30 rounded-lg border border-slate-600/50">
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="flex items-center gap-2">
+              <MenuIcon className="w-5 h-5 text-blue-400" />
+              <span className="text-white font-medium">Menu Management</span>
+              {isCustomMenu && <span className="text-xs bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded">Custom</span>}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={handleExportJson}
+                className="flex items-center gap-1 px-3 py-1.5 text-sm bg-slate-600 hover:bg-slate-500 text-white rounded transition-colors"
+              >
+                <DownloadIcon className="w-4 h-4" /> JSON
+              </button>
+              <button
+                onClick={handleExportCsv}
+                className="flex items-center gap-1 px-3 py-1.5 text-sm bg-slate-600 hover:bg-slate-500 text-white rounded transition-colors"
+              >
+                <DownloadIcon className="w-4 h-4" /> CSV
+              </button>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="flex items-center gap-1 px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-500 text-white rounded transition-colors"
+              >
+                <UploadIcon className="w-4 h-4" /> Import
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".json"
+                onChange={handleImportMenu}
+                className="hidden"
+              />
+              {isCustomMenu && (
+                <button
+                  onClick={handleResetMenu}
+                  className="flex items-center gap-1 px-3 py-1.5 text-sm bg-red-600/50 hover:bg-red-600 text-white rounded transition-colors"
+                >
+                  Reset
+                </button>
+              )}
+            </div>
+            {menuMessage && (
+              <span className="text-sm text-green-400">{menuMessage}</span>
+            )}
           </div>
         </div>
 
