@@ -45,11 +45,16 @@ export function SignUpPage({ role, onSignedUp, onBack }: SignUpPageProps) {
       });
       onSignedUp(staff);
     } catch (err) {
+      let errorMessage = 'Failed to create account. Please try again.';
       if (err instanceof ApiError) {
-        setError(err.message);
-      } else {
-        setError('Failed to create account. Please try again.');
+        errorMessage = err.message;
+      } else if (err instanceof Error) {
+        errorMessage = err.message;
+      } else if (err) {
+        // Fallback for any other object
+        errorMessage = String(err);
       }
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }

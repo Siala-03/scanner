@@ -42,13 +42,16 @@ export function LoginPage({ role, onLogin, onBack }: LoginPageProps) {
         setError(`This account does not have ${role} privileges.`);
       }
     } catch (err) {
+      let errorMessage = 'Invalid username or password.';
       if (err instanceof ApiError) {
-        setError(err.message);
+        errorMessage = err.message;
       } else if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError('Invalid username or password.');
+        errorMessage = err.message;
+      } else if (err) {
+        // Fallback for any other object
+        errorMessage = String(err);
       }
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
