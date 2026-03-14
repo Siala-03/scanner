@@ -16,6 +16,62 @@ import { ordersRouter } from './routes/orders.js';
 import { initSocket } from './socket.js';
 import { logger } from './logger.js';
 import { pool } from './db.js';
+import { readFile, readdir } from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const migrationsDir = path.resolve(__dirname, '../migrations');
+
+// Auto-run migrations on startup
+async function runMigrations() {
+  try {
+    const client = await pool.connect();
+    try {
+      // Create migrations table if not exists
+      await client.query(`
+        create table if not exists schema_migrations (
+          id text primary key,
+          applied_at timestamptz not null default now()
+        )
+      `);
+      
+      // Get already applied migrations
+      const result = await client.query(`select id from schema_migrations`);
+      const applied = new Set(result.rows.map((r) => r.id));
+      
+      // Get migration files
+      const files = (await readdir(migrationsDir))
+        .filter((f) => f.endsWith('.sql'))
+        .sort((a, b) => a.localeCompare(b));
+      
+      // Apply pending migrations
+      for (const file of files) {
+        if (applied.has(file)) continue;
+        const fullPath = path.join(migrationsDir, file);
+        const sql = await readFile(fullPath, 'utf8');
+        logger.info(`Running migration: ${file}`);
+        await client.query('begin');
+        try {
+          await client.query(sql);
+          await client.query(`insert into schema_migrations (id) values ($1)`, [file]);
+          await client.query('commit');
+          logger.info(`Migration complete: ${file}`);
+        } catch (e) {
+          await client.query('rollback');
+          throw e;
+        }
+      }
+      logger.info('All migrations complete');
+    } finally {
+      client.release();
+    }
+  } catch (err) {
+    logger.error('Migration failed', { err });
+    // Don't exit - let the server start anyway
+  }
+}
 
 const app = express();
 const httpServer = createServer(app);
@@ -78,9 +134,12 @@ app.use(
   }
 );
 
-httpServer.listen(env.PORT, () => {
+httpServer.listen(env.PORT, async () => {
   logger.info('API server started', { port: env.PORT });
   logger.info('WebSocket server ready');
+  
+  // Run migrations on startup
+  await runMigrations();
 });
 
 // Graceful shutdown handling
