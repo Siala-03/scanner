@@ -4,6 +4,7 @@ import { ArrowLeftIcon, UtensilsIcon, BarChart3Icon, BriefcaseIcon, ChefHatIcon,
 import { CartItem, Order, OrderStatus } from './types';
 import { mockStaff } from './data/staffData';
 import { useOrders } from './hooks/useOrders';
+import { useTables } from './hooks/useTables';
 import { CustomerApp } from './pages/customer/CustomerApp';
 import { WaiterDashboard } from './pages/waiter/WaiterDashboard';
 import { SupervisorDashboard } from './pages/supervisor/SupervisorDashboard';
@@ -35,26 +36,9 @@ export function App() {
   const [scanningTable, setScanningTable] = useState<number | null>(null);
   const [detectedTable, setDetectedTable] = useState<number | null>(null);
   const [showQRGrid, setShowQRGrid] = useState(false);
-  // list of table numbers created by manager
-  const [tables, setTables] = useState<number[]>([]);
-  // persist tables in localStorage
-  React.useEffect(() => {
-    try {
-      const saved = localStorage.getItem('tables');
-      if (saved) {
-        setTables(JSON.parse(saved));
-      }
-    } catch (e) {
-      console.warn('failed to load tables', e);
-    }
-  }, []);
-  React.useEffect(() => {
-    try {
-      localStorage.setItem('tables', JSON.stringify(tables));
-    } catch (e) {
-      console.warn('failed to save tables', e);
-    }
-  }, [tables]);
+  
+  // Tables from backend
+  const { tables, addTable } = useTables();
 
   const [waiterCalls, setWaiterCalls] = useState<
     {
@@ -311,10 +295,8 @@ export function App() {
           <QRCodeGenerator
             tables={tables}
             onAddTable={() => {
-              setTables((prev) => {
-                const next = prev.length > 0 ? Math.max(...prev) + 1 : 1;
-                return [...prev, next];
-              });
+              const next = tables.length > 0 ? Math.max(...tables) + 1 : 1;
+              addTable(next);
             }}
           />
         )}
@@ -354,10 +336,8 @@ export function App() {
           <QRCodeGenerator
             tables={tables}
             onAddTable={() => {
-              setTables((prev) => {
-                const next = prev.length > 0 ? Math.max(...prev) + 1 : 1;
-                return [...prev, next];
-              });
+              const next = tables.length > 0 ? Math.max(...tables) + 1 : 1;
+              addTable(next);
             }}
           />
         )}

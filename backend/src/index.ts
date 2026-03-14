@@ -9,6 +9,7 @@ import { HttpError } from './http.js';
 import { authRouter } from './routes/auth.js';
 import { inventoryRouter } from './routes/inventory.js';
 import { menuRouter } from './routes/menu.js';
+import { tablesRouter } from './routes/tables.js';
 import { suppliersRouter } from './routes/suppliers.js';
 import { purchaseOrdersRouter } from './routes/purchaseOrders.js';
 import { movementsRouter } from './routes/movements.js';
@@ -124,6 +125,7 @@ app.get('/health/db', async (_req, res) => {
 
 app.use('/api/auth', authRouter);
 app.use('/api/menu', menuRouter);
+app.use('/api/tables', tablesRouter);
 app.use('/api/inventory', inventoryRouter);
 app.use('/api/suppliers', suppliersRouter);
 app.use('/api/purchase-orders', purchaseOrdersRouter);
