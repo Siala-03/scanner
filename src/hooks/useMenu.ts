@@ -34,20 +34,24 @@ export function useMenu() {
     loadMenu();
 
     // Listen for menu updates
-    const socket = getSocket();
-    
-    const handleMenuUpdate = () => {
-      console.log('Menu update received, reloading...');
-      loadMenu();
-    };
+    try {
+      const socket = getSocket();
+      
+      const handleMenuUpdate = () => {
+        console.log('Menu update received, reloading...');
+        loadMenu();
+      };
 
-    socket.on('menu:update', handleMenuUpdate);
-    socket.on('menu:changed', handleMenuUpdate);
+      socket.on('menu:update', handleMenuUpdate);
+      socket.on('menu:changed', handleMenuUpdate);
 
-    return () => {
-      socket.off('menu:update', handleMenuUpdate);
-      socket.off('menu:changed', handleMenuUpdate);
-    };
+      return () => {
+        socket.off('menu:update', handleMenuUpdate);
+        socket.off('menu:changed', handleMenuUpdate);
+      };
+    } catch (err) {
+      console.warn('Socket not available:', err);
+    }
   }, [loadMenu]);
 
   // Get unique categories from menu

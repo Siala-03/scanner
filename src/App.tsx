@@ -25,7 +25,46 @@ import { Staff } from './types';
 type UserRole = 'customer' | 'waiter' | 'supervisor' | 'manager' | 'kitchen' | null;
 type ManagerPage = 'dashboard' | 'menu' | 'staff' | 'analytics' | 'qrcodes' | 'inventory' | 'history';
 type SupervisorPage = 'dashboard' | 'revenue' | 'staff' | 'qrcodes' | 'inventory' | 'history';
+
+// Backend API URL
+const API_BASE = 'https://scanner-3cku.onrender.com';
+
+// Startup screen while checking backend
+function StartupScreen() {
+  return (
+    <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-500 mx-auto mb-4"></div>
+        <p className="text-white text-lg">Connecting to server...</p>
+        <p className="text-slate-400 text-sm mt-2">Please wait</p>
+      </div>
+    </div>
+  );
+}
+
+// Error screen when backend is unavailable
+function ErrorScreen({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+      <div className="bg-slate-800 p-8 rounded-lg max-w-md w-full text-center">
+        <div className="text-red-500 text-5xl mb-4">⚠️</div>
+        <h1 className="text-2xl font-bold text-white mb-2">Server Unavailable</h1>
+        <p className="text-slate-400 mb-6">
+          Unable to connect to the backend server. Please check your connection and try again.
+        </p>
+        <button
+          onClick={onRetry}
+          className="bg-amber-500 text-white px-6 py-2 rounded-lg hover:bg-amber-600 transition-colors"
+        >
+          Try Again
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function App() {
+  const [backendStatus, setBackendStatus] = useState<'checking' | 'available' | 'unavailable'>('checking');
   const [selectedRole, setSelectedRole] = useState<UserRole>(null);
   const [authUser, setAuthUser] = useState<Staff | null>(null);
   const [tableNumber, setTableNumber] = useState<number | null>(null);
@@ -36,6 +75,41 @@ export function App() {
   const [scanningTable, setScanningTable] = useState<number | null>(null);
   const [detectedTable, setDetectedTable] = useState<number | null>(null);
   const [showQRGrid, setShowQRGrid] = useState(false);
+  
+  // Check backend availability on mount
+  useEffect(() => {
+    async function checkBackend() {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+        const res = await fetch(`${API_BASE}/health`, {
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+
+        if (res.ok) {
+          setBackendStatus('available');
+        } else {
+          setBackendStatus('unavailable');
+        }
+      } catch (err) {
+        console.error('Backend unavailable:', err);
+        setBackendStatus('unavailable');
+      }
+    }
+    checkBackend();
+  }, []);
+
+  // Show startup screen while checking backend
+  if (backendStatus === 'checking') {
+    return <StartupScreen />;
+  }
+
+  // Show error screen if backend is unavailable
+  if (backendStatus === 'unavailable') {
+    return <ErrorScreen onRetry={() => window.location.reload()} />;
+  }
   
   // Tables from backend
   const { tables, addTable } = useTables();

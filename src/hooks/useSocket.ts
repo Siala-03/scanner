@@ -8,12 +8,24 @@ let socket: Socket | null = null;
 
 export function getSocket(): Socket {
   if (!socket) {
-    socket = io(SOCKET_URL, {
-      autoConnect: false,
-      reconnection: true,
-      reconnectionAttempts: 5,
-      reconnectionDelay: 1000,
-    });
+    try {
+      socket = io(SOCKET_URL, {
+        autoConnect: false,
+        reconnection: true,
+        reconnectionAttempts: 3,
+        reconnectionDelay: 1000,
+        timeout: 5000,
+      });
+    } catch (err) {
+      console.warn('Failed to create socket:', err);
+      // Return a dummy socket that does nothing
+      return {
+        on: () => {},
+        off: () => {},
+        emit: () => {},
+        connected: false
+      } as unknown as Socket;
+    }
   }
   return socket;
 }
@@ -22,8 +34,12 @@ export function useSocket() {
   const socket = getSocket();
 
   useEffect(() => {
-    if (!socket.connected) {
-      socket.connect();
+    try {
+      if (!socket.connected) {
+        socket.connect();
+      }
+    } catch (err) {
+      console.warn('Socket connection failed:', err);
     }
 
     return () => {
