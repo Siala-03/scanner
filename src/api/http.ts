@@ -17,11 +17,17 @@ export async function apiRequest<T>(
   headers.set('Accept', 'application/json');
   if (init.json !== undefined) headers.set('Content-Type', 'application/json');
 
-  const res = await fetch(path, {
-    ...init,
-    headers,
-    body: init.json !== undefined ? JSON.stringify(init.json) : init.body
-  });
+  let res: Response;
+  try {
+    res = await fetch(path, {
+      ...init,
+      headers,
+      body: init.json !== undefined ? JSON.stringify(init.json) : init.body
+    });
+  } catch (networkError) {
+    // Network error (e.g., server not reachable)
+    throw new ApiError(0, 'Unable to connect to server. Please check your connection.');
+  }
 
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
