@@ -24,13 +24,15 @@ interface MenuPageProps {
 
 const categoryNames: Record<string, string> = {
   'all': 'All',
-  'alcoholic-drinks': 'Alcoholic',
-  'beers': 'Beers',
-  'wine': 'Wine',
-  'soft-drinks': 'Drinks',
-  'breakfast': 'Breakfast',
-  'lunch': 'Lunch',
-  'dinner': 'Dinner'
+  'alcoholic-drinks': '🍸 Alcoholic',
+  'beers': '🍺 Beers',
+  'wine': '🍷 Wine',
+  'soft-drinks': '🥤 Drinks',
+  'breakfast': '🍳 Breakfast',
+  'lunch': '🥗 Lunch',
+  'dinner': '🍽️ Dinner',
+  'desserts': '🍰 Desserts',
+  'snacks': '🥨 Snacks'
 };
 
 export function MenuPage({ onAddToCart }: MenuPageProps) {

@@ -2,13 +2,12 @@ import React, { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   PlusIcon,
-  SearchIcon,
   EditIcon,
   TrashIcon,
   EyeIcon,
   EyeOffIcon } from
 'lucide-react';
-import { MenuItem, MenuCategory } from '../../types';
+import { MenuItem, MenuCategory, MenuCategoryInfo } from '../../types';
 import {
   menuItems as initialMenuItems,
   menuCategories } from
@@ -20,23 +19,67 @@ import { SearchBar } from '../../components/ui/SearchBar';
 import { Badge } from '../../components/ui/Badge';
 import { MenuItemEditor } from '../../components/manager/MenuItemEditor';
 import { formatPrice } from '../../utils/currency';
+import { useMenu } from '../../hooks/useMenu';
+import { uploadMenu } from '../../api/menu';
+
+// Default categories with emojis from dummy data
+const defaultCategories: MenuCategoryInfo[] = [
+  { id: 'alcoholic-drinks', name: 'Alcoholic Drinks', emoji: '🍸' },
+  { id: 'beers', name: 'Beers', emoji: '🍺' },
+  { id: 'wine', name: 'Wine', emoji: '🍷' },
+  { id: 'soft-drinks', name: 'Soft Drinks', emoji: '🥤' },
+  { id: 'breakfast', name: 'Breakfast', emoji: '🍳' },
+  { id: 'lunch', name: 'Lunch', emoji: '🥗' },
+  { id: 'dinner', name: 'Dinner', emoji: '🍽️' },
+  { id: 'desserts', name: 'Desserts', emoji: '🍰' },
+  { id: 'snacks', name: 'Snacks', emoji: '🥨' },
+];
+
+// Tab type with optional emoji icon
+interface TabOption {
+  id: string;
+  label: string;
+  icon?: React.ReactNode;
+}
+
 export function MenuManagement() {
-  const [menuItemsState, setMenuItemsState] =
-  useState<MenuItem[]>(initialMenuItems);
-  const [categoriesState, setCategoriesState] = useState(menuCategories);
+  // Use menu hook to get items from backend
+  const { menuItems: backendMenuItems, isLoading, refetch } = useMenu();
+  
+  // Use backend items if available, otherwise fall back to initial
+  const menuItemsState = backendMenuItems && backendMenuItems.length > 0 
+    ? backendMenuItems 
+    : initialMenuItems;
+  
   const [activeCategory, setActiveCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
-  const categories = [
-  {
-    id: 'all',
-    label: 'All Items'
-  },
-  ...categoriesState.map((c) => ({
-    id: c.id,
-    label: c.name
-  }))];
+  const [isSaving, setIsSaving] = useState(false);
+  // Build categories from menu items + defaults
+  // Build tabs from menu items + defaults
+  const tabs: TabOption[] = React.useMemo(() => {
+    const uniqueCategories = Array.from(new Set(menuItemsState.map(item => item.category)));
+    // Start with 'All Items' tab
+    const allTab: TabOption = { id: 'all', label: 'All Items', icon: '📋' };
+    // Add categories from default that exist in menu
+    const categoryTabs = defaultCategories
+      .filter(c => uniqueCategories.includes(c.id))
+      .map(c => ({
+        id: c.id,
+        label: c.name,
+        icon: c.emoji
+      }));
+    return [allTab, ...categoryTabs];
+  }, [menuItemsState]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+        <div className="text-white text-lg">Loading menu...</div>
+      </div>
+    );
+  }
 
   const filteredItems = useMemo(() => {
     let items =
@@ -61,17 +104,17 @@ export function MenuManagement() {
     setEditingItem(item);
     setIsEditorOpen(true);
   };
-  const handleSaveItem = (itemData: Partial<MenuItem>) => {
+  const handleSaveItem = async (itemData: Partial<MenuItem>) => {
+    let updatedItems: MenuItem[];
+    
     if (editingItem) {
-      setMenuItemsState((prev) =>
-      prev.map((item) =>
-      item.id === editingItem.id ?
-      {
-        ...item,
-        ...itemData
-      } :
-      item
-      )
+      updatedItems = menuItemsState.map((item) =>
+        item.id === editingItem.id ?
+        {
+          ...item,
+          ...itemData
+        } :
+        item
       );
     } else {
       const newItem: MenuItem = {
@@ -85,24 +128,56 @@ export function MenuManagement() {
         isAvailable: itemData.isAvailable ?? true,
         isPopular: itemData.isPopular ?? false
       };
-      setMenuItemsState((prev) => [newItem, ...prev]);
+      updatedItems = [newItem, ...menuItemsState];
+    }
+    
+    // Save to backend
+    setIsSaving(true);
+    try {
+      await uploadMenu(updatedItems);
+      refetch(); // Reload from backend
+    } catch (err) {
+      console.error('Failed to save menu:', err);
+    } finally {
+      setIsSaving(false);
     }
   };
-  const handleToggleAvailability = (itemId: string) => {
-    setMenuItemsState((prev) =>
-    prev.map((item) =>
-    item.id === itemId ?
-    {
-      ...item,
-      isAvailable: !item.isAvailable
-    } :
-    item
-    )
+  const handleToggleAvailability = async (itemId: string) => {
+    const updatedItems = menuItemsState.map((item) =>
+      item.id === itemId ?
+      {
+        ...item,
+        isAvailable: !item.isAvailable
+      } :
+      item
     );
+    
+    // Save to backend
+    setIsSaving(true);
+    try {
+      await uploadMenu(updatedItems);
+      refetch();
+    } catch (err) {
+      console.error('Failed to update item:', err);
+    } finally {
+      setIsSaving(false);
+    }
   };
-  const handleDeleteItem = (itemId: string) => {
+  
+  const handleDeleteItem = async (itemId: string) => {
     if (confirm('Are you sure you want to delete this item?')) {
-      setMenuItemsState((prev) => prev.filter((item) => item.id !== itemId));
+      const updatedItems = menuItemsState.filter((item) => item.id !== itemId);
+      
+      // Save to backend
+      setIsSaving(true);
+      try {
+        await uploadMenu(updatedItems);
+        refetch();
+      } catch (err) {
+        console.error('Failed to delete item:', err);
+      } finally {
+        setIsSaving(false);
+      }
     }
   };
   return (
@@ -132,7 +207,7 @@ export function MenuManagement() {
 
           <div className="flex-1 overflow-x-auto">
             <Tabs
-              tabs={categories}
+              tabs={tabs}
               activeTab={activeCategory}
               onTabChange={setActiveCategory}
               variant="pills" />
@@ -198,7 +273,7 @@ export function MenuManagement() {
 
                   <div className="flex items-center justify-between text-sm text-slate-400 mb-4">
                     <span>
-                      {categoriesState.find((c) => c.id === item.category)?.name}
+                      {defaultCategories.find((c) => c.id === item.category)?.name || item.category}
                     </span>
                     <span>{item.prepTime} min prep</span>
                   </div>
@@ -256,12 +331,10 @@ export function MenuManagement() {
           isOpen={isEditorOpen}
           onClose={() => setIsEditorOpen(false)}
           onSave={handleSaveItem}
-          categories={categoriesState}
+          categories={defaultCategories.filter(c => c.id !== 'all')}
           onAddCategory={(cat) => {
-            setCategoriesState((prev) => {
-              if (prev.some((c) => c.id === (cat.id as any))) return prev;
-              return [...prev, { id: cat.id as any, name: cat.name, emoji: cat.emoji }];
-            });
+            // Categories are now auto-detected from menu items
+            console.log('Category added:', cat);
           }}
         />
 
