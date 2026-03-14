@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { LockIcon, UserIcon, ArrowLeftIcon, EyeIcon, EyeOffIcon } from 'lucide-react';
 import { StaffRole, Staff } from '../../types';
 import { loginStaff } from '../../api/auth';
+import { ApiError } from '../../api/http';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { SignUpPage } from './SignUpPage';
@@ -40,8 +41,14 @@ export function LoginPage({ role, onLogin, onBack }: LoginPageProps) {
       } else {
         setError(`This account does not have ${role} privileges.`);
       }
-    } catch (err: any) {
-      setError(err.message || 'Invalid username or password.');
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError(err.message);
+      } else if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('Invalid username or password.');
+      }
     } finally {
       setIsLoading(false);
     }
