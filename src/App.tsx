@@ -380,7 +380,7 @@ export function App() {
               <span className="text-2xl font-serif text-white font-bold">S</span>
             </div>
             <h1 className="text-4xl md:text-5xl font-serif text-amber-500 tracking-tight">
-              SERV
+              SERVV
             </h1>
           </div>
           <p className="text-lg text-[#a89f91] max-w-2xl mx-auto font-light">
