@@ -9,17 +9,23 @@ export class ApiError extends Error {
   }
 }
 
+// API base URL - uses VITE_API_URL env var in production, defaults to relative path for dev
+const API_BASE = import.meta.env.VITE_API_URL || '';
+
 export async function apiRequest<T>(
   path: string,
   init: RequestInit & { json?: unknown } = {}
 ): Promise<T> {
+  // Prepend API_BASE if the path doesn't start with http/https
+  const url = path.startsWith('http') ? path : `${API_BASE}${path}`;
+  
   const headers = new Headers(init.headers);
   headers.set('Accept', 'application/json');
   if (init.json !== undefined) headers.set('Content-Type', 'application/json');
 
   let res: Response;
   try {
-    res = await fetch(path, {
+    res = await fetch(url, {
       ...init,
       headers,
       body: init.json !== undefined ? JSON.stringify(init.json) : init.body
