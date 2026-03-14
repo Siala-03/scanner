@@ -30,7 +30,7 @@ import { listLowStock } from '../../utils/inventoryStorage';
 import { menuItems } from '../../data/menuData';
 import { downloadCsv, buildOrdersCsv } from '../../utils/csv';
 import { getStaffById } from '../../data/staffData';
-import { exportMenuToJson, exportMenuToCsv, importMenuFromJson, saveCustomMenu, hasCustomMenu, resetToDefaultMenu } from '../../utils/menuImportExport';
+import { exportMenuToJson, exportMenuToCsv, importMenuFromFile, saveCustomMenu, hasCustomMenu, resetToDefaultMenu } from '../../utils/menuImportExport';
 interface SupervisorDashboardProps {
   orders: Order[];
   onUpdateOrderStatus: (
@@ -105,8 +105,7 @@ export function SupervisorDashboard({
     if (!file) return;
     
     try {
-      const items = await importMenuFromJson(file);
-      saveCustomMenu(items);
+      const items = await importMenuFromFile(file);
       setIsCustomMenu(true);
       setMenuMessage(`Imported ${items.length} menu items`);
       setTimeout(() => setMenuMessage(null), 3000);
@@ -218,7 +217,7 @@ export function SupervisorDashboard({
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".json"
+                accept=".json,.csv,.xlsx,.xls"
                 onChange={handleImportMenu}
                 className="hidden"
               />

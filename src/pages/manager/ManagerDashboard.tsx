@@ -37,7 +37,7 @@ import { formatPrice } from '../../utils/currency';
 import { getAverageRating } from '../../utils/reviewsStorage';
 import { listLowStock } from '../../utils/inventoryStorage';
 import { menuItems } from '../../data/menuData';
-import { exportMenuToJson, exportMenuToCsv, importMenuFromJson, saveCustomMenu, hasCustomMenu, resetToDefaultMenu } from '../../utils/menuImportExport';
+import { exportMenuToJson, exportMenuToCsv, importMenuFromFile, saveCustomMenu, hasCustomMenu, resetToDefaultMenu } from '../../utils/menuImportExport';
 interface ManagerDashboardProps {
   onNavigate: (page: string) => void;
 }
@@ -79,8 +79,7 @@ export function ManagerDashboard({ onNavigate }: ManagerDashboardProps) {
     if (!file) return;
     
     try {
-      const items = await importMenuFromJson(file);
-      saveCustomMenu(items);
+      const items = await importMenuFromFile(file);
       setIsCustomMenu(true);
       setMenuMessage(`Imported ${items.length} menu items`);
       setTimeout(() => setMenuMessage(null), 3000);
@@ -168,7 +167,7 @@ export function ManagerDashboard({ onNavigate }: ManagerDashboardProps) {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".json"
+                accept=".json,.csv,.xlsx,.xls"
                 onChange={handleImportMenu}
                 className="hidden"
               />

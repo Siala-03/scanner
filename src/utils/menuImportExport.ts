@@ -2,6 +2,9 @@ import type { MenuItem, MenuCategory } from '../types';
 import { menuItems as defaultMenuItems } from '../data/menuData';
 import { fetchMenu, uploadMenu, clearMenu } from '../api/menu';
 
+// Import xlsx for Excel support
+import * as XLSX from 'xlsx';
+
 // Menu storage key (for offline fallback)
 const MENU_STORAGE_KEY = 'custom_menu_items';
 
@@ -99,49 +102,163 @@ export function exportMenuToCsv(items: MenuItem[]): void {
 }
 
 /**
- * Import menu from JSON file and save to backend
+ * Parse CSV content to menu items
+ */
+function parseCsvContent(content: string): Partial<MenuItem>[] {
+  const lines = content.trim().split('\n');
+  if (lines.length < 2) return [];
+  
+  const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+  const items: Partial<MenuItem>[] = [];
+  
+  for (let i = 1; i < lines.length; i++) {
+    // Handle quoted fields
+    const values: string[] = [];
+    let current = '';
+    let inQuotes = false;
+    
+    for (const char of lines[i]) {
+      if (char === '"') {
+        inQuotes = !inQuotes;
+      } else if (char === ',' && !inQuotes) {
+        values.push(current.trim());
+        current = '';
+      } else {
+        current += char;
+      }
+    }
+    values.push(current.trim());
+    
+    const item: Partial<MenuItem> = {};
+    headers.forEach((header, index) => {
+      const value = values[index] || '';
+      switch (header) {
+        case 'id':
+          item.id = value;
+          break;
+        case 'name':
+          item.name = value;
+          break;
+        case 'description':
+          item.description = value.replace(/^"|"$/g, '');
+          break;
+        case 'price':
+          item.price = parseFloat(value) || 0;
+          break;
+        case 'category':
+          item.category = value;
+          break;
+        case 'emoji':
+          item.emoji = value;
+          break;
+        case 'preptime':
+          item.prepTime = parseInt(value, 10) || 15;
+          break;
+        case 'isavailable':
+          item.isAvailable = value.toLowerCase() === 'true';
+          break;
+        case 'ispopular':
+          item.isPopular = value.toLowerCase() === 'true';
+          break;
+      }
+    });
+    
+    if (item.name) {
+      items.push(item);
+    }
+  }
+  
+  return items;
+}
+
+/**
+ * Parse Excel (.xlsx) content to menu items
+ */
+function parseExcelContent(arrayBuffer: ArrayBuffer): Partial<MenuItem>[] {
+  try {
+    const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+    const firstSheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[firstSheetName];
+    const jsonData = XLSX.utils.sheet_to_json<Record<string, any>>(worksheet);
+    
+    return jsonData.map((row: Record<string, any>) => ({
+      id: row.id || row.ID || row.Id,
+      name: row.name || row.Name || row.ITEM || row.Item,
+      description: row.description || row.Description || row.desc || row.Desc || '',
+      price: parseFloat(row.price || row.Price || row.PRICE || row.amount || 0) || 0,
+      category: row.category || row.Category || row.type || row.Type || 'lunch',
+      emoji: row.emoji || row.Emoji || '🍽️',
+      prepTime: parseInt(row.prepTime || row.prep_time || row.prep || row.PrepTime || 15, 10) || 15,
+      isAvailable: row.isAvailable !== false && row.is_available !== false && row.Available !== false,
+      isPopular: row.isPopular === true || row.is_popular === true || row.Popular === true
+    }));
+  } catch (err) {
+    console.error('Error parsing Excel:', err);
+    return [];
+  }
+}
+
+/**
+ * Import menu from file (JSON, CSV, or Excel)
+ */
+export async function importMenuFromFile(file: File): Promise<MenuItem[]> {
+  const fileName = file.name.toLowerCase();
+  let items: Partial<MenuItem>[];
+  
+  if (fileName.endsWith('.json')) {
+    // Parse JSON
+    const text = await file.text();
+    const data = JSON.parse(text);
+    if (!Array.isArray(data)) {
+      throw new Error('Invalid menu format: expected array');
+    }
+    items = data;
+  } else if (fileName.endsWith('.csv')) {
+    // Parse CSV
+    const text = await file.text();
+    items = parseCsvContent(text);
+  } else if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
+    // Try to parse Excel
+    const arrayBuffer = await file.arrayBuffer();
+    items = parseExcelContent(arrayBuffer);
+    if (items.length === 0) {
+      throw new Error('Excel parsing requires xlsx library. Please convert to CSV or JSON.');
+    }
+  } else {
+    throw new Error('Unsupported file format. Please use JSON, CSV, or Excel (.xlsx)');
+  }
+  
+  // Normalize items
+  const normalizedItems: MenuItem[] = items.map((item, index) => ({
+    id: item.id || `item-${Date.now()}-${index}`,
+    name: item.name || 'Unnamed Item',
+    description: item.description || '',
+    price: typeof item.price === 'number' ? item.price : 0,
+    category: item.category || 'lunch',
+    emoji: item.emoji || '🍽️',
+    prepTime: typeof item.prepTime === 'number' ? item.prepTime : 15,
+    isAvailable: item.isAvailable !== false,
+    isPopular: item.isPopular || false
+  }));
+  
+  // Save to local storage first (offline backup)
+  saveCustomMenu(normalizedItems);
+  
+  // Try to save to backend
+  try {
+    await uploadMenu(normalizedItems);
+  } catch (err) {
+    console.warn('Failed to upload to backend, saved locally only');
+  }
+  
+  return normalizedItems;
+}
+
+/**
+ * @deprecated Use importMenuFromFile instead
  */
 export async function importMenuFromJson(file: File): Promise<MenuItem[]> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      try {
-        const data = JSON.parse(e.target?.result as string);
-        if (!Array.isArray(data)) {
-          reject(new Error('Invalid menu format: expected array'));
-          return;
-        }
-        // Validate and normalize items
-        const items: MenuItem[] = data.map((item: Partial<MenuItem>, index: number) => ({
-          id: item.id || `item-${Date.now()}-${index}`,
-          name: item.name || 'Unnamed Item',
-          description: item.description || '',
-          price: typeof item.price === 'number' ? item.price : 0,
-          category: item.category || 'lunch',
-          emoji: item.emoji || '🍽️',
-          prepTime: typeof item.prepTime === 'number' ? item.prepTime : 15,
-          isAvailable: item.isAvailable !== false,
-          isPopular: item.isPopular || false
-        }));
-        
-        // Save to local storage first (offline backup)
-        saveCustomMenu(items);
-        
-        // Try to save to backend
-        try {
-          await uploadMenu(items);
-        } catch (err) {
-          console.warn('Failed to upload to backend, saved locally only');
-        }
-        
-        resolve(items);
-      } catch (err) {
-        reject(new Error('Failed to parse menu file'));
-      }
-    };
-    reader.onerror = () => reject(new Error('Failed to read file'));
-    reader.readAsText(file);
-  });
+  return importMenuFromFile(file);
 }
 
 /**
