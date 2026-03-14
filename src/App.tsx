@@ -90,6 +90,10 @@ export function App() {
     );
   }, []);
   const handleBack = () => {
+    if (selectedRole === 'customer') {
+      // Go to home page (root)
+      window.history.pushState({}, '', '/');
+    }
     if (selectedRole === 'manager' && managerPage !== 'dashboard') {
       setManagerPage('dashboard');
     } else if (
@@ -107,6 +111,8 @@ export function App() {
       setDetectedTable(null);
       setScanningTable(null);
       setIsScanning(false);
+      // Reset URL to home
+      window.history.pushState({}, '', '/');
     }
   };
   const handleScanQR = (tableNum?: number) => {
@@ -139,16 +145,39 @@ export function App() {
     }, 1500);
   };
   // check for table number in path (deep linking via QR code)
+  // and also check for role-based URLs like /waiter, /kitchen, etc.
   useEffect(() => {
-    const match = window.location.pathname.match(/\/t\/(\d+)/);
-    if (match) {
-      const num = parseInt(match[1], 10);
+    const path = window.location.pathname;
+    
+    // Check for table QR code: /t/123
+    const tableMatch = path.match(/^\/t\/(\d+)/);
+    if (tableMatch) {
+      const num = parseInt(tableMatch[1], 10);
       if (!isNaN(num)) {
         setSelectedRole('customer');
         setTableNumber(num);
+        return;
       }
     }
+    
+    // Check for role-based URLs
+    if (path === '/waiter' || path.startsWith('/waiter')) {
+      setSelectedRole('waiter');
+    } else if (path === '/kitchen' || path.startsWith('/kitchen')) {
+      setSelectedRole('kitchen');
+    } else if (path === '/manager' || path.startsWith('/manager')) {
+      setSelectedRole('manager');
+    } else if (path === '/supervisor' || path.startsWith('/supervisor')) {
+      setSelectedRole('supervisor');
+    }
   }, []);
+
+  // Update URL when role changes
+  useEffect(() => {
+    if (selectedRole && selectedRole !== 'customer') {
+      window.history.replaceState({}, '', `/${selectedRole}`);
+    }
+  }, [selectedRole]);
 
   // Auth flow for staff roles
   if (selectedRole && selectedRole !== 'customer' && !authUser) {
