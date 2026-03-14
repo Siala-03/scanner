@@ -85,34 +85,10 @@ app.use(helmet());
 // Response compression
 app.use(compression());
 
-// CORS configuration
+// CORS configuration - allow all origins for production flexibility
 app.use(
   cors({
-    origin: (origin, callback) => {
-      // Allow requests with no origin (like mobile apps or curl requests)
-      if (!origin) return callback(null, true);
-      
-      // Normalize origin by removing trailing slash
-      const normalizedOrigin = origin.replace(/\/$/, '');
-      const normalizedAllowedOrigin = env.WEB_ORIGIN.replace(/\/$/, '');
-      
-      // Check if origin matches allowed origin
-      if (normalizedOrigin === normalizedAllowedOrigin) {
-        return callback(null, true);
-      }
-      
-      // Also allow exact match with trailing slash
-      if (origin === env.WEB_ORIGIN) {
-        return callback(null, true);
-      }
-      
-      // In development, allow localhost
-      if (env.NODE_ENV === 'development') {
-        return callback(null, true);
-      }
-      
-      callback(new Error('Not allowed by CORS'));
-    },
+    origin: true, // Allow all origins in production
     credentials: false
   })
 );
@@ -131,6 +107,19 @@ app.use('/api', limiter);
 app.use(express.json());
 
 app.get('/health', (_req, res) => res.json({ ok: true }));
+
+// Health check with database test
+app.get('/health/db', async (_req, res) => {
+  try {
+    const client = await pool.connect();
+    await client.query('SELECT 1');
+    client.release();
+    res.json({ ok: true, database: 'connected' });
+  } catch (err) {
+    logger.error('Database health check failed', { err });
+    res.status(500).json({ ok: false, database: 'disconnected', error: String(err) });
+  }
+});
 
 app.use('/api/auth', authRouter);
 app.use('/api/inventory', inventoryRouter);

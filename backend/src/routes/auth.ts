@@ -79,6 +79,7 @@ authRouter.post('/signup', async (req, res, next) => {
     const body = SignUpSchema.parse(req.body);
 
     const staff = await withClient(async (client) => {
+      // Check if username exists
       const existing = await client.query(
         `select 1 from staff_credentials where username = $1`,
         [body.username]
@@ -87,8 +88,17 @@ authRouter.post('/signup', async (req, res, next) => {
         throw new HttpError(409, 'Username already taken');
       }
 
+      // Check if email exists
+      const existingEmail = await client.query(
+        `select 1 from staff where email = $1`,
+        [body.email]
+      );
+      if (existingEmail.rowCount) {
+        throw new HttpError(409, 'Email already registered');
+      }
+
       const hash = await bcrypt.hash(body.password, 10);
-      const id = `staff-${Date.now()}`;
+      const id = `staff-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
       await client.query('begin');
       try {
@@ -96,24 +106,9 @@ authRouter.post('/signup', async (req, res, next) => {
           `insert into staff
              (id, name, role, email, phone, is_on_duty, assigned_tables, performance, hire_date)
            values
-             ($1,$2,$3,$4,$5,true,$6,$7,now())
-           returning id, name, role, email, phone, is_on_duty as "isOnDuty",
-                     assigned_tables as "assignedTables", performance, hire_date as "hireDate"`,
-          [
-            id,
-            body.name,
-            body.role,
-            body.email,
-            body.phone,
-            [],
-            {
-              ordersServed: 0,
-              avgServiceTime: 0,
-              rating: 5,
-              totalRevenue: 0,
-              shiftsThisWeek: 0
-            }
-          ]
+             ($1,$2,$3,$4,$5,$6,$7,$8,now())
+           returning id, name, role, email, phone, is_on_duty as "isOnDuty", assigned_tables as "assignedTables", performance, hire_date as "hireDate"`,
+          [id, body.name, body.role, body.email, body.phone, true, '{}', '{}']
         );
 
         await client.query(
