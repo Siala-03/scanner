@@ -315,7 +315,7 @@ export function StaffManagement() {
               label="Email"
               value={addForm.email}
               onChange={(e) => setAddForm((p) => ({ ...p, email: e.target.value }))}
-              placeholder="e.g. aline@serv.rw"
+              placeholder="e.g. aline@servv.rw"
             />
             <Input
               label="Phone"
