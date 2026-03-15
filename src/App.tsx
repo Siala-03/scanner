@@ -4,7 +4,6 @@ import { ArrowLeftIcon, UtensilsIcon, BarChart3Icon, BriefcaseIcon, ChefHatIcon,
 import { CartItem, Order, OrderStatus } from './types';
 import { mockStaff } from './data/staffData';
 import { useOrders } from './hooks/useOrders';
-import { useTables } from './hooks/useTables';
 import { CustomerApp } from './pages/customer/CustomerApp';
 import { WaiterDashboard } from './pages/waiter/WaiterDashboard';
 import { SupervisorDashboard } from './pages/supervisor/SupervisorDashboard';
@@ -25,46 +24,7 @@ import { Staff } from './types';
 type UserRole = 'customer' | 'waiter' | 'supervisor' | 'manager' | 'kitchen' | null;
 type ManagerPage = 'dashboard' | 'menu' | 'staff' | 'analytics' | 'qrcodes' | 'inventory' | 'history';
 type SupervisorPage = 'dashboard' | 'revenue' | 'staff' | 'qrcodes' | 'inventory' | 'history';
-
-// Backend API URL
-const API_BASE = 'https://scanner-3cku.onrender.com';
-
-// Startup screen while checking backend
-function StartupScreen() {
-  return (
-    <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-      <div className="text-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-500 mx-auto mb-4"></div>
-        <p className="text-white text-lg">Connecting to server...</p>
-        <p className="text-slate-400 text-sm mt-2">Please wait</p>
-      </div>
-    </div>
-  );
-}
-
-// Error screen when backend is unavailable
-function ErrorScreen({ onRetry }: { onRetry: () => void }) {
-  return (
-    <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
-      <div className="bg-slate-800 p-8 rounded-lg max-w-md w-full text-center">
-        <div className="text-red-500 text-5xl mb-4">⚠️</div>
-        <h1 className="text-2xl font-bold text-white mb-2">Server Unavailable</h1>
-        <p className="text-slate-400 mb-6">
-          Unable to connect to the backend server. Please check your connection and try again.
-        </p>
-        <button
-          onClick={onRetry}
-          className="bg-amber-500 text-white px-6 py-2 rounded-lg hover:bg-amber-600 transition-colors"
-        >
-          Try Again
-        </button>
-      </div>
-    </div>
-  );
-}
-
 export function App() {
-  const [backendStatus, setBackendStatus] = useState<'checking' | 'available' | 'unavailable'>('checking');
   const [selectedRole, setSelectedRole] = useState<UserRole>(null);
   const [authUser, setAuthUser] = useState<Staff | null>(null);
   const [tableNumber, setTableNumber] = useState<number | null>(null);
@@ -75,44 +35,26 @@ export function App() {
   const [scanningTable, setScanningTable] = useState<number | null>(null);
   const [detectedTable, setDetectedTable] = useState<number | null>(null);
   const [showQRGrid, setShowQRGrid] = useState(false);
-  
-  // Check backend availability on mount
-  useEffect(() => {
-    async function checkBackend() {
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000);
-
-        const res = await fetch(`${API_BASE}/health`, {
-          signal: controller.signal
-        });
-        clearTimeout(timeoutId);
-
-        if (res.ok) {
-          setBackendStatus('available');
-        } else {
-          setBackendStatus('unavailable');
-        }
-      } catch (err) {
-        console.error('Backend unavailable:', err);
-        setBackendStatus('unavailable');
+  // list of table numbers created by manager
+  const [tables, setTables] = useState<number[]>([]);
+  // persist tables in localStorage
+  React.useEffect(() => {
+    try {
+      const saved = localStorage.getItem('tables');
+      if (saved) {
+        setTables(JSON.parse(saved));
       }
+    } catch (e) {
+      console.warn('failed to load tables', e);
     }
-    checkBackend();
   }, []);
-
-  // Show startup screen while checking backend
-  if (backendStatus === 'checking') {
-    return <StartupScreen />;
-  }
-
-  // Show error screen if backend is unavailable
-  if (backendStatus === 'unavailable') {
-    return <ErrorScreen onRetry={() => window.location.reload()} />;
-  }
-  
-  // Tables from backend
-  const { tables, addTable } = useTables();
+  React.useEffect(() => {
+    try {
+      localStorage.setItem('tables', JSON.stringify(tables));
+    } catch (e) {
+      console.warn('failed to save tables', e);
+    }
+  }, [tables]);
 
   const [waiterCalls, setWaiterCalls] = useState<
     {
@@ -369,8 +311,10 @@ export function App() {
           <QRCodeGenerator
             tables={tables}
             onAddTable={() => {
-              const next = tables.length > 0 ? Math.max(...tables) + 1 : 1;
-              addTable(next);
+              setTables((prev) => {
+                const next = prev.length > 0 ? Math.max(...prev) + 1 : 1;
+                return [...prev, next];
+              });
             }}
           />
         )}
@@ -410,8 +354,10 @@ export function App() {
           <QRCodeGenerator
             tables={tables}
             onAddTable={() => {
-              const next = tables.length > 0 ? Math.max(...tables) + 1 : 1;
-              addTable(next);
+              setTables((prev) => {
+                const next = prev.length > 0 ? Math.max(...prev) + 1 : 1;
+                return [...prev, next];
+              });
             }}
           />
         )}
@@ -467,10 +413,177 @@ export function App() {
             </h1>
           </div>
           <p className="text-lg text-[#a89f91] max-w-2xl mx-auto font-light">
-            Restaurant Management System.
+            A complete end-to-end solution for modern hospitality.
           </p>
         </motion.div>
 
+        {/* Customer QR Scan Section */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="bg-gradient-to-br from-[#2a2018] to-[#1a1410] rounded-2xl border border-[#3a2e20] p-8 mb-12"
+        >
+          <div className="flex flex-col md:flex-row items-center gap-8">
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-8 h-8 rounded-lg bg-green-500/20 flex items-center justify-center">
+                  <ShoppingBagIcon className="w-4 h-4 text-green-400" />
+                </div>
+                <span className="text-xs font-medium text-green-400/60 uppercase tracking-wider">Customer</span>
+              </div>
+              <h2 className="text-2xl font-semibold text-[#e8e4dc] mb-3">
+                Scan QR to Order
+              </h2>
+              <p className="text-[#a89f91] mb-6">
+                Customers can scan the QR code on their table to access the digital menu and place orders directly from their phones.
+              </p>
+              <div className="flex flex-wrap gap-3">
+                <Button
+                  variant="primary"
+                  size="lg"
+                  className="px-8 py-3 rounded-full shadow-[0_0_30px_rgba(245,158,11,0.15)] hover:shadow-[0_0_40px_rgba(245,158,11,0.3)]"
+                  onClick={() => handleScanQR()}
+                >
+                  <QrCodeIcon className="w-5 h-5 mr-2" />
+                  Scan QR Code
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="lg"
+                  className="px-8 py-3 rounded-full border-[#3a2e20] text-[#a89f91] hover:text-amber-500 hover:border-amber-500/50"
+                  onClick={() => setShowQRGrid(true)}
+                >
+                  Demo: Pick Table
+                </Button>
+              </div>
+            </div>
+            <div className="w-48 h-48 relative">
+              <div className="absolute inset-0 bg-gradient-to-br from-amber-500/10 to-transparent rounded-2xl" />
+              <div className="relative w-full h-full flex items-center justify-center">
+                <div className="grid grid-cols-5 gap-2 opacity-40">
+                  {Array.from({ length: 25 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className={`w-4 h-4 rounded-sm ${[0, 2, 3, 5, 6, 8, 10, 12, 14, 15, 17, 18, 20, 22, 23, 24].includes(i) ? 'bg-amber-500' : 'bg-transparent'}`}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Scanning / Detection Overlay */}
+        <AnimatePresence>
+            {(isScanning || detectedTable) &&
+            <motion.div
+              initial={{
+                opacity: 0,
+                scale: 0.9
+              }}
+              animate={{
+                opacity: 1,
+                scale: 1
+              }}
+              exit={{
+                opacity: 0,
+                scale: 0.9
+              }}
+              className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center">
+
+                <div className="text-center">
+                  {isScanning &&
+                <motion.div className="relative w-56 h-56 mx-auto mb-6">
+                      {/* QR frame corners */}
+                      <div className="absolute top-0 left-0 w-10 h-10 border-t-4 border-l-4 border-amber-500 rounded-tl-lg" />
+                      <div className="absolute top-0 right-0 w-10 h-10 border-t-4 border-r-4 border-amber-500 rounded-tr-lg" />
+                      <div className="absolute bottom-0 left-0 w-10 h-10 border-b-4 border-l-4 border-amber-500 rounded-bl-lg" />
+                      <div className="absolute bottom-0 right-0 w-10 h-10 border-b-4 border-r-4 border-amber-500 rounded-br-lg" />
+
+                      {/* Scanning line */}
+                      <motion.div
+                    animate={{
+                      y: [0, 200, 0]
+                    }}
+                    transition={{
+                      repeat: Infinity,
+                      duration: 2,
+                      ease: 'easeInOut'
+                    }}
+                    className="absolute left-2 right-2 h-0.5 bg-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.8)]" />
+
+
+                      {/* Simulated QR pattern */}
+                      <div className="absolute inset-8 flex items-center justify-center">
+                        <div className="grid grid-cols-5 gap-1.5 opacity-30">
+                          {Array.from({
+                        length: 25
+                      }).map((_, i) =>
+                      <div
+                        key={i}
+                        className={`w-5 h-5 rounded-sm ${Math.random() > 0.4 ? 'bg-white' : 'bg-transparent'}`} />
+
+                      )}
+                        </div>
+                      </div>
+
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <span className="text-amber-500/60 text-4xl font-bold">
+                          {scanningTable}
+                        </span>
+                      </div>
+                    </motion.div>
+                }
+
+                  {isScanning &&
+                <p className="text-[#a89f91] text-lg animate-pulse">
+                      Scanning QR code...
+                    </p>
+                }
+
+                  {detectedTable && !isScanning &&
+                <motion.div
+                  initial={{
+                    scale: 0.5,
+                    opacity: 0
+                  }}
+                  animate={{
+                    scale: 1,
+                    opacity: 1
+                  }}
+                  transition={{
+                    type: 'spring',
+                    damping: 15
+                  }}>
+
+                      <div className="w-24 h-24 rounded-full bg-green-500/20 border-2 border-green-500 flex items-center justify-center mx-auto mb-4">
+                        <svg
+                      className="w-12 h-12 text-green-500"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={3}>
+
+                          <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M5 13l4 4L19 7" />
+
+                        </svg>
+                      </div>
+                      <p className="text-white text-2xl font-semibold mb-1">
+                        Table {detectedTable}
+                      </p>
+                      <p className="text-green-400 text-lg">
+                        QR code detected! Opening menu...
+                      </p>
+                    </motion.div>
+                }
+                </div>
+              </motion.div>
+            }
+          </AnimatePresence>
 
         {/* Staff Role Cards */}
         <div className="mt-16">
@@ -646,4 +759,3 @@ export function App() {
     </div>);
 
 }
-
