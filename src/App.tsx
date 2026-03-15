@@ -75,10 +75,7 @@ export function App() {
   const [scanningTable, setScanningTable] = useState<number | null>(null);
   const [detectedTable, setDetectedTable] = useState<number | null>(null);
   const [showQRGrid, setShowQRGrid] = useState(false);
-
-  // Tables from backend - must be called before any early returns
-  const { tables, addTable } = useTables();
-
+  
   // Check backend availability on mount
   useEffect(() => {
     async function checkBackend() {
@@ -113,6 +110,9 @@ export function App() {
   if (backendStatus === 'unavailable') {
     return <ErrorScreen onRetry={() => window.location.reload()} />;
   }
+  
+  // Tables from backend
+  const { tables, addTable } = useTables();
 
   const [waiterCalls, setWaiterCalls] = useState<
     {
