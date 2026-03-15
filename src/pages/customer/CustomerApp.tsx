@@ -117,7 +117,7 @@ export function CustomerApp({
   }];
 
   return (
-    <div className="min-h-screen bg-[#faf6f0]">
+    <div className="min-h-screen bg-[#1a1410]">
       {/* Toast Notification */}
       <AnimatePresence>
         {showToast &&
@@ -218,7 +218,7 @@ export function CustomerApp({
       </motion.button>
 
       {/* Bottom navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-[#e8e4dc] px-6 py-3 safe-area-pb z-50">
+      <nav className="fixed bottom-0 left-0 right-0 bg-[#1a1410] border-t border-[#3a2e20] px-6 py-3 safe-area-pb z-50">
         <div className="flex justify-around items-center">
           {tabs.map((tab) => {
             const Icon = tab.icon;
@@ -231,7 +231,7 @@ export function CustomerApp({
 
                 <div className="relative">
                   <Icon
-                    className={`w-6 h-6 transition-colors ${isActive ? 'text-amber-500' : 'text-slate-400'}`} />
+                    className={`w-6 h-6 transition-colors ${isActive ? 'text-amber-500' : 'text-[#a89f91]'}`} />
 
                   {tab.count !== undefined && tab.count > 0 &&
                   <span className="absolute -top-2 -right-2 w-5 h-5 bg-amber-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
@@ -240,7 +240,7 @@ export function CustomerApp({
                   }
                 </div>
                 <span
-                  className={`text-xs font-medium transition-colors ${isActive ? 'text-amber-500' : 'text-slate-400'}`}>
+                  className={`text-xs font-medium transition-colors ${isActive ? 'text-amber-500' : 'text-[#a89f91]'}`}>
 
                   {tab.label}
                 </span>
