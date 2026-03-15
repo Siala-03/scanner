@@ -93,12 +93,12 @@ export function MenuPage({ onAddToCart }: MenuPageProps) {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 pb-24">
+    <div className="min-h-screen bg-gradient-to-br from-amber-950 via-amber-900 to-yellow-950 pb-24">
       {/* Header */}
-      <div className="sticky top-0 z-40 bg-slate-900/95 backdrop-blur-sm border-b border-slate-700">
+      <div className="sticky top-0 z-40 bg-amber-950/95 backdrop-blur-sm border-b border-amber-800">
         <div className="px-4 py-4">
           <div className="flex items-center gap-3 mb-4">
-            <h1 className="text-2xl font-bold text-white">Menu</h1>
+            <h1 className="text-2xl font-bold text-amber-50">Menu</h1>
             {error && (
               <button 
                 onClick={refetch}
@@ -112,13 +112,13 @@ export function MenuPage({ onAddToCart }: MenuPageProps) {
           
           {/* Search */}
           <div className="relative">
-            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-amber-300/50" />
             <input
               type="text"
               placeholder="Search menu..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 bg-slate-800 border border-slate-600 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full pl-10 pr-4 py-3 bg-amber-900/50 border border-amber-700 rounded-xl text-amber-50 placeholder-amber-300/50 focus:outline-none focus:ring-2 focus:ring-amber-400"
             />
           </div>
         </div>
@@ -131,8 +131,8 @@ export function MenuPage({ onAddToCart }: MenuPageProps) {
               onClick={() => setActiveCategory(category.id)}
               className={`flex items-center gap-1.5 px-4 py-2 rounded-full whitespace-nowrap transition-all ${
                 activeCategory === category.id
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-slate-700/50 text-slate-300 hover:bg-slate-700'
+                  ? 'bg-amber-500 text-white'
+                  : 'bg-amber-900/40 text-amber-200/80 hover:bg-amber-800/50'
               }`}
             >
               <span className="text-sm font-medium">{category.name}</span>
@@ -153,9 +153,9 @@ export function MenuPage({ onAddToCart }: MenuPageProps) {
         <div className="px-4 py-6">
           <div className="flex items-center gap-2 mb-4">
             <SparklesIcon className="w-5 h-5 text-amber-400" />
-            <h2 className="text-lg font-semibold text-white">Popular</h2>
+            <h2 className="text-lg font-semibold text-amber-50">Popular</h2>
           </div>
-          <div className="grid grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
             {popularItems.map((item) => (
               <MenuItemCard
                 key={item.id}
@@ -171,13 +171,13 @@ export function MenuPage({ onAddToCart }: MenuPageProps) {
       {/* All Items */}
       {!isLoading && (
         <div className="px-4 py-4">
-          <h2 className="text-lg font-semibold text-white mb-4">
+          <h2 className="text-lg font-semibold text-amber-50 mb-4">
             {activeCategory === 'all' ? 'Full Menu' : categoryNames[activeCategory] || activeCategory}
-            <span className="text-slate-400 text-sm font-normal ml-2">
+            <span className="text-amber-300/60 text-sm font-normal ml-2">
               ({filteredItems.length} items)
             </span>
           </h2>
-          <div className="grid grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
             {filteredItems.map((item) => (
               <MenuItemCard
                 key={item.id}
@@ -189,7 +189,7 @@ export function MenuPage({ onAddToCart }: MenuPageProps) {
           </div>
           
           {filteredItems.length === 0 && (
-            <div className="text-center py-12 text-slate-400">
+            <div className="text-center py-12 text-amber-300/60">
               <p>No items found</p>
             </div>
           )}

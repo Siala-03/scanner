@@ -33,12 +33,12 @@ export function MenuItemCard({
         scale: 0.98
       }}
       onClick={() => onViewDetails(item)}
-      className="bg-[#fffdf9] rounded-xl shadow-sm overflow-hidden cursor-pointer hover:shadow-md transition-shadow duration-200 h-full flex flex-col">
+      className="bg-amber-900/40 rounded-xl shadow-sm overflow-hidden cursor-pointer hover:shadow-md transition-shadow duration-200 h-full flex flex-col border border-amber-700/50">
 
       <div className="p-4 flex flex-col flex-1">
         <div className="flex items-start justify-between mb-2">
           {item.isPopular ?
-          <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs font-medium rounded-full">
+          <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 text-xs font-medium rounded-full">
               Popular
             </span> :
 
@@ -46,20 +46,20 @@ export function MenuItemCard({
           }
         </div>
 
-        <h3 className="font-semibold text-slate-900 mb-1 line-clamp-1">
+        <h3 className="font-semibold text-amber-50 mb-1 line-clamp-1">
           {item.name}
         </h3>
 
-        <p className="text-sm text-slate-500 mb-3 line-clamp-2 min-h-[2.5rem]">
+        <p className="text-sm text-amber-200/70 mb-3 line-clamp-2 min-h-[2.5rem]">
           {item.description}
         </p>
 
         <div className="flex items-center justify-between mt-auto">
           <div>
-            <span className="text-lg font-bold text-slate-900">
+            <span className="text-lg font-bold text-amber-50">
               {formatPrice(getEffectivePrice(item))}
             </span>
-            <div className="flex items-center gap-1 text-xs text-slate-400 mt-0.5">
+            <div className="flex items-center gap-1 text-xs text-amber-300/60 mt-0.5">
               <ClockIcon className="w-3 h-3" />
               <span>{item.prepTime} min</span>
             </div>
@@ -82,7 +82,7 @@ export function MenuItemCard({
         </div>
 
         {!item.isAvailable &&
-        <p className="text-xs text-red-500 mt-2 font-medium">
+        <p className="text-xs text-red-400 mt-2 font-medium">
             Currently unavailable
           </p>
         }
