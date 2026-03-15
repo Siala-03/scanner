@@ -25,7 +25,8 @@ const activityIcons: Record<ActivityType, React.ElementType> = {
   staff_clock_in: UserPlusIcon,
   staff_clock_out: UserMinusIcon,
   menu_updated: EditIcon,
-  table_assigned: MapPinIcon
+  table_assigned: MapPinIcon,
+  waiter_called: BellIcon
 };
 const activityColors: Record<ActivityType, string> = {
   order_placed: 'bg-blue-500/20 text-blue-400',
@@ -36,7 +37,8 @@ const activityColors: Record<ActivityType, string> = {
   staff_clock_in: 'bg-green-500/20 text-green-400',
   staff_clock_out: 'bg-slate-500/20 text-slate-400',
   menu_updated: 'bg-blue-500/20 text-blue-400',
-  table_assigned: 'bg-amber-500/20 text-amber-400'
+  table_assigned: 'bg-amber-500/20 text-amber-400',
+  waiter_called: 'bg-amber-500/20 text-amber-400'
 };
 export function ActivityFeed({ activities, maxItems = 10 }: ActivityFeedProps) {
   const displayedActivities = activities.slice(0, maxItems);
