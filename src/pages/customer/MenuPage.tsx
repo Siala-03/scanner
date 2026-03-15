@@ -84,12 +84,11 @@ export function MenuPage({ onAddToCart }: MenuPageProps) {
   // Build categories from fetched menu
   const menuCategories = categories.map(cat => ({
     id: cat,
-    name: categoryNames[cat] || cat.charAt(0).toUpperCase() + cat.slice(1),
-    emoji: '🍽️'
+    name: categoryNames[cat] || cat.charAt(0).toUpperCase() + cat.slice(1)
   }));
 
   const categoryTabs = [
-    { id: 'all', name: 'All', emoji: '🍽️' },
+    { id: 'all', name: 'All' },
     ...menuCategories
   ];
 
@@ -136,7 +135,6 @@ export function MenuPage({ onAddToCart }: MenuPageProps) {
                   : 'bg-[#2a2018]/50 text-[#a89f91] hover:bg-[#2a2018]'
               }`}
             >
-              <span>{category.emoji}</span>
               <span className="text-sm font-medium">{category.name}</span>
             </button>
           ))}
