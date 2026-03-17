@@ -21,6 +21,7 @@ export function LoginPage({ role, onLogin, onBack }: LoginPageProps) {
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [showPassword, setShowPassword] = useState(false);
 
+  // Render signup form if in signup mode
   if (mode === 'signup') {
     return (
       <SignUpPage
@@ -30,6 +31,7 @@ export function LoginPage({ role, onLogin, onBack }: LoginPageProps) {
       />
     );
   }
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -56,6 +58,7 @@ export function LoginPage({ role, onLogin, onBack }: LoginPageProps) {
       setIsLoading(false);
     }
   };
+
   const roleTitle = role.charAt(0).toUpperCase() + role.slice(1);
   return (
     <div className="min-h-screen bg-[#1a1410] flex items-center justify-center p-4">
