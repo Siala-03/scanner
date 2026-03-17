@@ -8,11 +8,7 @@ import {
   KeyIcon } from
 'lucide-react';
 import { Staff, StaffRole, StaffCredentials } from '../../types';
-import {
-  mockStaff,
-  staffCredentials,
-  addStaffCredential } from
-'../../data/staffData';
+import { useStaff } from '../../hooks/useStaff';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
@@ -20,7 +16,7 @@ import { SearchBar } from '../../components/ui/SearchBar';
 import { Modal } from '../../components/ui/Modal';
 import { Input } from '../../components/ui/Input';
 export function StaffManagement() {
-  const [staff, setStaff] = useState<Staff[]>(mockStaff);
+  const { staff: backendStaff, isLoading, refetch } = useStaff();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedRole, setSelectedRole] = useState<StaffRole | 'all'>('all');
   const [isCredentialModalOpen, setIsCredentialModalOpen] = useState(false);
@@ -42,7 +38,7 @@ export function StaffManagement() {
     phone: '',
     assignedTables: ''
   });
-  const filteredStaff = staff.filter((s) => {
+  const filteredStaff = backendStaff.filter((s) => {
     const matchesSearch =
     s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     s.email.toLowerCase().includes(searchQuery.toLowerCase());
@@ -87,6 +83,14 @@ export function StaffManagement() {
       setIsCredentialModalOpen(false);
     }
   };
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+        <div className="text-white text-lg">Loading staff...</div>
+      </div>
+    );
+  }
+
   return (
     <div className="dark min-h-screen bg-slate-900 p-4 md:p-6">
       <div className="max-w-7xl mx-auto">
@@ -95,7 +99,7 @@ export function StaffManagement() {
           <div>
             <h1 className="text-2xl font-bold text-white">Staff Management</h1>
             <p className="text-slate-400">
-              {staff.filter((s) => s.isOnDuty).length} staff on duty
+              {backendStaff.filter((s) => s.isOnDuty).length} staff on duty
             </p>
           </div>
           <Button variant="primary" onClick={() => setIsAddStaffOpen(true)}>

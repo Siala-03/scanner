@@ -3,13 +3,14 @@ import { ChevronUpIcon, ChevronDownIcon } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Order, SortConfig, SortDirection } from '../../types';
 import { StatusBadge } from '../ui/Badge';
-import { getStaffById } from '../../data/staffData';
+import { useStaff } from '../../hooks/useStaff';
 import { formatPrice } from '../../utils/currency';
 interface OrdersTableProps {
   orders: Order[];
   onSelectOrder: (order: Order) => void;
 }
 export function OrdersTable({ orders, onSelectOrder }: OrdersTableProps) {
+  const { staff } = useStaff();
   const [sortConfig, setSortConfig] = useState<SortConfig>({
     field: 'createdAt',
     direction: 'desc'
@@ -87,7 +88,7 @@ export function OrdersTable({ orders, onSelectOrder }: OrdersTableProps) {
         <tbody className="divide-y divide-slate-700/50">
           {sortedOrders.map((order, index) => {
             const waiter = order.assignedWaiterId ?
-            getStaffById(order.assignedWaiterId) :
+            staff.find(s => s.id === order.assignedWaiterId) :
             null;
             const createdAt = order.createdAt;
             return (

@@ -7,11 +7,7 @@ import {
   EyeIcon,
   EyeOffIcon } from
 'lucide-react';
-import { MenuItem, MenuCategory, MenuCategoryInfo } from '../../types';
-import {
-  menuItems as initialMenuItems,
-  menuCategories } from
-'../../data/menuData';
+import { MenuItem, MenuCategoryInfo } from '../../types';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Tabs } from '../../components/ui/Tabs';
@@ -47,9 +43,7 @@ export function MenuManagement() {
   const { menuItems: backendMenuItems, isLoading, refetch } = useMenu();
   
   // Use backend items if available, otherwise fall back to initial
-  const menuItemsState = backendMenuItems && backendMenuItems.length > 0 
-    ? backendMenuItems 
-    : initialMenuItems;
+  const menuItemsState = useMemo(() => backendMenuItems || [], [backendMenuItems]);
   
   const [activeCategory, setActiveCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -331,14 +325,7 @@ export function MenuManagement() {
           isOpen={isEditorOpen}
           onClose={() => setIsEditorOpen(false)}
           onSave={handleSaveItem}
-          categories={defaultCategories.filter(c => c.id !== 'all')}
-          onAddCategory={(cat) => {
-            // Categories are now auto-detected from menu items
-            console.log('Category added:', cat);
-          }}
-        />
-
-      </div>
-    </div>);
-
+          categories={defaultCategories}
+          onAddCategory={() => {
+            // No-op: categories are auto-detected from menu item categories
 }

@@ -2,7 +2,7 @@ import React, { useCallback, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeftIcon, UtensilsIcon, BarChart3Icon, BriefcaseIcon, ChefHatIcon, QrCodeIcon, UsersIcon, TrendingUpIcon, ClockIcon, ShoppingBagIcon } from 'lucide-react';
 import { CartItem, Order, OrderStatus } from './types';
-import { mockStaff } from './data/staffData';
+import { useStaff } from './hooks/useStaff';
 import { useOrders } from './hooks/useOrders';
 import { CustomerApp } from './pages/customer/CustomerApp';
 import { WaiterDashboard } from './pages/waiter/WaiterDashboard';

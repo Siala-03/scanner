@@ -3,7 +3,7 @@ import { ChevronUpIcon, ChevronDownIcon, SearchIcon, CalendarIcon, DownloadIcon,
 import { motion } from 'framer-motion';
 import { Order, OrderStatus } from '../../types/orders';
 import { StatusBadge } from '../ui/Badge';
-import { getStaffById } from '../../data/staffData';
+import { useStaff } from '../../hooks/useStaff';
 import { formatPrice } from '../../utils/currency';
 
 interface OrdersHistoryTableProps {
@@ -28,17 +28,19 @@ export function OrdersHistoryTable({ orders, onSelectOrder, onExport }: OrdersHi
   const [dateTo, setDateTo] = useState<string>('');
   const [waiterFilter, setWaiterFilter] = useState<string>('all');
   
+  const { staff } = useStaff();
+
   // Get unique waiters from orders
   const waiters = useMemo(() => {
     const uniqueWaiters = new Map<string, string>();
     orders.forEach(order => {
       if (order.assignedWaiterId) {
-        const staff = getStaffById(order.assignedWaiterId);
-        uniqueWaiters.set(order.assignedWaiterId, staff?.name || order.assignedWaiterId);
+        const waiter = staff.find((s) => s.id === order.assignedWaiterId);
+        uniqueWaiters.set(order.assignedWaiterId, waiter?.name || order.assignedWaiterId);
       }
     });
     return Array.from(uniqueWaiters.entries()).map(([id, name]) => ({ id, name }));
-  }, [orders]);
+  }, [orders, staff]);
 
   // Status options
   const statusOptions: { value: string; label: string }[] = [

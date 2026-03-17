@@ -4,7 +4,7 @@ import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import type { Order, Staff } from '../../types';
 import { addReview } from '../../utils/reviewsStorage';
-import { getStaffById } from '../../data/staffData';
+import { useStaff } from '../../hooks/useStaff';
 
 interface ServiceReviewModalProps {
   order: Order | null;
@@ -16,10 +16,11 @@ export function ServiceReviewModal({ order, isOpen, onClose }: ServiceReviewModa
   const [rating, setRating] = useState<number>(5);
   const [comment, setComment] = useState('');
 
+  const { staff } = useStaff();
   const waiter: Staff | null = useMemo(() => {
     if (!order?.assignedWaiterId) return null;
-    return getStaffById(order.assignedWaiterId) ?? null;
-  }, [order?.assignedWaiterId]);
+    return staff.find((s) => s.id === order.assignedWaiterId) ?? null;
+  }, [order?.assignedWaiterId, staff]);
 
   if (!order) return null;
 

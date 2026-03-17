@@ -17,7 +17,6 @@ import {
   UploadIcon
 } from 'lucide-react';
 import { Order, OrderStatus } from '../../types';
-import { weeklyRevenue, todayKPIs } from '../../data/analyticsData';
 import { Card } from '../../components/ui/Card';
 import { Tabs } from '../../components/ui/Tabs';
 import { KPICard } from '../../components/supervisor/KPICard';
@@ -27,9 +26,9 @@ import { OrderDetailModal } from '../../components/waiter/OrderDetailModal';
 import { formatPrice } from '../../utils/currency';
 import { getAverageRating } from '../../utils/reviewsStorage';
 import { listLowStock } from '../../utils/inventoryStorage';
-import { menuItems } from '../../data/menuData';
+import { useMenu } from '../../hooks/useMenu';
 import { downloadCsv, buildOrdersCsv } from '../../utils/csv';
-import { getStaffById } from '../../data/staffData';
+import { useStaff } from '../../hooks/useStaff';
 import { exportMenuToJson, exportMenuToCsv, importMenuFromFile, saveCustomMenu, hasCustomMenu, resetToDefaultMenu } from '../../utils/menuImportExport';
 interface SupervisorDashboardProps {
   orders: Order[];
@@ -67,6 +66,8 @@ export function SupervisorDashboard({
   todaysRevenue / todaysOrders.filter((o) => o.status === 'served').length :
   0;
   const avgRating = getAverageRating();
+  const { menuItems } = useMenu();
+  const { staff } = useStaff();
   const lowStock = listLowStock(menuItems);
   const [tableFilter, setTableFilter] = useState<string>('all');
   const [waiterFilter, setWaiterFilter] = useState<string>('all');

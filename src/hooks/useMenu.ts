@@ -6,7 +6,7 @@ import { getSocket } from './useSocket';
 
 // Hook to get menu from backend with real-time sync
 export function useMenu() {
-  const [menuItems, setMenuItems] = useState<MenuItem[]>(defaultMenuItems);
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -15,14 +15,12 @@ export function useMenu() {
     try {
       setIsLoading(true);
       const backendMenu = await fetchMenu();
-      if (backendMenu && backendMenu.length > 0) {
-        setMenuItems(backendMenu);
-      }
+      setMenuItems(backendMenu || []);
       setError(null);
     } catch (err) {
       console.warn('Failed to fetch menu from backend:', err);
-      // Keep using local menu on error
-      setError('Using offline menu');
+      setMenuItems([]);
+      setError('Failed to load menu');
     } finally {
       setIsLoading(false);
     }

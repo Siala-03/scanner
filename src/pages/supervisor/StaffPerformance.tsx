@@ -9,13 +9,22 @@ import {
   ResponsiveContainer } from
 'recharts';
 import { StarIcon, TrophyIcon, ClockIcon, DollarSignIcon } from 'lucide-react';
-import { mockStaff, getWaiters } from '../../data/staffData';
+import { useWaiters } from '../../hooks/useStaff';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { ProgressBar } from '../../components/ui/ProgressBar';
 import { formatPrice } from '../../utils/currency';
 export function StaffPerformance() {
-  const waiters = getWaiters();
+  const { waiters, isLoading } = useWaiters();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+        <div className="text-white text-lg">Loading staff performance...</div>
+      </div>
+    );
+  }
+
   const sortedByRating = [...waiters].sort(
     (a, b) => b.performance.rating - a.performance.rating
   );
