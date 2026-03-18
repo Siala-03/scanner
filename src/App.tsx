@@ -119,7 +119,7 @@ export function App() {
         setSelectedRole('customer');
         setTableNumber(targetTable);
         // update URL so it matches what a real scan would point to
-        window.history.pushState({}, '', `/t/${targetTable}`);
+        window.history.pushState({}, '', `/?table=${targetTable}`);
         setDetectedTable(null);
         setScanningTable(null);
         setShowQRGrid(false);
@@ -130,8 +130,20 @@ export function App() {
   // and also check for role-based URLs like /waiter, /kitchen, etc.
   useEffect(() => {
     const path = window.location.pathname;
-    
-    // Check for table QR code: /t/123
+    const query = new URLSearchParams(window.location.search);
+
+    // Check for query table: ?table=123
+    const queryTable = query.get('table');
+    if (queryTable) {
+      const num = parseInt(queryTable, 10);
+      if (!isNaN(num)) {
+        setSelectedRole('customer');
+        setTableNumber(num);
+        return;
+      }
+    }
+
+    // Check for table QR code path: /t/123
     const tableMatch = path.match(/^\/t\/(\d+)/);
     if (tableMatch) {
       const num = parseInt(tableMatch[1], 10);
@@ -141,7 +153,7 @@ export function App() {
         return;
       }
     }
-    
+
     // Check for role-based URLs
     if (path === '/waiter' || path.startsWith('/waiter')) {
       setSelectedRole('waiter');
