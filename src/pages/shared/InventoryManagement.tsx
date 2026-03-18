@@ -25,34 +25,33 @@ import { Button } from '../../components/ui/Button';
 import { SearchBar } from '../../components/ui/SearchBar';
 import { Modal } from '../../components/ui/Modal';
 import { formatPrice } from '../../utils/currency';
-import { menuItems, menuCategories } from '../../data/menuData';
+import { useMenu } from '../../hooks/useMenu';
 import type {
   InventoryRecord,
   Supplier,
   PurchaseOrder,
   PurchaseOrderStatus,
   WasteReason,
+  InventoryAnalytics,
+  StockMovement,
 } from '../../types/inventory';
 import {
-  ensureInventoryInitialized,
-  loadInventoryMap,
-  updateInventoryRecord,
-  recordManualAdjustment,
-  listLowStock,
-  loadSuppliers,
-  ensureSuppliersInitialized,
-  addSupplier,
-  updateSupplier,
-  loadPurchaseOrders,
-  ensurePurchaseOrdersInitialized,
-  createPurchaseOrder,
-  updatePurchaseOrder,
-  receivePurchaseOrder,
-  loadMovements,
-  loadWasteLog,
-  recordWaste,
-  computeInventoryAnalytics,
-} from '../../utils/inventoryStorage';
+  fetchInventory,
+  fetchLowStockItems,
+  updateInventoryRecord as apiUpdateInventoryRecord,
+  adjustStock as apiAdjustStock,
+  fetchSuppliers,
+  createSupplier as apiCreateSupplier,
+  updateSupplier as apiUpdateSupplier,
+  fetchPurchaseOrders,
+  createPurchaseOrder as apiCreatePurchaseOrder,
+  updatePurchaseOrder as apiUpdatePurchaseOrder,
+  receivePurchaseOrder as apiReceivePurchaseOrder,
+  fetchMovements,
+  fetchWasteEntries,
+  recordWaste as apiRecordWaste,
+  computeInventoryAnalytics as apiComputeInventoryAnalytics,
+} from '../../api/inventory';
 
 interface InventoryManagementProps {
   role: 'manager' | 'supervisor';
@@ -114,17 +113,62 @@ function StarRating({ rating }: { rating: number }) {
 // ── Main Component ───────────────────────────────────────────────────────────
 
 export function InventoryManagement({ role }: InventoryManagementProps) {
+  const { menuItems } = useMenu();
+  const menuCategories = useMemo(() => Array.from(new Set(menuItems.map((m) => m.category))), [menuItems]);
   const isManager = role === 'manager';
   const [activeTab, setActiveTab] = useState<Tab>('overview');
   const [tick, setTick] = useState(0);
   const refresh = useCallback(() => setTick((t) => t + 1), []);
 
-  // Initialize all data on mount
+  const [inventoryMap, setInventoryMap] = useState<Record<string, InventoryRecord>>({});
+  const [lowStockItems, setLowStockItems] = useState<InventoryRecord[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
+
+  const [movements, setMovements] = useState<StockMovement[]>([]);
+  const [wasteLog, setWasteLog] = useState<any[]>([]);
+  const [analytics, setAnalytics] = useState<InventoryAnalytics>({
+    totalStockValue: 0,
+    lowStockCount: 0,
+    outOfStockCount: 0,
+    pendingPOCount: 0,
+    pendingPOValue: 0,
+    wasteCostLast30d: 0,
+    avgTurnoverDays: 0,
+    belowReorderCount: 0,
+    topWasteReason: null,
+    wasteByReason: [],
+    topWasteItems: [],
+    stockTurnoverRate: 0,
+    categoryBreakdown: [],
+  });
+
   useEffect(() => {
-    ensureInventoryInitialized(menuItems);
-    ensureSuppliersInitialized();
-    ensurePurchaseOrdersInitialized();
-  }, []);
+    async function loadAll() {
+      try {
+        const [inventoryData, lowStockData, supplierData, poData, moveData, wasteData, computedAnalytics] = await Promise.all([
+          fetchInventory(),
+          fetchLowStockItems(),
+          fetchSuppliers(),
+          fetchPurchaseOrders(),
+          fetchMovements({ limit: 200 }),
+          fetchWasteEntries({ limit: 200 }),
+          apiComputeInventoryAnalytics(),
+        ]);
+
+        setInventoryMap(Object.fromEntries(inventoryData.map((rec) => [rec.menuItemId, rec])));
+        setLowStockItems(lowStockData);
+        setSuppliers(supplierData);
+        setPurchaseOrders(poData);
+        setMovements(moveData);
+        setWasteLog(wasteData);
+        setAnalytics(computedAnalytics);
+      } catch (err) {
+        console.warn('Failed to load inventory backend data', err);
+      }
+    }
+    loadAll();
+  }, [tick]);
 
   // ── Overview state ──────────────────────────────────────────────────────
   const [query, setQuery] = useState('');
@@ -137,13 +181,12 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
   const [adjustNotes, setAdjustNotes] = useState('');
 
   const inventoryRows = useMemo(() => {
-    const map = loadInventoryMap();
     const q = query.trim().toLowerCase();
     return menuItems
       .filter((i) => !q || i.name.toLowerCase().includes(q) || i.id.toLowerCase().includes(q))
       .filter((i) => categoryFilter === 'all' || i.category === categoryFilter)
       .map((item) => {
-        const rec = map[item.id]!;
+        const rec = inventoryMap[item.id];
         const stock = rec?.stock ?? 0;
         const threshold = rec?.lowStockThreshold ?? 0;
         return { item, rec, stock, threshold, isOut: stock === 0, isLow: stock > 0 && stock <= threshold };
@@ -159,25 +202,31 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
         if (a.isLow !== b.isLow) return Number(b.isLow) - Number(a.isLow);
         return a.item.name.localeCompare(b.item.name);
       });
-  }, [query, categoryFilter, statusFilter, tick]);
+  }, [query, categoryFilter, statusFilter, tick, menuItems, inventoryMap]);
 
-  const lowStockItems = useMemo(() => listLowStock(menuItems), [tick]);
+  // lowStockItems loaded from backend state via fetchLowStockItems() and setLowStockItems()
 
-  const handleSaveRow = (menuItemId: string, name: string) => {
+  const handleSaveRow = async (menuItemId: string, _name: string) => {
     if (!isManager) return;
-    const current = loadInventoryMap()[menuItemId];
+    const current = inventoryMap[menuItemId];
     if (!current) return;
-    const newStock = editValues.stock !== undefined ? editValues.stock : current.stock;
-    if (newStock !== current.stock) {
-      recordManualAdjustment(menuItemId, name, newStock, 'Manager');
+    const updates: Partial<InventoryRecord> = {};
+    if (editValues.stock !== undefined && editValues.stock !== current.stock) updates.stock = editValues.stock;
+    if (editValues.lowStockThreshold !== undefined && editValues.lowStockThreshold !== current.lowStockThreshold) updates.lowStockThreshold = editValues.lowStockThreshold;
+    if (editValues.reorderPoint !== undefined && editValues.reorderPoint !== current.reorderPoint) updates.reorderPoint = editValues.reorderPoint;
+    if (editValues.reorderQty !== undefined && editValues.reorderQty !== current.reorderQty) updates.reorderQty = editValues.reorderQty;
+    if (editValues.unitCost !== undefined && editValues.unitCost !== current.unitCost) updates.unitCost = editValues.unitCost;
+    if (editValues.location !== undefined && editValues.location !== current.location) updates.location = editValues.location;
+
+    if (Object.keys(updates).length > 0) {
+      try {
+        const updated = await apiUpdateInventoryRecord(menuItemId, updates);
+        setInventoryMap((prev) => ({ ...prev, [menuItemId]: updated }));
+      } catch (err) {
+        console.error('Failed to update inventory record', err);
+      }
     }
-    updateInventoryRecord(menuItemId, {
-      lowStockThreshold: editValues.lowStockThreshold ?? current.lowStockThreshold,
-      reorderPoint: editValues.reorderPoint ?? current.reorderPoint,
-      reorderQty: editValues.reorderQty ?? current.reorderQty,
-      unitCost: editValues.unitCost ?? current.unitCost,
-      location: editValues.location ?? current.location,
-    });
+
     setEditingRow(null);
     setEditValues({});
     refresh();
@@ -192,54 +241,62 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
   const [receiveModal, setReceiveModal] = useState<PurchaseOrder | null>(null);
   const [receiveQtys, setReceiveQtys] = useState<Record<string, number>>({});
 
-  const purchaseOrders = useMemo(() => {
-    const all = loadPurchaseOrders();
-    return poFilter === 'all' ? all : all.filter((p) => p.status === poFilter);
-  }, [tick, poFilter]);
-
-  const suppliers = useMemo(() => loadSuppliers(), [tick]);
-
-  const handleCreatePO = () => {
+  const handleCreatePO = async () => {
     if (!newPO.supplierId || newPOItems.length === 0) return;
     const sup = suppliers.find((s) => s.id === newPO.supplierId);
     if (!sup) return;
     const items = newPOItems.map((i) => {
       const mi = menuItems.find((m) => m.id === i.menuItemId);
       return {
-        menuItemId: i.menuItemId,
-        menuItemName: mi?.name ?? i.menuItemId,
-        orderedQty: i.orderedQty,
-        receivedQty: 0,
-        unitCost: i.unitCost,
-        totalCost: i.orderedQty * i.unitCost,
+        menu_item_id: i.menuItemId,
+        menu_item_name: mi?.name ?? i.menuItemId,
+        ordered_qty: i.orderedQty,
+        received_qty: 0,
+        unit_cost: i.unitCost,
+        total_cost: i.orderedQty * i.unitCost,
       };
     });
-    createPurchaseOrder({
-      supplierId: sup.id,
-      supplierName: sup.name,
-      status: 'draft',
-      items,
-      totalCost: items.reduce((s, i) => s + i.totalCost, 0),
-      expectedDelivery: newPO.expectedDelivery,
-      notes: newPO.notes,
-      createdBy: 'Manager',
-    });
+    try {
+      await apiCreatePurchaseOrder({
+        supplierId: sup.id,
+        supplierName: sup.name,
+        status: 'draft',
+        items: newPOItems.map((i) => ({
+          menuItemId: i.menuItemId,
+          menuItemName: menuItems.find((m) => m.id === i.menuItemId)?.name ?? i.menuItemId,
+          orderedQty: i.orderedQty,
+          receivedQty: 0,
+          unitCost: i.unitCost,
+          totalCost: i.orderedQty * i.unitCost,
+        })),
+        totalCost: newPOItems.reduce((s, i) => s + i.orderedQty * i.unitCost, 0),
+        expectedDelivery: newPO.expectedDelivery,
+        notes: newPO.notes,
+        createdBy: 'Manager',
+      });
+    } catch (err) {
+      console.error('Failed to create PO', err);
+    }
     setShowNewPO(false);
     setNewPO({ supplierId: '', expectedDelivery: '', notes: '' });
     setNewPOItems([]);
     refresh();
   };
 
-  const handleReceivePO = () => {
+  const handleReceivePO = async () => {
     if (!receiveModal) return;
     const items = receiveModal.items.map((i) => ({
-      menuItemId: i.menuItemId,
-      receivedQty: receiveQtys[i.menuItemId] ?? 0,
+      menu_item_id: i.menuItemId,
+      received_qty: receiveQtys[i.menuItemId] ?? 0,
     }));
-    receivePurchaseOrder(receiveModal.id, items, 'Manager', menuItems);
+    try {
+      await apiReceivePurchaseOrder(receiveModal.id, items, 'Manager');
+      refresh();
+    } catch (err) {
+      console.error('Failed to receive PO', err);
+    }
     setReceiveModal(null);
     setReceiveQtys({});
-    refresh();
   };
 
   // ── Suppliers state ─────────────────────────────────────────────────────
@@ -247,24 +304,28 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
   const [supplierForm, setSupplierForm] = useState<Partial<Supplier>>({});
 
-  const handleSaveSupplier = () => {
+  const handleSaveSupplier = async () => {
     if (!supplierForm.name) return;
-    if (editingSupplier) {
-      updateSupplier(editingSupplier.id, supplierForm as Partial<Supplier>);
-    } else {
-      addSupplier({
-        name: supplierForm.name ?? '',
-        contactPerson: supplierForm.contactPerson ?? '',
-        email: supplierForm.email ?? '',
-        phone: supplierForm.phone ?? '',
-        address: supplierForm.address ?? '',
-        categories: supplierForm.categories ?? [],
-        leadTimeDays: supplierForm.leadTimeDays ?? 3,
-        paymentTerms: supplierForm.paymentTerms ?? 'Net 30',
-        rating: supplierForm.rating ?? 3,
-        isActive: supplierForm.isActive ?? true,
-        notes: supplierForm.notes,
-      });
+    try {
+      if (editingSupplier) {
+        await apiUpdateSupplier(editingSupplier.id, supplierForm as Partial<Supplier>);
+      } else {
+        await apiCreateSupplier({
+          name: supplierForm.name ?? '',
+          contactPerson: supplierForm.contactPerson ?? '',
+          email: supplierForm.email ?? '',
+          phone: supplierForm.phone ?? '',
+          address: supplierForm.address ?? '',
+          categories: supplierForm.categories ?? [],
+          leadTimeDays: supplierForm.leadTimeDays ?? 3,
+          paymentTerms: supplierForm.paymentTerms ?? 'Net 30',
+          rating: supplierForm.rating ?? 3,
+          isActive: supplierForm.isActive ?? true,
+          notes: supplierForm.notes,
+        });
+      }
+    } catch (err) {
+      console.error('Failed to save supplier', err);
     }
     setShowSupplierModal(false);
     setEditingSupplier(null);
@@ -276,37 +337,33 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
   const [movementTypeFilter, setMovementTypeFilter] = useState<string>('all');
   const [movementQuery, setMovementQuery] = useState('');
 
-  const movements = useMemo(() => {
-    const all = loadMovements();
-    const q = movementQuery.trim().toLowerCase();
-    return all
-      .filter((m) => movementTypeFilter === 'all' || m.type === movementTypeFilter)
-      .filter((m) => !q || m.menuItemName.toLowerCase().includes(q) || (m.reference ?? '').toLowerCase().includes(q));
-  }, [tick, movementTypeFilter, movementQuery]);
-
   // ── Waste state ─────────────────────────────────────────────────────────
   const [showWasteModal, setShowWasteModal] = useState(false);
   const [wasteForm, setWasteForm] = useState({ menuItemId: '', qty: 1, reason: 'expired' as WasteReason, notes: '' });
   const [wasteQuery, setWasteQuery] = useState('');
 
-  const wasteLog = useMemo(() => {
-    const all = loadWasteLog();
-    const q = wasteQuery.trim().toLowerCase();
-    return all.filter((w) => !q || w.menuItemName.toLowerCase().includes(q));
-  }, [tick, wasteQuery]);
-
-  const handleRecordWaste = () => {
+  const handleRecordWaste = async () => {
     if (!wasteForm.menuItemId || wasteForm.qty <= 0) return;
     const mi = menuItems.find((m) => m.id === wasteForm.menuItemId);
     if (!mi) return;
-    recordWaste(wasteForm.menuItemId, mi.name, wasteForm.qty, wasteForm.reason, 'Manager', wasteForm.notes || undefined);
+    try {
+      await apiRecordWaste({
+        menu_item_id: wasteForm.menuItemId,
+        menu_item_name: mi.name,
+        qty: wasteForm.qty,
+        unit_cost: inventoryMap[wasteForm.menuItemId]?.unitCost ?? 0,
+        reason: wasteForm.reason,
+        reported_by: 'Manager',
+        recorded_by: 'Manager',
+        notes: wasteForm.notes || undefined,
+      });
+      refresh();
+    } catch (err) {
+      console.error('Failed to record waste', err);
+    }
     setShowWasteModal(false);
     setWasteForm({ menuItemId: '', qty: 1, reason: 'expired', notes: '' });
-    refresh();
   };
-
-  // ── Analytics ───────────────────────────────────────────────────────────
-  const analytics = useMemo(() => computeInventoryAnalytics(menuItems), [tick]);
 
   // ── Tab definitions ─────────────────────────────────────────────────────
   const tabs: { id: Tab; label: string; icon: React.ReactNode; badge?: number }[] = [
@@ -445,7 +502,7 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                 className="px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
               >
                 <option value="all">All Categories</option>
-                {menuCategories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                {menuCategories.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
               <div className="flex gap-1">
                 {(['all', 'ok', 'low', 'out'] as const).map((s) => (
@@ -654,10 +711,10 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
             {/* PO KPIs */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
               {[
-                { label: 'Total POs', value: loadPurchaseOrders().length, color: 'text-white' },
+                { label: 'Total POs', value: purchaseOrders.length, color: 'text-white' },
                 { label: 'Pending', value: analytics.pendingPOCount, color: 'text-amber-400' },
                 { label: 'Pending Value', value: formatPrice(analytics.pendingPOValue), color: 'text-amber-400' },
-                { label: 'Received This Month', value: loadPurchaseOrders().filter((p) => p.status === 'received').length, color: 'text-emerald-400' },
+                { label: 'Received This Month', value: purchaseOrders.filter((p) => p.status === 'received').length, color: 'text-emerald-400' },
               ].map((kpi) => (
                 <Card key={kpi.label} className="bg-slate-800/50 border border-slate-700/50">
                   <p className="text-xs text-slate-400 mb-1">{kpi.label}</p>
@@ -716,13 +773,13 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                       {isManager && po.status === 'draft' && (
                         <div className="flex gap-1 mt-2 justify-end">
                           <button
-                            onClick={(e) => { e.stopPropagation(); updatePurchaseOrder(po.id, { status: 'sent' }); refresh(); }}
+                            onClick={async (e) => { e.stopPropagation(); try { await apiUpdatePurchaseOrder(po.id, { status: 'sent' }); refresh(); } catch (err) { console.error('Failed to send PO', err); } }}
                             className="px-3 py-1 rounded-lg bg-blue-500/20 text-blue-400 text-xs font-medium hover:bg-blue-500/30 transition"
                           >
                             Send PO
                           </button>
                           <button
-                            onClick={(e) => { e.stopPropagation(); updatePurchaseOrder(po.id, { status: 'cancelled' }); refresh(); }}
+                            onClick={async (e) => { e.stopPropagation(); try { await apiUpdatePurchaseOrder(po.id, { status: 'cancelled' }); refresh(); } catch (err) { console.error('Failed to cancel PO', err); } }}
                             className="px-3 py-1 rounded-lg bg-red-500/20 text-red-400 text-xs font-medium hover:bg-red-500/30 transition"
                           >
                             Cancel
@@ -1259,18 +1316,18 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
               <p className="text-slate-400 text-sm">Categories</p>
               <div className="flex flex-wrap gap-1">
                 {menuCategories.map((c) => (
-                  <label key={c.id} className="flex items-center gap-1 text-xs text-slate-300">
+                  <label key={c} className="flex items-center gap-1 text-xs text-slate-300">
                     <input
                       type="checkbox"
-                      checked={(supplierForm.categories ?? []).includes(c.id)}
+                      checked={(supplierForm.categories ?? []).includes(c)}
                       onChange={(e) => {
                         const cats = supplierForm.categories ?? [];
-                        const newCats = e.target.checked ? [...cats, c.id] : cats.filter((x) => x !== c.id);
+                        const newCats = e.target.checked ? [...cats, c] : cats.filter((x) => x !== c);
                         setSupplierForm((v) => ({ ...v, categories: newCats }));
                       }}
                       className="rounded border-slate-600 text-amber-500 focus:ring-amber-500"
                     />
-                    {c.name}
+                    {c}
                   </label>
                 ))}
               </div>
@@ -1327,14 +1384,18 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                   Cancel
                 </button>
                 <button
-                  onClick={() => {
+                  onClick={async () => {
                     const qty = parseInt(adjustQty || '0', 10);
-                    if (qty >= 0) {
-                      recordManualAdjustment(adjustModal.id, adjustModal.name, qty, 'Manager', adjustNotes || undefined);
-                      setAdjustModal(null);
-                      setAdjustQty('');
-                      setAdjustNotes('');
-                      refresh();
+                    if (qty >= 0 && adjustModal) {
+                      try {
+                        await apiAdjustStock(adjustModal.id, qty - adjustModal.current, adjustNotes || 'Manual adjustment', 'Manager');
+                        setAdjustModal(null);
+                        setAdjustQty('');
+                        setAdjustNotes('');
+                        refresh();
+                      } catch (err) {
+                        console.error('Failed manual adjustment', err);
+                      }
                     }
                   }}
                   className="px-3 py-1 rounded-lg bg-emerald-500/20 text-emerald-400 text-xs font-medium hover:bg-emerald-500/30 transition"

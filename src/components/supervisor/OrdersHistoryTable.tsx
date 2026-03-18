@@ -281,7 +281,7 @@ export function OrdersHistoryTable({ orders, onSelectOrder, onExport }: OrdersHi
               </tr>
             ) : (
               sortedOrders.map((order: any, index) => {
-                const waiter = order.assignedWaiterId ? getStaffById(order.assignedWaiterId) : null;
+                const waiter = order.assignedWaiterId ? staff.find((s) => s.id === order.assignedWaiterId) : null;
                 const createdAt = new Date(order.createdAt);
                 
                 return (

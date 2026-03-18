@@ -4,6 +4,7 @@ import { ArrowLeftIcon, UtensilsIcon, BarChart3Icon, BriefcaseIcon, ChefHatIcon,
 import { CartItem, Order, OrderStatus } from './types';
 import { useStaff } from './hooks/useStaff';
 import { useOrders } from './hooks/useOrders';
+import { useTables } from './hooks/useTables';
 import { CustomerApp } from './pages/customer/CustomerApp';
 import { WaiterDashboard } from './pages/waiter/WaiterDashboard';
 import { SupervisorDashboard } from './pages/supervisor/SupervisorDashboard';
@@ -23,7 +24,7 @@ import { Button } from './components/ui/Button';
 import { Staff } from './types';
 type UserRole = 'customer' | 'waiter' | 'supervisor' | 'manager' | 'kitchen' | null;
 type ManagerPage = 'dashboard' | 'menu' | 'staff' | 'analytics' | 'qrcodes' | 'inventory' | 'history';
-type SupervisorPage = 'dashboard' | 'revenue' | 'staff' | 'qrcodes' | 'inventory' | 'history';
+type SupervisorPage = 'dashboard' | 'revenue' | 'staff' | 'qrcodes' | 'inventory' | 'history' | 'menu';
 export function App() {
   const [selectedRole, setSelectedRole] = useState<UserRole>(null);
   const [authUser, setAuthUser] = useState<Staff | null>(null);
@@ -35,26 +36,7 @@ export function App() {
   const [scanningTable, setScanningTable] = useState<number | null>(null);
   const [detectedTable, setDetectedTable] = useState<number | null>(null);
   const [showQRGrid, setShowQRGrid] = useState(false);
-  // list of table numbers created by manager
-  const [tables, setTables] = useState<number[]>([]);
-  // persist tables in localStorage
-  React.useEffect(() => {
-    try {
-      const saved = localStorage.getItem('tables');
-      if (saved) {
-        setTables(JSON.parse(saved));
-      }
-    } catch (e) {
-      console.warn('failed to load tables', e);
-    }
-  }, []);
-  React.useEffect(() => {
-    try {
-      localStorage.setItem('tables', JSON.stringify(tables));
-    } catch (e) {
-      console.warn('failed to save tables', e);
-    }
-  }, [tables]);
+  const { tables, isLoading: isTablesLoading, addTable, removeTable, refetch: reloadTables } = useTables();
 
   const [waiterCalls, setWaiterCalls] = useState<
     {
@@ -301,8 +283,7 @@ export function App() {
 
         {supervisorPage === 'dashboard' && (
           <SupervisorDashboard
-            orders={orders}
-            onUpdateOrderStatus={handleUpdateOrderStatus}
+            onManageMenu={() => setSupervisorPage('menu')}
           />
         )}
         {supervisorPage === 'revenue' && <RevenueReports />}
@@ -311,15 +292,14 @@ export function App() {
           <QRCodeGenerator
             tables={tables}
             onAddTable={() => {
-              setTables((prev) => {
-                const next = prev.length > 0 ? Math.max(...prev) + 1 : 1;
-                return [...prev, next];
-              });
+              const next = tables.length > 0 ? Math.max(...tables) + 1 : 1;
+              addTable(next).catch((err) => console.error('Failed to add table:', err));
             }}
           />
         )}
         {supervisorPage === 'inventory' && <InventoryManagement role="supervisor" />}
         {supervisorPage === 'history' && <OrderHistoryPage onBack={() => setSupervisorPage('dashboard')} existingOrders={orders} />}
+        {supervisorPage === 'menu' && <MenuManagement />}
       </div>
     );
   }
@@ -354,10 +334,8 @@ export function App() {
           <QRCodeGenerator
             tables={tables}
             onAddTable={() => {
-              setTables((prev) => {
-                const next = prev.length > 0 ? Math.max(...prev) + 1 : 1;
-                return [...prev, next];
-              });
+              const next = tables.length > 0 ? Math.max(...tables) + 1 : 1;
+              addTable(next).catch((err) => console.error('Failed to add table:', err));
             }}
           />
         )}

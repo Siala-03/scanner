@@ -16,7 +16,6 @@ import { Badge } from '../../components/ui/Badge';
 import { MenuItemEditor } from '../../components/manager/MenuItemEditor';
 import { formatPrice } from '../../utils/currency';
 import { useMenu } from '../../hooks/useMenu';
-import { uploadMenu } from '../../api/menu';
 
 // Default categories with emojis from dummy data
 const defaultCategories: MenuCategoryInfo[] = [
@@ -40,8 +39,14 @@ interface TabOption {
 
 export function MenuManagement() {
   // Use menu hook to get items from backend
-  const { menuItems: backendMenuItems, isLoading, refetch } = useMenu();
-  
+  const {
+    menuItems: backendMenuItems,
+    isLoading,
+    error: menuError,
+    refresh,
+    saveMenu
+  } = useMenu();
+
   // Use backend items if available, otherwise fall back to initial
   const menuItemsState = useMemo(() => backendMenuItems || [], [backendMenuItems]);
   
@@ -71,6 +76,23 @@ export function MenuManagement() {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center">
         <div className="text-white text-lg">Loading menu...</div>
+      </div>
+    );
+  }
+
+  if (menuError) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+        <div className="bg-red-700/30 border border-red-500/40 p-6 rounded-lg max-w-xl text-center">
+          <p className="text-red-300 mb-2 text-lg font-semibold">Unable to load menu</p>
+          <p className="text-red-200 mb-4">{menuError}</p>
+          <button
+            onClick={refresh}
+            className="px-4 py-2 rounded-md bg-amber-500 text-slate-900 font-semibold hover:bg-amber-400"
+          >
+            Retry
+          </button>
+        </div>
       </div>
     );
   }
@@ -128,8 +150,8 @@ export function MenuManagement() {
     // Save to backend
     setIsSaving(true);
     try {
-      await uploadMenu(updatedItems);
-      refetch(); // Reload from backend
+      await saveMenu(updatedItems);
+      await refresh();
     } catch (err) {
       console.error('Failed to save menu:', err);
     } finally {
@@ -149,8 +171,8 @@ export function MenuManagement() {
     // Save to backend
     setIsSaving(true);
     try {
-      await uploadMenu(updatedItems);
-      refetch();
+      await saveMenu(updatedItems);
+      await refresh();
     } catch (err) {
       console.error('Failed to update item:', err);
     } finally {
@@ -165,8 +187,8 @@ export function MenuManagement() {
       // Save to backend
       setIsSaving(true);
       try {
-        await uploadMenu(updatedItems);
-        refetch();
+        await saveMenu(updatedItems);
+        await refresh();
       } catch (err) {
         console.error('Failed to delete item:', err);
       } finally {

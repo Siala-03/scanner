@@ -12,14 +12,14 @@ interface QRCodeGeneratorProps {
 export function QRCodeGenerator({
   tables,
   onAddTable,
-  baseUrl = 'https://servv-psi.vercel.app'
+  baseUrl
 }: QRCodeGeneratorProps) {
   // default to empty list if none
   const handlePrint = () => {
     window.print();
   };
 
-  const resolvedBaseUrl = baseUrl;
+  const resolvedBaseUrl = baseUrl || window.location.origin;
 
   const handleDownload = (tableNum: number) => {
     const svg = document.getElementById(`qr-${tableNum}`) as SVGSVGElement | null;

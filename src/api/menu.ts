@@ -1,23 +1,24 @@
 import { apiRequest } from './http';
 import type { MenuItem } from '../types';
 
-// API base URL
-const API_BASE = 'https://scanner-3cku.onrender.com/api/menu';
+// API base URL for menu. Use env var if available, otherwise relative paths.
+const MENU_API_BASE = import.meta.env.VITE_API_URL
+  ? `${import.meta.env.VITE_API_URL.replace(/\/$/, '')}/api/menu`
+  : '/api/menu';
 
 // Fetch menu from backend
 export async function fetchMenu(): Promise<MenuItem[]> {
   try {
-    const data = await apiRequest<MenuItem[]>(`${API_BASE}`);
-    return data;
+    return await apiRequest<MenuItem[]>(MENU_API_BASE);
   } catch (err) {
-    console.warn('Failed to fetch menu from backend, using local');
+    console.warn('Failed to fetch menu from backend, using local', err);
     return [];
   }
 }
 
 // Upload menu to backend
 export async function uploadMenu(items: MenuItem[]): Promise<{ message: string; count: number }> {
-  return apiRequest<{ message: string; count: number }>(`${API_BASE}`, {
+  return apiRequest<{ message: string; count: number }>(MENU_API_BASE, {
     method: 'POST',
     json: { items }
   });
@@ -25,7 +26,7 @@ export async function uploadMenu(items: MenuItem[]): Promise<{ message: string; 
 
 // Clear menu on backend
 export async function clearMenu(): Promise<{ message: string }> {
-  return apiRequest<{ message: string }>(`${API_BASE}`, {
+  return apiRequest<{ message: string }>(MENU_API_BASE, {
     method: 'DELETE'
   });
 }

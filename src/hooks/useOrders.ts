@@ -1,11 +1,8 @@
 import { useState, useCallback, useEffect } from 'react';
 import { Order, OrderStatus, CartItem, MenuItem } from '../types';
-import { mockOrders } from '../data/orderData';
 import { getEffectivePrice } from '../utils/pricing';
 import { decrementInventoryForOrder, ensureInventoryInitialized } from '../utils/inventoryStorage';
-
-// Backend API URL - defaults to production backend
-const API_BASE = 'https://scanner-3cku.onrender.com';
+import { fetchOrders as fetchOrdersApi, createOrder as createOrderApi, updateOrderStatus as updateOrderStatusApi } from '../api/orders';
 
 interface UseOrdersReturn {
   orders: Order[];
@@ -29,83 +26,19 @@ interface UseOrdersReturn {
 }
 
 // API functions
-async function fetchOrdersAPI(status?: string): Promise<Order[]> {
-  const query = status && status !== 'all' ? `?status=${status}` : '';
-  const res = await fetch(`${API_BASE}/orders${query}`);
-  if (!res.ok) throw new Error('Failed to fetch orders');
-  const data = await res.json();
-  return data.map((o: any) => ({
-    id: o.id,
-    tableNumber: o.table_number,
-    items: Array.isArray(o.items) ? o.items.map((item: any) => ({
-      menuItem: {
-        id: item.menuItemId || 'unknown',
-        name: item.menuItemName || 'Unknown',
-        price: item.unitPrice ? item.unitPrice / 100 : 0,
-        category: 'other',
-        description: '',
-        available: true
-      },
-      quantity: item.quantity,
-      specialInstructions: item.notes
-    })) : [],
-    status: o.status,
-    createdAt: new Date(o.created_at),
-    updatedAt: new Date(o.updated_at),
-    subtotal: o.subtotal ? o.subtotal / 100 : 0,
-    serviceCharge: 0,
-    total: o.total ? o.total / 100 : 0,
-    specialInstructions: o.notes,
-    requiresKitchen: true
-  }));
-}
-
-async function createOrderAPI(order: any): Promise<Order> {
-  const res = await fetch(`${API_BASE}/orders`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(order)
-  });
-  if (!res.ok) throw new Error('Failed to create order');
-  return res.json();
-}
-
-async function updateOrderStatusAPI(orderId: string, status: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/orders/${orderId}/status`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ status })
-  });
-  if (!res.ok) throw new Error('Failed to update order');
-}
-
 export function useOrders(): UseOrdersReturn {
-  const [orders, setOrders] = useState<Order[]>(mockOrders);
-  const [backendAvailable, setBackendAvailable] = useState(false);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [backendAvailable, setBackendAvailable] = useState(true);
 
-  // Try to load from backend on mount
   useEffect(() => {
     async function loadFromBackend() {
       try {
-        const backendOrders = await fetchOrdersAPI('all');
-        if (backendOrders.length > 0) {
-          setOrders(backendOrders);
-          setBackendAvailable(true);
-        } else {
-          // No orders in backend - try to seed test orders
-          try {
-            await fetch(`${API_BASE}/orders/seed`, { method: 'POST' });
-            const seededOrders = await fetchOrdersAPI('all');
-            if (seededOrders.length > 0) {
-              setOrders(seededOrders);
-              setBackendAvailable(true);
-            }
-          } catch (seedErr) {
-            console.warn('Could not seed orders:', seedErr);
-          }
-        }
+        const backendOrders = await fetchOrdersApi('all');
+        setOrders(backendOrders);
+        setBackendAvailable(true);
       } catch (e) {
-        console.warn('Backend not available, using local orders');
+        console.warn('Failed to load orders from backend', e);
+        setOrders([]);
         setBackendAvailable(false);
       }
     }
@@ -135,48 +68,51 @@ export function useOrders(): UseOrdersReturn {
       );
       const total = subtotal;
 
-      const newOrder: Order = {
+      const localOrder: Order = {
         id: `ORD-${Date.now()}`,
+        orderNumber: `ORD-${Date.now().toString().slice(-6)}`,
         tableNumber,
-        items: orderItems,
+        items: orderItems.map((item) => ({
+          id: `${item.menuItem.id}-${Date.now()}`,
+          menuItemId: item.menuItem.id,
+          menuItemName: item.menuItem.name,
+          unitPrice: Math.round(getEffectivePrice(item.menuItem) * 100),
+          totalPrice: Math.round(getEffectivePrice(item.menuItem) * item.quantity * 100),
+          quantity: item.quantity,
+          status: 'pending'
+        })),
         status: 'pending',
-        createdAt: new Date(),
-        updatedAt: new Date(),
         subtotal,
-        serviceCharge: 0,
+        tax: 0,
         total,
-        specialInstructions,
-        requiresKitchen: true
+        notes: specialInstructions,
+        createdBy: 'system',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
       };
 
-      // Try to sync with backend
+      let savedOrder: Order = localOrder;
       if (backendAvailable) {
         try {
-          const orderNumber = `ORD-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(Math.random() * 10000)}`;
-          await createOrderAPI({
-            order_number: orderNumber,
-            table_number: tableNumber,
+          savedOrder = await createOrderApi({
+            tableNumber,
+            customerName: 'Walk-in',
             items: orderItems.map(item => ({
               menuItemId: item.menuItem.id,
               menuItemName: item.menuItem.name,
               quantity: item.quantity,
-              unitPrice: Math.round(getEffectivePrice(item.menuItem) * 100),
-              totalPrice: Math.round(getEffectivePrice(item.menuItem) * item.quantity * 100),
-              notes: item.specialInstructions
+              unitPrice: Math.round(getEffectivePrice(item.menuItem) * 100)
             })),
-            subtotal: Math.round(subtotal * 100),
-            tax: 0,
-            total: Math.round(total * 100),
-            status: 'pending',
             notes: specialInstructions
           });
         } catch (e) {
           console.warn('Failed to sync order to backend:', e);
+          savedOrder = localOrder;
         }
       }
 
-      setOrders((prev) => [newOrder, ...prev]);
-      return newOrder;
+      setOrders((prev) => [savedOrder, ...prev]);
+      return savedOrder;
     },
     [backendAvailable]
   );
@@ -189,7 +125,7 @@ export function useOrders(): UseOrdersReturn {
       // Try to sync with backend
       if (backendAvailable) {
         try {
-          await updateOrderStatusAPI(orderId, backendStatus);
+          await updateOrderStatusApi(orderId, { status: backendStatus });
         } catch (e) {
           console.warn('Failed to sync order status to backend:', e);
         }

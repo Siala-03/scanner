@@ -2,6 +2,7 @@ import "./index.css";
 import React from "react";
 import { render } from "react-dom";
 import { App } from "./App";
+import { MenuProvider } from "./contexts/MenuContext";
 
 // Error boundary to catch unhandled errors
 class ErrorBoundary extends React.Component<
@@ -47,7 +48,9 @@ class ErrorBoundary extends React.Component<
 
 render(
   <ErrorBoundary>
-    <App />
+    <MenuProvider>
+      <App />
+    </MenuProvider>
   </ErrorBoundary>,
   document.getElementById("root")
 );

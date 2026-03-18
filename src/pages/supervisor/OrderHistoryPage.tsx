@@ -7,7 +7,6 @@ import { OrdersHistoryTable } from '../../components/supervisor/OrdersHistoryTab
 import { OrderDetailModal } from '../../components/waiter/OrderDetailModal';
 import { fetchOrders } from '../../api/orders';
 import { downloadCsv, buildOrdersCsv } from '../../utils/csv';
-import { mockOrders } from '../../data/orderData';
 
 // Type alias to handle both API and local Order types
 type Order = OrderType & {
@@ -51,33 +50,31 @@ export function OrderHistoryPage({ onBack, existingOrders }: OrderHistoryPagePro
     async function loadOrders() {
       try {
         setLoading(true);
-        
-        // Try to use existing orders first (passed from parent)
+
+        // Use existing orders first (from parent state)
         if (existingOrders && existingOrders.length > 0) {
           setOrders(existingOrders);
-          setUsingLocalData(true);
+          setUsingLocalData(false);
           setError(null);
           setLoading(false);
           return;
         }
-        
-        // Try to fetch from API
+
+        // Fetch from API
         const allOrders = await fetchOrders('all');
         if (allOrders.length > 0) {
           setOrders(convertOrders(allOrders));
           setUsingLocalData(false);
         } else {
-          // Fall back to local mock orders
-          setOrders(convertOrders(mockOrders));
-          setUsingLocalData(true);
+          setOrders([]);
+          setUsingLocalData(false);
         }
         setError(null);
       } catch (err) {
-        console.warn('Failed to fetch orders from API, using local data:', err);
-        // Fall back to local mock orders
-        setOrders(convertOrders(mockOrders));
-        setUsingLocalData(true);
-        setError(null);
+        console.warn('Failed to fetch orders from API:', err);
+        setOrders([]);
+        setUsingLocalData(false);
+        setError('Unable to load orders from server.');
       } finally {
         setLoading(false);
       }

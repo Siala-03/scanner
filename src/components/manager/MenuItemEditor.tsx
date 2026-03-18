@@ -56,14 +56,14 @@ export function MenuItemEditor({
   useEffect(() => {
     if (item) {
       setFormData({
-        name: item.name,
-        description: item.description,
-        price: item.price.toString(),
-        category: item.category,
-        emoji: item.emoji,
-        prepTime: item.prepTime.toString(),
-        isAvailable: item.isAvailable,
-        isPopular: item.isPopular
+        name: item.name || '',
+        description: item.description || '',
+        price: item.price !== undefined && item.price !== null ? item.price.toString() : '',
+        category: item.category || 'lunch',
+        emoji: item.emoji || '🍽️',
+        prepTime: item.prepTime !== undefined && item.prepTime !== null ? item.prepTime.toString() : '',
+        isAvailable: item.isAvailable ?? true,
+        isPopular: item.isPopular ?? false
       });
       setCategoryMode('existing');
       setNewCategory({ id: '', name: '', emoji: '🍽️' });
