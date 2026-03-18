@@ -139,6 +139,7 @@ export function App() {
       if (!isNaN(num)) {
         setSelectedRole('customer');
         setTableNumber(num);
+        window.history.replaceState({}, '', '/');
         return;
       }
     }
@@ -150,6 +151,7 @@ export function App() {
       if (!isNaN(num)) {
         setSelectedRole('customer');
         setTableNumber(num);
+        window.history.replaceState({}, '', '/');
         return;
       }
     }
