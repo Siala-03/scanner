@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { MenuItem } from '../types';
-import { menuItems as defaultMenuItems } from '../data/menuData';
 import { fetchMenu } from '../api/menu';
 import { getSocket } from './useSocket';
 

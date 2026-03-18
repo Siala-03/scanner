@@ -52,7 +52,7 @@ export function MenuItemEditor({
   const [categoryMode, setCategoryMode] = useState<'existing' | 'new'>('existing');
   const [newCategory, setNewCategory] = useState({ id: '', name: '', emoji: '🍽️' });
 
-  const categoryOptions = useMemo(() => categories, [categories]);
+  const categoryOptions = categories;
   useEffect(() => {
     if (item) {
       setFormData({

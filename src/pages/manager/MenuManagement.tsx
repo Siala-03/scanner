@@ -52,7 +52,7 @@ export function MenuManagement() {
   const [isSaving, setIsSaving] = useState(false);
   // Build categories from menu items + defaults
   // Build tabs from menu items + defaults
-  const tabs: TabOption[] = React.useMemo(() => {
+  const tabs: TabOption[] = useMemo(() => {
     const uniqueCategories = Array.from(new Set(menuItemsState.map(item => item.category)));
     // Start with 'All Items' tab
     const allTab: TabOption = { id: 'all', label: 'All Items', icon: '📋' };
@@ -185,7 +185,7 @@ export function MenuManagement() {
               {menuItemsState.length} items total
             </p>
           </div>
-          <Button variant="primary" onClick={handleAddItem}>
+          <Button variant="primary" onClick={handleAddItem} isLoading={isSaving}>
             <PlusIcon className="w-5 h-5" />
             Add Item
           </Button>
@@ -328,4 +328,10 @@ export function MenuManagement() {
           categories={defaultCategories}
           onAddCategory={() => {
             // No-op: categories are auto-detected from menu item categories
+          }}
+        />
+
+      </div>
+    </div>
+  );
 }
