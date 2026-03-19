@@ -10,7 +10,7 @@ import {
 import { OrderStatus } from '../../types';
 interface OrderTrackerProps {
   status: OrderStatus;
-  createdAt: Date;
+  createdAt: Date | string;
   estimatedWaitTime?: number;
 }
 const steps = [
@@ -53,13 +53,15 @@ export function OrderTracker({
   useEffect(() => {
     setCurrentStep(statusToStep[status]);
   }, [status]);
+  const createdAtDate = typeof createdAt === 'string' ? new Date(createdAt) : createdAt;
+
   useEffect(() => {
     const interval = setInterval(() => {
-      const elapsed = Math.floor((Date.now() - createdAt.getTime()) / 60000);
+      const elapsed = Math.floor((Date.now() - createdAtDate.getTime()) / 60000);
       setElapsedTime(elapsed);
     }, 1000);
     return () => clearInterval(interval);
-  }, [createdAt]);
+  }, [createdAtDate]);
   if (status === 'cancelled') {
     return (
       <div className="bg-red-50 rounded-xl p-6 text-center">

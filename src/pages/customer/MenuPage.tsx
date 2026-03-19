@@ -44,7 +44,7 @@ export function MenuPage({ onAddToCart }: MenuPageProps) {
 
   // Get popular items from the fetched menu
   const popularItems = useMemo(() => 
-    menuItems.filter((item) => item.isPopular).slice(0, 6),
+    menuItems.filter((item) => item.isPopular && item.isAvailable).slice(0, 6),
     [menuItems]
   );
 
@@ -53,6 +53,7 @@ export function MenuPage({ onAddToCart }: MenuPageProps) {
     activeCategory === 'all' ?
     menuItems :
     menuItems.filter((item) => item.category === activeCategory);
+    items = items.filter((item) => item.isAvailable);
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       items = items.filter(

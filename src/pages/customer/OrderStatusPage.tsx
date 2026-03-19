@@ -72,7 +72,7 @@ export function OrderStatusPage({ orders, tableNumber }: OrderStatusPageProps) {
             <h2 className="font-semibold text-slate-700 mb-3">Current Order</h2>
             <OrderTracker
             status={activeOrder.status}
-            createdAt={activeOrder.createdAt}
+            createdAt={typeof activeOrder.createdAt === 'string' ? new Date(activeOrder.createdAt) : activeOrder.createdAt}
             estimatedWaitTime={20} />
 
 
@@ -84,7 +84,7 @@ export function OrderStatusPage({ orders, tableNumber }: OrderStatusPageProps) {
                 </span>
                 <div className="flex items-center gap-2 text-sm text-slate-500">
                   <ClockIcon className="w-4 h-4" />
-                  {activeOrder.createdAt.toLocaleTimeString([], {
+                  {new Date(activeOrder.createdAt).toLocaleTimeString([], {
                   hour: '2-digit',
                   minute: '2-digit'
                 })}
@@ -142,8 +142,8 @@ export function OrderStatusPage({ orders, tableNumber }: OrderStatusPageProps) {
                             {order.id}
                           </span>
                           <p className="text-sm text-slate-500">
-                            {order.createdAt.toLocaleDateString()} at{' '}
-                            {order.createdAt.toLocaleTimeString([], {
+                            {new Date(order.createdAt).toLocaleDateString()} at{' '}
+                            {new Date(order.createdAt).toLocaleTimeString([], {
                           hour: '2-digit',
                           minute: '2-digit'
                         })}

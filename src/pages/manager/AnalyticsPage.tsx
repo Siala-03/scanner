@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   LineChart,
   Line,
@@ -13,21 +13,145 @@ import {
   Pie,
   Cell,
   AreaChart,
-  Area } from
-'recharts';
-import { CalendarIcon, TrendingUpIcon, TrendingDownIcon } from 'lucide-react';
-import {
-  weeklyRevenue,
-  hourlyOrders,
-  categoryRevenue,
-  monthlyComparison,
-  peakHoursData } from
-'../../data/analyticsData';
+  Area } from 'recharts';
+import { TrendingUpIcon, TrendingDownIcon } from 'lucide-react';
+import { fetchOrders } from '../../api/orders';
+import { useMenu } from '../../hooks/useMenu';
 import { Card } from '../../components/ui/Card';
 import { Tabs } from '../../components/ui/Tabs';
 import { formatPrice } from '../../utils/currency';
 export function AnalyticsPage() {
-  const [timeRange, setTimeRange] = useState('week');
+  const [timeRange, setTimeRange] = useState<'today' | 'week' | 'month' | 'year'>('week');
+  const [orders, setOrders] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const { menuItems } = useMenu();
+  const menuById = useMemo(() => Object.fromEntries(menuItems.map((item) => [item.id, item])), [menuItems]);
+
+  useEffect(() => {
+    let active = true;
+    const load = async () => {
+      setIsLoading(true);
+      setLoadError(null);
+      try {
+        const data = await fetchOrders();
+        if (active) setOrders(data);
+      } catch (e) {
+        console.error(e);
+        if (active) setLoadError('Unable to load analytics data right now.');
+      } finally {
+        if (active) setIsLoading(false);
+      }
+    };
+    load();
+    return () => { active = false; };
+  }, []);
+
+  const now = new Date();
+  const last7Days = useMemo(() => {
+    const days: string[] = [];
+    for (let i = 6; i >= 0; i -= 1) {
+      const d = new Date(now);
+      d.setDate(now.getDate() - i);
+      days.push(d.toISOString().slice(0, 10));
+    }
+    return days;
+  }, [now]);
+
+  const weeklyRevenue = useMemo(() => {
+    const map = new Map<string, { date: string; revenue: number; orders: number; avgOrderValue: number }>();
+    last7Days.forEach((d) => map.set(d, { date: d, revenue: 0, orders: 0, avgOrderValue: 0 }));
+    orders.forEach((order) => {
+      const d = new Date(order.createdAt ?? order.created_at);
+      if (Number.isNaN(d.getTime())) return;
+      const key = d.toISOString().slice(0, 10);
+      if (!map.has(key)) return;
+      const row = map.get(key)!;
+      const total = order.total ?? order.total_price ?? 0;
+      row.revenue += total;
+      row.orders += 1;
+    });
+    return Array.from(map.values()).map((r) => ({ ...r, avgOrderValue: r.orders ? r.revenue / r.orders : 0 }));
+  }, [last7Days, orders]);
+
+  const monthlyComparison = useMemo(() => {
+    const current = { revenue: 0, orders: 0, avgOrderValue: 0, newCustomers: 0 };
+    const previous = { revenue: 0, orders: 0, avgOrderValue: 0, newCustomers: 0 };
+    const currSet = new Set<string>();
+    const prevSet = new Set<string>();
+    const nowDate = new Date();
+    const month = nowDate.getMonth();
+    const year = nowDate.getFullYear();
+    const prevDate = new Date(year, month - 1, 1);
+    orders.forEach((order) => {
+      const d = new Date(order.createdAt ?? order.created_at);
+      if (Number.isNaN(d.getTime())) return;
+      const total = order.total ?? order.total_price ?? 0;
+      if (d.getMonth() === month && d.getFullYear() === year) {
+        current.revenue += total;
+        current.orders += 1;
+        if (order.customerName) currSet.add(order.customerName);
+      }
+      if (d.getMonth() === prevDate.getMonth() && d.getFullYear() === prevDate.getFullYear()) {
+        previous.revenue += total;
+        previous.orders += 1;
+        if (order.customerName) prevSet.add(order.customerName);
+      }
+    });
+    current.avgOrderValue = current.orders ? current.revenue / current.orders : 0;
+    previous.avgOrderValue = previous.orders ? previous.revenue / previous.orders : 0;
+    current.newCustomers = currSet.size;
+    previous.newCustomers = prevSet.size;
+    return { currentMonth: current, previousMonth: previous };
+  }, [orders]);
+
+  const hourlyOrders = useMemo(() => {
+    const hours = Array.from({ length: 24 }, (_, i) => ({ hour: i, orders: 0, revenue: 0 }));
+    const todayKey = now.toISOString().slice(0, 10);
+    orders.forEach((order) => {
+      const d = new Date(order.createdAt ?? order.created_at);
+      if (Number.isNaN(d.getTime())) return;
+      if (d.toISOString().slice(0, 10) !== todayKey) return;
+      const row = hours[d.getHours()];
+      row.orders += 1;
+      row.revenue += order.total ?? order.total_price ?? 0;
+    });
+    return hours.slice(8, 23);
+  }, [orders, now]);
+
+  const categoryRevenue = useMemo(() => {
+    const map = new Map<string, { category: string; revenue: number; orders: number; percentage: number }>();
+    let totalRevenue = 0;
+    orders.forEach((order) => {
+      const total = order.total ?? order.total_price ?? 0;
+      totalRevenue += total;
+      (order.items || []).forEach((item: any) => {
+        const category = menuById[item.menuItemId]?.category ?? 'other';
+        const existing = map.get(category) ?? { category, revenue: 0, orders: 0, percentage: 0 };
+        const itemRev = item.totalPrice ?? (item.unitPrice ?? 0) * (item.quantity ?? 1);
+        existing.revenue += itemRev;
+        existing.orders += item.quantity ?? 1;
+        map.set(category, existing);
+      });
+    });
+    return Array.from(map.values())
+      .map((r) => ({ ...r, percentage: totalRevenue ? Math.round((r.revenue / totalRevenue) * 100) : 0 }))
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 5);
+  }, [orders, menuById]);
+
+  const peakHoursData = useMemo(() => {
+    const byDay: Record<string, Set<number>> = {};
+    orders.forEach((order) => {
+      const d = new Date(order.createdAt ?? order.created_at);
+      if (Number.isNaN(d.getTime())) return;
+      const day = d.toLocaleDateString('en-US', { weekday: 'short' });
+      if (!byDay[day]) byDay[day] = new Set();
+      byDay[day].add(d.getHours());
+    });
+    return Object.entries(byDay).map(([day, hours]) => ({ day, hours: Array.from(hours).sort((a, b) => a - b) }));
+  }, [orders]);
+
   const timeRangeTabs = [
   {
     id: 'today',

@@ -110,6 +110,18 @@ export function emitOrderUpdate(data: {
   }
 }
 
+export function emitInventoryAlert(data: {
+  type: 'low-stock' | 'out-of-stock';
+  menuItemId: string;
+  menuItemName: string;
+  stock: number;
+  threshold: number;
+}) {
+  if (io) {
+    io.to('inventory').emit('inventory:alert', data);
+  }
+}
+
 // Menu events (for real-time menu updates)
 export function emitMenuUpdate(data: {
   type: 'update' | 'change';

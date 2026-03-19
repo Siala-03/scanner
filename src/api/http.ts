@@ -10,15 +10,18 @@ export class ApiError extends Error {
 }
 
 // API base URL - defaults to production backend, override with VITE_API_URL if needed
-const API_BASE = import.meta.env.VITE_API_URL || 'https://scanner-3cku.onrender.com';
+const API_BASE = import.meta.env.VITE_API_URL || '';
 
 export async function apiRequest<T>(
   path: string,
   init: RequestInit & { json?: unknown } = {}
 ): Promise<T> {
-  // Prepend API_BASE if the path doesn't start with http/https
-  const url = path.startsWith('http') ? path : `${API_BASE}${path}`;
-  
+  let url = path;
+  if (!path.startsWith('http') && !path.startsWith('/')) {
+    // Only prepend API_BASE for relative API paths like 'orders' when provided
+    url = `${API_BASE}${path.startsWith('/') ? '' : '/'}${path}`;
+  }
+
   const headers = new Headers(init.headers);
   headers.set('Accept', 'application/json');
   if (init.json !== undefined) headers.set('Content-Type', 'application/json');

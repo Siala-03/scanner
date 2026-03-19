@@ -71,6 +71,48 @@ export function App() {
     prev.filter((call) => call.tableNumber !== tableNum)
     );
   }, []);
+
+  const managerTotalOrders = orders.length;
+  const managerActiveOrders = orders.filter((order) => ['pending', 'verified', 'preparing', 'ready'].includes(order.status)).length;
+  const managerServedOrders = orders.filter((order) => order.status === 'served').length;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const managerTodaysRevenue = orders
+    .filter((order) => new Date(order.createdAt) >= today && order.status === 'served')
+    .reduce((sum, order) => sum + (typeof order.total === 'number' ? order.total : 0), 0);
+
+  const getHourKey = (date: Date) => `${date.getHours().toString().padStart(2, '0')}:00`;
+  const chartHours = Array.from({ length: 12 }, (_, i) => {
+    const dt = new Date();
+    dt.setHours(dt.getHours() - (11 - i), 0, 0, 0);
+    return dt;
+  });
+
+  const ordersByHour = chartHours.map((hourDate) => {
+    const hourStart = new Date(hourDate);
+    const hourEnd = new Date(hourDate);
+    hourEnd.setHours(hourEnd.getHours() + 1);
+
+    const ordersInHour = orders.filter((order) => {
+      const created = new Date(order.createdAt);
+      return created >= hourStart && created < hourEnd;
+    });
+
+    return {
+      hour: getHourKey(hourDate),
+      orders: ordersInHour.length,
+      revenue: ordersInHour.reduce((sum, order) => sum + (typeof order.total === 'number' ? order.total : 0), 0) / 100
+    };
+  });
+
+  const statusBreakdown = [
+    { status: 'pending', count: orders.filter((o) => o.status === 'pending').length },
+    { status: 'verified', count: orders.filter((o) => o.status === 'verified').length },
+    { status: 'preparing', count: orders.filter((o) => o.status === 'preparing').length },
+    { status: 'ready', count: orders.filter((o) => o.status === 'ready').length },
+    { status: 'served', count: orders.filter((o) => o.status === 'served').length },
+  ];
+
   const handleBack = () => {
     if (selectedRole === 'customer') {
       // Go to home page (root)
@@ -326,42 +368,75 @@ export function App() {
   // Manager portal
   if (selectedRole === 'manager' && authUser) {
     return (
-      <div className="min-h-screen bg-slate-900">
-        {/* Fixed Header with Back Button */}
-        <div className="sticky top-0 z-50 bg-slate-800/90 backdrop-blur-sm border-b border-slate-700">
-          <div className="flex items-center gap-3 px-4 py-3">
+      <div className="min-h-screen bg-slate-900 text-slate-100">
+        {/* Header */}
+        <div className="sticky top-0 z-50 bg-slate-800/95 border-b border-slate-700">
+          <div className="max-w-6xl mx-auto flex items-center gap-3 px-4 py-3">
             <button
               onClick={handleBack}
-              className="p-2 rounded-lg bg-slate-700/50 hover:bg-slate-700 text-slate-300 hover:text-white transition-all duration-200 active:scale-95"
+              className="p-2 rounded-lg bg-slate-700/60 hover:bg-slate-600 text-slate-200"
               aria-label="Back"
             >
               <ArrowLeftIcon className="w-5 h-5" />
             </button>
-            <span className="text-white font-medium">Manager Dashboard</span>
+            <div>
+              <div className="text-sm text-slate-300 uppercase tracking-wider">Manager Portal</div>
+              <div className="text-lg font-semibold">Welcome, {authUser.name}</div>
+            </div>
           </div>
         </div>
 
-        {managerPage === 'dashboard' &&
-        <ManagerDashboard
-          onNavigate={(page) => setManagerPage(page as ManagerPage)} />
+        <div className="max-w-6xl mx-auto px-4 py-6">
+          <div className="flex flex-wrap items-center gap-2 mb-4">
+            {[
+              { id: 'dashboard', label: 'Dashboard' },
+              { id: 'inventory', label: 'Inventory' },
+              { id: 'menu', label: 'Manage Menu' },
+              { id: 'history', label: 'Order History' },
+              { id: 'analytics', label: 'Analytics' },
+              { id: 'staff', label: 'Staff' },
+            ].map((item) => (
+              <button
+                key={item.id}
+                onClick={() => setManagerPage(item.id as ManagerPage)}
+                className={`px-3 py-2 rounded-full text-xs font-semibold transition ${managerPage === item.id ? 'bg-amber-500 text-slate-900' : 'bg-slate-700 text-slate-200 hover:bg-slate-600'}`}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
 
-        }
-        {managerPage === 'menu' && <MenuManagement />}
-        {managerPage === 'staff' && <StaffManagement />}
-        {managerPage === 'analytics' && <AnalyticsPage />}
-        {managerPage === 'inventory' && <InventoryManagement role="manager" />}
-        {managerPage === 'qrcodes' && (
-          <QRCodeGenerator
-            tables={tables}
-            onAddTable={() => {
-              const next = tables.length > 0 ? Math.max(...tables) + 1 : 1;
-              addTable(next).catch((err) => console.error('Failed to add table:', err));
-            }}
-          />
-        )}
-        {managerPage === 'history' && <OrderHistoryPage onBack={() => setManagerPage('dashboard')} existingOrders={orders} />}
-      </div>);
-
+          <main className="bg-slate-900 text-slate-100 rounded-none p-0 min-h-[70vh] min-w-0 overflow-x-auto">
+            {managerPage === 'dashboard' &&
+              <ManagerDashboard
+                onNavigate={(page) => setManagerPage(page as ManagerPage)}
+                totalOrders={managerTotalOrders}
+                activeOrders={managerActiveOrders}
+                servedOrders={managerServedOrders}
+                todaysRevenue={managerTodaysRevenue}
+                tableCount={tables.length}
+                ordersByHour={ordersByHour}
+                statusBreakdown={statusBreakdown}
+              />
+            }
+            {managerPage === 'menu' && <MenuManagement />}
+            {managerPage === 'staff' && <StaffManagement />}
+            {managerPage === 'analytics' && <AnalyticsPage />}
+            {managerPage === 'inventory' && <InventoryManagement role="manager" />}
+            {managerPage === 'qrcodes' && (
+              <QRCodeGenerator
+                tables={tables}
+                onAddTable={() => {
+                  const next = tables.length > 0 ? Math.max(...tables) + 1 : 1;
+                  addTable(next).catch((err) => console.error('Failed to add table:', err));
+                }}
+              />
+            )}
+            {managerPage === 'history' && <OrderHistoryPage onBack={() => setManagerPage('dashboard')} existingOrders={orders} />}
+          </main>
+        </div>
+      </div>
+    );
   }
 
   // Kitchen portal (requires auth)

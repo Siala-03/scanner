@@ -2,6 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 import type { MenuItem } from '../types';
 import { fetchMenu, uploadMenu } from '../api/menu';
 import { getSocket } from '../hooks/useSocket';
+import { menuItems as defaultMenuItems } from '../data/menuData';
 
 interface MenuContextValue {
   menuItems: MenuItem[];
@@ -31,7 +32,7 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(true);
     try {
       const menu = await fetchMenu();
-      setMenuItems(menu || []);
+      setMenuItems((menu && menu.length > 0) ? menu : defaultMenuItems);
       setError(null);
     } catch (err) {
       console.error('Failed to refresh menu:', err);
@@ -64,12 +65,12 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
       try {
         const items = await fetchMenu();
         if (!isMounted) return;
-        setMenuItems(items || []);
+        setMenuItems((items && items.length > 0) ? items : defaultMenuItems);
         setError(null);
       } catch (err) {
         console.error('Failed to load menu:', err);
         if (!isMounted) return;
-        setMenuItems([]);
+        setMenuItems(defaultMenuItems);
         setError(err instanceof Error ? err.message : 'Unable to load menu');
       } finally {
         if (!isMounted) return;

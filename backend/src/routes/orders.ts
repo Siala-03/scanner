@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { pool } from '../db.js';
 import { HttpError } from '../http.js';
-import { emitOrderUpdate } from '../socket.js';
+import { emitInventoryAlert, emitInventoryUpdate, emitOrderUpdate } from '../socket.js';
 
 const router = Router();
 
@@ -301,23 +301,100 @@ router.post('/', async (req: Request, res: Response) => {
       status: 'pending' as const
     }));
 
-    const result = await pool.query(
-      `INSERT INTO orders 
-        (id, order_number, table_number, customer_name, status, items, subtotal, tax, total, notes, created_by)
-       VALUES ($1, $2, $3, $4, 'pending', $5, $6, $7, $8, $9, $10)
-       RETURNING *`,
-      [id, order_number, resolvedTableNumber, resolvedCustomerName, JSON.stringify(orderItems), subtotal, tax, total, notes, resolvedCreatedBy]
-    );
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
 
-    const order = {
-      ...result.rows[0],
-      items: orderItems
-    };
+      const result = await client.query(
+        `INSERT INTO orders 
+          (id, order_number, table_number, customer_name, status, items, subtotal, tax, total, notes, created_by)
+         VALUES ($1, $2, $3, $4, 'pending', $5, $6, $7, $8, $9, $10)
+         RETURNING *`,
+        [id, order_number, resolvedTableNumber, resolvedCustomerName, JSON.stringify(orderItems), subtotal, tax, total, notes, resolvedCreatedBy]
+      );
 
-    // Emit WebSocket event
-    emitOrderUpdate({ type: 'create', order });
+      const alertEvents: Array<{
+        type: 'low-stock' | 'out-of-stock';
+        menuItemId: string;
+        menuItemName: string;
+        stock: number;
+        threshold: number;
+      }> = [];
 
-    res.status(201).json(order);
+      for (const item of orderItems) {
+        const invResult = await client.query(
+          'SELECT stock, low_stock_threshold FROM inventory_records WHERE menu_item_id = $1 FOR UPDATE',
+          [item.menuItemId]
+        );
+
+        if (invResult.rows.length === 0) {
+          continue;
+        }
+
+        const stockBefore = invResult.rows[0].stock ?? 0;
+        const threshold = invResult.rows[0].low_stock_threshold ?? 0;
+        const stockAfter = Math.max(0, stockBefore - item.quantity);
+
+        await client.query(
+          `UPDATE inventory_records SET stock = $1, updated_at = $2 WHERE menu_item_id = $3`,
+          [stockAfter, new Date().toISOString(), item.menuItemId]
+        );
+
+        const movementId = `mov_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+        await client.query(
+          `INSERT INTO stock_movements 
+            (id, menu_item_id, menu_item_name, type, qty, stock_before, balance_after, performed_by, notes)
+           VALUES ($1, $2, $3, 'sale', $4, $5, $6, $7, $8)`,
+          [movementId, item.menuItemId, item.menuItemName || item.menuItemId, -item.quantity, stockBefore, stockAfter, resolvedCreatedBy, `Sale for order ${order_number}`]
+        );
+
+        if (stockAfter <= threshold && stockBefore > threshold) {
+          alertEvents.push({
+            type: 'low-stock',
+            menuItemId: item.menuItemId,
+            menuItemName: item.menuItemName || item.menuItemId,
+            stock: stockAfter,
+            threshold,
+          });
+        }
+
+        if (stockAfter === 0 && stockBefore > 0) {
+          alertEvents.push({
+            type: 'out-of-stock',
+            menuItemId: item.menuItemId,
+            menuItemName: item.menuItemName || item.menuItemId,
+            stock: stockAfter,
+            threshold,
+          });
+        }
+      }
+
+      await client.query('COMMIT');
+
+      const order = {
+        ...result.rows[0],
+        items: orderItems
+      };
+
+      emitOrderUpdate({ type: 'create', order });
+      for (const item of orderItems) {
+        emitInventoryUpdate({ type: 'update', menuItemId: item.menuItemId });
+      }
+      for (const alertEvent of alertEvents) {
+        emitInventoryAlert({
+          ...alertEvent,
+          menuItemName: alertEvent.menuItemName,
+        });
+      }
+
+      res.status(201).json(order);
+    } catch (error) {
+      await client.query('ROLLBACK');
+      console.error('Error creating order:', error);
+      res.status(500).json({ error: 'Failed to create order' });
+    } finally {
+      client.release();
+    }
   } catch (error) {
     console.error('Error creating order:', error);
     res.status(500).json({ error: 'Failed to create order' });

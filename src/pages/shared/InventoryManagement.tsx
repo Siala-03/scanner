@@ -26,6 +26,7 @@ import { SearchBar } from '../../components/ui/SearchBar';
 import { Modal } from '../../components/ui/Modal';
 import { formatPrice } from '../../utils/currency';
 import { useMenu } from '../../hooks/useMenu';
+import { useSocket } from '../../hooks/useSocket';
 import type {
   InventoryRecord,
   Supplier,
@@ -130,10 +131,12 @@ function normalizeInventoryRecord(rec: any): InventoryRecord {
 
 export function InventoryManagement({ role }: InventoryManagementProps) {
   const { menuItems } = useMenu();
+  const { joinInventory, socket } = useSocket();
   const menuCategories = useMemo(() => Array.from(new Set(menuItems.map((m) => m.category))), [menuItems]);
   const isManager = role === 'manager';
   const [activeTab, setActiveTab] = useState<Tab>('overview');
   const [tick, setTick] = useState(0);
+  const [inventoryAlerts, setInventoryAlerts] = useState<string[]>([]);
   const refresh = useCallback(() => setTick((t) => t + 1), []);
 
   const [inventoryMap, setInventoryMap] = useState<Record<string, InventoryRecord>>({});
@@ -160,6 +163,28 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
     stockTurnoverRate: 0,
     categoryBreakdown: [],
   });
+
+  useEffect(() => {
+    joinInventory();
+    const handleInventoryUpdate = () => {
+      refresh();
+    };
+    const handleInventoryAlert = (data: { menuItemName: string; stock: number; threshold: number; type: string }) => {
+      const message = data.type === 'out-of-stock'
+        ? `${data.menuItemName} is out of stock.`
+        : `${data.menuItemName} is low on stock (${data.stock} <= ${data.threshold}).`;
+      setInventoryAlerts((prev) => [message, ...prev].slice(0, 5));
+      refresh();
+    };
+
+    socket.on('inventory:update', handleInventoryUpdate);
+    socket.on('inventory:alert', handleInventoryAlert);
+
+    return () => {
+      socket.off('inventory:update', handleInventoryUpdate);
+      socket.off('inventory:alert', handleInventoryAlert);
+    };
+  }, [joinInventory, refresh, socket]);
 
   useEffect(() => {
     async function loadAll() {
@@ -509,6 +534,17 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
               </div>
             </div>
           </motion.div>
+        )}
+
+        {inventoryAlerts.length > 0 && (
+          <div className="mb-4 rounded-xl border border-amber-300/30 bg-amber-500/10 p-3">
+            <p className="text-xs font-semibold uppercase tracking-wider text-amber-700">Inventory Alerts</p>
+            <ul className="mt-1 list-disc list-inside text-xs text-amber-900">
+              {inventoryAlerts.map((msg, index) => (
+                <li key={`${msg}-${index}`}>{msg}</li>
+              ))}
+            </ul>
+          </div>
         )}
 
         {/* ════════════════════════════════════════════════════════════════
