@@ -1,7 +1,7 @@
 import { apiRequest } from './http';
 import type { Order, CreateOrderInput, UpdateOrderStatusInput } from '../types/orders';
 
-const API_BASE = 'https://scanner-3cku.onrender.com';
+const API_BASE = import.meta.env.VITE_API_URL || '';
 
 // POST seed test orders
 export async function seedTestOrders(): Promise<{ message: string; count: number }> {

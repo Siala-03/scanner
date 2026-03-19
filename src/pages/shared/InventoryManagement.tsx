@@ -110,6 +110,22 @@ function StarRating({ rating }: { rating: number }) {
   );
 }
 
+// ── Helper Functions ─────────────────────────────────────────────────────────
+
+function normalizeInventoryRecord(rec: any): InventoryRecord {
+  return {
+    menuItemId: rec.menuItemId || rec.menu_item_id || '',
+    stock: rec.stock ?? 0,
+    lowStockThreshold: rec.lowStockThreshold ?? rec.low_stock_threshold ?? 0,
+    reorderPoint: rec.reorderPoint ?? rec.reorder_point ?? 0,
+    reorderQty: rec.reorderQty ?? rec.reorder_qty ?? 0,
+    unitCost: rec.unitCost ?? rec.unit_cost ?? 0,
+    supplierId: rec.supplierId ?? rec.supplier_id,
+    location: rec.location ?? '',
+    updatedAt: rec.updatedAt ?? rec.updated_at ?? new Date().toISOString(),
+  };
+}
+
 // ── Main Component ───────────────────────────────────────────────────────────
 
 export function InventoryManagement({ role }: InventoryManagementProps) {
@@ -124,6 +140,8 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
   const [lowStockItems, setLowStockItems] = useState<InventoryRecord[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const [movements, setMovements] = useState<StockMovement[]>([]);
   const [wasteLog, setWasteLog] = useState<any[]>([]);
@@ -145,6 +163,8 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
 
   useEffect(() => {
     async function loadAll() {
+      setIsLoading(true);
+      setLoadError(null);
       try {
         const [inventoryData, lowStockData, supplierData, poData, moveData, wasteData, computedAnalytics] = await Promise.all([
           fetchInventory(),
@@ -156,15 +176,21 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
           apiComputeInventoryAnalytics(),
         ]);
 
-        setInventoryMap(Object.fromEntries(inventoryData.map((rec) => [rec.menuItemId, rec])));
-        setLowStockItems(lowStockData);
+        setInventoryMap(Object.fromEntries(inventoryData.map((rec) => {
+          const normalized = normalizeInventoryRecord(rec);
+          return [normalized.menuItemId, normalized];
+        })));
+        setLowStockItems(lowStockData.map(normalizeInventoryRecord));
         setSuppliers(supplierData);
         setPurchaseOrders(poData);
         setMovements(moveData);
         setWasteLog(wasteData);
         setAnalytics(computedAnalytics);
       } catch (err) {
-        console.warn('Failed to load inventory backend data', err);
+        console.error('Failed to load inventory backend data', err);
+        setLoadError('Unable to load inventory data right now. Please check your network or try again.');
+      } finally {
+        setIsLoading(false);
       }
     }
     loadAll();
@@ -210,18 +236,18 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
     if (!isManager) return;
     const current = inventoryMap[menuItemId];
     if (!current) return;
-    const updates: Partial<InventoryRecord> = {};
-    if (editValues.stock !== undefined && editValues.stock !== current.stock) updates.stock = editValues.stock;
-    if (editValues.lowStockThreshold !== undefined && editValues.lowStockThreshold !== current.lowStockThreshold) updates.lowStockThreshold = editValues.lowStockThreshold;
-    if (editValues.reorderPoint !== undefined && editValues.reorderPoint !== current.reorderPoint) updates.reorderPoint = editValues.reorderPoint;
-    if (editValues.reorderQty !== undefined && editValues.reorderQty !== current.reorderQty) updates.reorderQty = editValues.reorderQty;
-    if (editValues.unitCost !== undefined && editValues.unitCost !== current.unitCost) updates.unitCost = editValues.unitCost;
-    if (editValues.location !== undefined && editValues.location !== current.location) updates.location = editValues.location;
+    const updatePayload: any = {};
+    if (editValues.stock !== undefined && editValues.stock !== current.stock) updatePayload.stock = editValues.stock;
+    if (editValues.lowStockThreshold !== undefined && editValues.lowStockThreshold !== current.lowStockThreshold) updatePayload.low_stock_threshold = editValues.lowStockThreshold;
+    if (editValues.reorderPoint !== undefined && editValues.reorderPoint !== current.reorderPoint) updatePayload.reorder_point = editValues.reorderPoint;
+    if (editValues.reorderQty !== undefined && editValues.reorderQty !== current.reorderQty) updatePayload.reorder_qty = editValues.reorderQty;
+    if (editValues.unitCost !== undefined && editValues.unitCost !== current.unitCost) updatePayload.unit_cost = editValues.unitCost;
+    if (editValues.location !== undefined && editValues.location !== current.location) updatePayload.location = editValues.location;
 
-    if (Object.keys(updates).length > 0) {
+    if (Object.keys(updatePayload).length > 0) {
       try {
-        const updated = await apiUpdateInventoryRecord(menuItemId, updates);
-        setInventoryMap((prev) => ({ ...prev, [menuItemId]: updated }));
+        const updated = await apiUpdateInventoryRecord(menuItemId, updatePayload);
+        setInventoryMap((prev) => ({ ...prev, [menuItemId]: normalizeInventoryRecord(updated) }));
       } catch (err) {
         console.error('Failed to update inventory record', err);
       }
@@ -441,6 +467,20 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 md:px-6 py-6">
+        {isLoading && (
+          <div className="mb-4 rounded-xl border border-amber-400/30 bg-amber-500/10 p-3 text-amber-100">
+            Loading inventory data from server. Please wait...
+          </div>
+        )}
+        {!isLoading && loadError && (
+          <div className="mb-4 rounded-xl border border-red-400/30 bg-red-500/10 p-3 text-red-100 flex items-center justify-between gap-4">
+            <div>
+              <p className="font-semibold">Unable to load inventory data.</p>
+              <p className="text-xs text-red-200">{loadError}</p>
+            </div>
+            <Button variant="primary" size="sm" onClick={refresh}>Retry</Button>
+          </div>
+        )}
 
         {/* ── LOW STOCK BANNER ── */}
         {lowStockItems.length > 0 && activeTab === 'overview' && (
@@ -455,11 +495,14 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                 {lowStockItems.length} item{lowStockItems.length > 1 ? 's' : ''} need restocking
               </p>
               <div className="flex flex-wrap gap-2">
-                {lowStockItems.slice(0, 6).map((x) => (
-                  <span key={x.item.id} className="px-2 py-0.5 rounded-full bg-red-500/20 text-red-200 text-xs">
-                    {x.item.name} ({x.stock} left)
-                  </span>
-                ))}
+                {lowStockItems.slice(0, 6).map((x) => {
+                  const menuItem = menuItems.find((m) => m.id === x.menuItemId);
+                  return (
+                    <span key={x.menuItemId} className="px-2 py-0.5 rounded-full bg-red-500/20 text-red-200 text-xs">
+                      {menuItem?.name ?? x.menuItemId} ({x.stock} left)
+                    </span>
+                  );
+                })}
                 {lowStockItems.length > 6 && (
                   <span className="text-red-300/70 text-xs self-center">+{lowStockItems.length - 6} more</span>
                 )}
@@ -847,7 +890,7 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                         Edit
                       </button>
                       <button
-                        onClick={() => { updateSupplier(sup.id, { isActive: !sup.isActive }); refresh(); }}
+                        onClick={() => { apiUpdateSupplier(sup.id, { isActive: !sup.isActive }); refresh(); }}
                         className={`px-3 py-1 rounded-lg text-xs font-medium transition ${
                           sup.isActive ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30' : 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30'
                         }`}

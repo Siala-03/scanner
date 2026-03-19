@@ -258,11 +258,17 @@ router.post('/', async (req: Request, res: Response) => {
   try {
     const {
       table_number,
+      tableNumber,
       customer_name,
+      customerName,
       items,
       notes,
-      created_by
+      created_by,
+      createdBy
     } = req.body;
+    const resolvedTableNumber = table_number ?? tableNumber;
+    const resolvedCustomerName = customer_name ?? customerName ?? 'Walk-in';
+    const resolvedCreatedBy = created_by ?? createdBy ?? 'system';
 
     const id = `order_${Date.now().toString(36)}`;
     const order_number = generateOrderNumber();
@@ -300,7 +306,7 @@ router.post('/', async (req: Request, res: Response) => {
         (id, order_number, table_number, customer_name, status, items, subtotal, tax, total, notes, created_by)
        VALUES ($1, $2, $3, $4, 'pending', $5, $6, $7, $8, $9, $10)
        RETURNING *`,
-      [id, order_number, table_number, customer_name, JSON.stringify(orderItems), subtotal, tax, total, notes, created_by]
+      [id, order_number, resolvedTableNumber, resolvedCustomerName, JSON.stringify(orderItems), subtotal, tax, total, notes, resolvedCreatedBy]
     );
 
     const order = {

@@ -165,6 +165,12 @@ export function App() {
       setSelectedRole('manager');
     } else if (path === '/supervisor' || path.startsWith('/supervisor')) {
       setSelectedRole('supervisor');
+    } else if (path === '/' || path.startsWith('/t/') || queryTable) {
+      // allow root and table deep-link paths
+    } else {
+      // Unknown path fallback: keep app loadable and show friendly message
+      window.history.replaceState({}, '', '/');
+      setSelectedRole(null);
     }
   }, []);
 

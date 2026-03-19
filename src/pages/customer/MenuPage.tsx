@@ -93,69 +93,71 @@ export function MenuPage({ onAddToCart }: MenuPageProps) {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-950 via-amber-900 to-yellow-950 pb-24">
-      {/* Header */}
-      <div className="sticky top-0 z-40 bg-amber-950/95 backdrop-blur-sm border-b border-amber-800">
-        <div className="px-4 py-4">
-          <div className="flex items-center gap-3 mb-4">
-            <h1 className="text-2xl font-bold text-amber-50">Menu</h1>
-            {error && (
-              <button 
+    <div className="min-h-screen bg-slate-50 text-slate-900 pb-24">
+      <div className="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-sm">
+        <div className="max-w-5xl mx-auto px-4 py-4">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Restaurant Menu</p>
+              <h1 className="text-3xl font-bold text-slate-900">Order from your table</h1>
+              <p className="text-slate-500 mt-1">Browse dishes, add to your cart, and place orders instantly.</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
                 onClick={refetch}
-                className="p-1.5 rounded-full bg-amber-500/20 text-amber-400"
-                title="Reload menu"
+                className="inline-flex items-center gap-2 px-3 py-2 rounded-full bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800"
               >
                 <RefreshCwIcon className="w-4 h-4" />
+                Refresh
               </button>
-            )}
+              {error && (
+                <div className="text-red-500 text-xs font-medium">{error}</div>
+              )}
+            </div>
           </div>
-          
-          {/* Search */}
-          <div className="relative">
-            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-amber-300/50" />
+
+          <div className="mt-4 relative">
+            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
             <input
               type="text"
               placeholder="Search menu..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 bg-amber-900/50 border border-amber-700 rounded-xl text-amber-50 placeholder-amber-300/50 focus:outline-none focus:ring-2 focus:ring-amber-400"
+              className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-300"
             />
           </div>
-        </div>
 
-        {/* Category Tabs */}
-        <div className="flex gap-2 px-4 pb-3 overflow-x-auto scrollbar-hide">
-          {categoryTabs.map((category) => (
-            <button
-              key={category.id}
-              onClick={() => setActiveCategory(category.id)}
-              className={`flex items-center gap-1.5 px-4 py-2 rounded-full whitespace-nowrap transition-all ${
-                activeCategory === category.id
-                  ? 'bg-amber-500 text-white'
-                  : 'bg-amber-900/40 text-amber-200/80 hover:bg-amber-800/50'
-              }`}
-            >
-              <span className="text-sm font-medium">{category.name}</span>
-            </button>
-          ))}
+          <div className="mt-3 flex flex-wrap gap-2 overflow-x-auto pb-2">
+            {categoryTabs.map((category) => (
+              <button
+                key={category.id}
+                onClick={() => setActiveCategory(category.id)}
+                className={`h-9 px-3 rounded-full text-xs font-semibold transition-all ${
+                  activeCategory === category.id
+                    ? 'bg-slate-900 text-white shadow'
+                    : 'bg-white text-slate-600 border border-slate-200 hover:border-slate-300'
+                }`}
+              >
+                {category.name}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* Loading State */}
       {isLoading && (
         <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-700"></div>
         </div>
       )}
 
-      {/* Popular Items */}
       {!isLoading && activeCategory === 'all' && searchQuery === '' && popularItems.length > 0 && (
-        <div className="px-4 py-6">
+        <div className="max-w-5xl mx-auto px-4 py-6">
           <div className="flex items-center gap-2 mb-4">
-            <SparklesIcon className="w-5 h-5 text-amber-400" />
-            <h2 className="text-lg font-semibold text-amber-50">Popular</h2>
+            <SparklesIcon className="w-5 h-5 text-slate-700" />
+            <h2 className="text-xl font-semibold text-slate-900">Popular</h2>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
             {popularItems.map((item) => (
               <MenuItemCard
                 key={item.id}
@@ -171,13 +173,13 @@ export function MenuPage({ onAddToCart }: MenuPageProps) {
       {/* All Items */}
       {!isLoading && (
         <div className="px-4 py-4">
-          <h2 className="text-lg font-semibold text-amber-50 mb-4">
-            {activeCategory === 'all' ? 'Full Menu' : categoryNames[activeCategory] || activeCategory}
-            <span className="text-amber-300/60 text-sm font-normal ml-2">
-              ({filteredItems.length} items)
-            </span>
-          </h2>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-semibold text-slate-900">
+              {activeCategory === 'all' ? 'Full Menu' : categoryNames[activeCategory] || activeCategory}
+            </h2>
+            <span className="text-sm text-slate-500">{filteredItems.length} items</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
             {filteredItems.map((item) => (
               <MenuItemCard
                 key={item.id}
@@ -189,8 +191,9 @@ export function MenuPage({ onAddToCart }: MenuPageProps) {
           </div>
           
           {filteredItems.length === 0 && (
-            <div className="text-center py-12 text-amber-300/60">
-              <p>No items found</p>
+            <div className="text-center py-12 text-slate-500">
+              <p className="text-lg font-semibold text-slate-700">No items found</p>
+              <p className="text-sm">Try another category or clear your search.</p>
             </div>
           )}
         </div>

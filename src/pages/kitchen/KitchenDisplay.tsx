@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { ClockIcon, ChefHatIcon, UtensilsIcon, RefreshCwIcon, CheckCircleIcon, FlameIcon, AlertTriangleIcon, BarChart3Icon, ListOrderedIcon } from 'lucide-react';
 
 // Backend API
-const API_BASE = 'https://scanner-3cku.onrender.com';
+const API_BASE = import.meta.env.VITE_API_URL || '';
 
 interface KitchenOrder {
   id: string;
@@ -62,7 +62,7 @@ function formatTime(createdAt: string): string {
 
 async function fetchKitchenOrders(): Promise<KitchenOrder[]> {
   try {
-    const res = await fetch(`${API_BASE}/orders/kitchen`);
+    const res = await fetch(`${API_BASE}/api/orders/kitchen`);
     if (!res.ok) throw new Error('Failed to fetch');
     const data = await res.json();
     return data.map((o: any) => ({
@@ -86,7 +86,7 @@ async function fetchKitchenOrders(): Promise<KitchenOrder[]> {
 
 async function fetchKitchenAnalytics(): Promise<any> {
   try {
-    const res = await fetch(`${API_BASE}/orders/kitchen/analytics`);
+    const res = await fetch(`${API_BASE}/api/orders/kitchen/analytics`);
     if (!res.ok) throw new Error('Failed to fetch analytics');
     return await res.json();
   } catch (e) {
@@ -96,7 +96,7 @@ async function fetchKitchenAnalytics(): Promise<any> {
 }
 
 async function updateOrderStatus(orderId: string, status: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/orders/${orderId}/status`, {
+  const res = await fetch(`${API_BASE}/api/orders/${orderId}/status`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ status })
@@ -133,7 +133,6 @@ export function KitchenDisplay() {
   const [orders, setOrders] = useState<KitchenOrder[]>([]);
   const [completedToday, setCompletedToday] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
-  const [usingFallback, setUsingFallback] = useState(false);
   const [lastUpdate, setLastUpdate] = useState(new Date());
   const [viewMode, setViewMode] = useState<'orders' | 'analytics'>('orders');
   const [analytics, setAnalytics] = useState<any>(null);
@@ -155,79 +154,9 @@ export function KitchenDisplay() {
       fetchKitchenAnalytics()
     ]);
     
-    if (data.length > 0) {
-      setOrders(data);
-      setAnalytics(analyticsData);
-      setUsingFallback(false);
-      setLastUpdate(new Date());
-    } else {
-      setUsingFallback(true);
-      setOrders([
-        {
-          id: 'demo-1',
-          orderNumber: 'ORD-001',
-          tableNumber: 5,
-          status: 'pending',
-          notes: '⚠️ ALLERGY: Nut allergy - no nuts or nut sauces',  // Order-level notes
-          items: [
-            { name: 'Breakfast Platter', quantity: 2 },
-            { name: 'Fresh Juice', quantity: 2, notes: 'No ice' }
-          ],
-          createdAt: new Date(Date.now() - 3 * 60 * 1000).toISOString()
-        },
-        {
-          id: 'demo-2',
-          orderNumber: 'ORD-002',
-          tableNumber: 8,
-          status: 'preparing',
-          notes: 'Gluten-free plate needed',
-          items: [
-            { name: 'Grilled Chicken', quantity: 1 },
-            { name: 'Rice', quantity: 1 },
-            { name: 'House Salad', quantity: 1 }
-          ],
-          createdAt: new Date(Date.now() - 10 * 60 * 1000).toISOString()
-        },
-        {
-          id: 'demo-3',
-          orderNumber: 'ORD-003',
-          tableNumber: 12,
-          status: 'ready',
-          items: [
-            { name: 'Fish and Chips', quantity: 2, notes: 'Extra tartare' }
-          ],
-          createdAt: new Date(Date.now() - 18 * 60 * 1000).toISOString()
-        },
-        {
-          id: 'demo-4',
-          orderNumber: 'ORD-004',
-          tableNumber: 3,
-          status: 'pending',
-          notes: '⚠️ ALLERGY: Shellfish allergy - avoid all seafood',
-          items: [
-            { name: 'Pancakes Stack', quantity: 1 },
-            { name: 'Coffee', quantity: 2 }
-          ],
-          createdAt: new Date(Date.now() - 1 * 60 * 1000).toISOString()
-        }
-      ]);
-      // Demo analytics
-      setAnalytics({
-        totalOrders: 24,
-        completedOrders: 18,
-        avgPrepTime: 12,
-        pendingOrders: 4,
-        preparingOrders: 2,
-        readyOrders: 2,
-        popularItems: [
-          { name: 'Breakfast Platter', count: 8 },
-          { name: 'Grilled Chicken', count: 6 },
-          { name: 'Fish and Chips', count: 5 },
-          { name: 'Pancakes Stack', count: 4 },
-          { name: 'Fresh Juice', count: 3 }
-        ]
-      });
-    }
+    setOrders(data);
+    setAnalytics(analyticsData);
+    setLastUpdate(new Date());
     setLoading(false);
   }, []);
 
@@ -440,12 +369,6 @@ export function KitchenDisplay() {
           </>
         )}
 
-        {usingFallback && (
-          <div className="fixed bottom-4 left-4 bg-amber-500/20 border border-amber-500 text-amber-400 px-4 py-2 rounded-lg flex items-center gap-2">
-            <AlertTriangleIcon className="w-4 h-4" />
-            <span className="text-sm">Demo Mode - No backend connected</span>
-          </div>
-        )}
       </main>
     </div>
   );

@@ -5,6 +5,7 @@ import { getSocket } from '../hooks/useSocket';
 
 interface MenuContextValue {
   menuItems: MenuItem[];
+  categories: string[];
   isLoading: boolean;
   error: string | null;
   refresh: () => Promise<void>;
@@ -50,6 +51,11 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
       setIsLoading(false);
     }
   }, [refresh]);
+
+  const categories = useMemo(
+    () => Array.from(new Set(menuItems.map((item) => item.category))),
+    [menuItems]
+  );
 
   useEffect(() => {
     let isMounted = true;
@@ -99,8 +105,8 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
   }, [refresh]);
 
   const value = useMemo(
-    () => ({ menuItems, isLoading, error, refresh, saveMenu }),
-    [menuItems, isLoading, error, refresh, saveMenu]
+    () => ({ menuItems, categories, isLoading, error, refresh, saveMenu }),
+    [menuItems, categories, isLoading, error, refresh, saveMenu]
   );
 
   return <MenuContext.Provider value={value}>{children}</MenuContext.Provider>;
