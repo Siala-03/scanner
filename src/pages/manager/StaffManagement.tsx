@@ -21,13 +21,16 @@ import { Modal } from '../../components/ui/Modal';
 import { Input } from '../../components/ui/Input';
 export function StaffManagement() {
   const { staff: backendStaff, isLoading, refetch } = useStaff();
+  const { tables, isLoading: tablesLoading } = useTables();
   const [searchQuery, setSearchQuery] = useState('');
 
   const [selectedRole, setSelectedRole] = useState<StaffRole | 'all'>('all');
   const [isCredentialModalOpen, setIsCredentialModalOpen] = useState(false);
   const [isAddStaffOpen, setIsAddStaffOpen] = useState(false);
-  const [selectedStaffForCreds, setSelectedStaffForCreds] =
-  useState<Staff | null>(null);
+  const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
+  const [selectedStaffForCreds, setSelectedStaffForCreds] = useState<Staff | null>(null);
+  const [selectedStaffForAssign, setSelectedStaffForAssign] = useState<Staff | null>(null);
+  const [assignmentSelection, setAssignmentSelection] = useState<number[]>([]);
   const [newUsername, setNewUsername] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [generatedCredentials, setGeneratedCredentials] = useState<{ staffName: string; username: string; password: string } | null>(null);
@@ -89,6 +92,27 @@ export function StaffManagement() {
       setIsCredentialModalOpen(false);
     }
   };
+
+  const openAssignTablesModal = (staffMember: Staff) => {
+    setSelectedStaffForAssign(staffMember);
+    setAssignmentSelection(staffMember.assignedTables ?? []);
+    setIsAssignModalOpen(true);
+  };
+
+  const saveAssignedTables = async () => {
+    if (!selectedStaffForAssign) return;
+    try {
+      await updateStaffAssignments(selectedStaffForAssign.id, assignmentSelection);
+      await refetch();
+    } catch (err) {
+      console.error('Failed to assign tables', err);
+    } finally {
+      setIsAssignModalOpen(false);
+      setSelectedStaffForAssign(null);
+      setAssignmentSelection([]);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center">
@@ -234,14 +258,14 @@ export function StaffManagement() {
                   <div className="space-y-2 mb-4 text-sm text-slate-300">
                     <p>📧 {member.email}</p>
                     <p>📱 {member.phone}</p>
-                    {member.role === 'waiter' &&
+                    {member.role === 'waiter' && (
                   <p>
                         🍽️ Tables:{' '}
                         {member.assignedTables.length > 0 ?
                     member.assignedTables.join(', ') :
                     'None'}
                       </p>
-                  }
+                  )}
                   </div>
 
                   <div className="flex gap-2 pt-4 border-t border-slate-700">
@@ -254,6 +278,15 @@ export function StaffManagement() {
                       <KeyIcon className="w-4 h-4" />
                       Login Access
                     </Button>
+                    {member.role === 'waiter' && (
+                      <Button
+                      variant="secondary"
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => openAssignTablesModal(member)}>
+                        Assign
+                      </Button>
+                    )}
                     <Button variant="secondary" size="sm">
                       <EditIcon className="w-4 h-4" />
                     </Button>
