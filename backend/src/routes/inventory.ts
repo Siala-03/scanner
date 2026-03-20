@@ -1,7 +1,8 @@
 import { Router, Request, Response } from 'express';
 import { pool } from '../db.js';
 import { HttpError } from '../http.js';
-import { emitInventoryUpdate, emitStockMovement } from '../socket.js';
+import { adjustStock, getLowStockItems } from '../services/inventoryService.js';
+import { emitInventoryUpdate } from '../socket.js';
 
 const router = Router();
 
@@ -151,41 +152,8 @@ router.patch('/:menuItemId/adjust', async (req: Request, res: Response) => {
   try {
     const { menuItemId } = req.params;
     const { adjustment, reason, performed_by } = req.body;
-
-    // Get current stock
-    const current = await pool.query(
-      'SELECT stock FROM inventory_records WHERE menu_item_id = $1',
-      [menuItemId]
-    );
-
-    if (current.rows.length === 0) {
-      throw new HttpError(404, 'Inventory record not found');
-    }
-
-    const stockBefore = current.rows[0].stock;
-    const newStock = stockBefore + adjustment;
-
-    // Update stock
-    const result = await pool.query(
-      `UPDATE inventory_records 
-       SET stock = $1, updated_at = $2 
-       WHERE menu_item_id = $3 
-       RETURNING *`,
-      [newStock, new Date().toISOString(), menuItemId]
-    );
-
-    // Record movement
-    const movementId = `mov_${Date.now().toString(36)}`;
-    await pool.query(
-      `INSERT INTO stock_movements 
-        (id, menu_item_id, menu_item_name, type, qty, stock_before, balance_after, performed_by, notes)
-       VALUES ($1, $2, $3, 'adjustment', $4, $5, $6, $7, $8)`,
-      [movementId, menuItemId, menuItemId, adjustment, stockBefore, newStock, performed_by, reason]
-    );
-
-    emitInventoryUpdate({ type: 'update', record: result.rows[0] });
-    emitStockMovement({ type: 'create', movement: { menuItemId, adjustment, stockBefore, balanceAfter: newStock } });
-    res.json(result.rows[0]);
+    const record = await adjustStock(menuItemId, adjustment, reason ?? 'Manual adjustment', performed_by ?? 'system');
+    res.json(record);
   } catch (error) {
     if (error instanceof HttpError) {
       res.status(error.status).json({ error: error.message });
@@ -215,12 +183,8 @@ router.delete('/:menuItemId', async (req: Request, res: Response) => {
 // GET low stock items
 router.get('/alerts/low-stock', async (_req: Request, res: Response) => {
   try {
-    const result = await pool.query(
-      `SELECT * FROM inventory_records 
-       WHERE stock <= low_stock_threshold 
-       ORDER BY stock ASC`
-    );
-    res.json(result.rows);
+    const rows = await getLowStockItems();
+    res.json(rows);
   } catch (error) {
     console.error('Error fetching low stock:', error);
     res.status(500).json({ error: 'Failed to fetch low stock items' });

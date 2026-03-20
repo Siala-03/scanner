@@ -26,7 +26,7 @@ import { SearchBar } from '../../components/ui/SearchBar';
 import { Modal } from '../../components/ui/Modal';
 import { formatPrice } from '../../utils/currency';
 import { useMenu } from '../../hooks/useMenu';
-import { useSocket } from '../../hooks/useSocket';
+import { useInventoryData } from '../../hooks/useInventory';
 import type {
   InventoryRecord,
   Supplier,
@@ -131,95 +131,34 @@ function normalizeInventoryRecord(rec: any): InventoryRecord {
 
 export function InventoryManagement({ role }: InventoryManagementProps) {
   const { menuItems } = useMenu();
-  const { joinInventory, socket } = useSocket();
+  const {
+    inventory,
+    lowStockItems,
+    suppliers,
+    purchaseOrders,
+    movements,
+    waste,
+    analytics,
+    alerts: inventoryAlerts,
+    isLoading,
+    loadError,
+    refresh,
+  } = useInventoryData();
   const menuCategories = useMemo(() => Array.from(new Set(menuItems.map((m) => m.category))), [menuItems]);
   const isManager = role === 'manager';
   const [activeTab, setActiveTab] = useState<Tab>('overview');
-  const [tick, setTick] = useState(0);
-  const [inventoryAlerts, setInventoryAlerts] = useState<string[]>([]);
-  const refresh = useCallback(() => setTick((t) => t + 1), []);
 
-  const [inventoryMap, setInventoryMap] = useState<Record<string, InventoryRecord>>({});
-  const [lowStockItems, setLowStockItems] = useState<InventoryRecord[]>([]);
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const inventoryMap = useMemo(() => {
+    const map: Record<string, InventoryRecord> = {};
+    inventory.forEach((rec) => {
+      const normalized = normalizeInventoryRecord(rec);
+      map[normalized.menuItemId] = normalized;
+    });
+    return map;
+  }, [inventory]);
 
-  const [movements, setMovements] = useState<StockMovement[]>([]);
-  const [wasteLog, setWasteLog] = useState<any[]>([]);
-  const [analytics, setAnalytics] = useState<InventoryAnalytics>({
-    totalStockValue: 0,
-    lowStockCount: 0,
-    outOfStockCount: 0,
-    pendingPOCount: 0,
-    pendingPOValue: 0,
-    wasteCostLast30d: 0,
-    avgTurnoverDays: 0,
-    belowReorderCount: 0,
-    topWasteReason: null,
-    wasteByReason: [],
-    topWasteItems: [],
-    stockTurnoverRate: 0,
-    categoryBreakdown: [],
-  });
+  const menuCategoriesFromData = useMemo(() => Array.from(new Set(menuItems.map((m) => m.category))), [menuItems]);
 
-  useEffect(() => {
-    joinInventory();
-    const handleInventoryUpdate = () => {
-      refresh();
-    };
-    const handleInventoryAlert = (data: { menuItemName: string; stock: number; threshold: number; type: string }) => {
-      const message = data.type === 'out-of-stock'
-        ? `${data.menuItemName} is out of stock.`
-        : `${data.menuItemName} is low on stock (${data.stock} <= ${data.threshold}).`;
-      setInventoryAlerts((prev) => [message, ...prev].slice(0, 5));
-      refresh();
-    };
-
-    socket.on('inventory:update', handleInventoryUpdate);
-    socket.on('inventory:alert', handleInventoryAlert);
-
-    return () => {
-      socket.off('inventory:update', handleInventoryUpdate);
-      socket.off('inventory:alert', handleInventoryAlert);
-    };
-  }, [joinInventory, refresh, socket]);
-
-  useEffect(() => {
-    async function loadAll() {
-      setIsLoading(true);
-      setLoadError(null);
-      try {
-        const [inventoryData, lowStockData, supplierData, poData, moveData, wasteData, computedAnalytics] = await Promise.all([
-          fetchInventory(),
-          fetchLowStockItems(),
-          fetchSuppliers(),
-          fetchPurchaseOrders(),
-          fetchMovements({ limit: 200 }),
-          fetchWasteEntries({ limit: 200 }),
-          apiComputeInventoryAnalytics(),
-        ]);
-
-        setInventoryMap(Object.fromEntries(inventoryData.map((rec) => {
-          const normalized = normalizeInventoryRecord(rec);
-          return [normalized.menuItemId, normalized];
-        })));
-        setLowStockItems(lowStockData.map(normalizeInventoryRecord));
-        setSuppliers(supplierData);
-        setPurchaseOrders(poData);
-        setMovements(moveData);
-        setWasteLog(wasteData);
-        setAnalytics(computedAnalytics);
-      } catch (err) {
-        console.error('Failed to load inventory backend data', err);
-        setLoadError('Unable to load inventory data right now. Please check your network or try again.');
-      } finally {
-        setIsLoading(false);
-      }
-    }
-    loadAll();
-  }, [tick]);
 
   // ── Overview state ──────────────────────────────────────────────────────
   const [query, setQuery] = useState('');
@@ -253,7 +192,7 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
         if (a.isLow !== b.isLow) return Number(b.isLow) - Number(a.isLow);
         return a.item.name.localeCompare(b.item.name);
       });
-  }, [query, categoryFilter, statusFilter, tick, menuItems, inventoryMap]);
+  }, [query, categoryFilter, statusFilter, menuItems, inventoryMap]);
 
   // lowStockItems loaded from backend state via fetchLowStockItems() and setLowStockItems()
 
@@ -271,8 +210,7 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
 
     if (Object.keys(updatePayload).length > 0) {
       try {
-        const updated = await apiUpdateInventoryRecord(menuItemId, updatePayload);
-        setInventoryMap((prev) => ({ ...prev, [menuItemId]: normalizeInventoryRecord(updated) }));
+        await apiUpdateInventoryRecord(menuItemId, updatePayload);
       } catch (err) {
         console.error('Failed to update inventory record', err);
       }
@@ -357,23 +295,24 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
 
   const handleSaveSupplier = async () => {
     if (!supplierForm.name) return;
+    const payload = {
+      name: supplierForm.name ?? '',
+      contact_person: supplierForm.contactPerson ?? supplierForm.contact_person ?? '',
+      email: supplierForm.email ?? '',
+      phone: supplierForm.phone ?? '',
+      address: supplierForm.address ?? '',
+      categories: supplierForm.categories ?? [],
+      lead_time_days: supplierForm.leadTimeDays ?? supplierForm.lead_time_days ?? 3,
+      payment_terms: supplierForm.paymentTerms ?? supplierForm.payment_terms ?? 'Net 30',
+      rating: supplierForm.rating ?? 3,
+      is_active: supplierForm.isActive ?? supplierForm.is_active ?? true,
+      notes: supplierForm.notes ?? '',
+    };
     try {
       if (editingSupplier) {
-        await apiUpdateSupplier(editingSupplier.id, supplierForm as Partial<Supplier>);
+        await apiUpdateSupplier(editingSupplier.id, payload);
       } else {
-        await apiCreateSupplier({
-          name: supplierForm.name ?? '',
-          contactPerson: supplierForm.contactPerson ?? '',
-          email: supplierForm.email ?? '',
-          phone: supplierForm.phone ?? '',
-          address: supplierForm.address ?? '',
-          categories: supplierForm.categories ?? [],
-          leadTimeDays: supplierForm.leadTimeDays ?? 3,
-          paymentTerms: supplierForm.paymentTerms ?? 'Net 30',
-          rating: supplierForm.rating ?? 3,
-          isActive: supplierForm.isActive ?? true,
-          notes: supplierForm.notes,
-        });
+        await apiCreateSupplier(payload);
       }
     } catch (err) {
       console.error('Failed to save supplier', err);
@@ -1043,7 +982,7 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-700/30">
-                    {wasteLog.map((w) => (
+                    {waste.map((w) => (
                       <tr key={w.id} className="hover:bg-slate-700/20">
                         <td className="px-4 py-3">
                           <p className="text-xs text-slate-400">{new Date(w.timestamp).toLocaleString()}</p>
@@ -1068,7 +1007,7 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                     ))}
                   </tbody>
                 </table>
-                {wasteLog.length === 0 && (
+                {waste.length === 0 && (
                   <div className="py-12 text-center text-slate-500">No waste entries found.</div>
                 )}
               </div>

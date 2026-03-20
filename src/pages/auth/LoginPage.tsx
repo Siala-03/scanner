@@ -160,13 +160,19 @@ export function LoginPage({ role, onLogin, onBack }: LoginPageProps) {
             Sign In
           </Button>
 
-          <button
-            type="button"
-            onClick={() => setMode('signup')}
-            className="w-full text-sm text-amber-400 mt-3 hover:text-amber-300 transition-colors"
-          >
-            Create a new account
-          </button>
+          {role === 'manager' ? (
+            <button
+              type="button"
+              onClick={() => setMode('signup')}
+              className="w-full text-sm text-amber-400 mt-3 hover:text-amber-300 transition-colors"
+            >
+              Create a new account
+            </button>
+          ) : (
+            <p className="text-xs text-slate-300 text-center mt-3">
+              Need an account? Ask your manager to create your login credentials.
+            </p>
+          )}
         </form>
       </motion.div>
     </div>);

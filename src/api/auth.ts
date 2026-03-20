@@ -1,7 +1,8 @@
 import { apiRequest } from './http';
 import type { Staff, StaffRole } from '../types';
 
-const API_BASE = 'https://scanner-3cku.onrender.com/api/auth';
+// Use relative API path so local dev proxy and production base both work.
+const API_BASE = '/api/auth';
 
 export async function loginStaff(
   username: string,

@@ -1,26 +1,30 @@
 import { apiRequest } from './http';
 import type { Staff } from '../types';
 
-const API_BASE = 'https://scanner-3cku.onrender.com/api/staff';
+const API_BASE = '/api/auth/staff';
 
 // Fetch all staff
 export async function fetchStaff(): Promise<Staff[]> {
-  return apiRequest<Staff[]>(`${API_BASE}`);
+  const data = await apiRequest<{ staff: Staff[] }>(`${API_BASE}`);
+  return data.staff;
 }
 
 // Fetch staff by ID
 export async function fetchStaffById(id: string): Promise<Staff> {
-  return apiRequest<Staff>(`${API_BASE}/${id}`);
+  const data = await apiRequest<{ staff: Staff }>(`${API_BASE}/${id}`);
+  return data.staff;
 }
 
 // Get staff on duty
 export async function fetchStaffOnDuty(): Promise<Staff[]> {
-  return apiRequest<Staff[]>(`${API_BASE}/on-duty`);
+  const data = await apiRequest<{ staff: Staff[] }>(`${API_BASE}/on-duty`);
+  return data.staff;
 }
 
 // Get waiters only
 export async function fetchWaiters(): Promise<Staff[]> {
-  return apiRequest<Staff[]>(`${API_BASE}/waiters`);
+  const data = await apiRequest<{ staff: Staff[] }>(`${API_BASE}/waiters`);
+  return data.staff;
 }
 
 // Update staff status

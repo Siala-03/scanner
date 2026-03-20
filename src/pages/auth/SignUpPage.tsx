@@ -26,6 +26,10 @@ export function SignUpPage({ role, onSignedUp, onBack }: SignUpPageProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (role !== 'manager') {
+      setError('Only managers can create new staff accounts. Please ask your manager to create your login.');
+      return;
+    }
     setError('');
 
     if (password !== confirmPassword) {
@@ -74,6 +78,13 @@ export function SignUpPage({ role, onSignedUp, onBack }: SignUpPageProps) {
         animate={{ opacity: 1, y: 0 }}
         className="w-full max-w-md bg-[#2a2018] border border-[#3a2e20] rounded-2xl p-8 shadow-2xl"
       >
+        {role !== 'manager' && (
+          <div className="mb-4 rounded-lg border border-amber-400/35 bg-amber-500/10 p-3">
+            <p className="text-xs text-amber-200">
+              Only managers can register new staff accounts. Please ask your manager to create your credentials.
+            </p>
+          </div>
+        )}
         <div className="text-center mb-8">
           <h1 className="text-3xl font-serif text-[#e8e4dc] mb-2">
             {roleTitle} Sign Up

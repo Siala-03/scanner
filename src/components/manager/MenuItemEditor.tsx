@@ -93,14 +93,18 @@ export function MenuItemEditor({
         categoryToSave = id as MenuCategory;
       }
     }
+
+    const parsedPrice = Number.isFinite(Number(formData.price)) ? Number(formData.price) : 0;
+    const parsedPrepTime = Number.isFinite(Number(formData.prepTime)) ? Number(formData.prepTime) : 15;
+
     onSave({
       ...item,
-      name: formData.name,
-      description: formData.description,
-      price: parseFloat(formData.price),
+      name: formData.name.trim(),
+      description: formData.description.trim(),
+      price: parsedPrice,
       category: categoryToSave,
       emoji: formData.emoji,
-      prepTime: parseInt(formData.prepTime),
+      prepTime: parsedPrepTime,
       isAvailable: formData.isAvailable,
       isPopular: formData.isPopular
     });

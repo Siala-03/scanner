@@ -42,24 +42,33 @@ router.post('/', async (req: Request, res: Response) => {
     const {
       name,
       contact_person,
+      contactPerson,
       email,
       phone,
       address,
       categories = [],
       lead_time_days = 7,
+      leadTimeDays,
       payment_terms = 'Net 30',
+      paymentTerms,
       rating = 3,
+      is_active = true,
+      isActive,
       notes
     } = req.body;
+    const resolvedContactPerson = contact_person ?? contactPerson ?? '';
+    const resolvedLeadTimeDays = lead_time_days ?? leadTimeDays ?? 7;
+    const resolvedPaymentTerms = payment_terms ?? paymentTerms ?? 'Net 30';
+    const resolvedIsActive = is_active ?? isActive ?? true;
 
     const id = `sup_${Date.now().toString(36)}`;
     
     const result = await pool.query(
       `INSERT INTO suppliers 
-        (id, name, contact_person, email, phone, address, categories, lead_time_days, payment_terms, rating, notes)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        (id, name, contact_person, email, phone, address, categories, lead_time_days, payment_terms, rating, is_active, notes)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
        RETURNING *`,
-      [id, name, contact_person, email, phone, address, categories, lead_time_days, payment_terms, rating, notes]
+      [id, name, resolvedContactPerson, email, phone, address, categories, resolvedLeadTimeDays, resolvedPaymentTerms, rating, resolvedIsActive, notes]
     );
     
     res.status(201).json(result.rows[0]);
@@ -76,31 +85,41 @@ router.put('/:id', async (req: Request, res: Response) => {
     const {
       name,
       contact_person,
+      contactPerson,
       email,
       phone,
       address,
       categories,
       lead_time_days,
+      leadTimeDays,
       payment_terms,
+      paymentTerms,
       rating,
       is_active,
+      isActive,
       notes
     } = req.body;
+
+    const resolvedContactPerson = contact_person ?? contactPerson;
+    const resolvedLeadTimeDays = lead_time_days ?? leadTimeDays;
+    const resolvedPaymentTerms = payment_terms ?? paymentTerms;
+    const resolvedIsActive = is_active ?? isActive;
 
     const updates: string[] = [];
     const values: unknown[] = [];
     let paramIndex = 1;
 
     if (name !== undefined) { updates.push(`name = $${paramIndex++}`); values.push(name); }
-    if (contact_person !== undefined) { updates.push(`contact_person = $${paramIndex++}`); values.push(contact_person); }
+    if (name !== undefined) { updates.push(`name = $${paramIndex++}`); values.push(name); }
+    if (resolvedContactPerson !== undefined) { updates.push(`contact_person = $${paramIndex++}`); values.push(resolvedContactPerson); }
     if (email !== undefined) { updates.push(`email = $${paramIndex++}`); values.push(email); }
     if (phone !== undefined) { updates.push(`phone = $${paramIndex++}`); values.push(phone); }
     if (address !== undefined) { updates.push(`address = $${paramIndex++}`); values.push(address); }
     if (categories !== undefined) { updates.push(`categories = $${paramIndex++}`); values.push(categories); }
-    if (lead_time_days !== undefined) { updates.push(`lead_time_days = $${paramIndex++}`); values.push(lead_time_days); }
-    if (payment_terms !== undefined) { updates.push(`payment_terms = $${paramIndex++}`); values.push(payment_terms); }
+    if (resolvedLeadTimeDays !== undefined) { updates.push(`lead_time_days = $${paramIndex++}`); values.push(resolvedLeadTimeDays); }
+    if (resolvedPaymentTerms !== undefined) { updates.push(`payment_terms = $${paramIndex++}`); values.push(resolvedPaymentTerms); }
     if (rating !== undefined) { updates.push(`rating = $${paramIndex++}`); values.push(rating); }
-    if (is_active !== undefined) { updates.push(`is_active = $${paramIndex++}`); values.push(is_active); }
+    if (resolvedIsActive !== undefined) { updates.push(`is_active = $${paramIndex++}`); values.push(resolvedIsActive); }
     if (notes !== undefined) { updates.push(`notes = $${paramIndex++}`); values.push(notes); }
 
     updates.push(`updated_at = $${paramIndex++}`);

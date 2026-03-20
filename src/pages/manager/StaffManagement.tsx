@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   PlusIcon,
@@ -8,7 +8,11 @@ import {
   KeyIcon } from
 'lucide-react';
 import { Staff, StaffRole, StaffCredentials } from '../../types';
+import { addStaffCredential, staffCredentials } from '../../data/staffData';
 import { useStaff } from '../../hooks/useStaff';
+import { useTables } from '../../hooks/useTables';
+import { signUpStaff } from '../../api/auth';
+import { updateStaffAssignments } from '../../api/staff';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
@@ -18,6 +22,7 @@ import { Input } from '../../components/ui/Input';
 export function StaffManagement() {
   const { staff: backendStaff, isLoading, refetch } = useStaff();
   const [searchQuery, setSearchQuery] = useState('');
+
   const [selectedRole, setSelectedRole] = useState<StaffRole | 'all'>('all');
   const [isCredentialModalOpen, setIsCredentialModalOpen] = useState(false);
   const [isAddStaffOpen, setIsAddStaffOpen] = useState(false);
@@ -25,6 +30,7 @@ export function StaffManagement() {
   useState<Staff | null>(null);
   const [newUsername, setNewUsername] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [generatedCredentials, setGeneratedCredentials] = useState<{ staffName: string; username: string; password: string } | null>(null);
   const [addForm, setAddForm] = useState<{
     name: string;
     role: StaffRole;
@@ -101,6 +107,33 @@ export function StaffManagement() {
             <p className="text-slate-400">
               {backendStaff.filter((s) => s.isOnDuty).length} staff on duty
             </p>
+            {generatedCredentials && (
+              <div className="mt-2 rounded-lg border border-emerald-400/30 bg-emerald-500/10 p-2 text-xs text-emerald-100">
+                <p className="font-semibold text-emerald-200">Credentials generated for {generatedCredentials.staffName}</p>
+                <div className="flex flex-col gap-1 mt-1 text-slate-200">
+                  <span className="font-medium">Username: <span className="text-emerald-200">{generatedCredentials.username}</span></span>
+                  <span className="font-medium">Password: <span className="text-emerald-200">{generatedCredentials.password}</span></span>
+                </div>
+                <div className="mt-2 flex gap-2">
+                  <Button
+                    variant="secondary"
+                    size="xs"
+                    onClick={() => {
+                      navigator.clipboard.writeText(`Username: ${generatedCredentials.username}\nPassword: ${generatedCredentials.password}`).catch(() => {});
+                    }}
+                  >
+                    Copy credentials
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="xs"
+                    onClick={() => setGeneratedCredentials(null)}
+                  >
+                    Dismiss
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
           <Button variant="primary" onClick={() => setIsAddStaffOpen(true)}>
             <PlusIcon className="w-5 h-5" />
@@ -231,6 +264,24 @@ export function StaffManagement() {
           </AnimatePresence>
         </div>
 
+        {generatedCredentials ? (
+          <div className="mb-4 rounded-xl border border-emerald-400/30 bg-emerald-500/10 p-3 text-emerald-100">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-emerald-200">New staff credentials generated for {generatedCredentials.staffName}.</p>
+                <div className="mt-1 text-xs text-emerald-100">
+                  <p>Username: <span className="font-semibold text-white">{generatedCredentials.username}</span></p>
+                  <p>Password: <span className="font-semibold text-white">{generatedCredentials.password}</span></p>
+                </div>
+              </div>
+              <button
+                onClick={() => setGeneratedCredentials(null)}
+                className="text-emerald-100 hover:text-white text-xs rounded-md bg-emerald-500/20 px-2 py-1"
+              >Clear</button>
+            </div>
+          </div>
+        ) : null}
+
         {filteredStaff.length === 0 &&
         <div className="text-center py-12">
             <span className="text-4xl block mb-3">👥</span>
@@ -349,52 +400,60 @@ export function StaffManagement() {
               <Button
                 variant="primary"
                 fullWidth
-                onClick={() => {
+                onClick={async () => {
                   if (!addForm.name || !addForm.email || !addForm.phone) return;
-                  const id = `staff-${Date.now()}`;
-                  const assignedTables =
-                    addForm.role === 'waiter'
-                      ? addForm.assignedTables
-                          .split(',')
-                          .map((s) => parseInt(s.trim(), 10))
-                          .filter((n) => !Number.isNaN(n))
-                      : [];
-                  const newStaff: Staff = {
-                    id,
-                    name: addForm.name,
-                    role: addForm.role,
-                    email: addForm.email,
-                    phone: addForm.phone,
-                    isOnDuty: true,
-                    assignedTables,
-                    performance: {
-                      ordersServed: 0,
-                      avgServiceTime: 0,
-                      rating: 5,
-                      totalRevenue: 0,
-                      shiftsThisWeek: 0
-                    },
-                    hireDate: new Date()
-                  };
-
-                  setStaff((prev) => [newStaff, ...prev]);
-
-                  const username = addForm.phone.replace(/\s+/g, '');
+                  const username = addForm.email.split('@')[0] + Date.now().toString().slice(-3);
                   const password = `Rw${Math.random().toString(36).slice(2, 8)}!`;
-                  addStaffCredential({ staffId: id, username, password });
+                  try {
+                    const staff = await signUpStaff({
+                      name: addForm.name,
+                      role: addForm.role,
+                      email: addForm.email,
+                      phone: addForm.phone,
+                      username,
+                      password
+                    });
 
-                  setSelectedStaffForCreds(newStaff);
-                  setNewUsername(username);
-                  setNewPassword(password);
-                  setIsAddStaffOpen(false);
-                  setIsCredentialModalOpen(true);
-                  setAddForm({
-                    name: '',
-                    role: 'waiter',
-                    email: '',
-                    phone: '',
-                    assignedTables: ''
-                  });
+                    const assignedTables =
+                      addForm.role === 'waiter'
+                        ? addForm.assignedTables
+                            .split(',')
+                            .map((s) => parseInt(s.trim(), 10))
+                            .filter((n) => !Number.isNaN(n))
+                        : [];
+
+                    addStaffCredential({ staffId: staff.id, username, password });
+                    setSelectedStaffForCreds({
+                      ...staff,
+                      assignedTables,
+                      performance: staff.performance ?? {
+                        ordersServed: 0,
+                        avgServiceTime: 0,
+                        rating: 5,
+                        totalRevenue: 0,
+                        shiftsThisWeek: 0
+                      }
+                    });
+                    setNewUsername(username);
+                    setNewPassword(password);
+                    setIsAddStaffOpen(false);
+                    setIsCredentialModalOpen(true);
+                    setAddForm({
+                      name: '',
+                      role: 'waiter',
+                      email: '',
+                      phone: '',
+                      assignedTables: ''
+                    });
+                    setGeneratedCredentials({
+                      staffName: staff.name,
+                      username,
+                      password
+                    });
+                    await refetch();
+                  } catch (error) {
+                    console.error('Failed to create staff', error);
+                  }
                 }}
                 disabled={!addForm.name || !addForm.email || !addForm.phone}
               >

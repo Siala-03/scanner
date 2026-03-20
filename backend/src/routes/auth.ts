@@ -227,3 +227,38 @@ authRouter.get('/waiters', async (_req, res, next) => {
   }
 });
 
+authRouter.put('/staff/:id/assignments', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const assignedTables = Array.isArray(req.body.assignedTables)
+      ? req.body.assignedTables.map((v: unknown) => Number(v)).filter((n: number) => !Number.isNaN(n))
+      : [];
+
+    const staff = await withClient(async (client) => {
+      const result = await client.query(
+        `UPDATE staff SET assigned_tables = $1 WHERE id = $2 RETURNING id, name, role, email, phone, is_on_duty, assigned_tables, performance, hire_date`,
+        [assignedTables, id]
+      );
+      if (result.rows.length === 0) {
+        throw new HttpError(404, 'Staff not found');
+      }
+      const row = result.rows[0];
+      return {
+        id: row.id,
+        name: row.name,
+        role: row.role,
+        email: row.email,
+        phone: row.phone,
+        isOnDuty: row.is_on_duty,
+        assignedTables: row.assigned_tables ?? [],
+        performance: row.performance,
+        hireDate: row.hire_date
+      };
+    });
+
+    res.json({ staff });
+  } catch (e) {
+    next(e);
+  }
+});
+
