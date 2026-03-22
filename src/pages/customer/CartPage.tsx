@@ -49,7 +49,11 @@ export function CartPage({
           opacity: 1,
           scale: 1
         }}
-        className="min-h-screen bg-[#faf6f0] flex items-center justify-center p-4">
+        transition={{
+          type: 'spring',
+          delay: 0.2
+        }}
+        className="min-h-screen bg-gradient-to-b from-slate-50 to-white flex items-center justify-center p-4">
 
         <div className="text-center">
           <motion.div
@@ -63,9 +67,9 @@ export function CartPage({
               type: 'spring',
               delay: 0.2
             }}
-            className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-6">
+            className="w-24 h-24 rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center mx-auto mb-6 shadow-xl shadow-green-500/30">
 
-            <CheckCircleIcon className="w-10 h-10 text-green-600" />
+            <CheckCircleIcon className="w-12 h-12 text-white" />
           </motion.div>
           <h2 className="text-2xl font-bold text-slate-900 mb-2">
             Order Placed!
@@ -84,21 +88,24 @@ export function CartPage({
   }
   if (cartItems.length === 0) {
     return (
-      <div className="min-h-screen bg-[#faf6f0] flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white flex items-center justify-center p-4">
         <EmptyState
-          icon={<ShoppingBagIcon className="w-8 h-8" />}
+          icon={<ShoppingBagIcon className="w-10 h-10" />}
           title="Your cart is empty"
-          description="Browse our menu and add some delicious items to your cart." />
+          description="Explore our exquisite menu and add your favorites." />
 
       </div>);
 
   }
   return (
-    <div className="min-h-screen bg-[#faf6f0] pb-48">
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white pb-48">
       <div className="px-4 py-6">
         <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold text-slate-900">Your Order</h1>
-          <span className="px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-sm font-medium">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900">Your Order</h1>
+            <p className="text-sm text-slate-500 mt-1">Review your selections</p>
+          </div>
+          <span className="px-4 py-1.5 bg-gradient-to-r from-amber-500 to-amber-600 text-white rounded-full text-sm font-semibold shadow-md shadow-amber-500/25">
             Table {tableNumber}
           </span>
         </div>
@@ -152,15 +159,15 @@ export function CartPage({
       </div>
 
       {/* Order summary - fixed bottom */}
-      <div className="fixed bottom-[72px] left-0 right-0 bg-white rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.08)] p-6 pb-8 z-40">
+      <div className="fixed bottom-[72px] left-0 right-0 bg-white rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.08)] p-6 pb-8 z-40 border-t border-slate-100">
         <div className="space-y-2 mb-4">
           <div className="flex justify-between text-slate-600">
-            <span>Subtotal</span>
-            <span>{formatPrice(subtotal)}</span>
+            <span className="font-medium">Subtotal</span>
+            <span className="font-semibold">{formatPrice(subtotal)}</span>
           </div>
-          <div className="flex justify-between text-xl font-bold text-slate-900 pt-2 border-t">
+          <div className="flex justify-between text-xl font-bold text-slate-900 pt-2 border-t border-slate-200">
             <span>Total</span>
-            <span>{formatPrice(total)}</span>
+            <span className="bg-gradient-to-r from-amber-500 to-amber-600 bg-clip-text text-transparent">{formatPrice(total)}</span>
           </div>
         </div>
 

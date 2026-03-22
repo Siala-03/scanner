@@ -117,7 +117,7 @@ export function CustomerApp({
   }];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-950 via-amber-900 to-yellow-950">
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-slate-100">
       {/* Toast Notification */}
       <AnimatePresence>
         {showToast &&
@@ -137,7 +137,7 @@ export function CustomerApp({
             y: -50,
             x: '-50%'
           }}
-          className="fixed top-0 left-1/2 z-[100] bg-green-600 text-white px-6 py-3 rounded-full shadow-lg font-medium flex items-center gap-2">
+          className="fixed top-0 left-1/2 z-[100] bg-gradient-to-r from-green-500 to-green-600 text-white px-6 py-3.5 rounded-2xl shadow-xl font-semibold flex items-center gap-2">
 
             <BellRingIcon className="w-5 h-5" />
             Waiter has been notified!
@@ -187,7 +187,9 @@ export function CustomerApp({
           scale: 0.9
         }}
         onClick={handleCallWaiterClick}
-        className={`fixed bottom-24 right-6 z-40 px-4 py-3 rounded-full shadow-xl flex items-center gap-2 transition-colors ${waiterCalled ? 'bg-green-500 text-white' : 'bg-amber-500 text-white hover:bg-amber-600'}`}
+        className={`fixed bottom-24 right-6 z-40 px-5 py-3.5 rounded-2xl shadow-2xl flex items-center gap-2.5 transition-all duration-300 ${waiterCalled 
+          ? 'bg-gradient-to-r from-green-500 to-green-600 text-white shadow-green-500/30' 
+          : 'bg-gradient-to-r from-amber-500 to-amber-600 text-white hover:from-amber-600 hover:to-amber-700 shadow-amber-500/30 hover:shadow-amber-500/40'}`}
         animate={
         waiterCalled ?
         {} :
@@ -207,18 +209,18 @@ export function CustomerApp({
         {waiterCalled ? (
           <>
             <CheckIcon className="w-5 h-5" />
-            <span className="text-sm font-medium">Waiter called</span>
+            <span className="text-sm font-semibold">Waiter called</span>
           </>
         ) : (
           <>
             <BellRingIcon className="w-5 h-5" />
-            <span className="text-sm font-medium">Call waiter</span>
+            <span className="text-sm font-semibold">Call Waiter</span>
           </>
         )}
       </motion.button>
 
       {/* Bottom navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-amber-950 border-t border-amber-800 px-6 py-3 safe-area-pb z-50">
+      <nav className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-lg border-t border-white/20 px-6 py-3 safe-area-pb z-50 shadow-2xl">
         <div className="flex justify-around items-center">
           {tabs.map((tab) => {
             const Icon = tab.icon;
@@ -227,27 +229,27 @@ export function CustomerApp({
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className="flex flex-col items-center gap-1 relative">
+                className="flex flex-col items-center gap-1 relative py-2 px-4 rounded-2xl transition-all duration-300">
 
                 <div className="relative">
                   <Icon
-                    className={`w-6 h-6 transition-colors ${isActive ? 'text-amber-400' : 'text-amber-300/60'}`} />
+                    className={`w-6 h-6 transition-all duration-300 ${isActive ? 'text-amber-600 scale-110' : 'text-slate-400'}`} />
 
                   {tab.count !== undefined && tab.count > 0 &&
-                  <span className="absolute -top-2 -right-2 w-5 h-5 bg-amber-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
+                  <span className="absolute -top-2 -right-2 w-5 h-5 bg-gradient-to-r from-amber-500 to-amber-600 text-white text-xs font-bold rounded-full flex items-center justify-center shadow-lg shadow-amber-500/30">
                       {tab.count}
                     </span>
                   }
                 </div>
                 <span
-                  className={`text-xs font-medium transition-colors ${isActive ? 'text-amber-400' : 'text-amber-300/60'}`}>
+                  className={`text-xs font-semibold transition-all duration-300 ${isActive ? 'text-amber-600' : 'text-slate-400'}`}>
 
                   {tab.label}
                 </span>
                 {isActive &&
                 <motion.div
                   layoutId="customerTabIndicator"
-                  className="absolute -bottom-3 w-1 h-1 bg-amber-500 rounded-full" />
+                  className="absolute -bottom-1 w-8 h-0.5 bg-gradient-to-r from-amber-500 to-amber-600 rounded-full" />
 
                 }
               </button>);

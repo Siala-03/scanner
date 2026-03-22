@@ -1,5 +1,6 @@
-import React from 'react';
+import { ReactNode } from 'react';
 import { LoaderIcon } from 'lucide-react';
+
 interface ButtonProps {
   children: ReactNode;
   variant?: 'primary' | 'secondary' | 'danger' | 'ghost';
@@ -11,6 +12,7 @@ interface ButtonProps {
   type?: 'button' | 'submit' | 'reset';
   className?: string;
 }
+
 export function Button({
   children,
   variant = 'primary',
@@ -28,11 +30,11 @@ export function Button({
     primary:
     'bg-amber-500 text-white hover:bg-amber-600 focus:ring-amber-500 shadow-md hover:shadow-lg',
     secondary:
-    'border-2 border-slate-300 text-slate-700 hover:bg-slate-100 focus:ring-slate-400 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800',
+    'border-2 border-slate-300 text-slate-700 hover:bg-slate-100 focus:ring-slate-400',
     danger:
     'bg-red-500 text-white hover:bg-red-600 focus:ring-red-500 shadow-md hover:shadow-lg',
     ghost:
-    'text-slate-600 hover:bg-slate-100 focus:ring-slate-400 dark:text-slate-400 dark:hover:bg-slate-800'
+    'text-slate-600 hover:bg-slate-100 focus:ring-slate-400'
   };
   const sizeStyles = {
     sm: 'px-3 py-1.5 text-sm gap-1.5',
@@ -55,5 +57,4 @@ export function Button({
       {isLoading && <LoaderIcon className="w-4 h-4 animate-spin" />}
       {children}
     </button>);
-
 }

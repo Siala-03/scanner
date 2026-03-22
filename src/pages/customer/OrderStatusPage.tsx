@@ -47,9 +47,9 @@ export function OrderStatusPage({ orders, tableNumber }: OrderStatusPageProps) {
   }, [simulatedStatus, activeOrder]);
   if (tableOrders.length === 0) {
     return (
-      <div className="min-h-screen bg-[#faf6f0] flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white flex items-center justify-center p-4">
         <EmptyState
-          icon={<ReceiptIcon className="w-8 h-8" />}
+          icon={<ReceiptIcon className="w-10 h-10" />}
           title="No orders yet"
           description="Place an order from the menu to track its status here." />
 
@@ -57,11 +57,14 @@ export function OrderStatusPage({ orders, tableNumber }: OrderStatusPageProps) {
 
   }
   return (
-    <div className="min-h-screen bg-[#faf6f0] pb-24">
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white pb-24">
       <div className="px-4 py-6">
         <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold text-slate-900">Order Status</h1>
-          <span className="px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-sm font-medium">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900">Order Status</h1>
+            <p className="text-sm text-slate-500 mt-1">Track your order in real-time</p>
+          </div>
+          <span className="px-4 py-1.5 bg-gradient-to-r from-amber-500 to-amber-600 text-white rounded-full text-sm font-semibold shadow-md shadow-amber-500/25">
             Table {tableNumber}
           </span>
         </div>
@@ -104,7 +107,7 @@ export function OrderStatusPage({ orders, tableNumber }: OrderStatusPageProps) {
               )}
               </div>
 
-              <div className="pt-3 border-t flex justify-between">
+              <div className="pt-3 border-t border-slate-200 flex justify-between">
                 <span className="font-semibold text-slate-900">Total</span>
                 <span className="font-bold text-amber-600">
                   {formatPrice(activeOrder.total)}
@@ -135,7 +138,7 @@ export function OrderStatusPage({ orders, tableNumber }: OrderStatusPageProps) {
                   delay: index * 0.1
                 }}>
 
-                    <Card className="bg-white">
+                    <Card className="bg-white rounded-2xl shadow-sm border border-slate-100">
                       <div className="flex items-center justify-between mb-3">
                         <div>
                           <span className="font-medium text-slate-900">
@@ -168,7 +171,7 @@ export function OrderStatusPage({ orders, tableNumber }: OrderStatusPageProps) {
                           <button
                             type="button"
                             onClick={() => setReviewingOrder(order)}
-                            className="px-3 py-2 rounded-lg bg-amber-500 text-white text-sm font-medium hover:bg-amber-600 transition-colors"
+                            className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-white text-sm font-semibold shadow-md shadow-amber-500/25 hover:from-amber-600 hover:to-amber-700 transition-all"
                           >
                             Rate service
                           </button>

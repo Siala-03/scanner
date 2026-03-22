@@ -429,7 +429,7 @@ export const menuItems: MenuItem[] = [
   id: 'lunch-002',
   name: 'Caesar Salad',
   description:
-  'Crisp romaine, parmesan, croutons, and house-made Caesar dressing. Add chicken +$5.',
+  'Crisp romaine, parmesan, croutons, and house-made Caesar dressing. Add chicken +5000.',
   price: 9500,
   category: 'lunch',
   emoji: '🥗',

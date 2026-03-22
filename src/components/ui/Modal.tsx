@@ -1,6 +1,7 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, ReactNode } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { XIcon } from 'lucide-react';
+
 interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -8,6 +9,7 @@ interface ModalProps {
   children: ReactNode;
   size?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
 }
+
 export function Modal({
   isOpen,
   onClose,
@@ -25,6 +27,7 @@ export function Modal({
       document.body.style.overflow = 'unset';
     };
   }, [isOpen]);
+
   const sizeStyles = {
     sm: 'max-w-sm',
     md: 'max-w-md',
@@ -32,6 +35,7 @@ export function Modal({
     xl: 'max-w-xl',
     full: 'max-w-4xl'
   };
+
   return (
     <AnimatePresence>
       {isOpen &&
@@ -74,18 +78,18 @@ export function Modal({
           }}
           className={`
               relative w-full ${sizeStyles[size]}
-              bg-white dark:bg-slate-800 rounded-2xl shadow-2xl
+              bg-white rounded-2xl shadow-2xl
               max-h-[90vh] overflow-hidden flex flex-col
             `}>
 
             {title &&
-          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-700">
-                <h2 className="text-xl font-semibold text-slate-900 dark:text-white">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+                <h2 className="text-xl font-semibold text-slate-900">
                   {title}
                 </h2>
                 <button
               onClick={onClose}
-              className="p-2 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+              className="p-2 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
               aria-label="Close modal">
 
                   <XIcon className="w-5 h-5" />
@@ -97,5 +101,4 @@ export function Modal({
         </div>
       }
     </AnimatePresence>);
-
 }

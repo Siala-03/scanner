@@ -74,16 +74,16 @@ export function OrderTracker({
 
   }
   return (
-    <div className="bg-white rounded-xl p-6 shadow-md">
+    <div className="bg-white rounded-2xl p-6 shadow-lg shadow-slate-200/50 border border-slate-100">
       <div className="flex items-center justify-between mb-6">
-        <h3 className="font-semibold text-slate-900">Order Status</h3>
+        <h3 className="font-bold text-lg text-slate-900">Order Status</h3>
         <div className="text-sm text-slate-500">
           {elapsedTime < estimatedWaitTime ?
-          <span className="text-green-600">
+          <span className="text-green-600 font-medium">
               ~{estimatedWaitTime - elapsedTime} min remaining
             </span> :
 
-          <span className="text-amber-600">Taking longer than expected</span>
+          <span className="text-amber-600 font-medium">Taking longer than expected</span>
           }
         </div>
       </div>
@@ -130,7 +130,7 @@ export function OrderTracker({
                   }}
                   className={`
                     relative z-10 w-12 h-12 rounded-full flex items-center justify-center
-                    ${isCompleted || isCurrent ? 'text-white' : 'text-slate-400'}
+                    ${isCompleted || isCurrent ? 'text-white shadow-lg shadow-amber-500/30' : 'text-slate-400'}
                   `}>
 
                   {isCompleted ?
