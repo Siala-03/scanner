@@ -1,84 +1,33 @@
 import { KPI, KPIWithProgress } from '../types';
+import { apiRequest } from './http';
 
 const API_BASE = '/api';
 
 export async function getKPIs(): Promise<KPI[]> {
-  const response = await fetch(`${API_BASE}/kpis`, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${localStorage.getItem('token')}`,
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error('Failed to fetch KPIs');
-  }
-
-  return response.json();
+  return apiRequest<KPI[]>(`${API_BASE}/kpis`);
 }
 
 export async function createKPI(kpi: { staffRole: string; name: string; description?: string; metric: string; targetValue: number; period: string; assignedStaffIds?: string[] }): Promise<KPI> {
-  const response = await fetch(`${API_BASE}/kpis`, {
+  return apiRequest<KPI>(`${API_BASE}/kpis`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${localStorage.getItem('token')}`,
-    },
-    body: JSON.stringify(kpi),
+    json: kpi,
   });
-
-  if (!response.ok) {
-    throw new Error('Failed to create KPI');
-  }
-
-  return response.json();
 }
 
 export async function getStaffKPIs(): Promise<KPIWithProgress[]> {
-  const response = await fetch(`${API_BASE}/kpis/staff`, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${localStorage.getItem('token')}`,
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error('Failed to fetch staff KPIs');
-  }
-
-  return response.json();
+  return apiRequest<KPIWithProgress[]>(`${API_BASE}/kpis/staff`);
 }
 
 export async function updateKPIProgress(kpiId: number, currentValue: number): Promise<void> {
-  const response = await fetch(`${API_BASE}/kpis/progress/${kpiId}`, {
+  await apiRequest<void>(`${API_BASE}/kpis/progress/${kpiId}`, {
     method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${localStorage.getItem('token')}`,
-    },
-    body: JSON.stringify({ currentValue }),
+    json: { currentValue },
   });
-
-  if (!response.ok) {
-    throw new Error('Failed to update KPI progress');
-  }
 }
 
 export async function deleteKPI(kpiId: number): Promise<{ success: boolean }> {
-  const response = await fetch(`${API_BASE}/kpis/${kpiId}`, {
+  await apiRequest<void>(`${API_BASE}/kpis/${kpiId}`, {
     method: 'DELETE',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${localStorage.getItem('token')}`,
-    },
   });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.message || 'Failed to delete KPI');
-  }
-
   return { success: true };
 }
