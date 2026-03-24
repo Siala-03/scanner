@@ -17,9 +17,11 @@ export async function apiRequest<T>(
   init: RequestInit & { json?: unknown } = {}
 ): Promise<T> {
   let url = path;
-  if (!path.startsWith('http') && !path.startsWith('/')) {
-    // Only prepend API_BASE for relative API paths like 'orders' when provided
-    url = `${API_BASE}${path.startsWith('/') ? '' : '/'}${path}`;
+  if (!path.startsWith('http')) {
+    // Prepend API_BASE for all relative paths (with or without leading /)
+    // This ensures production API calls go to the backend server
+    const prefix = API_BASE.endsWith('/') ? API_BASE.slice(0, -1) : API_BASE;
+    url = path.startsWith('/') ? `${prefix}${path}` : `${prefix}/${path}`;
   }
 
   const headers = new Headers(init.headers);
