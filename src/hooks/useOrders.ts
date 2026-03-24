@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import { Order, OrderStatus, CartItem, MenuItem } from '../types';
+import { Order, OrderStatus, CartItem, Customer } from '../types';
 import { getEffectivePrice } from '../utils/pricing';
 import { decrementInventoryForOrder, ensureInventoryInitialized } from '../utils/inventoryStorage';
 import { fetchOrders as fetchOrdersApi, createOrder as createOrderApi, updateOrderStatus as updateOrderStatusApi } from '../api/orders';
@@ -9,7 +9,10 @@ interface UseOrdersReturn {
   addOrder: (
     tableNumber: number,
     items: CartItem[],
-    specialInstructions?: string
+    specialInstructions?: string,
+    customer?: Customer | null,
+    delivery?: { provider: string; address: string },
+    loyaltyRewardId?: string
   ) => Promise<Order>;
   updateOrderStatus: (
     orderId: string,
@@ -49,7 +52,10 @@ export function useOrders(): UseOrdersReturn {
     async (
       tableNumber: number,
       items: CartItem[],
-      specialInstructions?: string
+      specialInstructions?: string,
+      customer?: Customer | null,
+      delivery?: { provider: string; address: string },
+      loyaltyRewardId?: string
     ): Promise<Order> => {
       ensureInventoryInitialized();
       const orderItems = items.map((item) => ({
@@ -72,38 +78,37 @@ export function useOrders(): UseOrdersReturn {
         id: `ORD-${Date.now()}`,
         orderNumber: `ORD-${Date.now().toString().slice(-6)}`,
         tableNumber,
-        items: orderItems.map((item) => ({
-          id: `${item.menuItem.id}-${Date.now()}`,
-          menuItemId: item.menuItem.id,
-          menuItemName: item.menuItem.name,
-          unitPrice: Math.round(getEffectivePrice(item.menuItem) * 100),
-          totalPrice: Math.round(getEffectivePrice(item.menuItem) * item.quantity * 100),
-          quantity: item.quantity,
-          status: 'pending'
-        })),
+        customerName: customer?.name,
+        customerId: customer?.id,
+        items: orderItems,
         status: 'pending',
         subtotal,
         tax: 0,
         total,
         notes: specialInstructions,
-        createdBy: 'system',
+        deliveryProvider: delivery?.provider,
+        deliveryAddress: delivery?.address,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-      };
+      } as Order;
 
       let savedOrder: Order = localOrder;
       if (backendAvailable) {
         try {
           savedOrder = await createOrderApi({
             tableNumber,
-            customerName: 'Walk-in',
+            customerName: customer?.name || 'Walk-in',
+            customerId: customer?.id,
             items: orderItems.map(item => ({
               menuItemId: item.menuItem.id,
               menuItemName: item.menuItem.name,
               quantity: item.quantity,
               unitPrice: Math.round(getEffectivePrice(item.menuItem) * 100)
             })),
-            notes: specialInstructions
+            notes: specialInstructions,
+            deliveryProvider: delivery?.provider,
+            deliveryAddress: delivery?.address,
+            loyaltyRewardId
           });
         } catch (e) {
           console.warn('Failed to sync order to backend:', e);

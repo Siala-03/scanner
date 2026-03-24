@@ -204,7 +204,7 @@ export function RevenueReports() {
           animate={{ opacity: 1, y: 0 }}
           className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">
+            <h1 className="text-3xl md:text-4xl font-bold text-gray-100 mb-2">
               {activeView === 'orders' ? 'Orders' : 'Revenue Reports'}
             </h1>
             <p className="text-slate-400">
@@ -388,7 +388,7 @@ export function RevenueReports() {
                       <span className="text-sm text-slate-300 flex-1">
                         {cat.name}
                       </span>
-                      <span className="text-sm font-medium text-white">
+                      <span className="text-sm font-medium text-gray-100">
                         {cat.percentage}%
                       </span>
                     </motion.div>
@@ -413,7 +413,7 @@ export function RevenueReports() {
               <motion.div key={`${item.item.name}-${index}`} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.55 + index * 0.05 }} className="flex items-center gap-4 p-3 rounded-lg hover:bg-slate-700/30 transition">
                   <div className="flex-1">
                     <div className="flex items-center justify-between mb-1">
-                      <span className="font-medium text-white">
+                      <span className="font-medium text-gray-100">
                         {item.item.name}
                       </span>
                       <span className="text-amber-400 font-bold">
@@ -596,7 +596,7 @@ export function RevenueReports() {
               {/* Summary */}
               <div className="border-t border-slate-700 p-4 flex items-center justify-between">
                 <div className="text-sm text-slate-400">
-                  Showing <span className="text-white font-bold">{filteredOrders.length}</span> orders
+                  Showing <span className="text-gray-100 font-bold">{filteredOrders.length}</span> orders
                 </div>
                 <div className="text-sm text-slate-400">
                   Total: <span className="text-amber-400 font-bold">{formatPrice(filteredOrders.reduce((sum, o) => sum + o.total, 0))}</span>

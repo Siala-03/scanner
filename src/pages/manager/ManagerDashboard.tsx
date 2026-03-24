@@ -1,6 +1,8 @@
 import React from 'react';
 import { Button } from '../../components/ui/Button';
 import { MenuIcon } from 'lucide-react';
+import { AIInsightsChat } from '../../components/manager/AIInsightsChat';
+import { useInventoryData } from '../../hooks/useInventory';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, Legend } from 'recharts';
 
 interface ManagerDashboardProps {
@@ -23,12 +25,14 @@ const statusColors: Record<string, string> = {
 };
 
 export function ManagerDashboard({ onNavigate, totalOrders, activeOrders, servedOrders, todaysRevenue, tableCount, ordersByHour, statusBreakdown }: ManagerDashboardProps) {
+  const { forecasts, forecastAlerts, isGeneratingForecasts, runForecasting } = useInventoryData();
+
   return (
     <div className="bg-slate-900 text-slate-100 p-4 min-h-screen">
       <div className="max-w-6xl mx-auto">
         <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-3 mb-4">
           <div>
-            <h1 className="text-3xl font-bold text-white">Manager Dashboard</h1>
+            <h1 className="text-3xl font-bold text-gray-100">Manager Dashboard</h1>
             <p className="text-slate-300">High-level operations overview for your restaurant.</p>
           </div>
           <Button variant="secondary" onClick={() => onNavigate('menu')}>
@@ -39,22 +43,22 @@ export function ManagerDashboard({ onNavigate, totalOrders, activeOrders, served
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 mb-4">
           <div className="rounded-xl border border-slate-700 p-3 bg-slate-800/70">
             <div className="text-xs uppercase tracking-wide text-slate-400">Total Orders</div>
-            <div className="mt-2 text-2xl font-semibold text-white">{totalOrders}</div>
+            <div className="mt-2 text-2xl font-semibold text-gray-100">{totalOrders}</div>
             <div className="text-xs text-slate-300 mt-1">All-time</div>
           </div>
           <div className="rounded-xl border border-slate-700 p-3 bg-slate-800/70">
             <div className="text-xs uppercase tracking-wide text-slate-400">Active Orders</div>
-            <div className="mt-2 text-2xl font-semibold text-white">{activeOrders}</div>
+            <div className="mt-2 text-2xl font-semibold text-gray-100">{activeOrders}</div>
             <div className="text-xs text-slate-300 mt-1">In kitchen + ready</div>
           </div>
           <div className="rounded-xl border border-slate-700 p-3 bg-slate-800/70">
             <div className="text-xs uppercase tracking-wide text-slate-400">Served Orders</div>
-            <div className="mt-2 text-2xl font-semibold text-white">{servedOrders}</div>
+            <div className="mt-2 text-2xl font-semibold text-gray-100">{servedOrders}</div>
             <div className="text-xs text-slate-300 mt-1">Completed today</div>
           </div>
           <div className="rounded-xl border border-slate-700 p-3 bg-slate-800/70">
             <div className="text-xs uppercase tracking-wide text-slate-400">Tables</div>
-            <div className="mt-2 text-2xl font-semibold text-white">{tableCount}</div>
+            <div className="mt-2 text-2xl font-semibold text-gray-100">{tableCount}</div>
             <div className="text-xs text-slate-300 mt-1">Configured tables</div>
           </div>
         </div>
@@ -64,7 +68,7 @@ export function ManagerDashboard({ onNavigate, totalOrders, activeOrders, served
             <div className="flex items-center justify-between mb-2">
               <div>
                 <div className="text-xs uppercase tracking-wide text-slate-400">Orders Trend</div>
-                <div className="text-lg font-semibold text-white">Last 12 hours</div>
+                <div className="text-lg font-semibold text-gray-100">Last 12 hours</div>
               </div>
               <div className="text-xs text-slate-300">Live updates</div>
             </div>
@@ -90,7 +94,7 @@ export function ManagerDashboard({ onNavigate, totalOrders, activeOrders, served
           <div className="rounded-xl border border-slate-700 bg-slate-800/60 p-3">
             <div className="mb-2">
               <div className="text-xs uppercase tracking-wide text-slate-400">Order Status Breakdown</div>
-              <div className="text-lg font-semibold text-white">Current</div>
+              <div className="text-lg font-semibold text-gray-100">Current</div>
             </div>
             <div className="h-52">
               <ResponsiveContainer width="100%" height="100%">
@@ -110,7 +114,7 @@ export function ManagerDashboard({ onNavigate, totalOrders, activeOrders, served
 
         <div className="mt-3 rounded-xl border border-slate-700 bg-slate-800/60 p-3">
           <div className="text-xs uppercase tracking-wide text-slate-400">Revenue</div>
-          <div className="text-lg font-semibold text-white">Today: ${(todaysRevenue / 100).toFixed(2)}</div>
+          <div className="text-lg font-semibold text-gray-100">Today: ${(todaysRevenue / 100).toFixed(2)}</div>
           <div className="mt-2 h-32">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={ordersByHour}>
@@ -124,6 +128,14 @@ export function ManagerDashboard({ onNavigate, totalOrders, activeOrders, served
           </div>
         </div>
       </div>
+
+      {/* AI Insights Chat */}
+      <AIInsightsChat
+        forecasts={forecasts}
+        alerts={forecastAlerts}
+        onGenerateForecasts={runForecasting}
+        isGenerating={isGeneratingForecasts}
+      />
     </div>
   );
 }

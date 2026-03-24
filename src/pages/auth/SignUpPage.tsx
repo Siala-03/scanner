@@ -26,10 +26,6 @@ export function SignUpPage({ role, onSignedUp, onBack }: SignUpPageProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (role !== 'manager') {
-      setError('Only managers can create new staff accounts. Please ask your manager to create your login.');
-      return;
-    }
     setError('');
 
     if (password !== confirmPassword) {
@@ -38,26 +34,56 @@ export function SignUpPage({ role, onSignedUp, onBack }: SignUpPageProps) {
     }
 
     setIsLoading(true);
+    console.log('Signup attempt:', { username, email, role });
+
     try {
-      const staff = await signUpStaff({
-        name,
-        email,
-        phone,
-        role,
-        username,
-        password
-      });
+      let staff: Staff;
+
+      if (role === 'manager') {
+        console.log('Creating manager account...');
+        staff = await signUpStaff({
+          name,
+          email,
+          phone,
+          role: 'manager',
+          username,
+          password
+        });
+      } else {
+        setError('Account creation is handled through the manager dashboard. Please contact your manager.');
+        return;
+      }
+
+      console.log('Signup successful:', staff);
       onSignedUp(staff);
     } catch (err) {
+      console.error('Signup error:', err);
       let errorMessage = 'Failed to create account. Please try again.';
+
       if (err instanceof ApiError) {
-        errorMessage = err.message;
+        switch (err.status) {
+          case 0:
+            errorMessage = 'Cannot connect to server. Please check your internet connection and try again.';
+            break;
+          case 400:
+            errorMessage = 'Invalid information provided. Please check all fields.';
+            break;
+          case 409:
+            errorMessage = 'Username or email already exists. Please choose different credentials.';
+            break;
+          case 403:
+            errorMessage = 'Account creation not allowed. Please contact your administrator.';
+            break;
+          case 500:
+            errorMessage = 'Server error. Please try again later.';
+            break;
+          default:
+            errorMessage = err.message || 'Failed to create account. Please try again.';
+        }
       } else if (err instanceof Error) {
         errorMessage = err.message;
-      } else if (err) {
-        // Fallback for any other object
-        errorMessage = String(err);
       }
+
       setError(errorMessage);
     } finally {
       setIsLoading(false);

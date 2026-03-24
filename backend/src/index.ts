@@ -8,13 +8,18 @@ import { env } from './env.js';
 import { HttpError } from './http.js';
 import { authRouter } from './routes/auth.js';
 import { inventoryRouter } from './routes/inventory.js';
+import simpleInventoryRouter from './routes/simple-inventory.js';
 import { menuRouter } from './routes/menu.js';
 import { tablesRouter } from './routes/tables.js';
 import { suppliersRouter } from './routes/suppliers.js';
 import { purchaseOrdersRouter } from './routes/purchaseOrders.js';
 import { movementsRouter } from './routes/movements.js';
 import { wasteRouter } from './routes/waste.js';
+import { loyaltyRouter } from './routes/loyalty.js';
 import { ordersRouter } from './routes/orders.js';
+import kpisRouter from './routes/kpis.js';
+import { printRouter } from './routes/print.js';
+import { forecastingRouter } from './routes/forecasting.js';
 import { initSocket } from './socket.js';
 import { logger } from './logger.js';
 import { pool } from './db.js';
@@ -124,14 +129,19 @@ app.get('/health/db', async (_req, res) => {
 });
 
 app.use('/api/auth', authRouter);
+app.use('/api/loyalty', loyaltyRouter);
 app.use('/api/menu', menuRouter);
 app.use('/api/tables', tablesRouter);
 app.use('/api/inventory', inventoryRouter);
+app.use('/api/inventory', simpleInventoryRouter);
 app.use('/api/suppliers', suppliersRouter);
 app.use('/api/purchase-orders', purchaseOrdersRouter);
 app.use('/api/movements', movementsRouter);
 app.use('/api/waste', wasteRouter);
 app.use('/api/orders', ordersRouter);
+app.use('/api/kpis', kpisRouter);
+app.use('/api/print', printRouter);
+app.use('/api/forecasting', forecastingRouter);
 
 app.use(
   (

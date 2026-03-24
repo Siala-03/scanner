@@ -72,6 +72,22 @@ export function MenuManagement() {
     return [allTab, ...categoryTabs];
   }, [menuItemsState]);
 
+  const filteredItems = useMemo(() => {
+    let items =
+    activeCategory === 'all' ?
+    menuItemsState :
+    menuItemsState.filter((item) => item.category === activeCategory);
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      items = items.filter(
+        (item) =>
+        item.name.toLowerCase().includes(query) ||
+        item.description.toLowerCase().includes(query)
+      );
+    }
+    return items;
+  }, [menuItemsState, activeCategory, searchQuery]);
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center">
@@ -96,22 +112,6 @@ export function MenuManagement() {
       </div>
     );
   }
-
-  const filteredItems = useMemo(() => {
-    let items =
-    activeCategory === 'all' ?
-    menuItemsState :
-    menuItemsState.filter((item) => item.category === activeCategory);
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      items = items.filter(
-        (item) =>
-        item.name.toLowerCase().includes(query) ||
-        item.description.toLowerCase().includes(query)
-      );
-    }
-    return items;
-  }, [menuItemsState, activeCategory, searchQuery]);
   const handleAddItem = () => {
     setEditingItem(null);
     setIsEditorOpen(true);
@@ -202,7 +202,7 @@ export function MenuManagement() {
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-white">Menu Management</h1>
+            <h1 className="text-2xl font-bold text-gray-100">Menu Management</h1>
             <p className="text-slate-400">
               {menuItemsState.length} items total
             </p>
@@ -261,7 +261,7 @@ export function MenuManagement() {
                     <div className="flex items-center gap-3">
                       <span className="text-3xl">{item.emoji}</span>
                       <div>
-                        <h3 className="font-semibold text-white">
+                        <h3 className="font-semibold text-gray-100">
                           {item.name}
                         </h3>
                         <p className="text-lg font-bold text-amber-400">

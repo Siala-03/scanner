@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   UtensilsIcon,
@@ -7,7 +7,7 @@ import {
   BellRingIcon,
   CheckIcon } from
 'lucide-react';
-import { CartItem, MenuItem, Order } from '../../types';
+import { CartItem, MenuItem, Order, Customer } from '../../types';
 import { MenuPage } from './MenuPage';
 import { CartPage } from './CartPage';
 import { OrderStatusPage } from './OrderStatusPage';
@@ -17,7 +17,11 @@ interface CustomerAppProps {
   onPlaceOrder: (
   tableNumber: number,
   items: CartItem[],
-  specialInstructions?: string)
+  specialInstructions?: string,
+  customer?: Customer | null,
+  delivery?: { provider: string; address: string },
+  loyaltyRewardId?: string
+  )
   => void;
   onCallWaiter: () => void;
 }
@@ -77,8 +81,13 @@ export function CustomerApp({
     setCartItems((prev) => prev.filter((item) => item.menuItem.id !== itemId));
   }, []);
   const handlePlaceOrder = useCallback(
-    (specialInstructions: string) => {
-      onPlaceOrder(tableNumber, cartItems, specialInstructions);
+    (
+      specialInstructions: string,
+      customer?: Customer | null,
+      delivery?: { provider: string; address: string },
+      loyaltyRewardId?: string
+    ) => {
+      onPlaceOrder(tableNumber, cartItems, specialInstructions, customer, delivery, loyaltyRewardId);
       setCartItems([]);
       setActiveTab('orders');
     },
@@ -187,7 +196,7 @@ export function CustomerApp({
           scale: 0.9
         }}
         onClick={handleCallWaiterClick}
-        className={`fixed bottom-24 right-6 z-40 px-5 py-3.5 rounded-2xl shadow-2xl flex items-center gap-2.5 transition-all duration-300 ${waiterCalled 
+        className={`fixed bottom-20 right-6 z-40 px-5 py-3.5 rounded-2xl shadow-2xl flex items-center gap-2.5 transition-all duration-300 ${waiterCalled 
           ? 'bg-gradient-to-r from-green-500 to-green-600 text-white shadow-green-500/30' 
           : 'bg-gradient-to-r from-amber-500 to-amber-600 text-white hover:from-amber-600 hover:to-amber-700 shadow-amber-500/30 hover:shadow-amber-500/40'}`}
         animate={

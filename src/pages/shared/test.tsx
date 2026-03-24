@@ -72,7 +72,7 @@ interface InventoryManagementProps {
   role: 'manager' | 'supervisor';
 }
 
-type Tab = 'overview' | 'purchase-orders' | 'suppliers' | 'movements' | 'waste' | 'analytics';
+type Tab = 'overview' | 'suppliers' | 'waste';
 
 const PO_STATUS_CONFIG: Record<PurchaseOrderStatus, { label: string; color: string; bg: string }> = {
   draft:     { label: 'Draft',     color: 'text-slate-400',  bg: 'bg-slate-500/10 border-slate-500/20' },
@@ -324,12 +324,9 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
 
   // ── Tab definitions ─────────────────────────────────────────────────────
   const tabs: { id: Tab; label: string; icon: React.ReactNode; badge?: number }[] = [
-    { id: 'overview',        label: 'Stock Overview',    icon: <PackageIcon className="w-4 h-4" />,     badge: lowStockItems.length || undefined },
-    { id: 'purchase-orders', label: 'Purchase Orders',   icon: <ShoppingCartIcon className="w-4 h-4" /> },
-    { id: 'suppliers',       label: 'Suppliers',         icon: <TruckIcon className="w-4 h-4" /> },
-    { id: 'movements',       label: 'Stock Movements',   icon: <BarChart2Icon className="w-4 h-4" /> },
-    { id: 'waste',           label: 'Waste Log',         icon: <TrashIcon className="w-4 h-4" /> },
-    { id: 'analytics',       label: 'Analytics',         icon: <TrendingUpIcon className="w-4 h-4" /> },
+    { id: 'overview', label: 'Stock', icon: <PackageIcon className="w-4 h-4" />, badge: lowStockItems.length || undefined },
+    { id: 'suppliers', label: 'Suppliers', icon: <TruckIcon className="w-4 h-4" /> },
+    { id: 'waste', label: 'Waste', icon: <TrashIcon className="w-4 h-4" /> },
   ];
 
   return (

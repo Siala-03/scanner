@@ -8,6 +8,7 @@ interface ModalProps {
   title?: string;
   children: ReactNode;
   size?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
+  variant?: 'dark' | 'light';
 }
 
 export function Modal({
@@ -15,8 +16,10 @@ export function Modal({
   onClose,
   title,
   children,
-  size = 'md'
+  size = 'md',
+  variant = 'dark'
 }: ModalProps) {
+  const isLight = variant === 'light';
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
@@ -78,25 +81,28 @@ export function Modal({
           }}
           className={`
               relative w-full ${sizeStyles[size]}
-              bg-white rounded-2xl shadow-2xl
+              ${isLight 
+                ? 'bg-white rounded-2xl shadow-2xl border border-slate-100' 
+                : 'bg-[#2a2018] rounded-2xl shadow-2xl border border-[#3a2e20]'
+              }
               max-h-[90vh] overflow-hidden flex flex-col
             `}>
 
             {title &&
-          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
-                <h2 className="text-xl font-semibold text-slate-900">
+          <div className={`flex items-center justify-between px-6 py-4 border-b ${isLight ? 'border-slate-100' : 'border-[#3a2e20]'}`}>
+                <h2 className={`text-xl font-semibold ${isLight ? 'text-slate-900' : 'text-white'}`}>
                   {title}
                 </h2>
                 <button
               onClick={onClose}
-              className="p-2 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+              className={`p-2 rounded-lg transition-colors ${isLight ? 'text-slate-400 hover:text-slate-700 hover:bg-slate-100' : 'text-slate-400 hover:text-white hover:bg-slate-700'}`}
               aria-label="Close modal">
 
                   <XIcon className="w-5 h-5" />
                 </button>
               </div>
-          }
-            <div className="flex-1 overflow-y-auto p-6">{children}</div>
+            }
+            <div className={`flex-1 overflow-y-auto p-6 ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>{children}</div>
           </motion.div>
         </div>
       }

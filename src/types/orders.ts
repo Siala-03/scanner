@@ -39,6 +39,7 @@ export interface Order {
   orderNumber: string;
   tableNumber?: number;
   customerName?: string;
+  customerId?: string;
   status: OrderStatus;
   items: OrderItem[];
   subtotal: number;
@@ -47,6 +48,13 @@ export interface Order {
   notes?: string;
   createdBy?: string;
   assignedTo?: string;
+  deliveryProvider?: string;
+  deliveryAddress?: string;
+  deliveryOrderId?: string;
+  deliveryStatus?: 'pending' | 'assigned' | 'picked_up' | 'delivered' | 'cancelled';
+  loyaltyRewardId?: string;
+  loyaltyDiscount?: number;
+  loyaltyFreeItemId?: string;
   createdAt: string;
   updatedAt: string;
   completedAt?: string;
@@ -56,6 +64,7 @@ export interface Order {
 export interface CreateOrderInput {
   tableNumber?: number;
   customerName?: string;
+  customerId?: string;
   items: {
     menuItemId: string;
     menuItemName: string;
@@ -66,6 +75,9 @@ export interface CreateOrderInput {
   }[];
   notes?: string;
   createdBy?: string;
+  deliveryProvider?: string;
+  deliveryAddress?: string;
+  loyaltyRewardId?: string;
 }
 
 // For updating order status

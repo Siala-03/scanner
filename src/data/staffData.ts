@@ -217,7 +217,7 @@ export const getStaffOnDuty = (): Staff[] => {
   return mockStaff.filter((staff) => staff.isOnDuty);
 };
 
-export const getTopPerformers = (limit: number = 5): Staff[] => {
+export const getTopPerformers = (limit = 5): Staff[] => {
   return [...mockStaff].
   filter((staff) => staff.role === 'waiter').
   sort((a, b) => b.performance.rating - a.performance.rating).

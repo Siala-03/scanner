@@ -26,6 +26,16 @@ export async function apiRequest<T>(
   headers.set('Accept', 'application/json');
   if (init.json !== undefined) headers.set('Content-Type', 'application/json');
 
+  // Add authentication headers automatically from localStorage
+  const staffId = localStorage.getItem('staffId');
+  const token = localStorage.getItem('token');
+  if (staffId) {
+    headers.set('x-staff-id', staffId);
+  }
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+
   let res: Response;
   try {
     res = await fetch(url, {
@@ -40,7 +50,15 @@ export async function apiRequest<T>(
 
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new ApiError(res.status, (data as any)?.error ?? 'Request failed', (data as any)?.details);
+    const errorMessage = (data as any)?.error ?? `Request failed with status ${res.status}`;
+    console.error('API Error:', {
+      status: res.status,
+      url,
+      method: init.method || 'GET',
+      error: errorMessage,
+      details: (data as any)?.details
+    });
+    throw new ApiError(res.status, errorMessage, (data as any)?.details);
   }
   return data as T;
 }

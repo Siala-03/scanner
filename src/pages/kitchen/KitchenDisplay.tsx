@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
-import { ClockIcon, ChefHatIcon, UtensilsIcon, RefreshCwIcon, CheckCircleIcon, FlameIcon, AlertTriangleIcon, BarChart3Icon, ListOrderedIcon } from 'lucide-react';
+import { ClockIcon, ChefHatIcon, UtensilsIcon, RefreshCwIcon, CheckCircleIcon, FlameIcon, AlertTriangleIcon, BarChart3Icon, ListOrderedIcon, TrendingUpIcon } from 'lucide-react';
+import { useStaffKPIs } from '../../hooks/useKPIs';
+import { KPICard } from '../../components/supervisor/KPICard';
 
 // Backend API
 const API_BASE = import.meta.env.VITE_API_URL || '';
@@ -12,6 +14,8 @@ interface KitchenOrder {
   items: { name: string; quantity: number; notes?: string }[];
   notes?: string;  // Order-level notes (allergies, special requests)
   createdAt: string;
+  loyaltyFreeItemId?: string;
+  loyaltyDiscount?: number;
 }
 
 interface KitchenStats {
@@ -76,7 +80,9 @@ async function fetchKitchenOrders(): Promise<KitchenOrder[]> {
         quantity: item.quantity,
         notes: item.notes  // Item-level notes
       })) : [],
-      createdAt: o.created_at
+      createdAt: o.created_at,
+      loyaltyFreeItemId: o.loyalty_free_item_id,
+      loyaltyDiscount: o.loyalty_discount
     }));
   } catch (e) {
     console.error('Failed to fetch from API:', e);
@@ -102,6 +108,20 @@ async function updateOrderStatus(orderId: string, status: string): Promise<void>
     body: JSON.stringify({ status })
   });
   if (!res.ok) throw new Error('Failed to update');
+}
+
+// Simple menu item lookup for free items (in production, fetch from API)
+const MENU_ITEM_NAMES: Record<string, string> = {
+  'item-1': 'Breakfast Platter',
+  'item-2': 'Fresh Juice',
+  'item-3': 'Grilled Chicken',
+  'item-4': 'Rice',
+  'item-5': 'Fish and Chips',
+  // Add more as needed
+};
+
+function getMenuItemName(itemId: string): string {
+  return MENU_ITEM_NAMES[itemId] || `Item ${itemId}`;
 }
 
 // Calculate stats from orders
@@ -136,6 +156,7 @@ export function KitchenDisplay() {
   const [lastUpdate, setLastUpdate] = useState(new Date());
   const [viewMode, setViewMode] = useState<'orders' | 'analytics'>('orders');
   const [analytics, setAnalytics] = useState<any>(null);
+  const { kpis: staffKPIs } = useStaffKPIs();
 
   // Use analytics from backend when available, otherwise calculate from orders
   const stats: KitchenStats = analytics ? {
@@ -257,6 +278,25 @@ export function KitchenDisplay() {
       </header>
 
       <main className="p-4">
+        {/* Staff KPIs Section */}
+        {staffKPIs.length > 0 && (
+          <div className="mb-6">
+            <h2 className="text-lg font-semibold text-white mb-3">Your KPIs</h2>
+            <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+              {staffKPIs.map((kpi) => (
+                <KPICard
+                  key={kpi.id}
+                  label={kpi.name}
+                  value={kpi.progress?.currentValue || 0}
+                  change={kpi.progress ? (kpi.progress.currentValue / kpi.targetValue) * 100 - 100 : 0}
+                  trend={kpi.progress?.achieved ? 'up' : 'neutral'}
+                  icon={<TrendingUpIcon className="w-5 h-5" />}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
         {viewMode === 'analytics' ? (
           // Analytics View
           <div className="space-y-6">
@@ -429,6 +469,21 @@ function OrderCard({
             <div className="text-red-400 text-xs font-bold">⚠️ {order.notes}</div>
           </div>
         )}
+
+        {/* Loyalty discount indicator */}
+        {order.loyaltyDiscount && order.loyaltyDiscount > 0 && (
+          <div className="bg-green-500/20 border border-green-500 rounded p-2 mb-2">
+            <div className="text-green-400 text-xs font-bold">🎁 Loyalty discount: -${(order.loyaltyDiscount / 100).toFixed(2)}</div>
+          </div>
+        )}
+
+        {/* Free item indicator */}
+        {order.loyaltyFreeItemId && (
+          <div className="bg-purple-500/20 border border-purple-500 rounded p-2 mb-2">
+            <div className="text-purple-400 text-xs font-bold">🎁 FREE: {getMenuItemName(order.loyaltyFreeItemId)}</div>
+          </div>
+        )}
+
         {order.items.map((item, idx) => (
           <div key={idx} className="flex items-start gap-2">
             <span className="bg-slate-700 text-white w-5 h-5 rounded flex items-center justify-center text-xs font-bold">

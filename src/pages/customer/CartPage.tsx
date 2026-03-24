@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ShoppingBagIcon, ArrowRightIcon, CheckCircleIcon } from 'lucide-react';
-import { CartItem, MenuItem } from '../../types';
+import { CartItem, Customer, LoyaltySummary, Reward } from '../../types';
 import { CartItemCard } from '../../components/customer/CartItem';
+import { CustomerIdentification } from '../../components/customer/CustomerIdentification';
 import { Button } from '../../components/ui/Button';
-import { TextArea } from '../../components/ui/Input';
+import { getCustomerDetails } from '../../api/loyalty';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { formatPrice } from '../../utils/currency';
 import { getEffectivePrice } from '../../utils/pricing';
@@ -12,7 +13,12 @@ interface CartPageProps {
   cartItems: CartItem[];
   onUpdateQuantity: (itemId: string, quantity: number) => void;
   onRemoveItem: (itemId: string) => void;
-  onPlaceOrder: (specialInstructions: string) => void;
+  onPlaceOrder: (
+    specialInstructions: string,
+    customer?: Customer | null,
+    delivery?: { provider: string; address: string },
+    loyaltyRewardId?: string
+  ) => void;
   tableNumber: number;
 }
 export function CartPage({
@@ -23,18 +29,73 @@ export function CartPage({
   tableNumber
 }: CartPageProps) {
   const [specialInstructions, setSpecialInstructions] = useState('');
+  const [isDelivery, setIsDelivery] = useState(false);
+  const [deliveryProvider, setDeliveryProvider] = useState<'vubavuba' | null>(null);
+  const [deliveryAddress, setDeliveryAddress] = useState('');
   const [isOrdering, setIsOrdering] = useState(false);
   const [orderPlaced, setOrderPlaced] = useState(false);
+  const [identifiedCustomer, setIdentifiedCustomer] = useState<Customer | null>(null);
+  const [loyaltySummary, setLoyaltySummary] = useState<LoyaltySummary | null>(null);
+  const [appliedReward, setAppliedReward] = useState<Reward | null>(null);
+  const [rewardMessage, setRewardMessage] = useState('');
+  const [rewardError, setRewardError] = useState('');
   const subtotal = cartItems.reduce(
     (sum, item) => sum + getEffectivePrice(item.menuItem) * item.quantity,
     0
   );
-  const total = subtotal;
+  const tax = Math.round(subtotal * 0.15);
+  const total = subtotal + tax;
+  const discount = appliedReward?.rewardType === 'discount' && appliedReward.discountPercentage
+    ? Math.round((subtotal * appliedReward.discountPercentage) / 100)
+    : 0;
+  const adjustedTotal = Math.max(0, total - discount);
+
+  useEffect(() => {
+    async function loadLoyalty() {
+      if (!identifiedCustomer?.id) {
+        setLoyaltySummary(null);
+        setAppliedReward(null);
+        return;
+      }
+
+      try {
+        const details = await getCustomerDetails(identifiedCustomer.id);
+        setLoyaltySummary(details);
+        setRewardMessage('');
+        setRewardError('');
+      } catch (error) {
+        console.warn('Failed to load loyalty summary', error);
+      }
+    }
+    loadLoyalty();
+  }, [identifiedCustomer]);
+
+  const handleApplyReward = async (reward: Reward) => {
+    if (!identifiedCustomer) {
+      setRewardError('Please identify customer first.');
+      return;
+    }
+
+    // Check if customer has enough points locally
+    if (loyaltySummary && loyaltySummary.customer.totalPoints < reward.pointsRequired) {
+      setRewardError('Insufficient points for this reward.');
+      return;
+    }
+
+    // Just set the reward locally - redemption will happen during order creation
+    setAppliedReward(reward);
+    setRewardMessage(`Reward "${reward.name}" will be applied to your order.`);
+    setRewardError('');
+  };
+
   const handlePlaceOrder = async () => {
     setIsOrdering(true);
     // Simulate API call
     await new Promise((resolve) => setTimeout(resolve, 1500));
-    onPlaceOrder(specialInstructions);
+    const delivery = isDelivery && deliveryProvider 
+      ? { provider: deliveryProvider, address: deliveryAddress }
+      : undefined;
+    onPlaceOrder(specialInstructions, identifiedCustomer, delivery, appliedReward?.id);
     setOrderPlaced(true);
     setIsOrdering(false);
   };
@@ -141,6 +202,52 @@ export function CartPage({
           </AnimatePresence>
         </div>
 
+        {/* Customer identification for loyalty program */}
+        <CustomerIdentification
+          onCustomerIdentified={setIdentifiedCustomer}
+          identifiedCustomer={identifiedCustomer}
+        />
+
+        {/* Loyalty program rewards */}
+        {identifiedCustomer && loyaltySummary && (
+          <div className="mb-6 rounded-xl border border-slate-200 bg-white p-4">
+            <div className="flex justify-between items-center mb-3">
+              <h2 className="font-semibold text-slate-800">Loyalty Rewards</h2>
+              <span className="text-sm text-slate-500">
+                Points: {loyaltySummary.customer.totalPoints}
+              </span>
+            </div>
+
+            {rewardMessage && <p className="text-sm text-green-600 mb-2">{rewardMessage}</p>}
+            {rewardError && <p className="text-sm text-red-600 mb-2">{rewardError}</p>}
+
+            <div className="space-y-2">
+              {loyaltySummary.availableRewards.length === 0 && (
+                <p className="text-sm text-slate-500">No rewards available yet.</p>
+              )}
+              {loyaltySummary.availableRewards.map((reward) => {
+                const eligible = loyaltySummary.customer.totalPoints >= reward.pointsRequired;
+                return (
+                  <div key={reward.id} className="flex items-center justify-between gap-3 p-3 border rounded-lg">
+                    <div>
+                      <p className="font-medium text-slate-700">{reward.name}</p>
+                      <p className="text-xs text-slate-500">{reward.description}</p>
+                      <p className="text-xs text-slate-500">Requires {reward.pointsRequired} points</p>
+                    </div>
+                    <Button
+                      variant={appliedReward?.id === reward.id ? 'secondary' : 'primary'}
+                      disabled={!eligible}
+                      onClick={() => handleApplyReward(reward)}
+                    >
+                      {appliedReward?.id === reward.id ? 'Applied' : 'Use'}
+                    </Button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Special instructions */}
         <div className="mb-6">
           <div className="w-full">
@@ -156,6 +263,59 @@ export function CartPage({
 
           </div>
         </div>
+
+        {/* Delivery options */}
+        <div className="mb-6">
+          <div className="w-full">
+            <label className="block text-sm font-medium text-slate-700 mb-3">
+              Delivery Method
+            </label>
+            <div className="space-y-2">
+              <button
+                onClick={() => {
+                  setIsDelivery(false);
+                  setDeliveryProvider(null);
+                  setDeliveryAddress('');
+                }}
+                className={`w-full p-3 rounded-lg border-2 transition-all text-left ${
+                  !isDelivery
+                    ? 'border-amber-500 bg-amber-50'
+                    : 'border-slate-300 bg-white hover:border-slate-400'
+                }`}
+              >
+                <div className="font-medium text-slate-900">Dine In - Table {tableNumber}</div>
+                <div className="text-sm text-slate-500">Served at your table</div>
+              </button>
+
+              <button
+                onClick={() => {
+                  setIsDelivery(true);
+                  setDeliveryProvider('vubavuba');
+                }}
+                className={`w-full p-3 rounded-lg border-2 transition-all text-left ${
+                  isDelivery && deliveryProvider === 'vubavuba'
+                    ? 'border-amber-500 bg-amber-50'
+                    : 'border-slate-300 bg-white hover:border-slate-400'
+                }`}
+              >
+                <div className="font-medium text-slate-900">VubaVuba Delivery</div>
+                <div className="text-sm text-slate-500">Fast delivery to your location</div>
+              </button>
+            </div>
+
+            {isDelivery && deliveryProvider === 'vubavuba' && (
+              <div className="mt-3">
+                <input
+                  type="text"
+                  placeholder="Enter delivery address"
+                  value={deliveryAddress}
+                  onChange={(e) => setDeliveryAddress(e.target.value)}
+                  className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2 text-slate-900 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500 placeholder:text-slate-400"
+                />
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Order summary - fixed bottom */}
@@ -165,9 +325,19 @@ export function CartPage({
             <span className="font-medium">Subtotal</span>
             <span className="font-semibold">{formatPrice(subtotal)}</span>
           </div>
+          <div className="flex justify-between text-slate-600">
+            <span className="font-medium">Tax (15%)</span>
+            <span className="font-semibold">{formatPrice(tax)}</span>
+          </div>
+          {appliedReward && appliedReward.rewardType === 'discount' && (
+            <div className="flex justify-between text-amber-600">
+              <span className="font-medium">Discount ({appliedReward.discountPercentage}%)</span>
+              <span className="font-semibold">-{formatPrice(discount)}</span>
+            </div>
+          )}
           <div className="flex justify-between text-xl font-bold text-slate-900 pt-2 border-t border-slate-200">
             <span>Total</span>
-            <span className="bg-gradient-to-r from-amber-500 to-amber-600 bg-clip-text text-transparent">{formatPrice(total)}</span>
+            <span className="bg-gradient-to-r from-amber-500 to-amber-600 bg-clip-text text-transparent">{formatPrice(adjustedTotal)}</span>
           </div>
         </div>
 
@@ -176,12 +346,12 @@ export function CartPage({
           size="lg"
           fullWidth
           onClick={handlePlaceOrder}
-          isLoading={isOrdering}>
-
+          isLoading={isOrdering}
+        >
           Place Order
           <ArrowRightIcon className="w-5 h-5" />
         </Button>
       </div>
-    </div>);
-
+    </div>
+  );
 }

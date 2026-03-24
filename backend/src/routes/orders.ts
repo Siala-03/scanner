@@ -2,8 +2,39 @@ import { Router, Request, Response } from 'express';
 import { pool } from '../db.js';
 import { HttpError } from '../http.js';
 import { createOrder as createOrderService } from '../services/orderService.js';
+import { emitOrderUpdate } from '../socket.js';
+import { createVubaVubaOrder, updateVubaVubaOrderStatus } from '../services/vubaVubaService.js';
 
 const router = Router();
+
+function normalizeOrder(row: any) {
+  return {
+    id: row.id,
+    orderNumber: row.order_number,
+    tableNumber: row.table_number,
+    customerName: row.customer_name,
+    customerId: row.customer_id,
+    status: row.status,
+    items: typeof row.items === 'string' ? JSON.parse(row.items) : row.items,
+    subtotal: row.subtotal,
+    tax: row.tax,
+    total: row.total,
+    notes: row.notes,
+    createdBy: row.created_by,
+    assignedTo: row.assigned_to,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    completedAt: row.completed_at,
+    deliveryProvider: row.delivery_provider,
+    deliveryAddress: row.delivery_address,
+    deliveryOrderId: row.delivery_order_id,
+    deliveryStatus: row.delivery_status,
+    deliveryData: row.delivery_data,
+    loyaltyRewardId: row.loyalty_reward_id,
+    loyaltyDiscount: row.loyalty_discount,
+    loyaltyFreeItemId: row.loyalty_free_item_id
+  };
+}
 
 // Generate order number
 function generateOrderNumber(): string {
@@ -110,10 +141,7 @@ router.get('/', async (req: Request, res: Response) => {
     query += ' ORDER BY created_at DESC';
 
     const result = await pool.query(query, params);
-    const orders = result.rows.map((row: any) => ({
-      ...row,
-      items: typeof row.items === 'string' ? JSON.parse(row.items) : row.items
-    }));
+    const orders = result.rows.map((row: any) => normalizeOrder(row));
     res.json(orders);
   } catch (error) {
     console.error('Error fetching orders:', error);
@@ -129,10 +157,7 @@ router.get('/kitchen', async (_req: Request, res: Response) => {
        WHERE status IN ('pending', 'preparing', 'ready') 
        ORDER BY created_at ASC`
     );
-    const orders = result.rows.map((row: any) => ({
-      ...row,
-      items: typeof row.items === 'string' ? JSON.parse(row.items) : row.items
-    }));
+    const orders = result.rows.map((row: any) => normalizeOrder(row));
     res.json(orders);
   } catch (error) {
     console.error('Error fetching kitchen orders:', error);
@@ -236,12 +261,7 @@ router.get('/:id', async (req: Request, res: Response) => {
       throw new HttpError(404, 'Order not found');
     }
 
-    const order = {
-      ...result.rows[0],
-      items: typeof result.rows[0].items === 'string' 
-        ? JSON.parse(result.rows[0].items) 
-        : result.rows[0].items
-    };
+    const order = normalizeOrder(result.rows[0]);
     res.json(order);
   } catch (error) {
     if (error instanceof HttpError) {
@@ -261,15 +281,24 @@ router.post('/', async (req: Request, res: Response) => {
       tableNumber,
       customer_name,
       customerName,
+      customer_id,
+      customerId,
       items,
       notes,
       created_by,
-      createdBy
+      createdBy,
+      delivery_provider,
+      delivery_provider: deliveryProvider,
+      delivery_address,
+      deliveryAddress,
+      loyalty_reward_id,
+      loyaltyRewardId
     } = req.body;
 
     const order = await createOrderService({
       tableNumber: table_number ?? tableNumber,
       customerName: customer_name ?? customerName ?? 'Walk-in',
+      customerId: customer_id ?? customerId,
       items: items.map((item: any) => ({
         menuItemId: item.menuItemId,
         menuItemName: item.menuItemName,
@@ -279,13 +308,49 @@ router.post('/', async (req: Request, res: Response) => {
         notes: item.notes,
       })),
       notes,
-      createdBy: created_by ?? createdBy ?? 'system'
+      createdBy: created_by ?? createdBy ?? 'system',
+      deliveryProvider: delivery_provider ?? deliveryProvider,
+      deliveryAddress: delivery_address ?? deliveryAddress,
+      loyaltyRewardId: loyalty_reward_id ?? loyaltyRewardId
     });
 
     res.status(201).json(order);
   } catch (error) {
     console.error('Error creating order:', error);
     res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to create order' });
+  }
+});
+
+// POST force-delivery sync for a specific order (admin / webhook retry)
+router.post('/:id/delivery-sync', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const result = await pool.query('SELECT * FROM orders WHERE id = $1', [id]);
+    if (result.rows.length === 0) {
+      throw new HttpError(404, 'Order not found');
+    }
+
+    const order = result.rows[0];
+    if (order.delivery_provider !== 'VubaVuba') {
+      return res.status(400).json({ error: 'Only VubaVuba orders can be sync' });
+    }
+
+    const deliveryResult = await createVubaVubaOrder(order);
+
+    const updated = await pool.query(
+      `UPDATE orders SET delivery_order_id=$1, delivery_status=$2, delivery_data=$3, updated_at=$4 WHERE id=$5 RETURNING *`,
+      [deliveryResult.deliveryOrderId, deliveryResult.deliveryStatus, JSON.stringify(deliveryResult.rawResponse), new Date().toISOString(), id]
+    );
+
+    emitOrderUpdate({ type: 'update', order: updated.rows[0] });
+    res.json(updated.rows[0]);
+  } catch (error) {
+    console.error('Delivery sync error:', error);
+    if (error instanceof HttpError) {
+      res.status(error.status).json({ error: error.message });
+    } else {
+      res.status(500).json({ error: 'Failed to sync delivery order' });
+    }
   }
 });
 
@@ -320,16 +385,62 @@ router.put('/:id/status', async (req: Request, res: Response) => {
       throw new HttpError(404, 'Order not found');
     }
 
-    const order = {
+    let order = {
       ...result.rows[0],
       items: typeof result.rows[0].items === 'string' 
         ? JSON.parse(result.rows[0].items) 
         : result.rows[0].items
     };
 
-    // Emit WebSocket event
-    emitOrderUpdate({ type: 'status', order });
+    // Award loyalty points if order is completed and has a customer
+    if ((status === 'served' || status === 'completed') && order.customer_id) {
+      try {
+        // Calculate points (1 point per $10 spent)
+        const pointsToAward = Math.floor(order.total / 1000); // total is in cents, so divide by 1000 for $10 = 100 points
 
+        if (pointsToAward > 0) {
+          const transactionId = `txn-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+          await pool.query(`
+            INSERT INTO loyalty_transactions (id, customer_id, order_id, transaction_type, points, description, restaurant_id)
+            VALUES ($1, $2, $3, 'earned', $4, $5, $6)
+          `, [transactionId, order.customer_id, id, pointsToAward, `Order completion: ${order.order_number}`, 'default_restaurant']);
+
+          await pool.query(`
+            UPDATE customers
+            SET
+              total_points = total_points + $1,
+              total_spent = total_spent + $2,
+              last_visit = now(),
+              visit_count = visit_count + 1,
+              updated_at = now()
+            WHERE id = $3 AND restaurant_id = $4
+          `, [pointsToAward, order.total, order.customer_id, 'default_restaurant']);
+        }
+      } catch (loyaltyError) {
+        console.error('Error awarding loyalty points:', loyaltyError);
+        // Don't fail the order update if loyalty points fail
+      }
+    }
+
+    // Notify delivery partner when order is served/completed
+    if ((status === 'served' || status === 'completed') && order.delivery_provider === 'VubaVuba' && order.delivery_order_id) {
+      try {
+        const deliveryResult = await updateVubaVubaOrderStatus(order.delivery_order_id, 'delivered');
+        await pool.query(
+          `UPDATE orders SET delivery_status=$1, delivery_data = $2, updated_at=$3 WHERE id=$4`,
+          [deliveryResult.deliveryStatus, JSON.stringify(deliveryResult.rawResponse), new Date().toISOString(), id]
+        );
+
+        order.delivery_status = deliveryResult.deliveryStatus;
+        order.delivery_data = deliveryResult.rawResponse;
+      } catch (deliveryError) {
+        console.error('Error syncing status to VubaVuba:', deliveryError);
+      }
+    }
+
+    // emit websocket update & return updated order object
+    emitOrderUpdate({ type: 'update', order });
     res.json(order);
   } catch (error) {
     if (error instanceof HttpError) {

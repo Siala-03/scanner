@@ -56,7 +56,7 @@ export function QRCodeGenerator({
         {/* Header - Hidden when printing */}
         <div className="flex flex-col sm:flex-row items-center justify-between mb-8 print:hidden">
           <div>
-            <h1 className="text-2xl font-bold text-white">Table QR Codes</h1>
+            <h1 className="text-2xl font-bold text-gray-100">Table QR Codes</h1>
             <p className="text-slate-400">
               Print or download codes to place on tables
             </p>

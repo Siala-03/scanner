@@ -8,6 +8,7 @@ import type {
   WasteEntry,
   WasteReason,
   InventoryAnalytics,
+  InventoryForecast,
 } from '../types/inventory';
 
 // Base API URL
@@ -254,4 +255,25 @@ export async function computeInventoryAnalytics(): Promise<InventoryAnalytics> {
     stockTurnoverRate: 1, // Simplified
     categoryBreakdown: [], // Would need category data
   };
+}
+
+// ── Forecasting ────────────────────────────────────────────────────────────────
+
+export async function fetchForecasts(): Promise<InventoryForecast[]> {
+  return apiRequest<InventoryForecast[]>(`${API_BASE}/forecasting`);
+}
+
+export async function generateForecasts(): Promise<{ success: boolean; count: number; forecasts: InventoryForecast[] }> {
+  return apiRequest<{ success: boolean; count: number; forecasts: InventoryForecast[] }>(`${API_BASE}/forecasting/generate`, {
+    method: 'POST',
+  });
+}
+
+export async function fetchForecastAlerts(): Promise<InventoryForecast[]> {
+  return apiRequest<InventoryForecast[]>(`${API_BASE}/forecasting/alerts`);
+}
+
+export async function fetchForecastByItem(menuItemId: string, menuItemName?: string): Promise<InventoryForecast> {
+  const params = menuItemName ? `?menuItemName=${encodeURIComponent(menuItemName)}` : '';
+  return apiRequest<InventoryForecast>(`${API_BASE}/forecasting/${menuItemId}${params}`);
 }

@@ -5,6 +5,7 @@ import { pool } from '../db.js';
 export interface AuthenticatedRequest extends Request {
   staffId?: string;
   staffRole?: string;
+  restaurantId?: string;
 }
 
 /**
@@ -24,9 +25,9 @@ export async function authenticate(
       throw new HttpError(401, 'Authentication required');
     }
 
-    // Verify the staff exists
+    // Verify the staff exists and get restaurant context
     const result = await pool.query(
-      'SELECT id, role FROM staff WHERE id = $1',
+      'SELECT id, role, restaurant_id FROM staff WHERE id = $1',
       [staffId]
     );
 
@@ -36,6 +37,7 @@ export async function authenticate(
 
     req.staffId = result.rows[0].id;
     req.staffRole = result.rows[0].role;
+    req.restaurantId = result.rows[0].restaurant_id;
     
     next();
   } catch (error) {

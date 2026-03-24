@@ -20,13 +20,13 @@ export interface OrderLine {
   quantity: number;
 }
 
-export async function getAllInventory() {
-  const result = await pool.query('SELECT * FROM inventory_records ORDER BY menu_item_id');
+export async function getAllInventory(restaurantId: string) {
+  const result = await pool.query('SELECT * FROM inventory_records WHERE restaurant_id = $1 ORDER BY menu_item_id', [restaurantId]);
   return result.rows;
 }
 
-export async function getInventoryById(menuItemId: string) {
-  const result = await pool.query('SELECT * FROM inventory_records WHERE menu_item_id = $1', [menuItemId]);
+export async function getInventoryById(menuItemId: string, restaurantId: string) {
+  const result = await pool.query('SELECT * FROM inventory_records WHERE menu_item_id = $1 AND restaurant_id = $2', [menuItemId, restaurantId]);
   return result.rows[0] ?? null;
 }
 

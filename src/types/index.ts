@@ -41,27 +41,46 @@ export type OrderStatus =
 'cancelled';
 
 export interface OrderItem {
-  menuItem: MenuItem;
+  menuItem?: MenuItem;
   quantity: number;
   specialInstructions?: string;
+  // API response fields
+  id?: string;
+  menuItemId?: string;
+  menuItemName?: string;
+  unitPrice?: number;
+  totalPrice?: number;
+  status?: string;
+  startedAt?: string;
+  completedAt?: string;
 }
 
 export interface Order {
   id: string;
-  tableNumber: number;
+  tableNumber?: number;
+  orderNumber?: string;
+  customerName?: string;
+  customerId?: string;
   items: OrderItem[];
   status: OrderStatus;
-  createdAt: Date;
-  updatedAt: Date;
-  verifiedAt?: Date;
-  readyAt?: Date;
-  servedAt?: Date;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+  verifiedAt?: Date | string;
+  readyAt?: Date | string;
+  servedAt?: Date | string;
+  completedAt?: Date | string;
   assignedWaiterId?: string;
   subtotal: number;
-  serviceCharge: number;
+  serviceCharge?: number;
+  tax?: number;
   total: number;
+  notes?: string;
   specialInstructions?: string;
-  requiresKitchen: boolean;
+  requiresKitchen?: boolean;
+  deliveryProvider?: string;
+  deliveryAddress?: string;
+  deliveryOrderId?: string;
+  deliveryStatus?: 'pending' | 'assigned' | 'picked_up' | 'delivered' | 'cancelled';
 }
 
 // Table Types
@@ -95,6 +114,48 @@ export interface StaffPerformance {
   rating: number; // 1-5
   totalRevenue: number;
   shiftsThisWeek: number;
+}
+
+// KPI Types
+export type KPIPeriod = 'daily' | 'weekly' | 'monthly';
+
+export type KPIMetric = 'orders_served' | 'revenue' | 'rating' | 'tables_served' | 'prep_time';
+
+export interface KPI {
+  id: number;
+  restaurant_id: string;
+  staff_role: StaffRole;
+  name: string;
+  description?: string;
+  metric: KPIMetric;
+  target_value: number;
+  period: KPIPeriod;
+  created_by: string;
+  created_at: Date;
+  updated_at: Date;
+  assigned_staff_ids?: string[]; // Staff IDs assigned to this KPI
+}
+
+export interface StaffKPIProgress {
+  id: number;
+  staffId: string;
+  kpiId: number;
+  currentValue: number;
+  periodStart: Date;
+  periodEnd: Date;
+  achieved: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface KPIWithProgress extends Omit<KPI, 'staff_role' | 'target_value' | 'created_by' | 'created_at' | 'updated_at' | 'assigned_staff_ids'> {
+  staff_role: StaffRole;
+  target_value: number;
+  created_by: string;
+  created_at: Date;
+  updated_at: Date;
+  assigned_staff_ids?: string[];
+  progress?: StaffKPIProgress;
 }
 
 export interface WaiterAssignment {
@@ -151,7 +212,7 @@ export interface TablePerformance {
   avgTurnoverTime: number;
 }
 
-export interface KPI {
+export interface DashboardKPI {
   label: string;
   value: string | number;
   change: number; // percentage change
@@ -196,6 +257,62 @@ export interface OrderFilters {
     start: Date;
     end: Date;
   };
+}
+
+// ============================================
+// LOYALTY PROGRAM TYPES
+// ============================================
+
+export interface Customer {
+  id: string;
+  phone?: string;
+  email?: string;
+  name?: string;
+  totalPoints: number;
+  totalSpent: number;
+  joinDate: Date;
+  lastVisit?: Date;
+  visitCount: number;
+}
+
+export type LoyaltyTransactionType = 'earned' | 'redeemed' | 'expired' | 'adjusted';
+
+export interface LoyaltyTransaction {
+  id: string;
+  customerId: string;
+  orderId?: string;
+  transactionType: LoyaltyTransactionType;
+  points: number;
+  description: string;
+  createdAt: Date;
+}
+
+export type RewardType = 'discount' | 'free_item' | 'service';
+
+export interface Reward {
+  id: string;
+  name: string;
+  description: string;
+  pointsRequired: number;
+  rewardType: RewardType;
+  discountPercentage?: number;
+  freeItemId?: string;
+  isActive: boolean;
+}
+
+export interface RewardRedemption {
+  id: string;
+  customerId: string;
+  rewardId: string;
+  orderId?: string;
+  pointsUsed: number;
+  redeemedAt: Date;
+}
+
+export interface LoyaltySummary {
+  customer: Customer;
+  recentTransactions: LoyaltyTransaction[];
+  availableRewards: Reward[];
 }
 
 export type SortDirection = 'asc' | 'desc';

@@ -6,13 +6,21 @@ const API_BASE = '/api/auth';
 
 export async function loginStaff(
   username: string,
-  password: string
+  password: string,
+  restaurantId?: string
 ): Promise<Staff> {
-  const data = await apiRequest<{ staff: Staff }>(`${API_BASE}/login`, {
-    method: 'POST',
-    json: { username, password }
-  });
-  return data.staff;
+  try {
+    console.log('Attempting login for:', username, 'restaurant:', restaurantId || 'default_restaurant');
+    const data = await apiRequest<{ staff: Staff }>(`${API_BASE}/login`, {
+      method: 'POST',
+      json: { username, password, restaurantId: restaurantId || 'default_restaurant' }
+    });
+    console.log('Login successful for user:', data.staff.name);
+    return data.staff;
+  } catch (error) {
+    console.error('Login failed:', error);
+    throw error;
+  }
 }
 
 export async function fetchAllStaff(): Promise<Staff[]> {
@@ -37,10 +45,20 @@ export async function signUpStaff(input: {
   role: StaffRole;
   username: string;
   password: string;
+  restaurantId?: string;
 }): Promise<Staff> {
-  const data = await apiRequest<{ staff: Staff }>(`${API_BASE}/signup`, {
-    method: 'POST',
-    json: input
-  });
-  return data.staff;
+  try {
+    console.log('Attempting signup for:', input.username, 'role:', input.role);
+    const data = await apiRequest<{ staff: Staff }>(`${API_BASE}/signup`, {
+      method: 'POST',
+      json: { ...input, restaurantId: input.restaurantId || 'default_restaurant' }
+    });
+    console.log('Signup successful for user:', data.staff.name);
+    return data.staff;
+  } catch (error) {
+    console.error('Signup failed:', error);
+    throw error;
+  }
 }
+
+

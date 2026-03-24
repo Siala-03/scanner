@@ -36,7 +36,7 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
       setError(null);
     } catch (err) {
       console.error('Failed to refresh menu:', err);
-      setMenuItems([]);
+      setMenuItems(defaultMenuItems);
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setIsLoading(false);

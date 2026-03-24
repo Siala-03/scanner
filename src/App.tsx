@@ -1,7 +1,7 @@
 import React, { useCallback, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeftIcon, UtensilsIcon, BarChart3Icon, BriefcaseIcon, ChefHatIcon, QrCodeIcon, UsersIcon, TrendingUpIcon, ClockIcon, ShoppingBagIcon } from 'lucide-react';
-import { CartItem, Order, OrderStatus } from './types';
+import { ArrowLeftIcon, UtensilsIcon, BarChart3Icon, BriefcaseIcon, ChefHatIcon, QrCodeIcon, UsersIcon, TrendingUpIcon, ClockIcon, ShoppingBagIcon, LockIcon } from 'lucide-react';
+import { CartItem, Order, OrderStatus, Customer } from './types';
 import { useStaff } from './hooks/useStaff';
 import { useOrders } from './hooks/useOrders';
 import { useTables } from './hooks/useTables';
@@ -17,6 +17,7 @@ import { StaffManagement } from './pages/manager/StaffManagement';
 import { AnalyticsPage } from './pages/manager/AnalyticsPage';
 import { QRCodeGenerator } from './pages/manager/QRCodeGenerator';
 import { InventoryManagement } from './pages/shared/InventoryManagement';
+import { SimpleInventory } from './pages/shared/SimpleInventory';
 import { KitchenDisplay } from './pages/kitchen/KitchenDisplay';
 import { LoginPage } from './pages/auth/LoginPage';
 import { Card } from './components/ui/Card';
@@ -24,7 +25,7 @@ import { Button } from './components/ui/Button';
 import { Staff } from './types';
 type UserRole = 'customer' | 'waiter' | 'supervisor' | 'manager' | 'kitchen' | null;
 type ManagerPage = 'dashboard' | 'menu' | 'staff' | 'analytics' | 'qrcodes' | 'inventory' | 'history';
-type SupervisorPage = 'dashboard' | 'revenue' | 'staff' | 'qrcodes' | 'inventory' | 'history' | 'menu';
+type SupervisorPage = 'dashboard' | 'revenue' | 'staff' | 'qrcodes' | 'inventory' | 'menu' | 'history';
 export function App() {
   const [selectedRole, setSelectedRole] = useState<UserRole>(null);
   const [authUser, setAuthUser] = useState<Staff | null>(null);
@@ -46,8 +47,8 @@ export function App() {
     []);
   const { orders, addOrder, updateOrderStatus } = useOrders();
   const handlePlaceOrder = useCallback(
-    (tableNum: number, items: CartItem[], specialInstructions?: string) => {
-      addOrder(tableNum, items, specialInstructions);
+    (tableNum: number, items: CartItem[], specialInstructions?: string, customer?: Customer | null, delivery?: { provider: string; address: string }, loyaltyRewardId?: string) => {
+      addOrder(tableNum, items, specialInstructions, customer, delivery, loyaltyRewardId);
     },
     [addOrder]
   );
@@ -120,22 +121,20 @@ export function App() {
     }
     if (selectedRole === 'manager' && managerPage !== 'dashboard') {
       setManagerPage('dashboard');
-    } else if (
-    selectedRole === 'supervisor' &&
-    supervisorPage !== 'dashboard')
-    {
-      setSupervisorPage('dashboard');
-    } else {
+      return;
+    }
+
+    if (selectedRole && selectedRole !== 'customer') {
+      // clear auth when leaving staff portal
+      localStorage.removeItem('staffId');
+      localStorage.removeItem('token');
       setSelectedRole(null);
       setAuthUser(null);
       setTableNumber(null);
       setManagerPage('dashboard');
       setSupervisorPage('dashboard');
-      setShowQRGrid(false);
-      setDetectedTable(null);
-      setScanningTable(null);
       setIsScanning(false);
-      // Reset URL to home
+      setDetectedTable(null);
       window.history.pushState({}, '', '/');
     }
   };
@@ -208,8 +207,7 @@ export function App() {
     } else if (path === '/supervisor' || path.startsWith('/supervisor')) {
       setSelectedRole('supervisor');
     } else if (path === '/' || path.startsWith('/t/') || queryTable) {
-      // allow root and table deep-link paths
-    } else {
+
       // Unknown path fallback: keep app loadable and show friendly message
       window.history.replaceState({}, '', '/');
       setSelectedRole(null);
@@ -359,7 +357,7 @@ export function App() {
             }}
           />
         )}
-        {supervisorPage === 'inventory' && <InventoryManagement role="supervisor" />}
+        {supervisorPage === 'inventory' && <SimpleInventory />}
         {supervisorPage === 'history' && <OrderHistoryPage onBack={() => setSupervisorPage('dashboard')} existingOrders={orders} />}
         {supervisorPage === 'menu' && <MenuManagement />}
       </div>
@@ -422,7 +420,7 @@ export function App() {
             {managerPage === 'menu' && <MenuManagement />}
             {managerPage === 'staff' && <StaffManagement />}
             {managerPage === 'analytics' && <AnalyticsPage />}
-            {managerPage === 'inventory' && <InventoryManagement role="manager" />}
+            {managerPage === 'inventory' && <SimpleInventory />}
             {managerPage === 'qrcodes' && (
               <QRCodeGenerator
                 tables={tables}
@@ -675,6 +673,7 @@ export function App() {
           </motion.div>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+
             {/* Waiter Portal */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}

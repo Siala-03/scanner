@@ -39,7 +39,7 @@ export function StaffPerformance() {
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-white">Staff Performance</h1>
+          <h1 className="text-2xl font-bold text-gray-100">Staff Performance</h1>
           <p className="text-slate-400">Track and compare team performance</p>
         </div>
 
@@ -47,7 +47,7 @@ export function StaffPerformance() {
         <Card className="bg-slate-800 mb-6">
           <div className="flex items-center gap-2 mb-4">
             <TrophyIcon className="w-5 h-5 text-amber-400" />
-            <h3 className="text-lg font-semibold text-white">Leaderboard</h3>
+            <h3 className="text-lg font-semibold text-gray-100">Leaderboard</h3>
           </div>
           <div className="space-y-3">
             {sortedByRating.map((waiter, index) =>
@@ -67,7 +67,7 @@ export function StaffPerformance() {
                 join('')}
                 </div>
                 <div className="flex-1">
-                  <p className="font-medium text-white">{waiter.name}</p>
+                  <p className="font-medium text-gray-100">{waiter.name}</p>
                   <div className="flex items-center gap-1">
                     {Array.from({
                     length: 5
@@ -98,7 +98,7 @@ export function StaffPerformance() {
         {/* Performance Charts */}
         <div className="grid md:grid-cols-2 gap-6 mb-6">
           <Card className="bg-slate-800">
-            <h3 className="text-lg font-semibold text-white mb-4">
+            <h3 className="text-lg font-semibold text-gray-100 mb-4">
               Orders Served
             </h3>
             <div className="h-64">
@@ -127,7 +127,7 @@ export function StaffPerformance() {
           </Card>
 
           <Card className="bg-slate-800">
-            <h3 className="text-lg font-semibold text-white mb-4">
+            <h3 className="text-lg font-semibold text-gray-100 mb-4">
               Revenue Generated
             </h3>
             <div className="h-64">
@@ -166,7 +166,7 @@ export function StaffPerformance() {
         </div>
 
         {/* Staff Cards */}
-        <h3 className="text-lg font-semibold text-white mb-4">
+        <h3 className="text-lg font-semibold text-gray-100 mb-4">
           Individual Performance
         </h3>
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -180,7 +180,7 @@ export function StaffPerformance() {
                 join('')}
                 </div>
                 <div>
-                  <p className="font-semibold text-white">{waiter.name}</p>
+                  <p className="font-semibold text-gray-100">{waiter.name}</p>
                   <Badge
                   variant={waiter.isOnDuty ? 'ready' : 'served'}
                   size="sm">
@@ -213,7 +213,7 @@ export function StaffPerformance() {
                     <ClockIcon className="w-4 h-4" />
                     <span className="text-sm">Avg Service Time</span>
                   </div>
-                  <span className="text-white font-medium">
+                  <span className="text-gray-100 font-medium">
                     {waiter.performance.avgServiceTime} min
                   </span>
                 </div>
@@ -231,7 +231,7 @@ export function StaffPerformance() {
                 <div className="pt-2 border-t border-slate-700">
                   <div className="flex justify-between text-sm mb-1">
                     <span className="text-slate-400">Orders Served</span>
-                    <span className="text-white">
+                    <span className="text-gray-100">
                       {waiter.performance.ordersServed}
                     </span>
                   </div>

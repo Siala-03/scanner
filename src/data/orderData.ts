@@ -12,7 +12,7 @@ tableNumber: number,
 status: OrderStatus,
 minutesAgo: number,
 waiterId?: string,
-itemCount: number = 3)
+itemCount = 3)
 : Order => {
   const items = getRandomItems(itemCount).map((item) => ({
     menuItem: item,

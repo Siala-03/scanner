@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   BellIcon,
@@ -12,12 +12,15 @@ import {
 import { Order, Staff } from '../../types';
 import { Tabs } from '../../components/ui/Tabs';
 import { Card } from '../../components/ui/Card';
-import { Badge } from '../../components/ui/Badge';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { OrderCard } from '../../components/waiter/OrderCard';
 import { OrderDetailModal } from '../../components/waiter/OrderDetailModal';
 import { TableMapView } from './TableMapView';
 import { loadReviews } from '../../utils/reviewsStorage';
+import { useStaffKPIs } from '../../hooks/useKPIs';
+import { buildReceiptHtml } from '../../utils/receipt';
+import { printReceiptNetwork } from '../../api/printer';
+import { KPICard } from '../../components/supervisor/KPICard';
 interface WaiterDashboardProps {
   waiter: Staff;
   orders: Order[];
@@ -42,6 +45,7 @@ export function WaiterDashboard({
   const [activeTab, setActiveTab] = useState('new');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [showTableMap, setShowTableMap] = useState(false);
+  const { kpis } = useStaffKPIs();
   const waiterOrders = useMemo(
     () => orders.filter((o) => waiter.assignedTables.includes(o.tableNumber)),
     [orders, waiter.assignedTables]
@@ -91,6 +95,27 @@ export function WaiterDashboard({
   };
   const handleMarkServed = (orderId: string) => {
     onUpdateOrderStatus(orderId, 'served', { assignedWaiterId: waiter.id });
+  };
+
+  const handlePrintReceipt = async (order: Order) => {
+    // Network print call to backend endpoint
+    try {
+      await printReceiptNetwork(order, waiter.name);
+    } catch (err) {
+      console.warn('Network receipt print failed, falling back to browser print', err);
+    }
+
+    if (typeof window !== 'undefined') {
+      const html = buildReceiptHtml(order, waiter.name);
+      const printWindow = window.open('', '_blank', 'width=450,height=700');
+      if (printWindow) {
+        printWindow.document.open();
+        printWindow.document.write(html);
+        printWindow.document.close();
+      } else {
+        console.warn('Unable to open print window');
+      }
+    }
   };
   if (showTableMap) {
     return (
@@ -229,6 +254,25 @@ export function WaiterDashboard({
         <Tabs tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} />
       </div>
 
+      {/* KPIs Section */}
+      {kpis.length > 0 && (
+        <div className="px-4 mb-6">
+          <h2 className="text-lg font-semibold text-white mb-3">Your KPIs</h2>
+          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+            {kpis.map((kpi) => (
+              <KPICard
+                key={kpi.id}
+                label={kpi.name}
+                value={kpi.progress?.currentValue || 0}
+                change={kpi.progress ? (kpi.progress.currentValue / kpi.targetValue) * 100 - 100 : 0}
+                trend={kpi.progress?.achieved ? 'up' : 'neutral'}
+                icon={<TrendingUpIcon className="w-5 h-5" />}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Content */}
       <div className="p-4 pb-24">
         <AnimatePresence mode="wait">
@@ -275,7 +319,8 @@ export function WaiterDashboard({
                 order={order}
                 onViewDetails={setSelectedOrder}
                 onApprove={handleApprove}
-                onReject={handleReject} />
+                onReject={handleReject}
+                onPrintReceipt={handlePrintReceipt} />
 
                   </motion.div>
             )
@@ -326,7 +371,8 @@ export function WaiterDashboard({
                 order={order}
                 onViewDetails={setSelectedOrder}
                 onMarkReady={handleMarkReady}
-                onMarkServed={handleMarkServed} />
+                onMarkServed={handleMarkServed}
+                onPrintReceipt={handlePrintReceipt} />
 
                   </motion.div>
             )
@@ -373,7 +419,7 @@ export function WaiterDashboard({
                 delay: index * 0.05
               }}>
 
-                    <OrderCard order={order} onViewDetails={setSelectedOrder} />
+                    <OrderCard order={order} onViewDetails={setSelectedOrder} onPrintReceipt={handlePrintReceipt} />
                   </motion.div>
             )
             }
@@ -390,7 +436,8 @@ export function WaiterDashboard({
         onApprove={handleApprove}
         onReject={handleReject}
         onMarkReady={handleMarkReady}
-        onMarkServed={handleMarkServed} />
+        onMarkServed={handleMarkServed}
+        onPrintReceipt={handlePrintReceipt} />
 
     </div>);
 

@@ -20,8 +20,11 @@ export function getSocket(): Socket {
       console.warn('Failed to create socket:', err);
       // Return a dummy socket that does nothing
       return {
+        // eslint-disable-next-line @typescript-eslint/no-empty-function
         on: () => {},
+        // eslint-disable-next-line @typescript-eslint/no-empty-function
         off: () => {},
+        // eslint-disable-next-line @typescript-eslint/no-empty-function
         emit: () => {},
         connected: false
       } as unknown as Socket;

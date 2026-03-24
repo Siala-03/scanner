@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { fetchTables, createTable, deleteTable, Table } from '../api/tables';
+import { fetchTables, createTable, deleteTable } from '../api/tables';
 
 // Hook to get tables from backend
 export function useTables() {

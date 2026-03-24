@@ -1,5 +1,4 @@
 import React, { useMemo, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import {
   SearchIcon,
   SparklesIcon,
@@ -10,7 +9,7 @@ import {
   RefreshCwIcon
 } from
 'lucide-react';
-import { MenuItem, MenuCategory, CartItem } from '../../types';
+import { MenuItem } from '../../types';
 import { useMenu } from '../../hooks/useMenu';
 import { MenuItemCard } from '../../components/customer/MenuItemCard';
 import { Modal } from '../../components/ui/Modal';

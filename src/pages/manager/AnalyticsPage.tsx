@@ -213,7 +213,7 @@ export function AnalyticsPage() {
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-white">Analytics</h1>
+            <h1 className="text-2xl font-bold text-gray-100">Analytics</h1>
             <p className="text-slate-400">
               Deep dive into your business metrics
             </p>
@@ -240,7 +240,7 @@ export function AnalyticsPage() {
                 ? 'Revenue This Week'
                 : 'Monthly Revenue'}
             </p>
-            <p className="text-2xl font-bold text-white">
+            <p className="text-2xl font-bold text-gray-100">
               {formatPrice(currentRevenue)}
             </p>
             <div
@@ -262,7 +262,7 @@ export function AnalyticsPage() {
                 ? 'Orders This Week'
                 : 'Monthly Orders'}
             </p>
-            <p className="text-2xl font-bold text-white">
+            <p className="text-2xl font-bold text-gray-100">
               {currentOrders.toLocaleString()}
             </p>
             <div
@@ -293,7 +293,7 @@ export function AnalyticsPage() {
         <div className="grid lg:grid-cols-2 gap-6 mb-6">
           {/* Revenue Trend */}
           <Card className="bg-slate-800">
-            <h3 className="text-lg font-semibold text-white mb-4">
+            <h3 className="text-lg font-semibold text-gray-100 mb-4">
               Revenue Trend
             </h3>
             <div className="h-72">
@@ -350,7 +350,7 @@ export function AnalyticsPage() {
 
           {/* Orders by Hour */}
           <Card className="bg-slate-800">
-            <h3 className="text-lg font-semibold text-white mb-4">
+            <h3 className="text-lg font-semibold text-gray-100 mb-4">
               Orders by Hour
             </h3>
             <div className="h-72">
@@ -382,7 +382,7 @@ export function AnalyticsPage() {
         <div className="grid lg:grid-cols-2 gap-6 mb-6">
           {/* Revenue by Category */}
           <Card className="bg-slate-800">
-            <h3 className="text-lg font-semibold text-white mb-4">
+            <h3 className="text-lg font-semibold text-gray-100 mb-4">
               Revenue by Category
             </h3>
             <div className="h-72 flex items-center">
@@ -430,7 +430,7 @@ export function AnalyticsPage() {
                       <span className="text-sm text-slate-300">{cat.name}</span>
                     </div>
                     <div className="text-right">
-                      <span className="text-sm font-medium text-white">
+                      <span className="text-sm font-medium text-gray-200">
                         {formatPrice(cat.revenue)}
                       </span>
                       <span className="text-xs text-slate-400 ml-2">
@@ -445,7 +445,7 @@ export function AnalyticsPage() {
 
           {/* Peak Hours Heatmap */}
           <Card className="bg-slate-800">
-            <h3 className="text-lg font-semibold text-white mb-4">
+            <h3 className="text-lg font-semibold text-gray-100 mb-4">
               Peak Hours
             </h3>
             <div className="overflow-x-auto">
@@ -509,7 +509,7 @@ export function AnalyticsPage() {
 
         {/* Orders Trend */}
         <Card className="bg-slate-800">
-          <h3 className="text-lg font-semibold text-white mb-4">
+          <h3 className="text-lg font-semibold text-gray-100 mb-4">
             Daily Orders & Revenue
           </h3>
           <div className="h-72">

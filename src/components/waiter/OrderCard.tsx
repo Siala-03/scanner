@@ -12,6 +12,7 @@ interface OrderCardProps {
   onReject?: (orderId: string) => void;
   onMarkReady?: (orderId: string) => void;
   onMarkServed?: (orderId: string) => void;
+  onPrintReceipt?: (order: Order) => void;
 }
 export function OrderCard({
   order,
@@ -134,6 +135,14 @@ export function OrderCard({
               Mark Served
             </Button>
           }
+          {order.status === 'served' && onPrintReceipt && (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => onPrintReceipt(order)}>
+              Print Receipt
+            </Button>
+          )}
         </div>
       </div>
     </motion.div>);

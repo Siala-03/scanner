@@ -1,18 +1,17 @@
 import { Router, Request, Response } from 'express';
 import { pool } from '../db.js';
 import { HttpError } from '../http.js';
-import { adjustStock, getLowStockItems } from '../services/inventoryService.js';
+import { adjustStock, getLowStockItems, getAllInventory, getInventoryById } from '../services/inventoryService.js';
 import { emitInventoryUpdate } from '../socket.js';
+import { authenticate, AuthenticatedRequest } from '../middleware/auth.js';
 
 const router = Router();
 
 // GET all inventory records
-router.get('/', async (_req: Request, res: Response) => {
+router.get('/', authenticate, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const result = await pool.query(
-      'SELECT * FROM inventory_records ORDER BY menu_item_id'
-    );
-    res.json(result.rows);
+    const result = await getAllInventory(req.restaurantId!);
+    res.json(result);
   } catch (error) {
     console.error('Error fetching inventory:', error);
     res.status(500).json({ error: 'Failed to fetch inventory' });
@@ -20,17 +19,14 @@ router.get('/', async (_req: Request, res: Response) => {
 });
 
 // GET single inventory record
-router.get('/:menuItemId', async (req: Request, res: Response) => {
+router.get('/:menuItemId', authenticate, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { menuItemId } = req.params;
-    const result = await pool.query(
-      'SELECT * FROM inventory_records WHERE menu_item_id = $1',
-      [menuItemId]
-    );
-    if (result.rows.length === 0) {
+    const result = await getInventoryById(menuItemId, req.restaurantId!);
+    if (!result) {
       throw new HttpError(404, 'Inventory record not found');
     }
-    res.json(result.rows[0]);
+    res.json(result);
   } catch (error) {
     if (error instanceof HttpError) {
       res.status(error.status).json({ error: error.message });

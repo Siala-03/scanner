@@ -1,8 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   PlusIcon,
-  SearchIcon,
   EditIcon,
   TrashIcon,
   KeyIcon } from
@@ -12,7 +11,9 @@ import { addStaffCredential, staffCredentials } from '../../data/staffData';
 import { useStaff } from '../../hooks/useStaff';
 import { useTables } from '../../hooks/useTables';
 import { signUpStaff } from '../../api/auth';
-import { updateStaffAssignments } from '../../api/staff';
+import { updateStaffAssignments, updateStaffStatus, updateStaffRole, deleteStaff } from '../../api/staff';
+import { useKPIs } from '../../hooks/useKPIs';
+import { createKPI, deleteKPI } from '../../api/kpis';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
@@ -22,6 +23,7 @@ import { Input } from '../../components/ui/Input';
 export function StaffManagement() {
   const { staff: backendStaff, isLoading, refetch } = useStaff();
   const { tables, isLoading: tablesLoading } = useTables();
+  const { kpis, refetch: refetchKPIs } = useKPIs();
   const [searchQuery, setSearchQuery] = useState('');
 
   const [selectedRole, setSelectedRole] = useState<StaffRole | 'all'>('all');
@@ -34,6 +36,18 @@ export function StaffManagement() {
   const [newUsername, setNewUsername] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [generatedCredentials, setGeneratedCredentials] = useState<{ staffName: string; username: string; password: string } | null>(null);
+  const [isCreatingStaff, setIsCreatingStaff] = useState(false);
+  const [addStaffError, setAddStaffError] = useState<string | null>(null);
+  const [isKPIModalOpen, setIsKPIModalOpen] = useState(false);
+  const [kpiForm, setKpiForm] = useState({
+    staffRole: 'waiter' as StaffRole,
+    name: '',
+    description: '',
+    metric: 'orders_served' as 'orders_served' | 'revenue' | 'rating' | 'tables_served' | 'prep_time',
+    targetValue: 0,
+    period: 'daily' as 'daily' | 'weekly' | 'monthly',
+    assignedStaffIds: [] as string[],
+  });
   const [addForm, setAddForm] = useState<{
     name: string;
     role: StaffRole;
@@ -113,6 +127,34 @@ export function StaffManagement() {
     }
   };
 
+  const handleCreateKPI = async () => {
+    // Validate required fields
+    if (!kpiForm.name.trim()) {
+      alert('Please enter a KPI name');
+      return;
+    }
+    if (!kpiForm.targetValue || kpiForm.targetValue <= 0) {
+      alert('Please enter a valid target value');
+      return;
+    }
+    try {
+      await createKPI(kpiForm);
+      setIsKPIModalOpen(false);
+      setKpiForm({
+        staffRole: 'waiter',
+        name: '',
+        description: '',
+        metric: 'orders_served',
+        targetValue: 0,
+        period: 'daily',
+        assignedStaffIds: [],
+      });
+      refetchKPIs();
+    } catch (error) {
+      console.error('Failed to create KPI:', error);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center">
@@ -127,7 +169,7 @@ export function StaffManagement() {
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-white">Staff Management</h1>
+            <h1 className="text-2xl font-bold text-gray-100">Staff Management</h1>
             <p className="text-slate-400">
               {backendStaff.filter((s) => s.isOnDuty).length} staff on duty
             </p>
@@ -143,6 +185,7 @@ export function StaffManagement() {
                     variant="secondary"
                     size="xs"
                     onClick={() => {
+                      // eslint-disable-next-line @typescript-eslint/no-empty-function
                       navigator.clipboard.writeText(`Username: ${generatedCredentials.username}\nPassword: ${generatedCredentials.password}`).catch(() => {});
                     }}
                   >
@@ -239,7 +282,7 @@ export function StaffManagement() {
                       join('')}
                       </div>
                       <div>
-                        <h3 className="font-semibold text-white">
+                        <h3 className="font-semibold text-gray-100">
                           {member.name}
                         </h3>
                         <p className="text-sm text-slate-400 capitalize">
@@ -258,6 +301,27 @@ export function StaffManagement() {
                   <div className="space-y-2 mb-4 text-sm text-slate-300">
                     <p>📧 {member.email}</p>
                     <p>📱 {member.phone}</p>
+                    <div className="flex items-center gap-2">
+                      <label className="text-slate-400 text-xs">Role:</label>
+                      <select
+                        value={member.role}
+                        onChange={async (e) => {
+                          const newRole = e.target.value as StaffRole;
+                          try {
+                            await updateStaffRole(member.id, newRole);
+                            await refetch();
+                          } catch (err) {
+                            console.error('Failed to update role', err);
+                          }
+                        }}
+                        className="rounded-lg bg-slate-700 px-2 py-1 text-xs text-white border border-slate-600"
+                      >
+                        <option value="waiter">Waiter</option>
+                        <option value="kitchen">Kitchen</option>
+                        <option value="supervisor">Supervisor</option>
+                        <option value="manager">Manager</option>
+                      </select>
+                    </div>
                     {member.role === 'waiter' && (
                   <p>
                         🍽️ Tables:{' '}
@@ -270,10 +334,25 @@ export function StaffManagement() {
 
                   <div className="flex gap-2 pt-4 border-t border-slate-700">
                     <Button
-                    variant="secondary"
-                    size="sm"
-                    className="flex-1"
-                    onClick={() => handleManageCredentials(member)}>
+                      variant={member.isOnDuty ? 'danger' : 'ready'}
+                      size="sm"
+                      className="flex-1"
+                      onClick={async () => {
+                        try {
+                          await updateStaffStatus(member.id, !member.isOnDuty);
+                          await refetch();
+                        } catch (err) {
+                          console.error('Failed to update on-duty status', err);
+                        }
+                      }}
+                    >
+                      {member.isOnDuty ? 'Set Off Duty' : 'Set On Duty'}
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => handleManageCredentials(member)}>
 
                       <KeyIcon className="w-4 h-4" />
                       Login Access
@@ -290,6 +369,23 @@ export function StaffManagement() {
                     <Button variant="secondary" size="sm">
                       <EditIcon className="w-4 h-4" />
                     </Button>
+                    <Button 
+                      variant="danger" 
+                      size="sm"
+                      onClick={async () => {
+                        if (window.confirm(`Are you sure you want to delete ${member.name}?`)) {
+                          try {
+                            await deleteStaff(member.id);
+                            await refetch();
+                          } catch (err: any) {
+                            console.error('Failed to delete staff', err);
+                            alert(err.message || 'Failed to delete staff member');
+                          }
+                        }
+                      }}
+                    >
+                      <TrashIcon className="w-4 h-4" />
+                    </Button>
                   </div>
                 </Card>
               </motion.div>
@@ -303,8 +399,8 @@ export function StaffManagement() {
               <div>
                 <p className="text-sm font-semibold text-emerald-200">New staff credentials generated for {generatedCredentials.staffName}.</p>
                 <div className="mt-1 text-xs text-emerald-100">
-                  <p>Username: <span className="font-semibold text-white">{generatedCredentials.username}</span></p>
-                  <p>Password: <span className="font-semibold text-white">{generatedCredentials.password}</span></p>
+                  <p>Username: <span className="font-semibold text-gray-100">{generatedCredentials.username}</span></p>
+                  <p>Password: <span className="font-semibold text-gray-100">{generatedCredentials.password}</span></p>
                 </div>
               </div>
               <button
@@ -322,6 +418,66 @@ export function StaffManagement() {
           </div>
         }
 
+        {/* KPIs Section */}
+        <div className="mt-12">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold text-white">Staff KPIs</h2>
+            <Button variant="primary" onClick={() => setIsKPIModalOpen(true)}>
+              <PlusIcon className="w-5 h-5" />
+              Create KPI
+            </Button>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {kpis.length === 0 ? (
+              <Card className="p-4">
+                <p className="text-slate-400">No KPIs created yet. Create one to get started.</p>
+              </Card>
+            ) : (
+              kpis.map((kpi) => (
+                <Card key={kpi.id} className="p-4 bg-slate-800 border-slate-700">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h3 className="font-semibold text-white">{kpi.name}</h3>
+                      <p className="text-sm text-slate-400">{kpi.description || 'No description'}</p>
+                      <div className="mt-2 flex gap-2">
+                        <Badge variant="primary">{kpi.staff_role}</Badge>
+                        <Badge variant="secondary">{kpi.period}</Badge>
+                      </div>
+                    </div>
+                    <div className="text-right flex flex-col items-end gap-2">
+                      <p className="text-lg font-bold text-amber-500">{kpi.target_value}</p>
+                      <p className="text-xs text-slate-400">Target</p>
+                      <Button 
+                        variant="danger" 
+                        size="sm"
+                        onClick={async () => {
+                          if (window.confirm(`Are you sure you want to delete the KPI "${kpi.name}"?`)) {
+                            try {
+                              await deleteKPI(kpi.id);
+                              await refetchKPIs();
+                            } catch (err: any) {
+                              console.error('Failed to delete KPI', err);
+                              alert(err.message || 'Failed to delete KPI');
+                            }
+                          }
+                        }}
+                      >
+                        <TrashIcon className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                  {kpi.assigned_staff_ids && kpi.assigned_staff_ids.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-slate-700">
+                      <p className="text-xs text-slate-400">Assigned to: {kpi.assigned_staff_ids.length} staff member(s)</p>
+                    </div>
+                  )}
+                </Card>
+              ))
+            )}
+          </div>
+        </div>
+
         {/* Credentials Modal */}
         <Modal
           isOpen={isCredentialModalOpen}
@@ -329,7 +485,7 @@ export function StaffManagement() {
           title={`Manage Access: ${selectedStaffForCreds?.name}`}>
 
           <div className="space-y-4">
-            <p className="text-sm text-slate-400 mb-4">
+            <p className="text-sm text-slate-600 mb-4">
               Set up login credentials for this staff member to access their
               portal.
             </p>
@@ -383,7 +539,7 @@ export function StaffManagement() {
               placeholder="e.g. Aline Mukamana"
             />
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
+              <label className="block text-sm font-medium text-slate-700 mb-2">
                 Role
               </label>
               <select
@@ -391,7 +547,7 @@ export function StaffManagement() {
                 onChange={(e) =>
                   setAddForm((p) => ({ ...p, role: e.target.value as StaffRole }))
                 }
-                className="w-full px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+                className="w-full px-4 py-2 rounded-lg bg-white border border-slate-100 text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
               >
                 <option value="waiter">Waiter</option>
                 <option value="kitchen">Kitchen</option>
@@ -422,6 +578,12 @@ export function StaffManagement() {
               />
             )}
 
+            {addStaffError && (
+              <div className="rounded-md bg-red-500/15 border border-red-500 text-red-600 px-3 py-2 text-sm">
+                {addStaffError}
+              </div>
+            )}
+
             <div className="flex gap-3 pt-4">
               <Button
                 variant="secondary"
@@ -434,7 +596,13 @@ export function StaffManagement() {
                 variant="primary"
                 fullWidth
                 onClick={async () => {
-                  if (!addForm.name || !addForm.email || !addForm.phone) return;
+                  setAddStaffError(null);
+                  setIsCreatingStaff(true);
+                  if (!addForm.name || !addForm.email || !addForm.phone) {
+                    setAddStaffError('Name, email, and phone are required.');
+                    setIsCreatingStaff(false);
+                    return;
+                  }
                   const username = addForm.email.split('@')[0] + Date.now().toString().slice(-3);
                   const password = `Rw${Math.random().toString(36).slice(2, 8)}!`;
                   try {
@@ -486,11 +654,127 @@ export function StaffManagement() {
                     await refetch();
                   } catch (error) {
                     console.error('Failed to create staff', error);
+                    let message = 'Failed to create staff. Please try again.';
+                    if ((error as any)?.status === 403) {
+                      message = 'Unauthorized: please login as manager or refresh the page.';
+                    } else if ((error as any)?.status === 409) {
+                      message = 'Username or email already exists. Please use different values.';
+                    }
+                    setAddStaffError(message);
+                  } finally {
+                    setIsCreatingStaff(false);
                   }
                 }}
-                disabled={!addForm.name || !addForm.email || !addForm.phone}
+                disabled={!addForm.name || !addForm.email || !addForm.phone || isCreatingStaff}
               >
                 Create + Generate Login
+              </Button>
+            </div>
+          </div>
+        </Modal>
+
+        {/* KPI Modal */}
+        <Modal
+          isOpen={isKPIModalOpen}
+          onClose={() => setIsKPIModalOpen(false)}
+          title="Create New KPI"
+        >
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Staff Role</label>
+              <select
+                value={kpiForm.staffRole}
+                onChange={(e) => setKpiForm(prev => ({ ...prev, staffRole: e.target.value as StaffRole }))}
+                className="w-full px-3 py-2 bg-white border border-slate-100 rounded-md text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500">
+                <option value="waiter">Waiter</option>
+                <option value="kitchen">Kitchen</option>
+                <option value="supervisor">Supervisor</option>
+              </select>
+            </div>
+
+            <Input
+              label="KPI Name"
+              value={kpiForm.name}
+              onChange={(e) => setKpiForm(prev => ({ ...prev, name: e.target.value }))}
+              placeholder="e.g. Orders Served per Day" />
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
+              <textarea
+                value={kpiForm.description}
+                onChange={(e) => setKpiForm(prev => ({ ...prev, description: e.target.value }))}
+                className="w-full px-3 py-2 bg-white border border-slate-100 rounded-md text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                rows={3}
+                placeholder="Optional description" />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Metric</label>
+              <select
+                value={kpiForm.metric}
+                onChange={(e) => setKpiForm(prev => ({ ...prev, metric: e.target.value as any }))}
+                className="w-full px-3 py-2 bg-white border border-slate-100 rounded-md text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500">
+                <option value="orders_served">Orders Served</option>
+                <option value="revenue">Revenue</option>
+                <option value="rating">Rating</option>
+                <option value="tables_served">Tables Served</option>
+                <option value="prep_time">Prep Time</option>
+              </select>
+            </div>
+
+            <Input
+              label="Target Value"
+              type="number"
+              value={kpiForm.targetValue}
+              onChange={(e) => setKpiForm(prev => ({ ...prev, targetValue: parseFloat(e.target.value) || 0 }))}
+              placeholder="e.g. 50" />
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Period</label>
+              <select
+                value={kpiForm.period}
+                onChange={(e) => setKpiForm(prev => ({ ...prev, period: e.target.value as any }))}
+                className="w-full px-3 py-2 bg-white border border-slate-100 rounded-md text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500">
+                <option value="daily">Daily</option>
+                <option value="weekly">Weekly</option>
+                <option value="monthly">Monthly</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Assign to Staff (Optional)</label>
+              <select
+                multiple
+                value={kpiForm.assignedStaffIds}
+                onChange={(e) => {
+                  const selected = Array.from(e.target.selectedOptions, option => option.value);
+                  setKpiForm(prev => ({ ...prev, assignedStaffIds: selected }));
+                }}
+                className="w-full px-3 py-2 bg-white border border-slate-100 rounded-md text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 min-h-[100px]">
+                {backendStaff
+                  .filter(s => s.role === kpiForm.staffRole)
+                  .map(staffMember => (
+                    <option key={staffMember.id} value={staffMember.id}>
+                      {staffMember.name}
+                    </option>
+                  ))}
+              </select>
+              <p className="text-xs text-slate-500 mt-1">Hold Ctrl/Cmd to select multiple staff members</p>
+            </div>
+
+            <div className="flex gap-3 pt-4">
+              <Button
+                variant="secondary"
+                fullWidth
+                onClick={() => setIsKPIModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                fullWidth
+                onClick={handleCreateKPI}
+                disabled={!kpiForm.name || kpiForm.targetValue <= 0}>
+                Create KPI
               </Button>
             </div>
           </div>

@@ -15,12 +15,12 @@ export function Card({
   onClick,
   padding = 'md'
 }: CardProps) {
-  const baseStyles = 'rounded-xl bg-white overflow-hidden';
+  const baseStyles = 'rounded-xl border border-slate-700 bg-slate-800/70 overflow-hidden';
   const variantStyles = {
-    default: 'shadow-md',
-    elevated: 'shadow-lg shadow-amber-100/50',
+    default: '',
+    elevated: 'shadow-lg',
     interactive:
-    'shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 cursor-pointer'
+    'hover:-translate-y-0.5 transition-all duration-200 cursor-pointer border-slate-600'
   };
   const paddingStyles = {
     none: '',

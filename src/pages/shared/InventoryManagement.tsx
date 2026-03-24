@@ -5,9 +5,7 @@ import {
   RefreshCcwIcon,
   AlertTriangleIcon,
   TrendingUpIcon,
-  ShoppingCartIcon,
   TruckIcon,
-  BarChart2Icon,
   PlusIcon,
   EditIcon,
   TrashIcon,
@@ -20,6 +18,7 @@ import {
   MailIcon,
   XIcon,
 } from 'lucide-react';
+import { InventoryForecasting } from '../../components/manager/InventoryForecasting';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { SearchBar } from '../../components/ui/SearchBar';
@@ -58,7 +57,7 @@ interface InventoryManagementProps {
   role: 'manager' | 'supervisor';
 }
 
-type Tab = 'overview' | 'purchase-orders' | 'suppliers' | 'movements' | 'waste' | 'analytics';
+type Tab = 'overview' | 'suppliers' | 'waste' | 'forecasting';
 
 const PO_STATUS_CONFIG: Record<PurchaseOrderStatus, { label: string; color: string; bg: string }> = {
   draft:     { label: 'Draft',     color: 'text-slate-400',  bg: 'bg-slate-500/10 border-slate-500/20' },
@@ -140,6 +139,10 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
     waste,
     analytics,
     alerts: inventoryAlerts,
+    forecasts,
+    forecastAlerts,
+    isGeneratingForecasts,
+    runForecasting,
     isLoading,
     loadError,
     refresh,
@@ -357,12 +360,10 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
 
   // ── Tab definitions ─────────────────────────────────────────────────────
   const tabs: { id: Tab; label: string; icon: React.ReactNode; badge?: number }[] = [
-    { id: 'overview',        label: 'Stock Overview',    icon: <PackageIcon className="w-4 h-4" />,     badge: lowStockItems.length || undefined },
-    { id: 'purchase-orders', label: 'Purchase Orders',   icon: <ShoppingCartIcon className="w-4 h-4" /> },
-    { id: 'suppliers',       label: 'Suppliers',         icon: <TruckIcon className="w-4 h-4" /> },
-    { id: 'movements',       label: 'Stock Movements',   icon: <BarChart2Icon className="w-4 h-4" /> },
-    { id: 'waste',           label: 'Waste Log',         icon: <TrashIcon className="w-4 h-4" /> },
-    { id: 'analytics',       label: 'Analytics',         icon: <TrendingUpIcon className="w-4 h-4" /> },
+    { id: 'overview', label: 'Stock', icon: <PackageIcon className="w-4 h-4" />, badge: lowStockItems.length || undefined },
+    { id: 'suppliers', label: 'Suppliers', icon: <TruckIcon className="w-4 h-4" /> },
+    { id: 'waste', label: 'Waste', icon: <TrashIcon className="w-4 h-4" /> },
+    { id: 'forecasting', label: 'Forecasting', icon: <TrendingUpIcon className="w-4 h-4" />, badge: forecastAlerts.length || undefined },
   ];
 
   return (
@@ -388,12 +389,6 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                 <Button variant="danger" size="sm" onClick={() => setShowWasteModal(true)}>
                   <PlusIcon className="w-4 h-4" />
                   Log Waste
-                </Button>
-              )}
-              {isManager && activeTab === 'purchase-orders' && (
-                <Button variant="primary" size="sm" onClick={() => setShowNewPO(true)}>
-                  <PlusIcon className="w-4 h-4" />
-                  New PO
                 </Button>
               )}
               {isManager && activeTab === 'suppliers' && (
@@ -1012,6 +1007,20 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                 )}
               </div>
             </Card>
+          </motion.div>
+        )}
+
+        {/* ════════════════════════════════════════════════════════════════
+            TAB: FORECASTING
+        ════════════════════════════════════════════════════════════════ */}
+        {activeTab === 'forecasting' && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+            <InventoryForecasting
+              forecasts={forecasts}
+              alerts={forecastAlerts}
+              onGenerateForecasts={runForecasting}
+              isGenerating={isGeneratingForecasts}
+            />
           </motion.div>
         )}
 

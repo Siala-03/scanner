@@ -8,6 +8,9 @@ import {
   fetchMovements,
   fetchWasteEntries,
   computeInventoryAnalytics,
+  fetchForecasts,
+  generateForecasts,
+  fetchForecastAlerts,
 } from '../api/inventory';
 import type {
   InventoryRecord,
@@ -16,6 +19,7 @@ import type {
   StockMovement,
   WasteEntry,
   InventoryAnalytics,
+  InventoryForecast,
 } from '../types/inventory';
 
 export function useInventoryData() {
@@ -44,12 +48,15 @@ export function useInventoryData() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [alerts, setAlerts] = useState<string[]>([]);
+  const [forecasts, setForecasts] = useState<InventoryForecast[]>([]);
+  const [forecastAlerts, setForecastAlerts] = useState<InventoryForecast[]>([]);
+  const [isGeneratingForecasts, setIsGeneratingForecasts] = useState(false);
 
   const loadAll = useCallback(async () => {
     setIsLoading(true);
     setLoadError(null);
     try {
-      const [inv, low, sup, po, mov, wasteEntries, analyticsData] = await Promise.all([
+      const [inv, low, sup, po, mov, wasteEntries, analyticsData, fc, fcAlerts] = await Promise.all([
         fetchInventory(),
         fetchLowStockItems(),
         fetchSuppliers(),
@@ -57,6 +64,8 @@ export function useInventoryData() {
         fetchMovements({ limit: 200 }),
         fetchWasteEntries({ limit: 200 }),
         computeInventoryAnalytics(),
+        fetchForecasts().catch(() => []),
+        fetchForecastAlerts().catch(() => []),
       ]);
       setInventory(inv);
       setLowStockItems(low);
@@ -65,11 +74,31 @@ export function useInventoryData() {
       setMovements(mov);
       setWaste(wasteEntries);
       setAnalytics(analyticsData);
+      setForecasts(fc);
+      setForecastAlerts(fcAlerts);
     } catch (err) {
       console.error('Failed to load inventory data', err);
       setLoadError(err instanceof Error ? err.message : 'Unable to load inventory data right now. Please check your network or try again.');
     } finally {
       setIsLoading(false);
+    }
+  }, []);
+
+  const runForecasting = useCallback(async () => {
+    setIsGeneratingForecasts(true);
+    try {
+      const result = await generateForecasts();
+      if (result.success) {
+        setForecasts(result.forecasts);
+        const critical = result.forecasts.filter(f => f.alertStatus === 'critical' || f.alertStatus === 'warning');
+        setForecastAlerts(critical);
+      }
+      return result;
+    } catch (err) {
+      console.error('Failed to generate forecasts', err);
+      throw err;
+    } finally {
+      setIsGeneratingForecasts(false);
     }
   }, []);
 
@@ -104,6 +133,10 @@ export function useInventoryData() {
     waste,
     analytics,
     alerts,
+    forecasts,
+    forecastAlerts,
+    isGeneratingForecasts,
+    runForecasting,
     isLoading,
     loadError,
     refresh: loadAll,

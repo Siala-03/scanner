@@ -20,6 +20,7 @@ interface OrderDetailModalProps {
   onReject?: (orderId: string) => void;
   onMarkReady?: (orderId: string) => void;
   onMarkServed?: (orderId: string) => void;
+  onPrintReceipt?: (order: Order) => void;
 }
 export function OrderDetailModal({
   order,
@@ -138,19 +139,13 @@ export function OrderDetailModal({
           <Button
             variant="secondary"
             onClick={() => {
-              try {
-                // Example POS URL; replace with your actual POS endpoint
-                const base =
-                  (typeof window !== 'undefined' && (window as Window & { POS_BASE_URL?: string }).POS_BASE_URL) ||
-                  'https://pos.your-restaurant.rw/receipt';
-                const url = `${base}?orderId=${encodeURIComponent(order.id)}&table=${order.tableNumber}`;
-                window.open(url, '_blank');
-              } catch {
-                // Fallback: browser print
+              if (onPrintReceipt) {
+                onPrintReceipt(order);
+              } else {
                 try {
                   window.print();
                 } catch {
-                  // no-op
+                  console.warn('Unable to print');
                 }
               }
             }}>

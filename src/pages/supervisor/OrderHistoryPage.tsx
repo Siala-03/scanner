@@ -121,7 +121,7 @@ export function OrderHistoryPage({ onBack, existingOrders }: OrderHistoryPagePro
             <ArrowLeftIcon className="w-5 h-5" />
           </button>
           <div className="flex-1">
-            <h1 className="text-xl font-bold text-white">
+            <h1 className="text-xl font-bold text-gray-100">
               Order History
             </h1>
             <p className="text-sm text-slate-400">
@@ -146,7 +146,7 @@ export function OrderHistoryPage({ onBack, existingOrders }: OrderHistoryPagePro
                 <ShoppingCartIcon className="w-4 h-4 text-amber-400" />
                 <span className="text-xs text-slate-400 uppercase">Total Orders</span>
               </div>
-              <p className="text-2xl font-bold text-white">{stats.totalOrders}</p>
+              <p className="text-2xl font-bold text-gray-100">{stats.totalOrders}</p>
             </Card>
           </motion.div>
 
@@ -218,7 +218,7 @@ export function OrderHistoryPage({ onBack, existingOrders }: OrderHistoryPagePro
           <Card className="bg-slate-800/50 backdrop-blur border border-slate-700/50" padding="none">
             <div className="p-6 border-b border-slate-700">
               <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+                <h2 className="text-lg font-semibold text-gray-100 flex items-center gap-2">
                   <ShoppingCartIcon className="w-5 h-5" />
                   All Orders
                 </h2>

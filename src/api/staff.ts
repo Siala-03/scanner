@@ -42,3 +42,18 @@ export async function updateStaffAssignments(id: string, assignedTables: number[
     json: { assignedTables }
   });
 }
+
+// Update staff role
+export async function updateStaffRole(id: string, role: StaffRole): Promise<Staff> {
+  return apiRequest<Staff>(`${API_BASE}/${id}/role`, {
+    method: 'PUT',
+    json: { role }
+  });
+}
+
+// Delete staff
+export async function deleteStaff(id: string): Promise<{ success: boolean }> {
+  return apiRequest<{ success: boolean }>(`${API_BASE}/${id}`, {
+    method: 'DELETE'
+  });
+}

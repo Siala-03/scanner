@@ -132,3 +132,27 @@ export interface InventoryAnalytics {
     itemCount: number;
   }[];
 }
+
+// ── Inventory Forecasting ─────────────────────────────────────────────────────
+export interface InventoryForecast {
+  id: string;
+  menuItemId: string;
+  menuItemName: string;
+  forecastDate: string;
+  predictedConsumption: number;
+  confidenceLevel: number; // 0-1
+  recommendedReorderQty: number;
+  leadTimeDays: number;
+  seasonalityFactor: number; // >1 = higher than average
+  trendFactor: number; // >1 = increasing, <1 = decreasing
+  lastStockLevel: number;
+  daysUntilStockout: number;
+  alertStatus: 'none' | 'warning' | 'critical';
+}
+
+export interface ForecastSummary {
+  totalItems: number;
+  criticalAlerts: number;
+  warningAlerts: number;
+  avgConfidence: number;
+}

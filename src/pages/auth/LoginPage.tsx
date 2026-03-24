@@ -1,11 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { LockIcon, UserIcon, ArrowLeftIcon, EyeIcon, EyeOffIcon } from 'lucide-react';
+import { LockIcon, UserIcon, ArrowLeftIcon, EyeIcon, EyeOffIcon, WifiIcon, WifiOffIcon } from 'lucide-react';
 import { StaffRole, Staff } from '../../types';
 import { loginStaff } from '../../api/auth';
 import { ApiError } from '../../api/http';
 import { Button } from '../../components/ui/Button';
-import { Input } from '../../components/ui/Input';
 import { SignUpPage } from './SignUpPage';
 
 interface LoginPageProps {
@@ -20,6 +19,28 @@ export function LoginPage({ role, onLogin, onBack }: LoginPageProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [showPassword, setShowPassword] = useState(false);
+  const [serverStatus, setServerStatus] = useState<'checking' | 'online' | 'offline'>('checking');
+
+  // Check server connection on mount
+  useEffect(() => {
+    const checkServerStatus = async () => {
+      try {
+        const response = await fetch('/health');
+        if (response.ok) {
+          setServerStatus('online');
+        } else {
+          setServerStatus('offline');
+        }
+      } catch {
+        setServerStatus('offline');
+      }
+    };
+
+    checkServerStatus();
+    // Check every 30 seconds
+    const interval = setInterval(checkServerStatus, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Render signup form if in signup mode
   if (mode === 'signup') {
@@ -36,23 +57,50 @@ export function LoginPage({ role, onLogin, onBack }: LoginPageProps) {
     e.preventDefault();
     setError('');
     setIsLoading(true);
+
+    console.log('Login attempt:', { username, role });
+
     try {
       const user = await loginStaff(username, password);
+      console.log('Login response:', user);
+
+      // Persist staffId for authenticated requests (including manager staff creation)
+      localStorage.setItem('staffId', user.id);
+      localStorage.removeItem('token');
+
       if (user.role === role) {
+        console.log('Login successful, redirecting...');
         onLogin(user);
       } else {
-        setError(`This account does not have ${role} privileges.`);
+        const errorMsg = `This account has ${user.role} privileges, but you're trying to log in as ${role}. Please use the correct portal.`;
+        console.warn('Role mismatch:', errorMsg);
+        setError(errorMsg);
       }
     } catch (err) {
-      let errorMessage = 'Invalid username or password.';
+      console.error('Login error:', err);
+      let errorMessage = 'Login failed. Please try again.';
+
       if (err instanceof ApiError) {
-        errorMessage = err.message;
+        switch (err.status) {
+          case 0:
+            errorMessage = 'Cannot connect to server. Please check your internet connection and try again.';
+            break;
+          case 401:
+            errorMessage = 'Invalid username or password. Please check your credentials.';
+            break;
+          case 403:
+            errorMessage = 'Access denied. Please contact your administrator.';
+            break;
+          case 500:
+            errorMessage = 'Server error. Please try again later.';
+            break;
+          default:
+            errorMessage = err.message || 'Login failed. Please try again.';
+        }
       } else if (err instanceof Error) {
         errorMessage = err.message;
-      } else if (err) {
-        // Fallback for any other object
-        errorMessage = String(err);
       }
+
       setError(errorMessage);
     } finally {
       setIsLoading(false);
@@ -84,9 +132,27 @@ export function LoginPage({ role, onLogin, onBack }: LoginPageProps) {
           <h1 className="text-3xl font-serif text-[#e8e4dc] mb-2">
             {roleTitle} Login
           </h1>
-          <p className="text-[#a89f91]">
+          <p className="text-[#a89f91] mb-3">
             Enter your credentials to access the portal
           </p>
+          <div className="flex items-center justify-center gap-2 text-sm">
+            {serverStatus === 'online' ? (
+              <>
+                <WifiIcon className="w-4 h-4 text-green-400" />
+                <span className="text-green-400">Server Online</span>
+              </>
+            ) : serverStatus === 'offline' ? (
+              <>
+                <WifiOffIcon className="w-4 h-4 text-red-400" />
+                <span className="text-red-400">Server Offline</span>
+              </>
+            ) : (
+              <>
+                <div className="w-4 h-4 border-2 border-amber-400 border-t-transparent rounded-full animate-spin"></div>
+                <span className="text-amber-400">Checking Connection...</span>
+              </>
+            )}
+          </div>
         </div>
 
         <form onSubmit={handleLogin} className="space-y-5">
