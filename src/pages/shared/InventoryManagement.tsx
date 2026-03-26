@@ -16,6 +16,7 @@ import {
   StarIcon,
   MapPinIcon,
   MailIcon,
+  ClockIcon,
   XIcon,
 } from 'lucide-react';
 import { InventoryForecasting } from '../../components/manager/InventoryForecasting';
@@ -57,7 +58,7 @@ interface InventoryManagementProps {
   role: 'manager' | 'supervisor';
 }
 
-type Tab = 'overview' | 'suppliers' | 'waste' | 'forecasting';
+type Tab = 'overview' | 'purchase-orders' | 'suppliers' | 'waste' | 'forecasting';
 
 const PO_STATUS_CONFIG: Record<PurchaseOrderStatus, { label: string; color: string; bg: string }> = {
   draft:     { label: 'Draft',     color: 'text-slate-400',  bg: 'bg-slate-500/10 border-slate-500/20' },
@@ -161,28 +162,63 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
   }, [inventory]);
 
   const menuCategoriesFromData = useMemo(() => Array.from(new Set(menuItems.map((m) => m.category))), [menuItems]);
+  const inventoryLocations = useMemo(() => {
+    const locs = inventory
+      .map((rec) => rec.location || '')
+      .filter((l) => l && l.trim().length > 0);
+    return ['all', ...Array.from(new Set(locs))];
+  }, [inventory]);
+
+  const avgStockAgeDays = useMemo(() => {
+    if (!inventory.length) return 0;
+    const ages = inventory.map((rec) => {
+      if (!rec.updatedAt) return 0;
+      return Math.max(0, Math.floor((Date.now() - new Date(rec.updatedAt).getTime()) / (1000 * 60 * 60 * 24)));
+    });
+    return Math.round(ages.reduce((sum, v) => sum + v, 0) / ages.length);
+  }, [inventory]);
 
 
   // ── Overview state ──────────────────────────────────────────────────────
   const [query, setQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
+  const [locationFilter, setLocationFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'ok' | 'low' | 'out'>('all');
   const [editingRow, setEditingRow] = useState<string | null>(null);
   const [editValues, setEditValues] = useState<Partial<InventoryRecord>>({});
   const [adjustModal, setAdjustModal] = useState<{ id: string; name: string; current: number } | null>(null);
   const [adjustQty, setAdjustQty] = useState('');
   const [adjustNotes, setAdjustNotes] = useState('');
+  const [selectedItemDetails, setSelectedItemDetails] = useState<null | {
+    item: any;
+    rec?: InventoryRecord;
+    stock: number;
+    threshold: number;
+    isOut: boolean;
+    isLow: boolean;
+    lastUpdatedDays: number | null;
+  }>(null);
 
   const inventoryRows = useMemo(() => {
     const q = query.trim().toLowerCase();
     return menuItems
       .filter((i) => !q || i.name.toLowerCase().includes(q) || i.id.toLowerCase().includes(q))
       .filter((i) => categoryFilter === 'all' || i.category === categoryFilter)
+      .filter((i) => locationFilter === 'all' || (inventoryMap[i.id]?.location || '').toLowerCase() === locationFilter.toLowerCase())
       .map((item) => {
         const rec = inventoryMap[item.id];
         const stock = rec?.stock ?? 0;
         const threshold = rec?.lowStockThreshold ?? 0;
-        return { item, rec, stock, threshold, isOut: stock === 0, isLow: stock > 0 && stock <= threshold };
+        const lastUpdatedDays = rec?.updatedAt ? Math.max(0, Math.floor((Date.now() - new Date(rec.updatedAt).getTime()) / (1000 * 60 * 60 * 24))) : null;
+        return {
+          item,
+          rec,
+          stock,
+          threshold,
+          isOut: stock === 0,
+          isLow: stock > 0 && stock <= threshold,
+          lastUpdatedDays,
+        };
       })
       .filter((r) => {
         if (statusFilter === 'ok') return !r.isLow && !r.isOut;
@@ -195,7 +231,9 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
         if (a.isLow !== b.isLow) return Number(b.isLow) - Number(a.isLow);
         return a.item.name.localeCompare(b.item.name);
       });
-  }, [query, categoryFilter, statusFilter, menuItems, inventoryMap]);
+  }, [query, categoryFilter, locationFilter, statusFilter, menuItems, inventoryMap]);
+
+  const reorderAlerts = useMemo(() => inventoryRows.filter((row) => row.isOut || row.isLow), [inventoryRows]);
 
   // lowStockItems loaded from backend state via fetchLowStockItems() and setLowStockItems()
 
@@ -361,6 +399,7 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
   // ── Tab definitions ─────────────────────────────────────────────────────
   const tabs: { id: Tab; label: string; icon: React.ReactNode; badge?: number }[] = [
     { id: 'overview', label: 'Stock', icon: <PackageIcon className="w-4 h-4" />, badge: lowStockItems.length || undefined },
+    { id: 'purchase-orders', label: 'Purchase Orders', icon: <TruckIcon className="w-4 h-4" />, badge: purchaseOrders.filter((po) => po.status !== 'received' && po.status !== 'cancelled').length || undefined },
     { id: 'suppliers', label: 'Suppliers', icon: <TruckIcon className="w-4 h-4" /> },
     { id: 'waste', label: 'Waste', icon: <TrashIcon className="w-4 h-4" /> },
     { id: 'forecasting', label: 'Forecasting', icon: <TrendingUpIcon className="w-4 h-4" />, badge: forecastAlerts.length || undefined },
@@ -491,8 +530,9 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
               {[
                 { label: 'Total Items', value: menuItems.length, icon: <PackageIcon className="w-5 h-5 text-blue-400" />, color: 'text-blue-400' },
                 { label: 'Low Stock', value: analytics.lowStockCount, icon: <AlertTriangleIcon className="w-5 h-5 text-amber-400" />, color: 'text-amber-400' },
-                { label: 'Out of Stock', value: analytics.outOfStockCount, icon: <XCircleIcon className="w-5 h-5 text-red-400" />, color: 'text-red-400' },
-                { label: 'Stock Value', value: formatPrice(analytics.totalStockValue), icon: <TrendingUpIcon className="w-5 h-5 text-emerald-400" />, color: 'text-emerald-400' },
+                { label: 'Reorder Alerts', value: reorderAlerts.length, icon: <TruckIcon className="w-5 h-5 text-indigo-400" />, color: 'text-indigo-400' },
+                { label: 'Turnover (30d)', value: `${analytics.stockTurnoverRate.toFixed(1)}x`, icon: <TrendingUpIcon className="w-5 h-5 text-emerald-400" />, color: 'text-emerald-400' },
+                { label: 'Avg Age', value: `${avgStockAgeDays}d`, icon: <ClockIcon className="w-5 h-5 text-slate-400" />, color: 'text-slate-400' },
               ].map((kpi) => (
                 <Card key={kpi.label} className="bg-slate-800/50 border border-slate-700/50">
                   <div className="flex items-center gap-3">
@@ -516,6 +556,13 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
               >
                 <option value="all">All Categories</option>
                 {menuCategories.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+              <select
+                value={locationFilter}
+                onChange={(e) => setLocationFilter(e.target.value)}
+                className="px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+              >
+                {inventoryLocations.map((loc) => <option key={loc} value={loc}>{loc === 'all' ? 'All Locations' : loc}</option>)}
               </select>
               <div className="flex gap-1">
                 {(['all', 'ok', 'low', 'out'] as const).map((s) => (
@@ -545,6 +592,7 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                       <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Stock Level</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Thresholds</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Unit Cost</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Age</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Status</th>
                       {isManager && <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Actions</th>}
                     </tr>
@@ -559,10 +607,16 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                           className={`transition-colors ${row.isOut ? 'bg-red-500/5' : row.isLow ? 'bg-amber-500/5' : 'hover:bg-slate-700/20'}`}
                         >
                           <td className="px-4 py-3">
-                            <div>
-                              <p className="text-white font-medium text-sm">{row.item.name}</p>
-                              <p className="text-xs text-slate-500">{row.item.id} · {row.item.category.replace(/-/g, ' ')}</p>
-                            </div>
+                            <button
+                              onClick={() => setSelectedItemDetails(row)}
+                              className="text-left w-full"
+                              title="View item movement details"
+                            >
+                              <div>
+                                <p className="text-white font-medium text-sm hover:text-amber-300 underline underline-offset-2">{row.item.name}</p>
+                                <p className="text-xs text-slate-500">{row.item.id} · {row.item.category.replace(/-/g, ' ')}</p>
+                              </div>
+                            </button>
                           </td>
                           <td className="px-4 py-3">
                             {isEditing ? (
@@ -643,6 +697,9 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                               <span className="text-sm text-slate-300">{formatPrice(row.rec?.unitCost ?? 0)}</span>
                             )}
                           </td>
+                          <td className="px-4 py-3 text-sm text-slate-300">
+                            {row.lastUpdatedDays !== null ? `${row.lastUpdatedDays}d` : '—'}
+                          </td>
                           <td className="px-4 py-3">
                             {row.isOut ? (
                               <span className="px-2 py-1 rounded-full text-xs font-semibold bg-red-500/15 text-red-300 border border-red-500/30">Out of Stock</span>
@@ -699,6 +756,17 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                                   >
                                     <ArrowUpIcon className="w-4 h-4" />
                                   </button>
+                                  <button
+                                    onClick={() => {
+                                      setShowNewPO(true);
+                                      setNewPO({ supplierId: suppliers[0]?.id ?? '', expectedDelivery: '', notes: `Auto reordering ${row.item.name} based on threshold` });
+                                      setNewPOItems([{ menuItemId: row.item.id, orderedQty: Math.max((row.rec?.reorderQty ?? 5) - row.stock, 1), unitCost: row.rec?.unitCost ?? 0 }]);
+                                    }}
+                                    className="p-1.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-500 transition"
+                                    title="Smart Reorder"
+                                  >
+                                    <PlusIcon className="w-4 h-4" />
+                                  </button>
                                 </div>
                               )}
                             </td>
@@ -714,6 +782,50 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
               </div>
             </Card>
           </motion.div>
+
+          {selectedItemDetails && (
+            <Modal isOpen={!!selectedItemDetails} onClose={() => setSelectedItemDetails(null)}>
+              <div className="p-4 space-y-4 max-w-xl">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h3 className="text-lg font-bold text-white">{selectedItemDetails.item.name} Movement History</h3>
+                    <p className="text-xs text-slate-400">{selectedItemDetails.item.id}</p>
+                  </div>
+                  <button onClick={() => setSelectedItemDetails(null)} className="text-slate-400 hover:text-white">
+                    <XIcon className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 text-xs text-slate-300">
+                  <div><span className="font-semibold">Stock</span>: {selectedItemDetails.stock}</div>
+                  <div><span className="font-semibold">Status</span>: {selectedItemDetails.isOut ? 'Out' : selectedItemDetails.isLow ? 'Low' : 'Healthy'}</div>
+                  <div><span className="font-semibold">Reorder</span>: {selectedItemDetails.rec?.reorderQty ?? '—'}</div>
+                  <div><span className="font-semibold">Last Updated</span>: {selectedItemDetails.lastUpdatedDays !== null ? `${selectedItemDetails.lastUpdatedDays}d ago` : '—'}</div>
+                </div>
+
+                <div>
+                  <h4 className="text-xs uppercase tracking-wider text-slate-400 mb-2">Recent Movement</h4>
+                  <div className="space-y-2 max-h-72 overflow-y-auto">
+                    {movements
+                      .filter((m) => m.menuItemId === selectedItemDetails.item.id)
+                      .slice(0, 8)
+                      .map((m) => (
+                        <div key={m.id} className="flex items-center justify-between bg-slate-850/70 p-2 rounded-lg text-xs">
+                          <div>
+                            <p className="text-slate-200">{m.type.toUpperCase()} {m.qty > 0 ? `+${m.qty}` : m.qty}</p>
+                            <p className="text-slate-400">{new Date(m.timestamp).toLocaleString()}</p>
+                          </div>
+                          <span className="text-slate-300">{m.reference ?? m.performedBy}</span>
+                        </div>
+                      ))}
+                    {movements.filter((m) => m.menuItemId === selectedItemDetails.item.id).length === 0 && (
+                      <p className="text-slate-400 text-xs">No movements recorded yet.</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </Modal>
+          )}
         )}
 
         {/* ════════════════════════════════════════════════════════════════

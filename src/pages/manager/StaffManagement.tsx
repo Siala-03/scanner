@@ -272,7 +272,7 @@ export function StaffManagement() {
                 scale: 0.9
               }}>
 
-                <Card className="bg-slate-800">
+                <Card className="bg-slate-800 flex flex-col h-full">
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center gap-3">
                       <div className="w-12 h-12 rounded-full bg-slate-700 flex items-center justify-center text-white font-medium text-lg">
@@ -298,7 +298,7 @@ export function StaffManagement() {
                     </Badge>
                   </div>
 
-                  <div className="space-y-2 mb-4 text-sm text-slate-300">
+                  <div className="space-y-2 mb-4 text-sm text-slate-300 min-h-[80px]">
                     <p>📧 {member.email}</p>
                     <p>📱 {member.phone}</p>
                     <div className="flex items-center gap-2">
@@ -323,20 +323,22 @@ export function StaffManagement() {
                       </select>
                     </div>
                     {member.role === 'waiter' && (
-                  <p>
+                  <p className="text-xs">
                         🍽️ Tables:{' '}
                         {member.assignedTables.length > 0 ?
                     member.assignedTables.join(', ') :
                     'None'}
                       </p>
-                  )}
+                    )}
+                    {member.role !== 'waiter' && (
+                      <p className="text-xs text-slate-600">-</p>
+                    )}
                   </div>
 
-                  <div className="flex gap-2 pt-4 border-t border-slate-700">
+                  <div className="flex flex-wrap gap-2 pt-4 border-t border-slate-700 mt-auto">
                     <Button
                       variant={member.isOnDuty ? 'danger' : 'ready'}
                       size="sm"
-                      className="flex-1"
                       onClick={async () => {
                         try {
                           await updateStaffStatus(member.id, !member.isOnDuty);
@@ -346,46 +348,46 @@ export function StaffManagement() {
                         }
                       }}
                     >
-                      {member.isOnDuty ? 'Set Off Duty' : 'Set On Duty'}
+                      {member.isOnDuty ? 'Off Duty' : 'On Duty'}
                     </Button>
                     <Button
                       variant="secondary"
                       size="sm"
-                      className="flex-1"
                       onClick={() => handleManageCredentials(member)}>
-
-                      <KeyIcon className="w-4 h-4" />
-                      Login Access
+                      <KeyIcon className="w-3 h-3" />
+                      <span className="hidden sm:inline">Credentials</span>
                     </Button>
                     {member.role === 'waiter' && (
                       <Button
                       variant="secondary"
                       size="sm"
-                      className="flex-1"
                       onClick={() => openAssignTablesModal(member)}>
-                        Assign
+                        <span className="hidden sm:inline">Assign </span>Tables
                       </Button>
                     )}
-                    <Button variant="secondary" size="sm">
-                      <EditIcon className="w-4 h-4" />
-                    </Button>
-                    <Button 
-                      variant="danger" 
-                      size="sm"
-                      onClick={async () => {
-                        if (window.confirm(`Are you sure you want to delete ${member.name}?`)) {
-                          try {
-                            await deleteStaff(member.id);
-                            await refetch();
-                          } catch (err: any) {
-                            console.error('Failed to delete staff', err);
-                            alert(err.message || 'Failed to delete staff member');
+                    <div className="flex gap-1 ml-auto">
+                      <Button variant="ghost" size="sm" className="p-1.5">
+                        <EditIcon className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="p-1.5 text-red-400 hover:text-red-300"
+                        onClick={async () => {
+                          if (window.confirm(`Are you sure you want to delete ${member.name}?`)) {
+                            try {
+                              await deleteStaff(member.id);
+                              await refetch();
+                            } catch (err: any) {
+                              console.error('Failed to delete staff', err);
+                              alert(err.message || 'Failed to delete staff member');
+                            }
                           }
-                        }
-                      }}
-                    >
-                      <TrashIcon className="w-4 h-4" />
-                    </Button>
+                        }}
+                      >
+                        <TrashIcon className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
                   </div>
                 </Card>
               </motion.div>
@@ -482,7 +484,8 @@ export function StaffManagement() {
         <Modal
           isOpen={isCredentialModalOpen}
           onClose={() => setIsCredentialModalOpen(false)}
-          title={`Manage Access: ${selectedStaffForCreds?.name}`}>
+          title={`Manage Access: ${selectedStaffForCreds?.name}`}
+          variant="light">
 
           <div className="space-y-4">
             <p className="text-sm text-slate-600 mb-4">
@@ -530,6 +533,7 @@ export function StaffManagement() {
           isOpen={isAddStaffOpen}
           onClose={() => setIsAddStaffOpen(false)}
           title="Add Staff Member"
+          variant="light"
         >
           <div className="space-y-4">
             <Input
@@ -678,6 +682,7 @@ export function StaffManagement() {
           isOpen={isKPIModalOpen}
           onClose={() => setIsKPIModalOpen(false)}
           title="Create New KPI"
+          variant="light"
         >
           <div className="space-y-4">
             <div>
