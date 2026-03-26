@@ -122,13 +122,24 @@ export function emitInventoryAlert(data: {
   }
 }
 
-// Menu events (for real-time menu updates)
+// Call waiter notification to all waiters on duty via socket
+export function emitWaiterCall(data: {
+  tableNumber: number;
+  timestamp: Date;
+}) {
+  if (io) {
+    io.to('role:waiter').emit('waiter:call', data);
+    console.log(`Waiter call emitted for table ${data.tableNumber}`);
+  }
+}
+
+// Menu events for real-time updates
 export function emitMenuUpdate(data: {
-  type: 'update' | 'change';
+  type: string;
   message?: string;
 }) {
   if (io) {
     io.to('menu').emit('menu:update', data);
-    io.emit('menu:changed', data);
+    console.log(`Menu update emitted: ${data.type}`);
   }
 }

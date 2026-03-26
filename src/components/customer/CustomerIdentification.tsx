@@ -36,9 +36,18 @@ export function CustomerIdentification({
       const customer = await createOrFindCustomer({ phone, email, name });
       onCustomerIdentified(customer);
       setIsExpanded(false);
-    } catch (err) {
-      setError('Failed to identify customer. Please try again.');
+    } catch (err: any) {
       console.error('Customer identification error:', err);
+      // Provide more specific error messages
+      if (err.message?.includes('network') || err.message?.includes('fetch')) {
+        setError('Network error. Please check your connection and try again.');
+      } else if (err.status === 400) {
+        setError('Invalid information provided. Please check your phone number and try again.');
+      } else if (err.status === 500) {
+        setError('Server error. Our team has been notified. Please try again later.');
+      } else {
+        setError('Unable to join loyalty program. Please try again or continue without joining.');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -118,6 +127,7 @@ export function CustomerIdentification({
                 variant="primary"
                 size="sm"
                 onClick={() => setIsExpanded(true)}
+                className="animate-pulse"
               >
                 Join Now
               </Button>

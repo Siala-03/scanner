@@ -80,13 +80,17 @@ export function CustomerApp({
   const handleRemoveItem = useCallback((itemId: string) => {
     setCartItems((prev) => prev.filter((item) => item.menuItem.id !== itemId));
   }, []);
-  const handlePlaceOrder = useCallback(
+  const handleConfirmOrder = useCallback(
     (
       specialInstructions: string,
       customer?: Customer | null,
       delivery?: { provider: string; address: string },
       loyaltyRewardId?: string
     ) => {
+      if (typeof onPlaceOrder !== 'function') {
+        console.error('onPlaceOrder prop is missing or not a function');
+        return;
+      }
       onPlaceOrder(tableNumber, cartItems, specialInstructions, customer, delivery, loyaltyRewardId);
       setCartItems([]);
       setActiveTab('orders');
@@ -180,8 +184,10 @@ export function CustomerApp({
             cartItems={cartItems}
             onUpdateQuantity={handleUpdateQuantity}
             onRemoveItem={handleRemoveItem}
-            onPlaceOrder={handlePlaceOrder}
-            tableNumber={tableNumber} />
+            onPlaceOrder={handleConfirmOrder}
+            tableNumber={tableNumber}
+            onCallWaiter={() => handleCallWaiter(tableNumber)}
+          />
 
           }
           {activeTab === 'orders' &&
@@ -190,43 +196,45 @@ export function CustomerApp({
         </motion.div>
       </AnimatePresence>
 
-      {/* Call Waiter Floating Button */}
-      <motion.button
-        whileTap={{
-          scale: 0.9
-        }}
-        onClick={handleCallWaiterClick}
-        className={`fixed bottom-20 right-6 z-40 px-5 py-3.5 rounded-2xl shadow-2xl flex items-center gap-2.5 transition-all duration-300 ${waiterCalled 
-          ? 'bg-gradient-to-r from-green-500 to-green-600 text-white shadow-green-500/30' 
-          : 'bg-gradient-to-r from-amber-500 to-amber-600 text-white hover:from-amber-600 hover:to-amber-700 shadow-amber-500/30 hover:shadow-amber-500/40'}`}
-        animate={
-        waiterCalled ?
-        {} :
-        {
-          boxShadow: [
-          '0px 0px 0px 0px rgba(245,158,11,0.4)',
-          '0px 0px 0px 15px rgba(245,158,11,0)',
-          '0px 0px 0px 0px rgba(245,158,11,0)']
+      {/* Call Waiter Floating Button - Only show on non-cart pages */}
+      {activeTab !== 'cart' && (
+        <motion.button
+          whileTap={{
+            scale: 0.9
+          }}
+          onClick={handleCallWaiterClick}
+          className={`fixed bottom-20 right-6 z-40 px-5 py-3.5 rounded-2xl shadow-2xl flex items-center gap-2.5 transition-all duration-300 ${waiterCalled 
+            ? 'bg-gradient-to-r from-green-500 to-green-600 text-white shadow-green-500/30' 
+            : 'bg-gradient-to-r from-amber-500 to-amber-600 text-white hover:from-amber-600 hover:to-amber-700 shadow-amber-500/30 hover:shadow-amber-500/40'}`}
+          animate={
+          waiterCalled ?
+          {} :
+          {
+            boxShadow: [
+            '0px 0px 0px 0px rgba(245,158,11,0.4)',
+            '0px 0px 0px 15px rgba(245,158,11,0)',
+            '0px 0px 0px 0px rgba(245,158,11,0)']
 
-        }
-        }
-        transition={{
-          repeat: Infinity,
-          duration: 2
-        }}>
+          }
+          }
+          transition={{
+            repeat: Infinity,
+            duration: 2
+          }}>
 
-        {waiterCalled ? (
-          <>
-            <CheckIcon className="w-5 h-5" />
-            <span className="text-sm font-semibold">Waiter called</span>
-          </>
-        ) : (
-          <>
-            <BellRingIcon className="w-5 h-5" />
-            <span className="text-sm font-semibold">Call Waiter</span>
-          </>
-        )}
-      </motion.button>
+          {waiterCalled ? (
+            <>
+              <CheckIcon className="w-5 h-5" />
+              <span className="text-sm font-semibold">Waiter called</span>
+            </>
+          ) : (
+            <>
+              <BellRingIcon className="w-5 h-5" />
+              <span className="text-sm font-semibold">Call Waiter</span>
+            </>
+          )}
+        </motion.button>
+      )}
 
       {/* Bottom navigation */}
       <nav className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-lg border-t border-white/20 px-6 py-3 safe-area-pb z-50 shadow-2xl">

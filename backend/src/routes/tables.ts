@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { pool } from '../db.js';
+import { emitWaiterCall } from '../socket.js';
 
 export const tablesRouter = Router();
 
@@ -53,5 +54,27 @@ tablesRouter.delete('/:id', async (req: Request, res: Response) => {
   } catch (err) {
     console.error('Error deleting table:', err);
     res.status(500).json({ error: 'Failed to delete table' });
+  }
+});
+
+// POST call waiter for a table
+tablesRouter.post('/call-waiter', async (req: Request, res: Response) => {
+  try {
+    const { tableNumber } = req.body;
+    
+    if (!tableNumber) {
+      return res.status(400).json({ error: 'Table number is required' });
+    }
+    
+    // Emit socket event to all waiters on duty
+    emitWaiterCall({
+      tableNumber,
+      timestamp: new Date()
+    });
+    
+    res.json({ success: true, message: `Waiter called for table ${tableNumber}` });
+  } catch (err) {
+    console.error('Error calling waiter:', err);
+    res.status(500).json({ error: 'Failed to call waiter' });
   }
 });

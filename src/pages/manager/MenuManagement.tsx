@@ -1,11 +1,14 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   PlusIcon,
   EditIcon,
   TrashIcon,
   EyeIcon,
-  EyeOffIcon } from
+  EyeOffIcon,
+  UploadIcon,
+  DownloadIcon,
+  FileSpreadsheetIcon } from
 'lucide-react';
 import { MenuItem, MenuCategoryInfo } from '../../types';
 import { Card } from '../../components/ui/Card';
@@ -16,6 +19,7 @@ import { Badge } from '../../components/ui/Badge';
 import { MenuItemEditor } from '../../components/manager/MenuItemEditor';
 import { formatPrice } from '../../utils/currency';
 import { useMenu } from '../../hooks/useMenu';
+import { exportMenuToCsv, exportMenuToJson, importMenuFromFile } from '../../utils/menuImportExport';
 
 // Default categories with emojis from dummy data
 const defaultCategories: MenuCategoryInfo[] = [
@@ -55,6 +59,28 @@ export function MenuManagement() {
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const exportButtonRef = useRef<HTMLButtonElement>(null);
+
+  // Close export dropdown when clicking outside
+  React.useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        exportButtonRef.current &&
+        !exportButtonRef.current.contains(event.target as Node) &&
+        !(event.target as Element).closest('.export-dropdown')
+      ) {
+        setIsExportMenuOpen(false);
+      }
+    };
+
+    if (isExportMenuOpen) {
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+    }
+  }, [isExportMenuOpen]);
   // Build categories from menu items + defaults
   // Build tabs from menu items + defaults
   const tabs: TabOption[] = useMemo(() => {
@@ -196,6 +222,41 @@ export function MenuManagement() {
       }
     }
   };
+
+  const handleExportJson = () => {
+    exportMenuToJson(menuItemsState);
+    setIsExportMenuOpen(false);
+  };
+
+  const handleExportCsv = () => {
+    exportMenuToCsv(menuItemsState);
+    setIsExportMenuOpen(false);
+  };
+
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsImporting(true);
+    try {
+      const importedItems = await importMenuFromFile(file);
+      await saveMenu(importedItems);
+      await refresh();
+      alert(`Successfully imported ${importedItems.length} menu items!`);
+    } catch (err) {
+      console.error('Failed to import menu:', err);
+      alert('Failed to import menu. Please check the file format.');
+    } finally {
+      setIsImporting(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
   return (
     <div className="dark min-h-screen bg-slate-900 p-4 md:p-6">
       <div className="max-w-7xl mx-auto">
@@ -207,10 +268,58 @@ export function MenuManagement() {
               {menuItemsState.length} items total
             </p>
           </div>
-          <Button variant="primary" onClick={handleAddItem} isLoading={isSaving}>
-            <PlusIcon className="w-5 h-5" />
-            Add Item
-          </Button>
+          <div className="flex items-center gap-2">
+            {/* Import Button */}
+            <Button 
+              variant="secondary" 
+              onClick={handleImportClick}
+              isLoading={isImporting}
+            >
+              <UploadIcon className="w-5 h-5" />
+              Import
+            </Button>
+            {/* Hidden file input */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".csv,.xlsx,.xls,.json"
+              onChange={handleFileChange}
+              className="hidden"
+            />
+            {/* Export Dropdown */}
+            <div className="relative export-dropdown">
+              <Button 
+                variant="secondary" 
+                onClick={() => setIsExportMenuOpen(!isExportMenuOpen)}
+                ref={exportButtonRef}
+              >
+                <DownloadIcon className="w-5 h-5" />
+                Export
+              </Button>
+              {isExportMenuOpen && (
+                <div className="absolute right-0 mt-2 w-48 bg-slate-800 rounded-md shadow-lg border border-slate-700 z-50">
+                  <button
+                    onClick={handleExportJson}
+                    className="w-full px-4 py-2 text-left text-gray-200 hover:bg-slate-700 flex items-center gap-2"
+                  >
+                    <FileSpreadsheetIcon className="w-4 h-4" />
+                    Export as JSON
+                  </button>
+                  <button
+                    onClick={handleExportCsv}
+                    className="w-full px-4 py-2 text-left text-gray-200 hover:bg-slate-700 flex items-center gap-2"
+                  >
+                    <FileSpreadsheetIcon className="w-4 h-4" />
+                    Export as CSV
+                  </button>
+                </div>
+              )}
+            </div>
+            <Button variant="primary" onClick={handleAddItem} isLoading={isSaving}>
+              <PlusIcon className="w-5 h-5" />
+              Add Item
+            </Button>
+          </div>
         </div>
 
         {/* Filters */}

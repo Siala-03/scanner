@@ -139,6 +139,94 @@ router.put('/progress/:kpiId', authenticate, async (req: AuthenticatedRequest, r
   }
 });
 
+// POST /api/kpis/assign - Assign KPI to staff (manager only)
+router.post('/assign', authenticate, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    if (req.staffRole !== 'manager') {
+      throw new HttpError(403, 'Only managers can assign KPIs');
+    }
+
+    const { staffId, kpiId } = req.body;
+
+    if (!staffId || !kpiId) {
+      throw new HttpError(400, 'Missing required fields: staffId, kpiId');
+    }
+
+    // Check if KPI exists and belongs to this restaurant
+    const kpiResult = await pool.query(
+      'SELECT * FROM kpis WHERE id = $1 AND restaurant_id = $2',
+      [kpiId, req.restaurantId]
+    );
+
+    if (kpiResult.rows.length === 0) {
+      throw new HttpError(404, 'KPI not found or access denied');
+    }
+
+    // Check if staff exists and belongs to this restaurant
+    const staffResult = await pool.query(
+      'SELECT * FROM staff WHERE id = $1 AND restaurant_id = $2',
+      [staffId, req.restaurantId]
+    );
+
+    if (staffResult.rows.length === 0) {
+      throw new HttpError(404, 'Staff member not found or access denied');
+    }
+
+    // Update KPI to include this staff member
+    const result = await pool.query(
+      `UPDATE kpis 
+       SET assigned_staff_ids = array_append(COALESCE(assigned_staff_ids, '{}'), $1)
+       WHERE id = $2 AND restaurant_id = $3
+       RETURNING *`,
+      [staffId, kpiId, req.restaurantId]
+    );
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error assigning KPI:', error);
+    throw error;
+  }
+});
+
+// DELETE /api/kpis/unassign - Unassign KPI from staff (manager only)
+router.delete('/unassign', authenticate, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    if (req.staffRole !== 'manager') {
+      throw new HttpError(403, 'Only managers can unassign KPIs');
+    }
+
+    const { staffId, kpiId } = req.body;
+
+    if (!staffId || !kpiId) {
+      throw new HttpError(400, 'Missing required fields: staffId, kpiId');
+    }
+
+    // Check if KPI exists and belongs to this restaurant
+    const kpiResult = await pool.query(
+      'SELECT * FROM kpis WHERE id = $1 AND restaurant_id = $2',
+      [kpiId, req.restaurantId]
+    );
+
+    if (kpiResult.rows.length === 0) {
+      throw new HttpError(404, 'KPI not found or access denied');
+    }
+
+    // Update KPI to remove this staff member
+    const result = await pool.query(
+      `UPDATE kpis 
+       SET assigned_staff_ids = array_remove(COALESCE(assigned_staff_ids, '{}'), $1)
+       WHERE id = $2 AND restaurant_id = $3
+       RETURNING *`,
+      [staffId, kpiId, req.restaurantId]
+    );
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error unassigning KPI:', error);
+    throw error;
+  }
+});
+
 // DELETE /api/kpis/:id - Delete a KPI (manager only)
 router.delete('/:id', authenticate, async (req: AuthenticatedRequest, res: Response) => {
   const client = await pool.connect();

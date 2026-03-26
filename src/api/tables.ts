@@ -36,3 +36,11 @@ export async function deleteTable(id: string): Promise<void> {
     method: 'DELETE'
   });
 }
+
+// Call waiter for a table
+export async function callWaiter(tableNumber: number): Promise<{ success: boolean; message?: string }> {
+  return apiRequest<{ success: boolean; message?: string }>(`${API_BASE}/call-waiter`, {
+    method: 'POST',
+    json: { tableNumber }
+  });
+}

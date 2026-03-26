@@ -18,6 +18,20 @@ export async function getStaffKPIs(): Promise<KPIWithProgress[]> {
   return apiRequest<KPIWithProgress[]>(`${API_BASE}/kpis/staff`);
 }
 
+export async function assignKPI(staffId: string, kpiId: number): Promise<void> {
+  await apiRequest<void>(`${API_BASE}/kpis/assign`, {
+    method: 'POST',
+    json: { staffId, kpiId },
+  });
+}
+
+export async function unassignKPI(staffId: string, kpiId: number): Promise<void> {
+  await apiRequest<void>(`${API_BASE}/kpis/unassign`, {
+    method: 'DELETE',
+    json: { staffId, kpiId },
+  });
+}
+
 export async function updateKPIProgress(kpiId: number, currentValue: number): Promise<void> {
   await apiRequest<void>(`${API_BASE}/kpis/progress/${kpiId}`, {
     method: 'PUT',

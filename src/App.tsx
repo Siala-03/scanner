@@ -5,6 +5,7 @@ import { CartItem, Order, OrderStatus, Customer } from './types';
 import { useStaff } from './hooks/useStaff';
 import { useOrders } from './hooks/useOrders';
 import { useTables } from './hooks/useTables';
+import { callWaiter } from './api/tables';
 import { CustomerApp } from './pages/customer/CustomerApp';
 import { WaiterDashboard } from './pages/waiter/WaiterDashboard';
 import { SupervisorDashboard } from './pages/supervisor/SupervisorDashboard';
@@ -59,6 +60,7 @@ export function App() {
     [updateOrderStatus]
   );
   const handleCallWaiter = useCallback((tableNum: number) => {
+    // Add to local state first for immediate UI feedback
     setWaiterCalls((prev) => [
     ...prev,
     {
@@ -66,6 +68,11 @@ export function App() {
       timestamp: new Date()
     }]
     );
+    
+    // Also call backend API to notify waiters via socket
+    callWaiter(tableNum).catch((err) => {
+      console.warn('Failed to call waiter via API:', err);
+    });
   }, []);
   const handleDismissWaiterCall = useCallback((tableNum: number) => {
     setWaiterCalls((prev) =>

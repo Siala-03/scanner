@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShoppingBagIcon, ArrowRightIcon, CheckCircleIcon } from 'lucide-react';
+import { ShoppingBagIcon, ArrowRightIcon, CheckCircleIcon, BellRingIcon, CheckIcon } from 'lucide-react';
 import { CartItem, Customer, LoyaltySummary, Reward } from '../../types';
 import { CartItemCard } from '../../components/customer/CartItem';
 import { CustomerIdentification } from '../../components/customer/CustomerIdentification';
@@ -20,13 +20,15 @@ interface CartPageProps {
     loyaltyRewardId?: string
   ) => void;
   tableNumber: number;
+  onCallWaiter: () => void;
 }
 export function CartPage({
   cartItems,
   onUpdateQuantity,
   onRemoveItem,
   onPlaceOrder,
-  tableNumber
+  tableNumber,
+  onCallWaiter
 }: CartPageProps) {
   const [specialInstructions, setSpecialInstructions] = useState('');
   const [isDelivery, setIsDelivery] = useState(false);
@@ -39,6 +41,7 @@ export function CartPage({
   const [appliedReward, setAppliedReward] = useState<Reward | null>(null);
   const [rewardMessage, setRewardMessage] = useState('');
   const [rewardError, setRewardError] = useState('');
+  const [waiterCalled, setWaiterCalled] = useState(false);
   const subtotal = cartItems.reduce(
     (sum, item) => sum + getEffectivePrice(item.menuItem) * item.quantity,
     0
@@ -88,17 +91,31 @@ export function CartPage({
     setRewardError('');
   };
 
-  const handlePlaceOrder = async () => {
-    setIsOrdering(true);
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    const delivery = isDelivery && deliveryProvider 
-      ? { provider: deliveryProvider, address: deliveryAddress }
-      : undefined;
-    onPlaceOrder(specialInstructions, identifiedCustomer, delivery, appliedReward?.id);
-    setOrderPlaced(true);
-    setIsOrdering(false);
+  const handleCallWaiterClick = () => {
+    if (waiterCalled) return;
+    onCallWaiter();
+    setWaiterCalled(true);
+    setTimeout(() => {
+      setWaiterCalled(false);
+    }, 30000);
   };
+
+  const handleSubmitOrder = async () => {
+    setIsOrdering(true);
+    try {
+      const delivery = isDelivery && deliveryProvider
+        ? { provider: deliveryProvider, address: deliveryAddress }
+        : undefined;
+      onPlaceOrder(specialInstructions, identifiedCustomer, delivery, appliedReward?.id);
+      setOrderPlaced(true);
+    } catch (err) {
+      console.error('Place order failed', err);
+      setRewardError('Unable to place order right now. Please try again.');
+    } finally {
+      setIsOrdering(false);
+    }
+  };
+
   if (orderPlaced) {
     return (
       <motion.div
@@ -345,12 +362,49 @@ export function CartPage({
           variant="primary"
           size="lg"
           fullWidth
-          onClick={handlePlaceOrder}
+          onClick={handleSubmitOrder}
           isLoading={isOrdering}
         >
           Place Order
           <ArrowRightIcon className="w-5 h-5" />
         </Button>
+
+        <motion.button
+          whileTap={{ scale: 0.95 }}
+          onClick={handleCallWaiterClick}
+          className={`w-full mt-3 px-5 py-3 rounded-xl shadow-lg flex items-center justify-center gap-2.5 transition-all duration-300 ${
+            waiterCalled 
+              ? 'bg-gradient-to-r from-green-500 to-green-600 text-white shadow-green-500/30' 
+              : 'bg-gradient-to-r from-slate-600 to-slate-700 text-white hover:from-slate-700 hover:to-slate-800 shadow-slate-500/30 hover:shadow-slate-500/40'
+          }`}
+          animate={
+            waiterCalled
+              ? {}
+              : {
+                  boxShadow: [
+                    '0px 0px 0px 0px rgba(100,116,139,0.4)',
+                    '0px 0px 0px 10px rgba(100,116,139,0)',
+                    '0px 0px 0px 0px rgba(100,116,139,0)'
+                  ]
+                }
+          }
+          transition={{
+            repeat: Infinity,
+            duration: 2
+          }}
+        >
+          {waiterCalled ? (
+            <>
+              <CheckIcon className="w-5 h-5" />
+              <span className="text-sm font-semibold">Waiter Notified</span>
+            </>
+          ) : (
+            <>
+              <BellRingIcon className="w-5 h-5" />
+              <span className="text-sm font-semibold">Call Waiter</span>
+            </>
+          )}
+        </motion.button>
       </div>
     </div>
   );

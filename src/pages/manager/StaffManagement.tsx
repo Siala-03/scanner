@@ -13,7 +13,7 @@ import { useTables } from '../../hooks/useTables';
 import { signUpStaff } from '../../api/auth';
 import { updateStaffAssignments, updateStaffStatus, updateStaffRole, deleteStaff } from '../../api/staff';
 import { useKPIs } from '../../hooks/useKPIs';
-import { createKPI, deleteKPI } from '../../api/kpis';
+import { createKPI, deleteKPI, assignKPI, unassignKPI } from '../../api/kpis';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
@@ -22,7 +22,6 @@ import { Modal } from '../../components/ui/Modal';
 import { Input } from '../../components/ui/Input';
 export function StaffManagement() {
   const { staff: backendStaff, isLoading, refetch } = useStaff();
-  const { tables, isLoading: tablesLoading } = useTables();
   const { kpis, refetch: refetchKPIs } = useKPIs();
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -183,7 +182,7 @@ export function StaffManagement() {
                 <div className="mt-2 flex gap-2">
                   <Button
                     variant="secondary"
-                    size="xs"
+                    size="sm"
                     onClick={() => {
                       // eslint-disable-next-line @typescript-eslint/no-empty-function
                       navigator.clipboard.writeText(`Username: ${generatedCredentials.username}\nPassword: ${generatedCredentials.password}`).catch(() => {});
@@ -193,7 +192,7 @@ export function StaffManagement() {
                   </Button>
                   <Button
                     variant="ghost"
-                    size="xs"
+                    size="sm"
                     onClick={() => setGeneratedCredentials(null)}
                   >
                     Dismiss
@@ -337,7 +336,7 @@ export function StaffManagement() {
 
                   <div className="flex flex-wrap gap-2 pt-4 border-t border-slate-700 mt-auto">
                     <Button
-                      variant={member.isOnDuty ? 'danger' : 'ready'}
+                      variant={member.isOnDuty ? 'danger' : 'secondary'}
                       size="sm"
                       onClick={async () => {
                         try {

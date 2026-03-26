@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   BellIcon,
@@ -21,6 +21,7 @@ import { useStaffKPIs } from '../../hooks/useKPIs';
 import { buildReceiptHtml } from '../../utils/receipt';
 import { printReceiptNetwork } from '../../api/printer';
 import { KPICard } from '../../components/supervisor/KPICard';
+import { useSocket } from '../../hooks/useSocket';
 interface WaiterDashboardProps {
   waiter: Staff;
   orders: Order[];
@@ -45,7 +46,53 @@ export function WaiterDashboard({
   const [activeTab, setActiveTab] = useState('new');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [showTableMap, setShowTableMap] = useState(false);
+  const [socketCalls, setSocketCalls] = useState<{ tableNumber: number; timestamp: Date }[]>([]);
+  const { socket, joinRole } = useSocket();
   const { kpis } = useStaffKPIs();
+
+  // Join waiter role room and listen for call events
+  useEffect(() => {
+    joinRole('waiter');
+
+    const handleWaiterCall = (data: { tableNumber: number; timestamp: Date }) => {
+      console.log('Received waiter call via socket:', data);
+      setSocketCalls((prev) => [...prev, { ...data, timestamp: new Date(data.timestamp) }]);
+    };
+
+    socket.on('waiter:call', handleWaiterCall);
+
+    return () => {
+      socket.off('waiter:call', handleWaiterCall);
+    };
+  }, [socket, joinRole]);
+
+  // Combine local waiterCalls prop with socket-based calls
+  const allWaiterCalls = useMemo(() => {
+    const callsMap = new Map<number, Date>();
+    
+    // Add socket calls
+    socketCalls.forEach((call) => {
+      callsMap.set(call.tableNumber, call.timestamp);
+    });
+    
+    // Add prop calls (from local state in App)
+    waiterCalls.forEach((call) => {
+      if (!callsMap.has(call.tableNumber)) {
+        callsMap.set(call.tableNumber, call.timestamp);
+      }
+    });
+
+    return Array.from(callsMap.entries()).map(([tableNumber, timestamp]) => ({
+      tableNumber,
+      timestamp
+    }));
+  }, [waiterCalls, socketCalls]);
+
+  // Dismiss handler that also clears from socket calls
+  const handleDismissCall = (tableNum: number) => {
+    setSocketCalls((prev) => prev.filter((c) => c.tableNumber !== tableNum));
+    onDismissWaiterCall?.(tableNum);
+  };
   const waiterOrders = useMemo(
     () => orders.filter((o) => waiter.assignedTables.includes(o.tableNumber)),
     [orders, waiter.assignedTables]
@@ -170,9 +217,9 @@ export function WaiterDashboard({
             </button>
             <button className="relative p-2 rounded-lg bg-slate-800 text-slate-400 hover:text-white transition-colors">
               <BellIcon className="w-5 h-5" />
-              {(newOrders.length > 0 || waiterCalls.length > 0) &&
+              {(newOrders.length > 0 || allWaiterCalls.length > 0) &&
               <span className="absolute -top-1 -right-1 w-5 h-5 bg-amber-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
-                  {newOrders.length + waiterCalls.length}
+                  {newOrders.length + allWaiterCalls.length}
                 </span>
               }
             </button>
@@ -180,9 +227,9 @@ export function WaiterDashboard({
         </div>
 
         {/* Waiter Calls Alerts */}
-        {waiterCalls.length > 0 &&
+        {allWaiterCalls.length > 0 &&
         <div className="mb-4 space-y-2">
-            {waiterCalls.map((call) =>
+            {allWaiterCalls.map((call) =>
           <div
             key={call.tableNumber}
             className="bg-amber-500/20 border border-amber-500/50 rounded-lg p-3 flex items-center justify-between">
@@ -194,7 +241,7 @@ export function WaiterDashboard({
                   </span>
                 </div>
                 <button
-              onClick={() => onDismissWaiterCall?.(call.tableNumber)}
+              onClick={() => handleDismissCall(call.tableNumber)}
               className="text-amber-400 hover:text-amber-300 text-sm font-medium px-2 py-1 bg-amber-500/20 rounded">
 
                   Dismiss

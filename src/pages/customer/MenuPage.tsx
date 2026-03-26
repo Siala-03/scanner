@@ -208,7 +208,7 @@ export function MenuPage({ onAddToCart }: MenuPageProps) {
       )}
 
       {/* Item Detail Modal */}
-      <Modal isOpen={!!selectedItem} onClose={() => setSelectedItem(null)}>
+      <Modal isOpen={!!selectedItem} onClose={() => setSelectedItem(null)} variant="light">
         {selectedItem && (
           <div className="p-6">
             <div className="flex justify-between items-start mb-5">
