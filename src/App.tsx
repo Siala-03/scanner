@@ -25,7 +25,7 @@ import { Card } from './components/ui/Card';
 import { Button } from './components/ui/Button';
 import { Staff } from './types';
 type UserRole = 'customer' | 'waiter' | 'supervisor' | 'manager' | 'kitchen' | null;
-type ManagerPage = 'dashboard' | 'menu' | 'staff' | 'analytics' | 'qrcodes' | 'inventory' | 'history';
+type ManagerPage = 'dashboard' | 'menu' | 'staff' | 'analytics' | 'performance' | 'qrcodes' | 'inventory' | 'history';
 type SupervisorPage = 'dashboard' | 'revenue' | 'staff' | 'qrcodes' | 'inventory' | 'menu' | 'history';
 export function App() {
   const [selectedRole, setSelectedRole] = useState<UserRole>(null);
@@ -400,6 +400,7 @@ export function App() {
               { id: 'history', label: 'Order History' },
               { id: 'analytics', label: 'Analytics' },
               { id: 'staff', label: 'Staff' },
+              { id: 'performance', label: 'Performance' },
             ].map((item) => (
               <button
                 key={item.id}
@@ -427,6 +428,7 @@ export function App() {
             {managerPage === 'menu' && <MenuManagement />}
             {managerPage === 'staff' && <StaffManagement />}
             {managerPage === 'analytics' && <AnalyticsPage />}
+            {managerPage === 'performance' && <StaffPerformance />}
             {managerPage === 'inventory' && <SimpleInventory />}
             {managerPage === 'qrcodes' && (
               <QRCodeGenerator

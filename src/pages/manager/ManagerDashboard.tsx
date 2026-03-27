@@ -6,7 +6,7 @@ import { useInventoryData } from '../../hooks/useInventory';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, Legend } from 'recharts';
 
 interface ManagerDashboardProps {
-  onNavigate: (page: 'dashboard' | 'menu' | 'staff' | 'analytics' | 'qrcodes' | 'inventory' | 'history') => void;
+  onNavigate: (page: 'dashboard' | 'menu' | 'staff' | 'analytics' | 'performance' | 'qrcodes' | 'inventory' | 'history') => void;
   totalOrders: number;
   activeOrders: number;
   servedOrders: number;

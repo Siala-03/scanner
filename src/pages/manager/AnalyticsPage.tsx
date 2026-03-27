@@ -22,6 +22,8 @@ import { Tabs } from '../../components/ui/Tabs';
 import { formatPrice } from '../../utils/currency';
 export function AnalyticsPage() {
   const [timeRange, setTimeRange] = useState<'today' | 'week' | 'month' | 'year'>('week');
+  const [comparisonMode, setComparisonMode] = useState<'previousMonth' | 'lastYear'>('previousMonth');
+  const [dateWindow, setDateWindow] = useState<'7d' | '30d' | '90d' | '1y'>('30d');
   const [orders, setOrders] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -207,6 +209,114 @@ export function AnalyticsPage() {
       : timeRange === 'week'
       ? weeklyRevenue.reduce((s, d) => s + d.orders, 0)
       : monthlyComparison.currentMonth.orders;
+
+  const totalWeeklyRevenue = weeklyRevenue.reduce((sum, d) => sum + d.revenue, 0);
+  const avgDailyRevenue = weeklyRevenue.length ? totalWeeklyRevenue / weeklyRevenue.length : 0;
+  const dailyRevenueChanges = weeklyRevenue.slice(1).map((d, i) => d.revenue - weeklyRevenue[i].revenue);
+  const avgDailyGrowth = dailyRevenueChanges.length
+    ? dailyRevenueChanges.reduce((sum, ch) => sum + ch, 0) / dailyRevenueChanges.length
+    : 0;
+
+  const predictedRevenueData = weeklyRevenue.map((d, index) => ({
+    date: new Date(d.date).toLocaleDateString('en-US', { weekday: 'short' }),
+    actual: d.revenue,
+    predicted: d.revenue + avgDailyGrowth * (index + 1),
+    orders: d.orders
+  }));
+
+  const predictedNextWeekRevenue = weeklyRevenue.length
+    ? weeklyRevenue[weeklyRevenue.length - 1].revenue + avgDailyGrowth * 7
+    : 0;
+
+  const [kpiTargets, setKpiTargets] = useState({
+    revenue: 150000,
+    orders: 3200,
+    avgOrderValue: 45
+  });
+
+  const revenueProgress = Math.min(100, (currentRevenue / kpiTargets.revenue) * 100);
+  const ordersProgress = Math.min(100, (currentOrders / kpiTargets.orders) * 100);
+  const avgOrderValueProgress = Math.min(100, (monthlyComparison.currentMonth.avgOrderValue / kpiTargets.avgOrderValue) * 100);
+
+  const salesFunnel = useMemo(() => {
+    const statuses = { pending: 0, verified: 0, preparing: 0, ready: 0, served: 0, cancelled: 0 } as Record<string, number>;
+    orders.forEach((order) => {
+      const status = order.status ?? 'pending';
+      statuses[status] = (statuses[status] ?? 0) + 1;
+    });
+    return statuses;
+  }, [orders]);
+
+  const topItems = useMemo(() => {
+    const itemStats = new Map<string, { name: string; revenue: number; orders: number }>();
+    orders.forEach((order) => {
+      (order.items ?? []).forEach((item: any) => {
+        const menuItem = menuById[item.menuItemId];
+        const key = item.menuItemId || item.menuItemName || 'unknown';
+        const price = item.totalPrice ?? (item.unitPrice ?? 0) * (item.quantity ?? 1);
+        const stat = itemStats.get(key) ?? { name: menuItem?.name ?? item.menuItemName ?? key, revenue: 0, orders: 0 };
+        stat.revenue += price;
+        stat.orders += item.quantity ?? 1;
+        itemStats.set(key, stat);
+      });
+    });
+    return Array.from(itemStats.values())
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 5);
+  }, [orders, menuById]);
+
+  const inventoryRiskItems = menuItems
+    .filter((item) => !item.isAvailable)
+    .slice(0, 5);
+
+  const alerts = [] as string[];
+  if (parseFloat(revenueChange) <= -10) alerts.push('Revenue is down over 10% vs last month.');
+  if (parseFloat(ordersChange) <= -10) alerts.push('Orders are down over 10% vs last month.');
+  if (salesFunnel.cancelled > 5) alerts.push(`${salesFunnel.cancelled} cancelled orders this period. Review process.`);
+  if (avgDailyGrowth > 100) alerts.push('High growth: consider expanding staffing and inventory.');
+  if (avgDailyGrowth < -50) alerts.push('Declining growth: evaluate promotions and offer incentives.');
+
+  const decomposedTrend = {
+    shortMA: (weeklyRevenue.slice(-7).reduce((sum, d) => sum + d.revenue, 0) / Math.min(7, weeklyRevenue.length)) || 0,
+    mediumMA: (weeklyRevenue.slice(-14).reduce((sum, d) => sum + d.revenue, 0) / Math.min(14, weeklyRevenue.length)) || 0,
+    trend: avgDailyGrowth >= 0 ? 'Upward' : 'Downward'
+  };
+
+  const comparisonData = comparisonMode === 'lastYear'
+    ? `${monthlyComparison.currentMonth.revenue.toFixed(0)} vs last year (N/A)`
+    : `${monthlyComparison.currentMonth.revenue.toFixed(0)} vs previous month`;
+
+  const predictiveRecommendations = {
+    staffing:
+      avgDailyGrowth > 200
+        ? 'Increase staff by 10% to handle surge'
+        : avgDailyGrowth < -100
+        ? 'Optimize labor schedule for lower demand'
+        : 'Maintain current staffing levels',
+    inventory:
+      avgDailyGrowth > 200
+        ? 'Order additional stock for high-demand items'
+        : 'Continue regular inventory refresh cycle',
+    marketing:
+      avgDailyGrowth < 0
+        ? 'Run promotions to boost off-peak revenue'
+        : 'Reinforce high-performing menu items in campaigns'
+  };
+
+  const downloadCSV = () => {
+    const header = 'date,revenue,orders\n';
+    const rows = weeklyRevenue.map((d) => `${d.date},${d.revenue},${d.orders}`).join('\n');
+    const blob = new Blob([header + rows], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'weekly_revenue.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="dark min-h-screen bg-slate-900 p-4 md:p-6">
       <div className="max-w-7xl mx-auto">
@@ -228,6 +338,90 @@ export function AnalyticsPage() {
             onTabChange={setTimeRange}
             variant="pills" />
 
+        </div>
+
+        {/* Date Window + Comparison Mode */}
+        <div className="flex items-center justify-between mb-6 gap-4">
+          <div className="flex items-center gap-2">
+            {['7d', '30d', '90d', '1y'].map((window) => (
+              <button
+                key={window}
+                className={`px-3 py-1 rounded ${dateWindow === window ? 'bg-emerald-500 text-white' : 'bg-slate-700 text-slate-200'}`}
+                onClick={() => setDateWindow(window as '7d' | '30d' | '90d' | '1y')}>
+                {window}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              className={`px-3 py-1 rounded ${comparisonMode === 'previousMonth' ? 'bg-sky-500 text-white' : 'bg-slate-700 text-slate-200'}`}
+              onClick={() => setComparisonMode('previousMonth')}>
+              Prev Month
+            </button>
+            <button
+              className={`px-3 py-1 rounded ${comparisonMode === 'lastYear' ? 'bg-sky-500 text-white' : 'bg-slate-700 text-slate-200'}`}
+              onClick={() => setComparisonMode('lastYear')}>
+              Last Year
+            </button>
+          </div>
+        </div>
+
+        {/* KPI targets */}
+        <div className="grid md:grid-cols-3 gap-4 mb-6">
+          <Card className="bg-slate-800 p-4">
+            <p className="text-xs text-slate-400">Revenue Target</p>
+            <div className="flex items-center gap-2">
+              <p className="text-2xl font-bold text-gray-100">{formatPrice(currentRevenue)} / {formatPrice(kpiTargets.revenue)}</p>
+              <input
+                type="number"
+                min={0}
+                value={kpiTargets.revenue}
+                onChange={(e) => setKpiTargets((prev) => ({ ...prev, revenue: Number(e.target.value) }))}
+                className="w-24 bg-slate-700 text-white px-2 py-1 rounded text-xs"
+              />
+            </div>
+            <div className="h-2 bg-slate-700 rounded mt-2 overflow-hidden">
+              <div style={{ width: `${revenueProgress}%` }} className="h-full bg-emerald-400" />
+            </div>
+          </Card>
+          <Card className="bg-slate-800 p-4">
+            <p className="text-xs text-slate-400">Orders Target</p>
+            <div className="flex items-center gap-2">
+              <p className="text-2xl font-bold text-gray-100">{currentOrders.toLocaleString()} / {kpiTargets.orders}</p>
+              <input
+                type="number"
+                min={0}
+                value={kpiTargets.orders}
+                onChange={(e) => setKpiTargets((prev) => ({ ...prev, orders: Number(e.target.value) }))}
+                className="w-20 bg-slate-700 text-white px-2 py-1 rounded text-xs"
+              />
+            </div>
+            <div className="h-2 bg-slate-700 rounded mt-2 overflow-hidden">
+              <div style={{ width: `${ordersProgress}%` }} className="h-full bg-blue-400" />
+            </div>
+          </Card>
+          <Card className="bg-slate-800 p-4">
+            <p className="text-xs text-slate-400">Avg Order Value Target</p>
+            <div className="flex items-center gap-2">
+              <p className="text-2xl font-bold text-gray-100">{formatPrice(monthlyComparison.currentMonth.avgOrderValue)} / {formatPrice(kpiTargets.avgOrderValue)}</p>
+              <input
+                type="number"
+                min={0}
+                step={0.1}
+                value={kpiTargets.avgOrderValue}
+                onChange={(e) => setKpiTargets((prev) => ({ ...prev, avgOrderValue: Number(e.target.value) }))}
+                className="w-20 bg-slate-700 text-white px-2 py-1 rounded text-xs"
+              />
+            </div>
+            <div className="h-2 bg-slate-700 rounded mt-2 overflow-hidden">
+              <div style={{ width: `${avgOrderValueProgress}%` }} className="h-full bg-amber-400" />
+            </div>
+          </Card>
+        </div>
+
+        <div className="mb-6 bg-slate-800 p-3 rounded-lg">
+          <p className="text-xs text-slate-400 mb-1">Comparison</p>
+          <p className="text-sm text-white">{comparisonData}</p>
         </div>
 
         {/* Month Comparison */}
@@ -287,6 +481,86 @@ export function AnalyticsPage() {
             <p className="text-2xl font-bold text-white">
               {monthlyComparison.currentMonth.newCustomers}
             </p>
+          </Card>
+        </div>
+
+        {/* BI improved analytics: predictions and recommendations */}
+        <div className="grid lg:grid-cols-4 gap-4 mb-6">
+          <Card className="bg-slate-800 p-4">
+            <p className="text-xs text-slate-400 mb-1">Avg Daily Revenue</p>
+            <p className="text-2xl font-bold text-gray-100">{formatPrice(avgDailyRevenue)}</p>
+          </Card>
+          <Card className="bg-slate-800 p-4">
+            <p className="text-xs text-slate-400 mb-1">Next Week Forecast</p>
+            <p className="text-2xl font-bold text-gray-100">{formatPrice(predictedNextWeekRevenue)}</p>
+          </Card>
+          <Card className="bg-slate-800 p-4">
+            <p className="text-xs text-slate-400 mb-1">Staffing Insight</p>
+            <p className="text-sm text-slate-200">{predictiveRecommendations.staffing}</p>
+          </Card>
+          <Card className="bg-slate-800 p-4">
+            <p className="text-xs text-slate-400 mb-1">Inventory Insight</p>
+            <p className="text-sm text-slate-200">{predictiveRecommendations.inventory}</p>
+          </Card>
+        </div>
+
+        {/* Additional BI improvements */}
+        <div className="grid lg:grid-cols-3 gap-4 mb-6">
+          <Card className="bg-slate-800 p-4">
+            <h3 className="text-sm font-semibold text-gray-100 mb-2">Sales Funnel</h3>
+            <ul className="space-y-1 text-sm text-slate-300">
+              <li>Pending: {salesFunnel.pending}</li>
+              <li>Verified: {salesFunnel.verified}</li>
+              <li>Preparing: {salesFunnel.preparing}</li>
+              <li>Ready: {salesFunnel.ready}</li>
+              <li>Served: {salesFunnel.served}</li>
+              <li>Cancelled: {salesFunnel.cancelled}</li>
+            </ul>
+          </Card>
+          <Card className="bg-slate-800 p-4">
+            <h3 className="text-sm font-semibold text-gray-100 mb-2">Top 5 Menu Items</h3>
+            <ol className="text-sm text-slate-300 list-decimal list-inside space-y-1">
+              {topItems.map((item) => (
+                <li key={item.name}>{item.name}: {formatPrice(item.revenue)} ({item.orders} orders)</li>
+              ))}
+            </ol>
+          </Card>
+          <Card className="bg-slate-800 p-4">
+            <h3 className="text-sm font-semibold text-gray-100 mb-2">Inventory Risk</h3>
+            {inventoryRiskItems.length ? (
+              <ul className="text-sm text-slate-300 space-y-1">
+                {inventoryRiskItems.map((item) => (
+                  <li key={item.id}>{item.name} (unavailable)</li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-slate-400">No items currently flagged</p>
+            )}
+          </Card>
+        </div>
+
+        <div className="grid lg:grid-cols-2 gap-4 mb-6">
+          <Card className="bg-slate-800 p-4">
+            <h3 className="text-sm font-semibold text-gray-100 mb-2">Alerts</h3>
+            {alerts.length ? (
+              <ul className="text-sm text-amber-300 space-y-1">
+                {alerts.map((alert, idx) => <li key={idx}>{alert}</li>)}
+              </ul>
+            ) : (
+              <p className="text-sm text-slate-400">All metrics within expected thresholds.</p>
+            )}
+          </Card>
+          <Card className="bg-slate-800 p-4">
+            <h3 className="text-sm font-semibold text-gray-100 mb-2">Trend Decomposition</h3>
+            <p className="text-sm text-slate-300">7d MA: {formatPrice(decomposedTrend.shortMA)}</p>
+            <p className="text-sm text-slate-300">14d MA: {formatPrice(decomposedTrend.mediumMA)}</p>
+            <p className="text-sm text-slate-300">Direction: {decomposedTrend.trend}</p>
+            <button
+              className="mt-3 px-3 py-1 bg-blue-500 rounded text-white text-xs"
+              onClick={downloadCSV}
+            >
+              Export Weekly Revenue CSV
+            </button>
           </Card>
         </div>
 
@@ -561,6 +835,30 @@ export function AnalyticsPage() {
                   }}
                   name="Revenue" />
 
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
+
+        {/* Predicted vs Actual Revenue */}
+        <Card className="bg-slate-800 mt-6">
+          <h3 className="text-lg font-semibold text-gray-100 mb-4">Predicted vs Actual Weekly Revenue</h3>
+          <div className="h-72">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={predictedRevenueData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                <XAxis dataKey="date" stroke="#64748b" fontSize={12} />
+                <YAxis stroke="#64748b" fontSize={12} tickFormatter={(v) => formatPrice(v)} />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: '#1e293b',
+                    border: '1px solid #334155',
+                    borderRadius: '8px'
+                  }}
+                  formatter={(value: number) => [formatPrice(value), 'Revenue']}
+                />
+                <Line type="monotone" dataKey="actual" stroke="#3b82f6" strokeWidth={2} dot={{ fill: '#3b82f6' }} name="Actual" />
+                <Line type="monotone" dataKey="predicted" stroke="#f59e0b" strokeWidth={2} strokeDasharray="5 5" dot={{ fill: '#f59e0b' }} name="Predicted" />
               </LineChart>
             </ResponsiveContainer>
           </div>
