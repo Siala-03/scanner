@@ -532,7 +532,7 @@ export function StaffManagement() {
           isOpen={isAddStaffOpen}
           onClose={() => setIsAddStaffOpen(false)}
           title="Add Staff Member"
-          variant="light"
+          variant="dark"
         >
           <div className="space-y-4">
             <Input

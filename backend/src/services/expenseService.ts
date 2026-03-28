@@ -2,6 +2,19 @@ import { pool } from '../db.js';
 import { HttpError } from '../http.js';
 
 // ============================================
+// HELPER FUNCTIONS
+// ============================================
+
+function normalizeExpense(expense: any) {
+  return {
+    ...expense,
+    amount: parseFloat(expense.amount) || 0,
+    tax_amount: parseFloat(expense.tax_amount) || 0,
+    tax_rate: parseFloat(expense.tax_rate) || 0,
+  };
+}
+
+// ============================================
 // EXPENSE CATEGORIES
 // ============================================
 
@@ -12,6 +25,17 @@ export async function getExpenseCategories(restaurantId: string) {
      ORDER BY name`,
     [restaurantId]
   );
+  
+  // If no restaurant-specific categories exist, return default categories
+  if (result.rows.length === 0) {
+    const defaultResult = await pool.query(
+      `SELECT * FROM expense_categories 
+       WHERE restaurant_id = 'default' AND is_active = true 
+       ORDER BY name`
+    );
+    return defaultResult.rows;
+  }
+  
   return result.rows;
 }
 
@@ -198,7 +222,7 @@ export async function getAllExpenses(
   );
 
   return {
-    data: result.rows,
+    data: result.rows.map(normalizeExpense),
     pagination: {
       page: pagination.page,
       limit: pagination.limit,
@@ -221,7 +245,7 @@ export async function getExpenseById(id: string, restaurantId: string) {
     [id, restaurantId]
   );
   
-  return result.rows[0] || null;
+  return result.rows[0] ? normalizeExpense(result.rows[0]) : null;
 }
 
 export async function createExpense(
@@ -267,7 +291,7 @@ export async function createExpense(
     ]
   );
   
-  return result.rows[0];
+  return normalizeExpense(result.rows[0]);
 }
 
 export async function updateExpense(
@@ -326,7 +350,7 @@ export async function updateExpense(
     throw new HttpError(404, 'Expense not found');
   }
   
-  return result.rows[0];
+  return normalizeExpense(result.rows[0]);
 }
 
 export async function deleteExpense(id: string, restaurantId: string) {
@@ -800,7 +824,7 @@ export async function submitExpenseForApproval(
   // Create audit log
   await createAuditLog(expenseId, restaurantId, userId, userRole, 'submitted_for_approval', 'draft', 'pending_approval', 'Expense submitted for approval');
 
-  return result.rows[0];
+  return normalizeExpense(result.rows[0]);
 }
 
 export async function approveExpense(
@@ -842,7 +866,7 @@ export async function approveExpense(
     await createExpenseNote(expenseId, restaurantId, userId, userRole, 'approval_note', notes);
   }
 
-  return result.rows[0];
+  return normalizeExpense(result.rows[0]);
 }
 
 export async function rejectExpense(
@@ -881,7 +905,7 @@ export async function rejectExpense(
   // Create rejection note
   await createExpenseNote(expenseId, restaurantId, userId, userRole, 'rejection_reason', rejectionReason);
 
-  return result.rows[0];
+  return normalizeExpense(result.rows[0]);
 }
 
 export async function recallExpense(
@@ -916,7 +940,7 @@ export async function recallExpense(
   // Create audit log
   await createAuditLog(expenseId, restaurantId, userId, userRole, 'recalled', previousStatus, 'recalled', reason || 'Expense recalled');
 
-  return result.rows[0];
+  return normalizeExpense(result.rows[0]);
 }
 
 // ============================================

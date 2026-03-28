@@ -249,7 +249,7 @@ export default function SupervisorExpenseManagement() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium mb-2">
+                <label className="block text-sm font-medium mb-2 text-slate-300">
                   Vendor Name
                 </label>
                 <input
@@ -258,12 +258,12 @@ export default function SupervisorExpenseManagement() {
                   onChange={e =>
                     setFormData({ ...formData, vendorName: e.target.value })
                   }
-                  className="w-full border rounded-lg px-3 py-2"
+                  className="w-full border border-slate-600 bg-slate-900 text-slate-100 rounded-lg px-3 py-2 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500"
                   placeholder="e.g., ABC Supplies"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-2">
+                <label className="block text-sm font-medium mb-2 text-slate-300">
                   Description*
                 </label>
                 <input
@@ -272,13 +272,13 @@ export default function SupervisorExpenseManagement() {
                   onChange={e =>
                     setFormData({ ...formData, description: e.target.value })
                   }
-                  className="w-full border rounded-lg px-3 py-2"
+                  className="w-full border border-slate-600 bg-slate-900 text-slate-100 rounded-lg px-3 py-2 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500"
                   placeholder="Expense description"
                   required
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-2">
+                <label className="block text-sm font-medium mb-2 text-slate-300">
                   Amount*
                 </label>
                 <input
@@ -290,13 +290,13 @@ export default function SupervisorExpenseManagement() {
                       amount: parseFloat(e.target.value),
                     })
                   }
-                  className="w-full border rounded-lg px-3 py-2"
+                  className="w-full border border-slate-600 bg-slate-900 text-slate-100 rounded-lg px-3 py-2 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500"
                   step="0.01"
                   required
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-2">
+                <label className="block text-sm font-medium mb-2 text-slate-300">
                   Expense Date*
                 </label>
                 <input
@@ -305,12 +305,12 @@ export default function SupervisorExpenseManagement() {
                   onChange={e =>
                     setFormData({ ...formData, expenseDate: e.target.value })
                   }
-                  className="w-full border rounded-lg px-3 py-2"
+                  className="w-full border border-slate-600 bg-slate-900 text-slate-100 rounded-lg px-3 py-2 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500"
                   required
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-2">
+                <label className="block text-sm font-medium mb-2 text-slate-300">
                   Payment Method
                 </label>
                 <select
@@ -321,7 +321,7 @@ export default function SupervisorExpenseManagement() {
                       paymentMethod: e.target.value as any,
                     })
                   }
-                  className="w-full border rounded-lg px-3 py-2"
+                  className="w-full border border-slate-600 bg-slate-900 text-slate-100 rounded-lg px-3 py-2 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500"
                 >
                   <option value="cash">Cash</option>
                   <option value="credit_card">Credit Card</option>
@@ -331,7 +331,7 @@ export default function SupervisorExpenseManagement() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium mb-2">
+                <label className="block text-sm font-medium mb-2 text-slate-300">
                   Tax Rate (%)
                 </label>
                 <input
@@ -343,14 +343,14 @@ export default function SupervisorExpenseManagement() {
                       taxRate: parseFloat(e.target.value),
                     })
                   }
-                  className="w-full border rounded-lg px-3 py-2"
+                  className="w-full border border-slate-600 bg-slate-900 text-slate-100 rounded-lg px-3 py-2 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500"
                   step="0.01"
                   min="0"
                   max="100"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-2">
+                <label className="block text-sm font-medium mb-2 text-slate-300">
                   Reference Number
                 </label>
                 <input
@@ -362,19 +362,19 @@ export default function SupervisorExpenseManagement() {
                       referenceNumber: e.target.value,
                     })
                   }
-                  className="w-full border rounded-lg px-3 py-2"
+                  className="w-full border border-slate-600 bg-slate-900 text-slate-100 rounded-lg px-3 py-2 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500"
                   placeholder="Invoice/Receipt number"
                 />
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium mb-2">Notes</label>
+              <label className="block text-sm font-medium mb-2 text-slate-300">Notes</label>
               <textarea
                 value={formData.notes}
                 onChange={e =>
                   setFormData({ ...formData, notes: e.target.value })
                 }
-                className="w-full border rounded-lg px-3 py-2"
+                className="w-full border border-slate-600 bg-slate-900 text-slate-100 rounded-lg px-3 py-2 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500"
                 rows={3}
                 placeholder="Additional notes"
               />
@@ -445,7 +445,7 @@ export default function SupervisorExpenseManagement() {
                   {expense.category?.name || 'N/A'}
                 </td>
                 <td className="px-6 py-4 text-sm font-medium">
-                  {expense.currency} {expense.amount.toFixed(2)}
+                  {expense.currency} {Number(expense.amount).toFixed(2)}
                 </td>
                 <td className="px-6 py-4">
                   <span
@@ -506,7 +506,7 @@ export default function SupervisorExpenseManagement() {
                 <div>
                   <p className="text-sm text-gray-600">Amount</p>
                   <p className="font-medium">
-                    {selectedExpense.currency} {selectedExpense.amount.toFixed(2)}
+                    {selectedExpense.currency} {Number(selectedExpense.amount).toFixed(2)}
                   </p>
                 </div>
                 <div>
