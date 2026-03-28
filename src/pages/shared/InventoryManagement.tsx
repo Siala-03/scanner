@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   PackageIcon,
@@ -12,11 +12,9 @@ import {
   CheckCircleIcon,
   XCircleIcon,
   ArrowUpIcon,
-  ArrowDownIcon,
   StarIcon,
   MapPinIcon,
   MailIcon,
-  ClockIcon,
   XIcon,
 } from 'lucide-react';
 import { InventoryForecasting } from '../../components/manager/InventoryForecasting';
@@ -33,25 +31,16 @@ import type {
   PurchaseOrder,
   PurchaseOrderStatus,
   WasteReason,
-  InventoryAnalytics,
-  StockMovement,
 } from '../../types/inventory';
 import {
-  fetchInventory,
-  fetchLowStockItems,
   updateInventoryRecord as apiUpdateInventoryRecord,
   adjustStock as apiAdjustStock,
-  fetchSuppliers,
   createSupplier as apiCreateSupplier,
   updateSupplier as apiUpdateSupplier,
-  fetchPurchaseOrders,
   createPurchaseOrder as apiCreatePurchaseOrder,
   updatePurchaseOrder as apiUpdatePurchaseOrder,
   receivePurchaseOrder as apiReceivePurchaseOrder,
-  fetchMovements,
-  fetchWasteEntries,
   recordWaste as apiRecordWaste,
-  computeInventoryAnalytics as apiComputeInventoryAnalytics,
 } from '../../api/inventory';
 
 interface InventoryManagementProps {
@@ -67,15 +56,6 @@ const PO_STATUS_CONFIG: Record<PurchaseOrderStatus, { label: string; color: stri
   partial:   { label: 'Partial',   color: 'text-orange-400', bg: 'bg-orange-500/10 border-orange-500/20' },
   received:  { label: 'Received',  color: 'text-green-400',  bg: 'bg-green-500/10 border-green-500/20' },
   cancelled: { label: 'Cancelled', color: 'text-red-400',    bg: 'bg-red-500/10 border-red-500/20' },
-};
-
-const MOVEMENT_CONFIG: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
-  purchase:   { label: 'Purchase',   color: 'text-green-400',  icon: <ArrowUpIcon className="w-3.5 h-3.5" /> },
-  sale:       { label: 'Sale',       color: 'text-blue-400',   icon: <ArrowDownIcon className="w-3.5 h-3.5" /> },
-  adjustment: { label: 'Adjustment', color: 'text-amber-400',  icon: <EditIcon className="w-3.5 h-3.5" /> },
-  waste:      { label: 'Waste',      color: 'text-red-400',    icon: <TrashIcon className="w-3.5 h-3.5" /> },
-  transfer:   { label: 'Transfer',   color: 'text-purple-400', icon: <TruckIcon className="w-3.5 h-3.5" /> },
-  return:     { label: 'Return',     color: 'text-orange-400', icon: <RefreshCcwIcon className="w-3.5 h-3.5" /> },
 };
 
 const WASTE_REASONS: WasteReason[] = ['expired', 'spoiled', 'damaged', 'overproduction', 'spillage', 'other'];
@@ -162,23 +142,12 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
     return map;
   }, [inventory]);
 
-  const menuCategoriesFromData = useMemo(() => Array.from(new Set(menuItems.map((m) => m.category))), [menuItems]);
   const inventoryLocations = useMemo(() => {
     const locs = inventory
       .map((rec) => rec.location || '')
       .filter((l) => l && l.trim().length > 0);
     return ['all', ...Array.from(new Set(locs))];
   }, [inventory]);
-
-  const avgStockAgeDays = useMemo(() => {
-    if (!inventory.length) return 0;
-    const ages = inventory.map((rec) => {
-      if (!rec.updatedAt) return 0;
-      return Math.max(0, Math.floor((Date.now() - new Date(rec.updatedAt).getTime()) / (1000 * 60 * 60 * 24)));
-    });
-    return Math.round(ages.reduce((sum, v) => sum + v, 0) / ages.length);
-  }, [inventory]);
-
 
   // ── Overview state ──────────────────────────────────────────────────────
   const [query, setQuery] = useState('');
@@ -234,8 +203,6 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
       });
   }, [query, categoryFilter, locationFilter, statusFilter, menuItems, inventoryMap]);
 
-  const reorderAlerts = useMemo(() => inventoryRows.filter((row) => row.isOut || row.isLow), [inventoryRows]);
-
   // lowStockItems loaded from backend state via fetchLowStockItems() and setLowStockItems()
 
   const handleSaveRow = async (menuItemId: string, _name: string) => {
@@ -276,17 +243,6 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
     if (!newPO.supplierId || newPOItems.length === 0) return;
     const sup = suppliers.find((s) => s.id === newPO.supplierId);
     if (!sup) return;
-    const items = newPOItems.map((i) => {
-      const mi = menuItems.find((m) => m.id === i.menuItemId);
-      return {
-        menu_item_id: i.menuItemId,
-        menu_item_name: mi?.name ?? i.menuItemId,
-        ordered_qty: i.orderedQty,
-        received_qty: 0,
-        unit_cost: i.unitCost,
-        total_cost: i.orderedQty * i.unitCost,
-      };
-    });
     try {
       await apiCreatePurchaseOrder({
         supplierId: sup.id,
@@ -339,15 +295,15 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
     if (!supplierForm.name) return;
     const payload = {
       name: supplierForm.name ?? '',
-      contact_person: supplierForm.contactPerson ?? supplierForm.contact_person ?? '',
+      contactPerson: supplierForm.contactPerson ?? '',
       email: supplierForm.email ?? '',
       phone: supplierForm.phone ?? '',
       address: supplierForm.address ?? '',
       categories: supplierForm.categories ?? [],
-      lead_time_days: supplierForm.leadTimeDays ?? supplierForm.lead_time_days ?? 3,
-      payment_terms: supplierForm.paymentTerms ?? supplierForm.payment_terms ?? 'Net 30',
+      leadTimeDays: supplierForm.leadTimeDays ?? 3,
+      paymentTerms: supplierForm.paymentTerms ?? 'Net 30',
       rating: supplierForm.rating ?? 3,
-      is_active: supplierForm.isActive ?? supplierForm.is_active ?? true,
+      isActive: supplierForm.isActive ?? true,
       notes: supplierForm.notes ?? '',
     };
     try {
@@ -364,10 +320,6 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
     setSupplierForm({});
     refresh();
   };
-
-  // ── Movements state ─────────────────────────────────────────────────────
-  const [movementTypeFilter, setMovementTypeFilter] = useState<string>('all');
-  const [movementQuery, setMovementQuery] = useState('');
 
   // ── Waste state ─────────────────────────────────────────────────────────
   const [showWasteModal, setShowWasteModal] = useState(false);
@@ -605,7 +557,7 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                   <tbody className="divide-y divide-slate-700/30">
                     {inventoryRows.map((row) => {
                       const isEditing = editingRow === row.item.id;
-                      const maxStock = Math.max(row.rec?.reorderQty ?? 20, row.stock, 1);
+                      const maxStock = Math.max(row.rec?.reorderQty ?? row.stock * 2 ?? 20, row.stock, 1);
                       return (
                         <tr
                           key={row.item.id}
@@ -796,8 +748,9 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
               </div>
             </Card>
           </motion.div>
+        )}
 
-          {selectedItemDetails && (
+        {selectedItemDetails && (
             <Modal isOpen={!!selectedItemDetails} onClose={() => setSelectedItemDetails(null)}>
               <div className="p-4 space-y-4 max-w-xl">
                 <div className="flex items-start justify-between">
@@ -813,8 +766,8 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                 <div className="grid grid-cols-2 gap-3 text-xs text-slate-300">
                   <div><span className="font-semibold">Stock</span>: {selectedItemDetails.stock}</div>
                   <div><span className="font-semibold">Status</span>: {selectedItemDetails.isOut ? 'Out' : selectedItemDetails.isLow ? 'Low' : 'Healthy'}</div>
-                  <div><span className="font-semibold">Reorder</span>: {selectedItemDetails.rec?.reorderQty ?? '—'}</div>
-                  <div><span className="font-semibold">Last Updated</span>: {selectedItemDetails.lastUpdatedDays !== null ? `${selectedItemDetails.lastUpdatedDays}d ago` : '—'}</div>
+                  <div><span className="font-semibold">Reorder</span>: {selectedItemDetails.rec?.reorderQty ?? '-'}</div>
+                  <div><span className="font-semibold">Last Updated</span>: {selectedItemDetails.lastUpdatedDays !== null ? `${selectedItemDetails.lastUpdatedDays}d ago` : '-'}</div>
                 </div>
 
                 <div>
@@ -840,7 +793,6 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
               </div>
             </Modal>
           )}
-        )}
 
         {activeTab === 'locations' && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
@@ -1066,83 +1018,6 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
         )}
 
         {/* ════════════════════════════════════════════════════════════════
-            TAB: STOCK MOVEMENTS
-        ════════════════════════════════════════════════════════════════ */}
-        {activeTab === 'movements' && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-            <div className="flex flex-col md:flex-row gap-3 mb-4">
-              <SearchBar value={movementQuery} onChange={setMovementQuery} placeholder="Search movements..." className="md:w-80" />
-              <select
-                value={movementTypeFilter}
-                onChange={(e) => setMovementTypeFilter(e.target.value)}
-                className="px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
-              >
-                <option value="all">All Types</option>
-                {Object.entries(MOVEMENT_CONFIG).map(([k, v]) => (
-                  <option key={k} value={k}>{v.label}</option>
-                ))}
-              </select>
-            </div>
-            <Card className="bg-slate-800/50 border border-slate-700/50" padding="none">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-slate-700/40 border-b border-slate-700/50">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Date</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Item</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Type</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Qty</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Balance</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Reference</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Notes</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-700/30">
-                    {movements.map((m) => {
-                      const cfg = MOVEMENT_CONFIG[m.type] ?? { label: m.type, color: 'text-slate-400', icon: null };
-                      return (
-                        <tr key={m.id} className="hover:bg-slate-700/20">
-                          <td className="px-4 py-3">
-                            <p className="text-xs text-slate-400">{new Date(m.timestamp).toLocaleString()}</p>
-                          </td>
-                          <td className="px-4 py-3">
-                            <p className="text-sm text-white">{m.menuItemName}</p>
-                            <p className="text-xs text-slate-500">{m.menuItemId}</p>
-                          </td>
-                          <td className="px-4 py-3">
-                            <span className={`flex items-center gap-1.5 text-xs font-medium ${cfg.color}`}>
-                              {cfg.icon}
-                              {cfg.label}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3">
-                            <span className={`font-medium ${m.qty > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                              {m.qty > 0 ? '+' : ''}{m.qty}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3">
-                            <span className="text-sm text-slate-300">{m.balanceAfter}</span>
-                          </td>
-                          <td className="px-4 py-3">
-                            <span className="text-xs text-slate-400">{m.reference ?? '—'}</span>
-                          </td>
-                          <td className="px-4 py-3">
-                            <span className="text-xs text-slate-400">{m.notes ?? '—'}</span>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-                {movements.length === 0 && (
-                  <div className="py-12 text-center text-slate-500">No movements found.</div>
-                )}
-              </div>
-            </Card>
-          </motion.div>
-        )}
-
-        {/* ════════════════════════════════════════════════════════════════
             TAB: WASTE LOG
         ════════════════════════════════════════════════════════════════ */}
         {activeTab === 'waste' && (
@@ -1205,66 +1080,9 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
             <InventoryForecasting
               forecasts={forecasts}
               alerts={forecastAlerts}
-              onGenerateForecasts={runForecasting}
+              onGenerateForecasts={async () => { await runForecasting(); }}
               isGenerating={isGeneratingForecasts}
             />
-          </motion.div>
-        )}
-
-        {/* ════════════════════════════════════════════════════════════════
-            TAB: ANALYTICS
-        ════════════════════════════════════════════════════════════════ */}
-        {activeTab === 'analytics' && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 mb-5">
-              {[
-                { label: 'Total Stock Value', value: formatPrice(analytics.totalStockValue), color: 'text-emerald-400' },
-                { label: 'Average Turnover Days', value: analytics.avgTurnoverDays.toFixed(1), color: 'text-blue-400' },
-                { label: 'Waste Cost (Last 30d)', value: formatPrice(analytics.wasteCostLast30d), color: 'text-red-400' },
-                { label: 'Pending PO Value', value: formatPrice(analytics.pendingPOValue), color: 'text-amber-400' },
-                { label: 'Items Below Reorder', value: analytics.belowReorderCount, color: 'text-orange-400' },
-                { label: 'Top Waste Reason', value: analytics.topWasteReason || '—', color: 'text-red-400' },
-              ].map((kpi) => (
-                <Card key={kpi.label} className="bg-slate-800/50 border border-slate-700/50">
-                  <p className="text-xs text-slate-400 mb-1">{kpi.label}</p>
-                  <p className={`text-xl font-bold ${kpi.color}`}>{kpi.value}</p>
-                </Card>
-              ))}
-            </div>
-
-            <div className="grid md:grid-cols-2 gap-5">
-              {/* Top waste reasons */}
-              <Card className="bg-slate-800/50 border border-slate-700/50">
-                <h3 className="font-bold text-white mb-3">Waste Reasons (Last 30d)</h3>
-                <div className="space-y-2">
-                  {analytics.wasteByReason.map((r) => (
-                    <div key={r.reason} className="flex items-center justify-between">
-                      <span className="text-sm text-slate-300 capitalize">{r.reason}</span>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm text-slate-400">{r.qty} units</span>
-                        <span className="text-sm text-red-400">{formatPrice(r.cost)}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </Card>
-
-              {/* Top waste items */}
-              <Card className="bg-slate-800/50 border border-slate-700/50">
-                <h3 className="font-bold text-white mb-3">Top Waste Items (Last 30d)</h3>
-                <div className="space-y-2">
-                  {analytics.topWasteItems.map((i) => (
-                    <div key={i.menuItemId} className="flex items-center justify-between">
-                      <span className="text-sm text-slate-300">{i.menuItemName}</span>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm text-slate-400">{i.qty} units</span>
-                        <span className="text-sm text-red-400">{formatPrice(i.cost)}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </Card>
-            </div>
           </motion.div>
         )}
 

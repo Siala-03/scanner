@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { pool } from '../db.js';
 import { HttpError } from '../http.js';
 import { 
   getAllInventoryItems, 
@@ -80,8 +81,87 @@ router.put('/:id', authenticate, async (req: AuthenticatedRequest, res: Response
   try {
     const { id } = req.params;
     const updates = req.body;
+    const restaurantId = req.restaurantId || 'default_restaurant';
 
-    const result = await updateInventoryItem(id, req.restaurantId!, updates);
+    // Check if this is a simple inventory record first
+    const simple = await pool.query(`
+      SELECT * FROM inventory_records WHERE menu_item_id = $1 AND restaurant_id = $2
+    `, [id, restaurantId]);
+
+    if (simple.rows.length > 0) {
+      // Update simple inventory record with snake_case support
+      const updateFields: string[] = [];
+      const updateValues: any[] = [];
+      let paramCount = 1;
+
+      // Map both camelCase and snake_case inputs
+      const stock = updates.stock ?? updates.stock;
+      const lowStockThreshold = updates.low_stock_threshold ?? updates.lowStockThreshold;
+      const reorderPoint = updates.reorder_point ?? updates.reorderPoint;
+      const reorderQty = updates.reorder_qty ?? updates.reorderQty;
+      const unitCost = updates.unit_cost ?? updates.unitCost;
+      const location = updates.location;
+
+      if (stock !== undefined) {
+        updateFields.push(`stock = $${paramCount}`);
+        updateValues.push(stock);
+        paramCount++;
+      }
+      if (lowStockThreshold !== undefined) {
+        updateFields.push(`low_stock_threshold = $${paramCount}`);
+        updateValues.push(lowStockThreshold);
+        paramCount++;
+      }
+      if (reorderPoint !== undefined) {
+        updateFields.push(`reorder_point = $${paramCount}`);
+        updateValues.push(reorderPoint);
+        paramCount++;
+      }
+      if (reorderQty !== undefined) {
+        updateFields.push(`reorder_qty = $${paramCount}`);
+        updateValues.push(reorderQty);
+        paramCount++;
+      }
+      if (unitCost !== undefined) {
+        updateFields.push(`unit_cost = $${paramCount}`);
+        updateValues.push(unitCost);
+        paramCount++;
+      }
+      if (location !== undefined) {
+        updateFields.push(`location = $${paramCount}`);
+        updateValues.push(location);
+        paramCount++;
+      }
+
+      if (updateFields.length === 0) {
+        return res.json(simple.rows[0]);
+      }
+
+      updateFields.push('updated_at = NOW()');
+      updateValues.push(id, restaurantId);
+
+      const result = await pool.query(`
+        UPDATE inventory_records
+        SET ${updateFields.join(', ')}
+        WHERE menu_item_id = $${paramCount} AND restaurant_id = $${paramCount + 1}
+        RETURNING *
+      `, updateValues);
+
+      const row = result.rows[0];
+      return res.json({
+        menuItemId: row.menu_item_id,
+        stock: row.stock,
+        lowStockThreshold: row.low_stock_threshold,
+        reorderPoint: row.reorder_point,
+        reorderQty: row.reorder_qty,
+        unitCost: row.unit_cost,
+        location: row.location,
+        updatedAt: row.updated_at,
+      });
+    }
+
+    // Fall back to enterprise service
+    const result = await updateInventoryItem(id, restaurantId, updates);
     if (!result) {
       throw new HttpError(404, 'Inventory item not found');
     }
@@ -124,19 +204,63 @@ router.delete('/:id', authenticate, async (req: AuthenticatedRequest, res: Respo
 router.patch('/:id/adjust', authenticate, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const { locationId, adjustment, reason, performedBy } = req.body;
+    const { locationId = 'default', adjustment, reason, performedBy } = req.body;
+    const restaurantId = req.restaurantId || 'default_restaurant';
     
-    if (!locationId || adjustment === undefined) {
-      throw new HttpError(400, 'locationId and adjustment are required');
+    if (adjustment === undefined) {
+      throw new HttpError(400, 'adjustment is required');
     }
 
+    // For 'default' location, use simple inventory records table for backward compatibility
+    if (locationId === 'default') {
+      let current = await pool.query(
+        'SELECT stock, low_stock_threshold FROM inventory_records WHERE menu_item_id = $1 AND restaurant_id = $2',
+        [id, restaurantId]
+      );
+      
+      if (current.rows.length === 0) {
+        // Create record if doesn't exist
+        await pool.query(`
+          INSERT INTO inventory_records (id, menu_item_id, stock, low_stock_threshold, restaurant_id, created_at, updated_at)
+          VALUES ($1, $2, 0, 5, $3, NOW(), NOW())
+          ON CONFLICT (menu_item_id, restaurant_id) DO NOTHING
+        `, [`inv_${id}`, id, restaurantId]);
+        
+        // Fetch the created/existing record
+        current = await pool.query(
+          'SELECT stock, low_stock_threshold FROM inventory_records WHERE menu_item_id = $1 AND restaurant_id = $2',
+          [id, restaurantId]
+        );
+      }
+      
+      const stockBefore = current.rows[0]?.stock ?? 0;
+      const newStock = Math.max(0, stockBefore + adjustment);
+      
+      const result = await pool.query(`
+        UPDATE inventory_records 
+        SET stock = $1, updated_at = NOW()
+        WHERE menu_item_id = $2 AND restaurant_id = $3
+        RETURNING *
+      `, [newStock, id, restaurantId]);
+      
+      const row = result.rows[0];
+      return res.json({
+        menuItemId: row.menu_item_id,
+        stock: row.stock,
+        lowStockThreshold: row.low_stock_threshold,
+        unitCost: row.unit_cost,
+        updatedAt: row.updated_at,
+      });
+    }
+
+    // For enterprise locations, use the enterprise service
     const result = await adjustStockAtLocation(
       id,
       locationId,
       adjustment,
       reason ?? 'Manual adjustment',
       performedBy ?? req.userId ?? 'system',
-      req.restaurantId!
+      restaurantId
     );
     
     res.json(result);
@@ -203,3 +327,4 @@ router.get('/alerts/low-stock', authenticate, async (req: AuthenticatedRequest, 
 });
 
 export const inventoryRouter = router;
+ 

@@ -17,6 +17,8 @@ import { MenuManagement } from './pages/manager/MenuManagement';
 import { StaffManagement } from './pages/manager/StaffManagement';
 import { AnalyticsPage } from './pages/manager/AnalyticsPage';
 import { QRCodeGenerator } from './pages/manager/QRCodeGenerator';
+import ExpenseApproval from './components/manager/ExpenseApproval';
+import SupervisorExpenseManagement from './components/supervisor/ExpenseManagement';
 import { InventoryManagement } from './pages/shared/InventoryManagement';
 import { SimpleInventory } from './pages/shared/SimpleInventory';
 import { KitchenDisplay } from './pages/kitchen/KitchenDisplay';
@@ -25,8 +27,8 @@ import { Card } from './components/ui/Card';
 import { Button } from './components/ui/Button';
 import { Staff } from './types';
 type UserRole = 'customer' | 'waiter' | 'supervisor' | 'manager' | 'kitchen' | null;
-type ManagerPage = 'dashboard' | 'menu' | 'staff' | 'analytics' | 'performance' | 'qrcodes' | 'inventory' | 'history';
-type SupervisorPage = 'dashboard' | 'revenue' | 'staff' | 'qrcodes' | 'inventory' | 'menu' | 'history';
+type ManagerPage = 'dashboard' | 'menu' | 'staff' | 'analytics' | 'performance' | 'qrcodes' | 'inventory' | 'history' | 'expenses';
+type SupervisorPage = 'dashboard' | 'revenue' | 'staff' | 'qrcodes' | 'inventory' | 'menu' | 'history' | 'expenses';
 export function App() {
   const [selectedRole, setSelectedRole] = useState<UserRole>(null);
   const [authUser, setAuthUser] = useState<Staff | null>(null);
@@ -345,6 +347,13 @@ export function App() {
             >
               Order History
             </Button>
+            <Button
+              variant={supervisorPage === 'expenses' ? 'primary' : 'ghost'}
+              size="sm"
+              onClick={() => setSupervisorPage('expenses')}
+            >
+              Expenses
+            </Button>
           </div>
         </div>
 
@@ -364,8 +373,9 @@ export function App() {
             }}
           />
         )}
-        {supervisorPage === 'inventory' && <SimpleInventory />}
+        {supervisorPage === 'inventory' && <InventoryManagement role="supervisor" />}
         {supervisorPage === 'history' && <OrderHistoryPage onBack={() => setSupervisorPage('dashboard')} existingOrders={orders} />}
+        {supervisorPage === 'expenses' && <SupervisorExpenseManagement />}
         {supervisorPage === 'menu' && <MenuManagement />}
       </div>
     );
@@ -401,7 +411,11 @@ export function App() {
               { id: 'analytics', label: 'Analytics' },
               { id: 'staff', label: 'Staff' },
               { id: 'performance', label: 'Performance' },
-            ].map((item) => (
+            {
+              id: 'expenses',
+              label: 'Expenses'
+            },
+          ].map((item) => (
               <button
                 key={item.id}
                 onClick={() => setManagerPage(item.id as ManagerPage)}
@@ -429,7 +443,7 @@ export function App() {
             {managerPage === 'staff' && <StaffManagement />}
             {managerPage === 'analytics' && <AnalyticsPage />}
             {managerPage === 'performance' && <StaffPerformance />}
-            {managerPage === 'inventory' && <SimpleInventory />}
+            {managerPage === 'inventory' && <InventoryManagement role="manager" />}
             {managerPage === 'qrcodes' && (
               <QRCodeGenerator
                 tables={tables}
@@ -439,6 +453,7 @@ export function App() {
                 }}
               />
             )}
+            {managerPage === 'expenses' && <ExpenseApproval />}
             {managerPage === 'history' && <OrderHistoryPage onBack={() => setManagerPage('dashboard')} existingOrders={orders} />}
           </main>
         </div>

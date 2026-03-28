@@ -82,7 +82,7 @@ export async function adjustStock(
 ): Promise<InventoryRecord> {
   return apiRequest<InventoryRecord>(`${API_BASE}/inventory/${menuItemId}/adjust`, {
     method: 'PATCH',
-    json: { adjustment, reason, performed_by: performedBy },
+    json: { adjustment, reason, performed_by: performedBy, locationId: 'default' },
   });
 }
 
