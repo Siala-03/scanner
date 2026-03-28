@@ -1,6 +1,7 @@
 import { apiRequest } from './http';
 import type {
   InventoryRecord,
+  InventoryLocation,
   Supplier,
   PurchaseOrder,
   PurchaseOrderStatus,
@@ -9,7 +10,37 @@ import type {
   WasteReason,
   InventoryAnalytics,
   InventoryForecast,
+  RecipeIngredient,
+  RecipeRequirement,
 } from '../types/inventory';
+
+// Types for cycle counts (add to types/inventory.ts later)
+interface CycleCount {
+  id: string;
+  restaurantId: string;
+  locationId?: string;
+  status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
+  scheduledDate: string;
+  completedDate?: string;
+  countedBy?: string;
+  varianceNotes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface CycleCountItem {
+  id: string;
+  cycleCountId: string;
+  inventoryItemId: string;
+  inventoryItemName: string;
+  locationId: string;
+  systemQty: number;
+  countedQty?: number;
+  variance?: number;
+  varianceReason?: string;
+  countedBy?: string;
+  countedAt?: string;
+}
 
 // Base API URL
 const API_BASE = import.meta.env.VITE_API_URL
@@ -63,6 +94,27 @@ export async function deleteInventoryRecord(menuItemId: string): Promise<void> {
 
 export async function fetchLowStockItems(): Promise<InventoryRecord[]> {
   return apiRequest<InventoryRecord[]>(`${API_BASE}/inventory/alerts/low-stock`);
+}
+
+// ── Locations (new unified inventory support) ─────────────────────────────────
+export async function fetchLocations(): Promise<InventoryLocation[]> {
+  return apiRequest<InventoryLocation[]>(`${API_BASE}/locations`);
+}
+
+export async function fetchLocationStock(locationId: string): Promise<{
+  itemId: string;
+  itemName: string;
+  category: string;
+  unitOfMeasure: string;
+  quantity: number;
+  reservedQty: number;
+  minLevel: number;
+  maxLevel: number;
+  reorderPoint: number;
+  reorderQty: number;
+  safetyStock: number;
+}[]> {
+  return apiRequest(`${API_BASE}/locations/${locationId}/stock`);
 }
 
 // ── Suppliers ─────────────────────────────────────────────────────────────────
@@ -276,4 +328,125 @@ export async function fetchForecastAlerts(): Promise<InventoryForecast[]> {
 export async function fetchForecastByItem(menuItemId: string, menuItemName?: string): Promise<InventoryForecast> {
   const params = menuItemName ? `?menuItemName=${encodeURIComponent(menuItemName)}` : '';
   return apiRequest<InventoryForecast>(`${API_BASE}/forecasting/${menuItemId}${params}`);
+}
+
+// ── Recipes (Ingredient Management) ────────────────────────────────────────
+
+export async function fetchRecipeIngredients(menuItemId: string): Promise<RecipeIngredient[]> {
+  return apiRequest<RecipeIngredient[]>(`${API_BASE}/recipes/${menuItemId}`);
+}
+
+export async function addRecipeIngredient(
+  menuItemId: string,
+  ingredient: {
+    inventoryItemId: string;
+    quantity: number;
+    unitOfMeasure: string;
+    yieldPercentage?: number;
+    isOptional?: boolean;
+  }
+): Promise<RecipeIngredient> {
+  return apiRequest<RecipeIngredient>(`${API_BASE}/recipes/${menuItemId}`, {
+    method: 'POST',
+    json: ingredient,
+  });
+}
+
+export async function updateRecipeIngredient(
+  menuItemId: string,
+  ingredientId: string,
+  updates: Partial<{
+    quantity: number;
+    unitOfMeasure: string;
+    yieldPercentage: number;
+    isOptional: boolean;
+  }>
+): Promise<RecipeIngredient> {
+  return apiRequest<RecipeIngredient>(`${API_BASE}/recipes/${menuItemId}/${ingredientId}`, {
+    method: 'PUT',
+    json: updates,
+  });
+}
+
+export async function deleteRecipeIngredient(
+  menuItemId: string,
+  ingredientId: string
+): Promise<void> {
+  return apiRequest<void>(`${API_BASE}/recipes/${menuItemId}/${ingredientId}`, {
+    method: 'DELETE',
+  });
+}
+
+export async function checkStockRequirements(
+  menuItemId: string,
+  quantity: number = 1,
+  locationId?: string
+): Promise<RecipeRequirement> {
+  return apiRequest<RecipeRequirement>(`${API_BASE}/recipes/${menuItemId}/requirements`, {
+    method: 'POST',
+    json: { quantity, locationId },
+  });
+}
+
+// ── Cycle Counts (Stock Takes) ────────────────────────────────────────────
+
+export async function listCycleCounts(status?: string): Promise<CycleCount[]> {
+  const query = status ? `?status=${status}` : '';
+  return apiRequest<CycleCount[]>(`${API_BASE}/cycle-counts${query}`);
+}
+
+export async function createCycleCount(
+  scheduledDate: string,
+  locationId?: string
+): Promise<CycleCount> {
+  return apiRequest<CycleCount>(`${API_BASE}/cycle-counts`, {
+    method: 'POST',
+    json: { scheduledDate, locationId },
+  });
+}
+
+export async function getCycleCount(cycleCountId: string): Promise<{
+  cycle: CycleCount;
+  items: CycleCountItem[];
+}> {
+  return apiRequest<{ cycle: CycleCount; items: CycleCountItem[] }>(
+    `${API_BASE}/cycle-counts/${cycleCountId}`
+  );
+}
+
+export async function recordCycleCountItem(
+  cycleCountId: string,
+  itemId: string,
+  countedQty: number,
+  varianceReason?: string
+): Promise<CycleCountItem> {
+  return apiRequest<CycleCountItem>(
+    `${API_BASE}/cycle-counts/${cycleCountId}/items/${itemId}`,
+    {
+      method: 'PATCH',
+      json: { countedQty, varianceReason },
+    }
+  );
+}
+
+export async function completeCycleCount(
+  cycleCountId: string,
+  varianceNotes?: string
+): Promise<CycleCount> {
+  return apiRequest<CycleCount>(
+    `${API_BASE}/cycle-counts/${cycleCountId}/complete`,
+    {
+      method: 'POST',
+      json: { varianceNotes },
+    }
+  );
+}
+
+export async function cancelCycleCount(cycleCountId: string): Promise<CycleCount> {
+  return apiRequest<CycleCount>(
+    `${API_BASE}/cycle-counts/${cycleCountId}/cancel`,
+    {
+      method: 'POST',
+    }
+  );
 }

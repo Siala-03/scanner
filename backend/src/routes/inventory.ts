@@ -1,16 +1,24 @@
 import { Router, Request, Response } from 'express';
-import { pool } from '../db.js';
 import { HttpError } from '../http.js';
-import { adjustStock, getLowStockItems, getAllInventory, getInventoryById } from '../services/inventoryService.js';
+import { 
+  getAllInventoryItems, 
+  getInventoryItemById, 
+  adjustStockAtLocation,
+  getLowStockItems,
+  createInventoryItem,
+  updateInventoryItem,
+  deleteInventoryItem,
+  initializeStockAtLocation
+} from '../services/unifiedInventoryService.js';
 import { emitInventoryUpdate } from '../socket.js';
 import { authenticate, AuthenticatedRequest } from '../middleware/auth.js';
 
 const router = Router();
 
-// GET all inventory records
+// GET all inventory items with stock information
 router.get('/', authenticate, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const result = await getAllInventory(req.restaurantId!);
+    const result = await getAllInventoryItems(req.restaurantId!);
     res.json(result);
   } catch (error) {
     console.error('Error fetching inventory:', error);
@@ -18,138 +26,120 @@ router.get('/', authenticate, async (req: AuthenticatedRequest, res: Response) =
   }
 });
 
-// GET single inventory record
-router.get('/:menuItemId', authenticate, async (req: AuthenticatedRequest, res: Response) => {
+// GET single inventory item by ID
+router.get('/:id', authenticate, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { menuItemId } = req.params;
-    const result = await getInventoryById(menuItemId, req.restaurantId!);
+    const { id } = req.params;
+    const result = await getInventoryItemById(id, req.restaurantId!);
     if (!result) {
-      throw new HttpError(404, 'Inventory record not found');
+      throw new HttpError(404, 'Inventory item not found');
     }
     res.json(result);
   } catch (error) {
     if (error instanceof HttpError) {
       res.status(error.status).json({ error: error.message });
     } else {
-      console.error('Error fetching inventory record:', error);
-      res.status(500).json({ error: 'Failed to fetch inventory record' });
+      console.error('Error fetching inventory item:', error);
+      res.status(500).json({ error: 'Failed to fetch inventory item' });
     }
   }
 });
 
-// POST create new inventory record
-router.post('/', async (req: Request, res: Response) => {
+// POST create new inventory item
+router.post('/', authenticate, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const {
-      menu_item_id,
-      stock = 0,
-      low_stock_threshold = 5,
-      reorder_point = 10,
-      reorder_qty = 20,
-      unit_cost = 0,
-      supplier_id,
-      location
-    } = req.body;
-
-    const id = `inv_${Date.now().toString(36)}`;
+    const { name, category, unitOfMeasure, sku, subCategory } = req.body;
     
-    const result = await pool.query(
-      `INSERT INTO inventory_records 
-        (id, menu_item_id, stock, low_stock_threshold, reorder_point, reorder_qty, unit_cost, supplier_id, location)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-       RETURNING *`,
-      [id, menu_item_id, stock, low_stock_threshold, reorder_point, reorder_qty, unit_cost, supplier_id, location]
+    if (!name || !category || !unitOfMeasure) {
+      throw new HttpError(400, 'Name, category, and unitOfMeasure are required');
+    }
+
+    const result = await createInventoryItem(
+      req.restaurantId!,
+      name,
+      category,
+      unitOfMeasure,
+      sku,
+      subCategory
     );
     
-    emitInventoryUpdate({ type: 'create', record: result.rows[0] });
-    res.status(201).json(result.rows[0]);
-  } catch (error) {
-    console.error('Error creating inventory record:', error);
-    res.status(500).json({ error: 'Failed to create inventory record' });
-  }
-});
-
-// PUT update inventory record
-router.put('/:menuItemId', async (req: Request, res: Response) => {
-  try {
-    const { menuItemId } = req.params;
-    const {
-      stock,
-      low_stock_threshold,
-      reorder_point,
-      reorder_qty,
-      unit_cost,
-      supplier_id,
-      location
-    } = req.body;
-
-    const updates: string[] = [];
-    const values: unknown[] = [];
-    let paramIndex = 1;
-
-    if (stock !== undefined) {
-      updates.push(`stock = $${paramIndex++}`);
-      values.push(stock);
-    }
-    if (low_stock_threshold !== undefined) {
-      updates.push(`low_stock_threshold = $${paramIndex++}`);
-      values.push(low_stock_threshold);
-    }
-    if (reorder_point !== undefined) {
-      updates.push(`reorder_point = $${paramIndex++}`);
-      values.push(reorder_point);
-    }
-    if (reorder_qty !== undefined) {
-      updates.push(`reorder_qty = $${paramIndex++}`);
-      values.push(reorder_qty);
-    }
-    if (unit_cost !== undefined) {
-      updates.push(`unit_cost = $${paramIndex++}`);
-      values.push(unit_cost);
-    }
-    if (supplier_id !== undefined) {
-      updates.push(`supplier_id = $${paramIndex++}`);
-      values.push(supplier_id);
-    }
-    if (location !== undefined) {
-      updates.push(`location = $${paramIndex++}`);
-      values.push(location);
-    }
-
-    updates.push(`updated_at = $${paramIndex++}`);
-    values.push(new Date().toISOString());
-    values.push(menuItemId);
-
-    const result = await pool.query(
-      `UPDATE inventory_records SET ${updates.join(', ')} 
-       WHERE menu_item_id = $${paramIndex} 
-       RETURNING *`,
-      values
-    );
-
-    if (result.rows.length === 0) {
-      throw new HttpError(404, 'Inventory record not found');
-    }
-
-    emitInventoryUpdate({ type: 'update', record: result.rows[0] });
-    res.json(result.rows[0]);
+    emitInventoryUpdate({ type: 'create', item: result });
+    res.status(201).json(result);
   } catch (error) {
     if (error instanceof HttpError) {
       res.status(error.status).json({ error: error.message });
     } else {
-      console.error('Error updating inventory record:', error);
-      res.status(500).json({ error: 'Failed to update inventory record' });
+      console.error('Error creating inventory item:', error);
+      res.status(500).json({ error: 'Failed to create inventory item' });
     }
   }
 });
 
-// PATCH adjust stock (for manual adjustments)
-router.patch('/:menuItemId/adjust', async (req: Request, res: Response) => {
+// PUT update inventory item
+router.put('/:id', authenticate, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { menuItemId } = req.params;
-    const { adjustment, reason, performed_by } = req.body;
-    const record = await adjustStock(menuItemId, adjustment, reason ?? 'Manual adjustment', performed_by ?? 'system');
-    res.json(record);
+    const { id } = req.params;
+    const updates = req.body;
+
+    const result = await updateInventoryItem(id, req.restaurantId!, updates);
+    if (!result) {
+      throw new HttpError(404, 'Inventory item not found');
+    }
+
+    emitInventoryUpdate({ type: 'update', item: result });
+    res.json(result);
+  } catch (error) {
+    if (error instanceof HttpError) {
+      res.status(error.status).json({ error: error.message });
+    } else {
+      console.error('Error updating inventory item:', error);
+      res.status(500).json({ error: 'Failed to update inventory item' });
+    }
+  }
+});
+
+// DELETE inventory item (soft delete)
+router.delete('/:id', authenticate, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const success = await deleteInventoryItem(id, req.restaurantId!);
+    
+    if (!success) {
+      throw new HttpError(404, 'Inventory item not found');
+    }
+
+    emitInventoryUpdate({ type: 'delete', itemId: id });
+    res.status(204).send();
+  } catch (error) {
+    if (error instanceof HttpError) {
+      res.status(error.status).json({ error: error.message });
+    } else {
+      console.error('Error deleting inventory item:', error);
+      res.status(500).json({ error: 'Failed to delete inventory item' });
+    }
+  }
+});
+
+// PATCH adjust stock at location
+router.patch('/:id/adjust', authenticate, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { locationId, adjustment, reason, performedBy } = req.body;
+    
+    if (!locationId || adjustment === undefined) {
+      throw new HttpError(400, 'locationId and adjustment are required');
+    }
+
+    const result = await adjustStockAtLocation(
+      id,
+      locationId,
+      adjustment,
+      reason ?? 'Manual adjustment',
+      performedBy ?? req.userId ?? 'system',
+      req.restaurantId!
+    );
+    
+    res.json(result);
   } catch (error) {
     if (error instanceof HttpError) {
       res.status(error.status).json({ error: error.message });
@@ -160,26 +150,51 @@ router.patch('/:menuItemId/adjust', async (req: Request, res: Response) => {
   }
 });
 
-// DELETE inventory record
-router.delete('/:menuItemId', async (req: Request, res: Response) => {
+// POST initialize stock at location
+router.post('/:id/stock', authenticate, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { menuItemId } = req.params;
-    await pool.query(
-      'DELETE FROM inventory_records WHERE menu_item_id = $1',
-      [menuItemId]
+    const { id } = req.params;
+    const { 
+      locationId, 
+      initialQuantity = 0, 
+      minLevel = 0, 
+      maxLevel = 0, 
+      reorderPoint = 0, 
+      reorderQty = 0, 
+      safetyStock = 0 
+    } = req.body;
+    
+    if (!locationId) {
+      throw new HttpError(400, 'locationId is required');
+    }
+
+    const result = await initializeStockAtLocation(
+      id,
+      locationId,
+      req.restaurantId!,
+      initialQuantity,
+      minLevel,
+      maxLevel,
+      reorderPoint,
+      reorderQty,
+      safetyStock
     );
-    emitInventoryUpdate({ type: 'delete', menuItemId });
-    res.status(204).send();
+    
+    res.status(201).json(result);
   } catch (error) {
-    console.error('Error deleting inventory record:', error);
-    res.status(500).json({ error: 'Failed to delete inventory record' });
+    if (error instanceof HttpError) {
+      res.status(error.status).json({ error: error.message });
+    } else {
+      console.error('Error initializing stock:', error);
+      res.status(500).json({ error: 'Failed to initialize stock' });
+    }
   }
 });
 
 // GET low stock items
-router.get('/alerts/low-stock', async (_req: Request, res: Response) => {
+router.get('/alerts/low-stock', authenticate, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const rows = await getLowStockItems();
+    const rows = await getLowStockItems(req.restaurantId!);
     res.json(rows);
   } catch (error) {
     console.error('Error fetching low stock:', error);

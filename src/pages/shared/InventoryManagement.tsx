@@ -58,7 +58,7 @@ interface InventoryManagementProps {
   role: 'manager' | 'supervisor';
 }
 
-type Tab = 'overview' | 'purchase-orders' | 'suppliers' | 'waste' | 'forecasting';
+type Tab = 'overview' | 'purchase-orders' | 'suppliers' | 'waste' | 'forecasting' | 'locations';
 
 const PO_STATUS_CONFIG: Record<PurchaseOrderStatus, { label: string; color: string; bg: string }> = {
   draft:     { label: 'Draft',     color: 'text-slate-400',  bg: 'bg-slate-500/10 border-slate-500/20' },
@@ -147,6 +147,7 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
     isLoading,
     loadError,
     refresh,
+    locations,
   } = useInventoryData();
   const menuCategories = useMemo(() => Array.from(new Set(menuItems.map((m) => m.category))), [menuItems]);
   const isManager = role === 'manager';
@@ -403,6 +404,7 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
     { id: 'suppliers', label: 'Suppliers', icon: <TruckIcon className="w-4 h-4" /> },
     { id: 'waste', label: 'Waste', icon: <TrashIcon className="w-4 h-4" /> },
     { id: 'forecasting', label: 'Forecasting', icon: <TrendingUpIcon className="w-4 h-4" />, badge: forecastAlerts.length || undefined },
+    { id: 'locations', label: 'Locations', icon: <MapPinIcon className="w-4 h-4" />, badge: locations.filter((l) => l.lowStockItems > 0).length || undefined },
   ];
 
   return (
@@ -529,10 +531,10 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
               {[
                 { label: 'Total Items', value: menuItems.length, icon: <PackageIcon className="w-5 h-5 text-blue-400" />, color: 'text-blue-400' },
+                { label: 'Total Stock Value', value: formatPrice(analytics.totalStockValue), icon: <TrendingUpIcon className="w-5 h-5 text-emerald-400" />, color: 'text-emerald-400' },
                 { label: 'Low Stock', value: analytics.lowStockCount, icon: <AlertTriangleIcon className="w-5 h-5 text-amber-400" />, color: 'text-amber-400' },
-                { label: 'Reorder Alerts', value: reorderAlerts.length, icon: <TruckIcon className="w-5 h-5 text-indigo-400" />, color: 'text-indigo-400' },
-                { label: 'Turnover (30d)', value: `${analytics.stockTurnoverRate.toFixed(1)}x`, icon: <TrendingUpIcon className="w-5 h-5 text-emerald-400" />, color: 'text-emerald-400' },
-                { label: 'Avg Age', value: `${avgStockAgeDays}d`, icon: <ClockIcon className="w-5 h-5 text-slate-400" />, color: 'text-slate-400' },
+                { label: 'Out of Stock', value: analytics.outOfStockCount, icon: <XCircleIcon className="w-5 h-5 text-red-400" />, color: 'text-red-400' },
+                { label: 'Below Reorder', value: analytics.belowReorderCount, icon: <TruckIcon className="w-5 h-5 text-indigo-400" />, color: 'text-indigo-400' },
               ].map((kpi) => (
                 <Card key={kpi.label} className="bg-slate-800/50 border border-slate-700/50">
                   <div className="flex items-center gap-3">
@@ -589,9 +591,12 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                     <tr>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Item</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Location</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Stock Level</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Thresholds</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Stock</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Low Threshold</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Reorder Point</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Reorder Qty</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Unit Cost</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Stock Value</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Age</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Status</th>
                       {isManager && <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Actions</th>}
@@ -653,35 +658,43 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                               <StockBar stock={row.stock} threshold={row.threshold} max={maxStock} />
                             </div>
                           </td>
-                          <td className="px-4 py-3">
+                          <td className="px-4 py-3 text-center">
                             {isEditing ? (
-                              <div className="flex gap-1">
-                                <div className="text-center">
-                                  <p className="text-xs text-slate-500 mb-0.5">Alert</p>
-                                  <input
-                                    type="number"
-                                    value={editValues.lowStockThreshold ?? row.rec?.lowStockThreshold ?? 0}
-                                    onChange={(e) => setEditValues((v) => ({ ...v, lowStockThreshold: parseInt(e.target.value || '0', 10) }))}
-                                    className="w-14 px-2 py-1 rounded bg-slate-900 border border-slate-600 text-white text-xs focus:outline-none focus:ring-1 focus:ring-amber-500"
-                                    min={0}
-                                  />
-                                </div>
-                                <div className="text-center">
-                                  <p className="text-xs text-slate-500 mb-0.5">Reorder</p>
-                                  <input
-                                    type="number"
-                                    value={editValues.reorderQty ?? row.rec?.reorderQty ?? 0}
-                                    onChange={(e) => setEditValues((v) => ({ ...v, reorderQty: parseInt(e.target.value || '0', 10) }))}
-                                    className="w-14 px-2 py-1 rounded bg-slate-900 border border-slate-600 text-white text-xs focus:outline-none focus:ring-1 focus:ring-amber-500"
-                                    min={0}
-                                  />
-                                </div>
-                              </div>
+                              <input
+                                type="number"
+                                value={editValues.lowStockThreshold ?? row.rec?.lowStockThreshold ?? 0}
+                                onChange={(e) => setEditValues((v) => ({ ...v, lowStockThreshold: parseInt(e.target.value || '0', 10) }))}
+                                className="w-16 px-2 py-1 rounded bg-slate-900 border border-slate-600 text-white text-xs focus:outline-none focus:ring-1 focus:ring-amber-500"
+                                min={0}
+                              />
                             ) : (
-                              <div className="text-xs text-slate-400 space-y-0.5">
-                                <p>Alert at <span className="text-amber-400 font-medium">{row.rec?.lowStockThreshold ?? 0}</span></p>
-                                <p>Reorder <span className="text-blue-400 font-medium">{row.rec?.reorderQty ?? 0}</span> units</p>
-                              </div>
+                              <span className="text-xs text-slate-300">{row.rec?.lowStockThreshold ?? 0}</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            {isEditing ? (
+                              <input
+                                type="number"
+                                value={editValues.reorderPoint ?? row.rec?.reorderPoint ?? 0}
+                                onChange={(e) => setEditValues((v) => ({ ...v, reorderPoint: parseInt(e.target.value || '0', 10) }))}
+                                className="w-16 px-2 py-1 rounded bg-slate-900 border border-slate-600 text-white text-xs focus:outline-none focus:ring-1 focus:ring-amber-500"
+                                min={0}
+                              />
+                            ) : (
+                              <span className="text-xs text-slate-300">{row.rec?.reorderPoint ?? 0}</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            {isEditing ? (
+                              <input
+                                type="number"
+                                value={editValues.reorderQty ?? row.rec?.reorderQty ?? 0}
+                                onChange={(e) => setEditValues((v) => ({ ...v, reorderQty: parseInt(e.target.value || '0', 10) }))}
+                                className="w-16 px-2 py-1 rounded bg-slate-900 border border-slate-600 text-white text-xs focus:outline-none focus:ring-1 focus:ring-amber-500"
+                                min={0}
+                              />
+                            ) : (
+                              <span className="text-xs text-slate-300">{row.rec?.reorderQty ?? 0}</span>
                             )}
                           </td>
                           <td className="px-4 py-3">
@@ -697,6 +710,7 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                               <span className="text-sm text-slate-300">{formatPrice(row.rec?.unitCost ?? 0)}</span>
                             )}
                           </td>
+                          <td className="px-4 py-3 text-sm text-slate-300">{formatPrice((row.rec?.unitCost ?? 0) * row.stock)}</td>
                           <td className="px-4 py-3 text-sm text-slate-300">
                             {row.lastUpdatedDays !== null ? `${row.lastUpdatedDays}d` : '—'}
                           </td>
@@ -826,6 +840,67 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
               </div>
             </Modal>
           )}
+        )}
+
+        {activeTab === 'locations' && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 mb-5">
+              {locations.map((loc) => (
+                <Card key={loc.id} className="bg-slate-800/50 border border-slate-700/50">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h3 className="text-white font-semibold">{loc.name}</h3>
+                      <p className="text-xs text-slate-400">{loc.type.replace(/_/g, ' ')}</p>
+                    </div>
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${loc.isActive ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/20' : 'bg-slate-700 text-slate-400 border border-slate-600'}`}>
+                      {loc.isActive ? 'Active' : 'Inactive'}
+                    </span>
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-300">
+                    <div><span className="font-medium">Items</span>: {loc.totalItems}</div>
+                    <div><span className="font-medium">Stock</span>: {loc.totalStock}</div>
+                    <div><span className="font-medium">Low</span>: {loc.lowStockItems}</div>
+                    <div><span className="font-medium">Capacity</span>: {loc.capacity ?? '—'}</div>
+                    <div className="col-span-2"><span className="font-medium">Temp</span>: {loc.temperatureRange ?? 'N/A'}</div>
+                  </div>
+                </Card>
+              ))}
+              {locations.length === 0 && (
+                <div className="py-16 text-center text-slate-500">No locations found.</div>
+              )}
+            </div>
+
+            <Card className="bg-slate-800/50 border border-slate-700/50" padding="none">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-slate-700/40 border-b border-slate-700/50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Location</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Type</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Items</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Stock</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Low Stock</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Capacity</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Temp</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-700/30">
+                    {locations.map((loc) => (
+                      <tr key={loc.id} className="hover:bg-slate-700/20">
+                        <td className="px-4 py-3 text-sm text-white">{loc.name}</td>
+                        <td className="px-4 py-3 text-sm text-slate-300">{loc.type.replace(/_/g, ' ')}</td>
+                        <td className="px-4 py-3 text-sm text-slate-300">{loc.totalItems}</td>
+                        <td className="px-4 py-3 text-sm text-slate-300">{loc.totalStock}</td>
+                        <td className="px-4 py-3 text-sm text-amber-300">{loc.lowStockItems}</td>
+                        <td className="px-4 py-3 text-sm text-slate-300">{loc.capacity ?? '—'}</td>
+                        <td className="px-4 py-3 text-sm text-slate-300">{loc.temperatureRange ?? 'N/A'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          </motion.div>
         )}
 
         {/* ════════════════════════════════════════════════════════════════

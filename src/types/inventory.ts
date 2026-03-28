@@ -156,3 +156,169 @@ export interface ForecastSummary {
   warningAlerts: number;
   avgConfidence: number;
 }
+
+// ============================================
+// UNIFIED INVENTORY MANAGEMENT - NEW TYPES
+// ============================================
+
+export interface InventoryLocation {
+  id: string;
+  restaurantId: string;
+  name: string;
+  type: 'warehouse' | 'walk_in' | 'dry_store' | 'bar' | 'kitchen' | 'cold_room' | 'freezer' | 'display' | 'other';
+  description?: string;
+  isActive: boolean;
+  capacity?: number;
+  temperatureRange?: string;
+  totalItems: number;
+  totalStock: number;
+  lowStockItems: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface StockByLocation {
+  locationId: string;
+  locationName: string;
+  quantity: number;
+  reservedQty: number;
+  minLevel: number;
+  maxLevel: number;
+  reorderPoint: number;
+  reorderQty: number;
+  safetyStock: number;
+}
+
+export interface UnifiedInventoryItem {
+  id: string;
+  restaurantId: string;
+  name: string;
+  sku?: string;
+  category: string;
+  subCategory?: string;
+  unitOfMeasure: string;
+  unitConversion: number;
+  isTracked: boolean;
+  isActive: boolean;
+  stockByLocation: StockByLocation[];
+  totalStock: number;
+  totalValue: number;
+  linkedMenuItems: {
+    menuItemId: string;
+    menuItemName: string;
+    quantityPerServing: number;
+    unitOfMeasure: string;
+  }[];
+  activeAlerts: {
+    type: string;
+    message: string;
+    severity: 'low' | 'medium' | 'high' | 'critical';
+  }[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RecipeIngredient {
+  id: string;
+  restaurantId: string;
+  menuItemId: string;
+  inventoryItemId: string;
+  inventoryItemName: string;
+  quantity: number;
+  unitOfMeasure: string;
+  yieldPercentage: number;
+  isOptional: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RecipeRequirement {
+  menuItemId: string;
+  menuItemName: string;
+  ingredients: {
+    inventoryItemId: string;
+    inventoryItemName: string;
+    quantityNeeded: number;
+    quantityAvailable: number;
+    unitOfMeasure: string;
+    canFulfill: boolean;
+  }[];
+  canFulfillAll: boolean;
+  maxServings: number;
+}
+
+export interface InventoryLot {
+  id: string;
+  restaurantId: string;
+  inventoryItemId: string;
+  inventoryItemName: string;
+  locationId: string;
+  locationName: string;
+  lotNumber?: string;
+  quantity: number;
+  unitCost: number;
+  totalValue: number;
+  receivedDate: string;
+  expiryDate?: string;
+  supplierId?: string;
+  supplierName?: string;
+  purchaseOrderId?: string;
+  isExpired: boolean;
+  daysUntilExpiry?: number;
+  isFullyConsumed: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CycleCount {
+  id: string;
+  restaurantId: string;
+  locationId?: string;
+  locationName?: string;
+  status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
+  scheduledDate: string;
+  completedDate?: string;
+  countedBy?: string;
+  varianceNotes?: string;
+  totalItems: number;
+  countedItems: number;
+  varianceItems: number;
+  totalVarianceValue: number;
+  items: CycleCountItem[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CycleCountItem {
+  id: string;
+  cycleCountId: string;
+  inventoryItemId: string;
+  inventoryItemName: string;
+  locationId: string;
+  systemQty: number;
+  countedQty?: number;
+  variance?: number;
+  varianceReason?: string;
+  countedBy?: string;
+  countedAt?: string;
+  verifiedBy?: string;
+  verifiedAt?: string;
+}
+
+export interface InventoryAlert {
+  id: string;
+  restaurantId: string;
+  alertType: 'low_stock' | 'out_of_stock' | 'expiring_soon' | 'expired' | 'below_par' | 'overstock' | 'count_variance' | 'price_change';
+  inventoryItemId?: string;
+  inventoryItemName?: string;
+  locationId?: string;
+  locationName?: string;
+  thresholdValue?: number;
+  currentValue?: number;
+  isResolved: boolean;
+  resolvedBy?: string;
+  resolvedAt?: string;
+  message: string;
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  createdAt: string;
+}

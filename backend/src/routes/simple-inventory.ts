@@ -19,7 +19,7 @@ router.get('/', authenticate, async (req: AuthenticatedRequest, res: Response) =
         m.category,
         ir.updated_at
       FROM inventory_records ir
-      LEFT JOIN menu m ON m.id = ir.menu_item_id AND m.restaurant_id = ir.restaurant_id
+      LEFT JOIN menu_items m ON m.id = ir.menu_item_id
       WHERE ir.restaurant_id = $1
       ORDER BY m.name ASC
     `, [restaurantId]);
@@ -46,17 +46,20 @@ router.put('/:menuItemId', authenticate, async (req: AuthenticatedRequest, res: 
     const { stock, low_stock_threshold } = req.body;
     const restaurantId = req.restaurantId || 'default_restaurant';
     
+    // Use UPSERT to create or update
     const result = await pool.query(`
-      UPDATE inventory_records 
-      SET stock = COALESCE($1, stock),
-          low_stock_threshold = COALESCE($2, low_stock_threshold),
-          updated_at = NOW()
-      WHERE menu_item_id = $3 AND restaurant_id = $4
+      INSERT INTO inventory_records (id, menu_item_id, stock, low_stock_threshold, restaurant_id, created_at, updated_at)
+      VALUES ($4, $3, $1, $2, $5, NOW(), NOW())
+      ON CONFLICT (menu_item_id, restaurant_id)
+      DO UPDATE SET 
+        stock = COALESCE($1, EXCLUDED.stock),
+        low_stock_threshold = COALESCE($2, EXCLUDED.low_stock_threshold),
+        updated_at = NOW()
       RETURNING *
-    `, [stock, low_stock_threshold, menuItemId, restaurantId]);
+    `, [stock, low_stock_threshold, menuItemId, `inv_${menuItemId}`, restaurantId]);
     
     if (result.rows.length === 0) {
-      res.status(404).json({ error: 'Inventory record not found' });
+      res.status(500).json({ error: 'Failed to update inventory record' });
       return;
     }
     
@@ -81,15 +84,24 @@ router.patch('/:menuItemId/adjust', authenticate, async (req: AuthenticatedReque
     const { adjustment, reason, performed_by } = req.body;
     const restaurantId = req.restaurantId || 'default_restaurant';
     
-    // Get current stock
-    const current = await pool.query(
+    // Get current stock (or create record if doesn't exist)
+    let current = await pool.query(
       'SELECT stock, low_stock_threshold FROM inventory_records WHERE menu_item_id = $1 AND restaurant_id = $2',
       [menuItemId, restaurantId]
     );
     
     if (current.rows.length === 0) {
-      res.status(404).json({ error: 'Inventory record not found' });
-      return;
+      // Create inventory record if it doesn't exist
+      await pool.query(`
+        INSERT INTO inventory_records (id, menu_item_id, stock, low_stock_threshold, restaurant_id, created_at, updated_at)
+        VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
+        ON CONFLICT (menu_item_id, restaurant_id) DO NOTHING
+      `, [`inv_${menuItemId}`, menuItemId, 0, 5, restaurantId]);
+      
+      current = await pool.query(
+        'SELECT stock, low_stock_threshold FROM inventory_records WHERE menu_item_id = $1 AND restaurant_id = $2',
+        [menuItemId, restaurantId]
+      );
     }
     
     const stockBefore = current.rows[0].stock || 0;
@@ -114,6 +126,43 @@ router.patch('/:menuItemId/adjust', authenticate, async (req: AuthenticatedReque
   } catch (error) {
     console.error('Error adjusting stock:', error);
     res.status(500).json({ error: 'Failed to adjust stock' });
+  }
+});
+
+// POST create new inventory record
+router.post('/', authenticate, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { menuItemId, stock = 0, lowStockThreshold = 5, unitCost = 0 } = req.body;
+    const restaurantId = req.restaurantId || 'default_restaurant';
+    
+    if (!menuItemId) {
+      res.status(400).json({ error: 'menuItemId is required' });
+      return;
+    }
+    
+    const result = await pool.query(`
+      INSERT INTO inventory_records (id, menu_item_id, stock, low_stock_threshold, unit_cost, restaurant_id, created_at, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+      ON CONFLICT (menu_item_id, restaurant_id) DO UPDATE
+      SET 
+        stock = COALESCE($3, EXCLUDED.stock),
+        low_stock_threshold = COALESCE($4, EXCLUDED.low_stock_threshold),
+        unit_cost = COALESCE($5, EXCLUDED.unit_cost),
+        updated_at = NOW()
+      RETURNING *
+    `, [`inv_${menuItemId}`, menuItemId, stock, lowStockThreshold, unitCost, restaurantId]);
+    
+    const row = result.rows[0];
+    res.status(201).json({
+      menuItemId: row.menu_item_id,
+      stock: row.stock,
+      lowStockThreshold: row.low_stock_threshold,
+      unitCost: row.unit_cost,
+      createdAt: row.created_at,
+    });
+  } catch (error) {
+    console.error('Error creating inventory record:', error);
+    res.status(500).json({ error: 'Failed to create inventory record' });
   }
 });
 

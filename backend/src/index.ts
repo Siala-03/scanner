@@ -20,6 +20,9 @@ import { ordersRouter } from './routes/orders.js';
 import kpisRouter from './routes/kpis.js';
 import { printRouter } from './routes/print.js';
 import { forecastingRouter } from './routes/forecasting.js';
+import { locationsRouter } from './routes/locations.js';
+import { recipesRouter } from './routes/recipes.js';
+import { cycleCountRouter } from './routes/cycleCounts.js';
 import { initSocket } from './socket.js';
 import { logger } from './logger.js';
 import { pool } from './db.js';
@@ -132,7 +135,6 @@ app.use('/api/auth', authRouter);
 app.use('/api/loyalty', loyaltyRouter);
 app.use('/api/menu', menuRouter);
 app.use('/api/tables', tablesRouter);
-app.use('/api/inventory', inventoryRouter);
 app.use('/api/inventory', simpleInventoryRouter);
 app.use('/api/suppliers', suppliersRouter);
 app.use('/api/purchase-orders', purchaseOrdersRouter);
@@ -142,6 +144,9 @@ app.use('/api/orders', ordersRouter);
 app.use('/api/kpis', kpisRouter);
 app.use('/api/print', printRouter);
 app.use('/api/forecasting', forecastingRouter);
+app.use('/api/locations', locationsRouter);
+app.use('/api/recipes', recipesRouter);
+app.use('/api/cycle-counts', cycleCountRouter);
 
 app.use(
   (

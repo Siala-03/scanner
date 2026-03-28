@@ -8,12 +8,14 @@ import {
   fetchMovements,
   fetchWasteEntries,
   computeInventoryAnalytics,
+  fetchLocations,
   fetchForecasts,
   generateForecasts,
   fetchForecastAlerts,
 } from '../api/inventory';
 import type {
   InventoryRecord,
+  InventoryLocation,
   Supplier,
   PurchaseOrder,
   StockMovement,
@@ -30,6 +32,7 @@ export function useInventoryData() {
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
   const [movements, setMovements] = useState<StockMovement[]>([]);
   const [waste, setWaste] = useState<WasteEntry[]>([]);
+  const [locations, setLocations] = useState<InventoryLocation[]>([]);
   const [analytics, setAnalytics] = useState<InventoryAnalytics>({
     totalStockValue: 0,
     lowStockCount: 0,
@@ -56,7 +59,7 @@ export function useInventoryData() {
     setIsLoading(true);
     setLoadError(null);
     try {
-      const [inv, low, sup, po, mov, wasteEntries, analyticsData, fc, fcAlerts] = await Promise.all([
+      const [inv, low, sup, po, mov, wasteEntries, analyticsData, locs, fc, fcAlerts] = await Promise.all([
         fetchInventory(),
         fetchLowStockItems(),
         fetchSuppliers(),
@@ -64,6 +67,7 @@ export function useInventoryData() {
         fetchMovements({ limit: 200 }),
         fetchWasteEntries({ limit: 200 }),
         computeInventoryAnalytics(),
+        fetchLocations(),
         fetchForecasts().catch(() => []),
         fetchForecastAlerts().catch(() => []),
       ]);
@@ -74,6 +78,7 @@ export function useInventoryData() {
       setMovements(mov);
       setWaste(wasteEntries);
       setAnalytics(analyticsData);
+      setLocations(locs);
       setForecasts(fc);
       setForecastAlerts(fcAlerts);
     } catch (err) {
@@ -131,6 +136,7 @@ export function useInventoryData() {
     purchaseOrders,
     movements,
     waste,
+    locations,
     analytics,
     alerts,
     forecasts,
