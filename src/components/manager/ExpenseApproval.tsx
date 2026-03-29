@@ -253,89 +253,96 @@ export default function ManagerExpenseApproval() {
   };
 
   const renderExpenseTable = (expenses: ExpenseWithDetails[], showActions: boolean) => (
-    <table className="w-full">
-      <thead className="bg-slate-800 border-b border-slate-700">
-        <tr>
-          <th className="px-6 py-3 text-left text-sm font-medium text-slate-300">
-            Description
-          </th>
-          <th className="px-6 py-3 text-left text-sm font-medium text-slate-300">
-            Category
-          </th>
-          <th className="px-6 py-3 text-left text-sm font-medium text-slate-300">
-            Amount
-          </th>
-          <th className="px-6 py-3 text-left text-sm font-medium text-slate-300">
-            Created By
-          </th>
-          <th className="px-6 py-3 text-left text-sm font-medium text-slate-300">
-            Actions
-          </th>
-        </tr>
-      </thead>
-      <tbody className="divide-y divide-slate-700">
-        {expenses.map(expense => (
-          <tr key={expense.id} className="hover:bg-slate-700/50 border-t border-slate-700">
-            <td className="px-6 py-4 text-sm text-slate-100">{expense.description}</td>
-            <td className="px-6 py-4 text-sm text-slate-100 text-slate-100">
-              {expense.category?.name || 'N/A'}
-            </td>
-            <td className="px-6 py-4 text-sm font-medium text-slate-100">
-              {expense.currency} {Number(expense.amount).toFixed(2)}
-            </td>
-            <td className="px-6 py-4 text-sm text-slate-100">
-              <span className="inline-block px-2 py-1 bg-amber-900/40 text-amber-200 rounded text-xs border border-amber-700">
-                {expense.createdByRole}
-              </span>
-            </td>
-            <td className="px-6 py-4 space-x-2">
-              <button
-                onClick={() => handleViewDetails(expense)}
-                className="text-amber-400 hover:text-amber-300 text-sm"
-              >
-                View
-              </button>
-              {showActions && (
-                !expense.receipt && (
-                  <button
-                    onClick={() => handleGenerateReceipt(expense.id)}
-                    className="text-purple-600 hover:text-purple-800 text-sm"
-                  >
-                    Receipt
-                  </button>
-                )
-              )}
-            </td>
+    <div className="overflow-x-auto">
+      <table className="w-full">
+        <thead className="bg-slate-800 border-b border-slate-700">
+          <tr>
+            <th className="px-3 md:px-6 py-3 text-left text-sm md:text-base font-medium text-slate-300">
+              Description
+            </th>
+            <th className="px-3 md:px-6 py-3 text-left text-sm md:text-base font-medium text-slate-300">
+              Category
+            </th>
+            <th className="px-3 md:px-6 py-3 text-left text-sm md:text-base font-medium text-slate-300">
+              Amount
+            </th>
+            <th className="px-3 md:px-6 py-3 text-left text-sm md:text-base font-medium text-slate-300">
+              Created By
+            </th>
+            <th className="px-3 md:px-6 py-3 text-left text-sm md:text-base font-medium text-slate-300">
+              Actions
+            </th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody className="divide-y divide-slate-700">
+          {expenses.map(expense => (
+            <tr key={expense.id} className="hover:bg-slate-700/50 border-t border-slate-700">
+              <td className="px-3 md:px-6 py-4 text-sm md:text-base text-slate-100">{expense.description}</td>
+              <td className="px-3 md:px-6 py-4 text-sm md:text-base text-slate-100">
+                {expense.category?.name || 'N/A'}
+              </td>
+              <td className="px-3 md:px-6 py-4 text-sm md:text-base font-medium text-slate-100">
+                {expense.currency} {Number(expense.amount).toFixed(2)}
+              </td>
+              <td className="px-3 md:px-6 py-4 text-sm md:text-base text-slate-100">
+                <span className="inline-block px-2 py-1 bg-amber-900/40 text-amber-200 rounded text-xs border border-amber-700">
+                  {expense.createdByRole}
+                </span>
+              </td>
+              <td className="px-3 md:px-6 py-4 space-x-2">
+                <button
+                  onClick={() => handleViewDetails(expense)}
+                  className="text-amber-400 hover:text-amber-300 text-sm"
+                >
+                  View
+                </button>
+                {showActions && (
+                  !expense.receipt && (
+                    <button
+                      onClick={() => handleGenerateReceipt(expense.id)}
+                      className="text-purple-600 hover:text-purple-800 text-sm"
+                    >
+                      Receipt
+                    </button>
+                  )
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 
   return (
-    <div className="space-y-6 bg-slate-900 text-slate-100 p-6 rounded-lg">
+    <div className="dark min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
       {/* Header */}
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Expense Approval Dashboard</h1>
+      <div className="border-b border-slate-700/50 bg-slate-900/80 backdrop-blur sticky top-0 z-10">
+        <div className="max-w-full mx-auto px-4 md:px-6 py-4">
+          <h1 className="text-2xl md:text-3xl font-bold text-white">Expense Approval Dashboard</h1>
+          <p className="text-slate-400 text-sm mt-0.5">Manage and approve expenses</p>
+        </div>
       </div>
 
-      {/* Error Alert */}
-      {error && (
-        <div className="bg-red-900/30 border border-red-700 rounded-lg p-4 flex items-center gap-3">
-          <AlertCircle className="text-red-400" size={20} />
-          <p className="text-red-200">{error}</p>
-        </div>
-      )}
+      {/* Main Content */}
+      <div className="max-w-full mx-auto px-4 md:px-6 py-6 space-y-6">
+        {/* Error Alert */}
+        {error && (
+          <div className="bg-red-900/30 border border-red-700 rounded-lg p-4 flex items-center gap-3">
+            <AlertCircle className="text-red-400" size={20} />
+            <p className="text-red-200">{error}</p>
+          </div>
+        )}
 
-      {/* Summary Cards */}
-      {summary && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        {/* Summary Cards */}
+        {summary && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {summary.map((item: any) => (
             <div key={item.approval_status} className="bg-slate-800 rounded-lg shadow p-4 border border-slate-700">
               <p className="text-sm text-slate-400 mb-2">
                 {item.approval_status.replace(/_/g, ' ').toUpperCase()}
               </p>
-              <p className="text-2xl font-bold text-slate-100">{item.count}</p>
+              <p className="text-2xl md:text-3xl font-bold text-slate-100">{item.count}</p>
               <p className="text-sm text-slate-400 mt-2">
                 RWF {Number(item.total_amount || 0).toFixed(2)}
               </p>
@@ -345,7 +352,7 @@ export default function ManagerExpenseApproval() {
       )}
 
       {/* Tabs */}
-      <div className="bg-slate-800 rounded-lg shadow border border-slate-700">
+      <div className="bg-slate-800 rounded-lg shadow border border-slate-700 overflow-hidden">
         <div className="flex border-b border-slate-700">
           <button
             onClick={() => setTab('pending')}
@@ -430,12 +437,12 @@ export default function ManagerExpenseApproval() {
 
         {/* Create Form */}
         {tab === 'create' && (
-          <div className="p-6">
-            <h2 className="text-xl font-bold mb-4">Create New Expense</h2>
-            <form onSubmit={handleCreateExpense} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="p-4 md:p-6 lg:p-8">
+            <h2 className="text-xl md:text-2xl font-bold mb-6 text-white">Create New Expense</h2>
+            <form onSubmit={handleCreateExpense} className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
                 <div>
-                  <label className="block text-sm font-medium mb-2">
+                  <label className="block text-sm md:text-base font-medium mb-2 text-slate-300">
                     Category*
                   </label>
                   <select
@@ -443,7 +450,7 @@ export default function ManagerExpenseApproval() {
                     onChange={e =>
                       setFormData({ ...formData, categoryId: e.target.value })
                     }
-                    className="w-full border rounded-lg px-3 py-2 bg-slate-700 text-slate-200"
+                    className="w-full border border-slate-600 rounded-lg px-3 py-2 md:py-3 bg-slate-700 text-slate-200 text-sm md:text-base focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500"
                     required
                   >
                     <option value="">Select Category</option>
@@ -455,7 +462,7 @@ export default function ManagerExpenseApproval() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-2">
+                  <label className="block text-sm md:text-base font-medium mb-2 text-slate-300">
                     Vendor Name
                   </label>
                   <input
@@ -467,12 +474,12 @@ export default function ManagerExpenseApproval() {
                         vendorName: e.target.value,
                       })
                     }
-                    className="w-full border border-slate-600 bg-slate-700 text-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500"
+                    className="w-full border border-slate-600 bg-slate-700 text-slate-200 rounded-lg px-3 py-2 md:py-3 text-sm md:text-base focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500"
                     placeholder="e.g., ABC Supplies"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-2">
+                  <label className="block text-sm md:text-base font-medium mb-2 text-slate-300">
                     Description*
                   </label>
                   <input
@@ -484,13 +491,13 @@ export default function ManagerExpenseApproval() {
                         description: e.target.value,
                       })
                     }
-                    className="w-full border border-slate-600 bg-slate-700 text-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500"
+                    className="w-full border border-slate-600 bg-slate-700 text-slate-200 rounded-lg px-3 py-2 md:py-3 text-sm md:text-base focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500"
                     placeholder="Expense description"
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-2">
+                  <label className="block text-sm md:text-base font-medium mb-2 text-slate-300">
                     Amount*
                   </label>
                   <input
@@ -502,13 +509,13 @@ export default function ManagerExpenseApproval() {
                         amount: parseFloat(e.target.value),
                       })
                     }
-                    className="w-full border border-slate-600 bg-slate-700 text-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500"
+                    className="w-full border border-slate-600 bg-slate-700 text-slate-200 rounded-lg px-3 py-2 md:py-3 text-sm md:text-base focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500"
                     step="0.01"
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-2">
+                  <label className="block text-sm md:text-base font-medium mb-2 text-slate-300">
                     Expense Date*
                   </label>
                   <input
@@ -520,12 +527,12 @@ export default function ManagerExpenseApproval() {
                         expenseDate: e.target.value,
                       })
                     }
-                    className="w-full border border-slate-600 bg-slate-700 text-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500"
+                    className="w-full border border-slate-600 bg-slate-700 text-slate-200 rounded-lg px-3 py-2 md:py-3 text-sm md:text-base focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500"
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-2">
+                  <label className="block text-sm md:text-base font-medium mb-2 text-slate-300">
                     Payment Method
                   </label>
                   <select
@@ -536,7 +543,7 @@ export default function ManagerExpenseApproval() {
                         paymentMethod: e.target.value as any,
                       })
                     }
-                    className="w-full border border-slate-600 bg-slate-700 text-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500"
+                    className="w-full border border-slate-600 bg-slate-700 text-slate-200 rounded-lg px-3 py-2 md:py-3 text-sm md:text-base focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500"
                   >
                     <option value="cash">Cash</option>
                     <option value="credit_card">Credit Card</option>
@@ -546,13 +553,15 @@ export default function ManagerExpenseApproval() {
                   </select>
                 </div>
               </div>
-              <button
-                type="submit"
-                disabled={loading}
-                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50"
-              >
-                {loading ? 'Creating...' : 'Create Expense'}
-              </button>
+              <div className="flex justify-start pt-4 border-t border-slate-700">
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white px-6 md:px-8 py-2 md:py-3 rounded-lg font-medium text-sm md:text-base transition"
+                >
+                  {loading ? 'Creating...' : 'Create Expense'}
+                </button>
+              </div>
             </form>
           </div>
         )}
@@ -561,7 +570,7 @@ export default function ManagerExpenseApproval() {
       {/* Details Modal */}
       {showDetails && selectedExpense && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
-          <div className="bg-slate-800 rounded-lg max-w-2xl w-full my-8 border border-slate-700">
+          <div className="bg-slate-800 rounded-lg max-w-4xl w-full my-8 border border-slate-700">
             <div className="p-6 space-y-4">
               <h2 className="text-2xl font-bold text-slate-100">Expense Details</h2>
 

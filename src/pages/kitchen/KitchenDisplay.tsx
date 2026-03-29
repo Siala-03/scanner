@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { ClockIcon, ChefHatIcon, UtensilsIcon, RefreshCwIcon, CheckCircleIcon, FlameIcon, AlertTriangleIcon, BarChart3Icon, ListOrderedIcon, TrendingUpIcon } from 'lucide-react';
+import { ClockIcon, ChefHatIcon, UtensilsIcon, RefreshCwIcon, CheckCircleIcon, FlameIcon, AlertTriangleIcon, BarChart3Icon, ListOrderedIcon, TrendingUpIcon, LogOutIcon } from 'lucide-react';
 import { useStaffKPIs } from '../../hooks/useKPIs';
 import { KPICard } from '../../components/supervisor/KPICard';
 
@@ -149,7 +149,7 @@ function calculateStats(orders: KitchenOrder[], completedToday: number[]): Kitch
   };
 }
 
-export function KitchenDisplay() {
+export function KitchenDisplay({ onLogout }: { onLogout?: () => void } = {}) {
   const [orders, setOrders] = useState<KitchenOrder[]>([]);
   const [completedToday, setCompletedToday] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
@@ -271,6 +271,13 @@ export function KitchenDisplay() {
                 className="p-3 bg-slate-800 hover:bg-slate-700 rounded-xl transition-all hover:rotate-180 duration-500"
               >
                 <RefreshCwIcon className="w-5 h-5 text-slate-300" />
+              </button>
+              <button
+                onClick={onLogout}
+                className="p-3 bg-slate-800 hover:bg-red-600/20 hover:text-red-400 rounded-xl transition-all text-slate-300"
+                title="Logout"
+              >
+                <LogOutIcon className="w-5 h-5" />
               </button>
             </div>
           </div>

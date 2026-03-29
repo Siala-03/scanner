@@ -7,7 +7,8 @@ import {
   CheckCircleIcon,
   MapIcon,
   TrendingUpIcon,
-  StarIcon } from
+  StarIcon,
+  LogOutIcon } from
 'lucide-react';
 import { Order, Staff } from '../../types';
 import { Tabs } from '../../components/ui/Tabs';
@@ -35,13 +36,15 @@ interface WaiterDashboardProps {
     timestamp: Date;
   }[];
   onDismissWaiterCall?: (tableNumber: number) => void;
+  onLogout?: () => void;
 }
 export function WaiterDashboard({
   waiter,
   orders,
   onUpdateOrderStatus,
   waiterCalls = [],
-  onDismissWaiterCall
+  onDismissWaiterCall,
+  onLogout
 }: WaiterDashboardProps) {
   const [activeTab, setActiveTab] = useState('new');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -222,6 +225,12 @@ export function WaiterDashboard({
                   {newOrders.length + allWaiterCalls.length}
                 </span>
               }
+            </button>
+            <button
+              onClick={onLogout}
+              className="p-2 rounded-lg bg-slate-800 text-slate-400 hover:text-red-400 transition-colors"
+              title="Logout">
+              <LogOutIcon className="w-5 h-5" />
             </button>
           </div>
         </div>

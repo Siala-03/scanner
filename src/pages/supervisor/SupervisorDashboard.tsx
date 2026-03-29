@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { Button } from '../../components/ui/Button';
-import { MenuIcon, AlertCircleIcon, TruckIcon, MapPinIcon, PhoneIcon } from 'lucide-react';
+import { MenuIcon, AlertCircleIcon, TruckIcon, MapPinIcon, PhoneIcon, LogOutIcon } from 'lucide-react';
 import { useMenu } from '../../hooks/useMenu';
 import { useStaff, useStaffOnDuty } from '../../hooks/useStaff';
 import { useTodayKPIs } from '../../hooks/useAnalytics';
@@ -11,9 +11,10 @@ import { TrendingUpIcon } from 'lucide-react';
 
 interface SupervisorDashboardProps {
   onManageMenu: () => void;
+  onLogout?: () => void;
 }
 
-export function SupervisorDashboard({ onManageMenu }: SupervisorDashboardProps) {
+export function SupervisorDashboard({ onManageMenu, onLogout }: SupervisorDashboardProps) {
   const { menuItems } = useMenu();
   const { staff, isLoading: staffLoading } = useStaff();
   const { staff: onDutyStaff, isLoading: onDutyLoading } = useStaffOnDuty();
@@ -59,9 +60,14 @@ export function SupervisorDashboard({ onManageMenu }: SupervisorDashboardProps) 
             <h1 className="text-3xl font-bold">Supervisor Dashboard</h1>
             <p className="text-slate-300">Operations and team insights.</p>
           </div>
-          <Button variant="secondary" onClick={onManageMenu}>
-            <MenuIcon className="w-4 h-4 mr-1" /> Manage Menu
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="secondary" onClick={onManageMenu}>
+              <MenuIcon className="w-4 h-4 mr-1" /> Manage Menu
+            </Button>
+            <Button variant="danger" onClick={onLogout}>
+              <LogOutIcon className="w-4 h-4 mr-1" /> Logout
+            </Button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">

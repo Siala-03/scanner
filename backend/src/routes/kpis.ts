@@ -70,7 +70,7 @@ router.get('/staff', authenticate, async (req: AuthenticatedRequest, res: Respon
        FROM kpis k
        LEFT JOIN staff_kpi_progress skp ON k.id = skp.kpi_id AND skp.staff_id = $1
        WHERE k.restaurant_id = $2 AND k.staff_role = $3
-         AND (k.assigned_staff_ids IS NULL OR k.assigned_staff_ids = '{}' OR $1 = ANY(k.assigned_staff_ids))
+         AND (COALESCE(array_length(k.assigned_staff_ids, 1), 0) = 0 OR $1 = ANY(k.assigned_staff_ids))
        ORDER BY k.created_at DESC`,
       [req.staffId, req.restaurantId, req.staffRole]
     );

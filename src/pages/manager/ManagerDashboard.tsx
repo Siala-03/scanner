@@ -1,12 +1,13 @@
 import React from 'react';
 import { Button } from '../../components/ui/Button';
-import { MenuIcon } from 'lucide-react';
+import { MenuIcon, LogOutIcon } from 'lucide-react';
 import { AIInsightsChat } from '../../components/manager/AIInsightsChat';
 import { useInventoryData } from '../../hooks/useInventory';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, Legend } from 'recharts';
 
 interface ManagerDashboardProps {
   onNavigate: (page: 'dashboard' | 'menu' | 'staff' | 'analytics' | 'performance' | 'qrcodes' | 'inventory' | 'history') => void;
+  onLogout?: () => void;
   totalOrders: number;
   activeOrders: number;
   servedOrders: number;
@@ -24,7 +25,7 @@ const statusColors: Record<string, string> = {
   served: '#22c55e'
 };
 
-export function ManagerDashboard({ onNavigate, totalOrders, activeOrders, servedOrders, todaysRevenue, tableCount, ordersByHour, statusBreakdown }: ManagerDashboardProps) {
+export function ManagerDashboard({ onNavigate, onLogout, totalOrders, activeOrders, servedOrders, todaysRevenue, tableCount, ordersByHour, statusBreakdown }: ManagerDashboardProps) {
   const { forecasts, forecastAlerts, isGeneratingForecasts, runForecasting } = useInventoryData();
 
   return (
@@ -35,9 +36,14 @@ export function ManagerDashboard({ onNavigate, totalOrders, activeOrders, served
             <h1 className="text-3xl font-bold text-gray-100">Manager Dashboard</h1>
             <p className="text-slate-300">High-level operations overview for your restaurant.</p>
           </div>
-          <Button variant="secondary" onClick={() => onNavigate('menu')}>
-            <MenuIcon className="w-4 h-4 mr-1" /> Manage Menu
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="secondary" onClick={() => onNavigate('menu')}>
+              <MenuIcon className="w-4 h-4 mr-1" /> Manage Menu
+            </Button>
+            <Button variant="danger" onClick={onLogout}>
+              <LogOutIcon className="w-4 h-4 mr-1" /> Logout
+            </Button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 mb-4">

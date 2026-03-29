@@ -61,4 +61,13 @@ export async function signUpStaff(input: {
   }
 }
 
+export function logoutStaff(): void {
+  // Clear authentication data from localStorage
+  localStorage.removeItem('staffId');
+  localStorage.removeItem('token');
+  localStorage.removeItem('staffRole');
+  localStorage.removeItem('restaurantId');
+  console.log('User logged out successfully');
+}
+
 

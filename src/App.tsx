@@ -1,11 +1,12 @@
 import React, { useCallback, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeftIcon, UtensilsIcon, BarChart3Icon, BriefcaseIcon, ChefHatIcon, QrCodeIcon, UsersIcon, TrendingUpIcon, ClockIcon, ShoppingBagIcon, LockIcon } from 'lucide-react';
+import { ArrowLeftIcon, UtensilsIcon, BarChart3Icon, BriefcaseIcon, ChefHatIcon, QrCodeIcon, UsersIcon, TrendingUpIcon, ClockIcon, ShoppingBagIcon, LockIcon, LogOutIcon } from 'lucide-react';
 import { CartItem, Order, OrderStatus, Customer } from './types';
 import { useStaff } from './hooks/useStaff';
 import { useOrders } from './hooks/useOrders';
 import { useTables } from './hooks/useTables';
 import { callWaiter } from './api/tables';
+import { logoutStaff } from './api/auth';
 import { CustomerApp } from './pages/customer/CustomerApp';
 import { WaiterDashboard } from './pages/waiter/WaiterDashboard';
 import { SupervisorDashboard } from './pages/supervisor/SupervisorDashboard';
@@ -134,9 +135,8 @@ export function App() {
     }
 
     if (selectedRole && selectedRole !== 'customer') {
-      // clear auth when leaving staff portal
-      localStorage.removeItem('staffId');
-      localStorage.removeItem('token');
+      // Clear auth when leaving staff portal
+      logoutStaff();
       setSelectedRole(null);
       setAuthUser(null);
       setTableNumber(null);
@@ -281,7 +281,8 @@ export function App() {
           orders={orders}
           onUpdateOrderStatus={handleUpdateOrderStatus}
           waiterCalls={waiterCalls}
-          onDismissWaiterCall={handleDismissWaiterCall} />
+          onDismissWaiterCall={handleDismissWaiterCall}
+          onLogout={handleBack} />
       </div>);
 
   }
@@ -360,6 +361,7 @@ export function App() {
         {supervisorPage === 'dashboard' && (
           <SupervisorDashboard
             onManageMenu={() => setSupervisorPage('menu')}
+            onLogout={handleBack}
           />
         )}
         {supervisorPage === 'revenue' && <RevenueReports />}
@@ -430,6 +432,7 @@ export function App() {
             {managerPage === 'dashboard' &&
               <ManagerDashboard
                 onNavigate={(page) => setManagerPage(page as ManagerPage)}
+                onLogout={handleBack}
                 totalOrders={managerTotalOrders}
                 activeOrders={managerActiveOrders}
                 servedOrders={managerServedOrders}
@@ -478,7 +481,7 @@ export function App() {
             <span className="text-white font-medium">Kitchen Display</span>
           </div>
         </div>
-        <KitchenDisplay />
+        <KitchenDisplay onLogout={handleBack} />
       </div>
     );
   }
