@@ -166,21 +166,21 @@ export default function ReceiptGenerator({
                 <div class="total-section">
                   <div class="total-row">
                     <span>Subtotal:</span>
-                    <span>${expense.currency} ${expense.amount.toFixed(2)}</span>
+                    <span>${expense.currency} ${Number(expense.amount).toFixed(2)}</span>
                   </div>
                   ${
                     expense.taxRate > 0 || expense.taxAmount > 0
                       ? `
                     <div class="total-row">
                       <span>Tax (${expense.taxRate}%):</span>
-                      <span>${expense.currency} ${(expense.taxAmount || (expense.amount * expense.taxRate) / 100).toFixed(2)}</span>
+                      <span>${expense.currency} ${Number(expense.taxAmount || (expense.amount * expense.taxRate) / 100).toFixed(2)}</span>
                     </div>
                   `
                       : ''
                   }
                   <div class="total-row total-amount">
                     <span>TOTAL:</span>
-                    <span>${expense.currency} ${calculateTotal().toFixed(2)}</span>
+                    <span>${expense.currency} ${Number(calculateTotal()).toFixed(2)}</span>
                   </div>
                 </div>
 
@@ -277,7 +277,7 @@ export default function ReceiptGenerator({
             <div className="flex justify-between text-sm">
               <span>Subtotal:</span>
               <span>
-                {expense.currency} {expense.amount.toFixed(2)}
+                {expense.currency} {Number(expense.amount).toFixed(2)}
               </span>
             </div>
             {(expense.taxRate > 0 || expense.taxAmount > 0) && (
@@ -285,7 +285,7 @@ export default function ReceiptGenerator({
                 <span>Tax ({expense.taxRate}%):</span>
                 <span>
                   {expense.currency}{' '}
-                  {(
+                  {Number(
                     expense.taxAmount ||
                     (expense.amount * expense.taxRate) / 100
                   ).toFixed(2)}
@@ -295,7 +295,7 @@ export default function ReceiptGenerator({
             <div className="flex justify-between font-bold text-lg text-blue-600">
               <span>TOTAL:</span>
               <span>
-                {expense.currency} {calculateTotal().toFixed(2)}
+                {expense.currency} {Number(calculateTotal()).toFixed(2)}
               </span>
             </div>
           </div>

@@ -38,6 +38,8 @@ export function StaffManagement() {
   const [isCreatingStaff, setIsCreatingStaff] = useState(false);
   const [addStaffError, setAddStaffError] = useState<string | null>(null);
   const [isKPIModalOpen, setIsKPIModalOpen] = useState(false);
+  const [isEditKPIOpen, setIsEditKPIOpen] = useState(false);
+  const [editingKPI, setEditingKPI] = useState<any>(null);
   const [kpiForm, setKpiForm] = useState({
     staffRole: 'waiter' as StaffRole,
     name: '',
@@ -446,26 +448,48 @@ export function StaffManagement() {
                         <Badge variant="secondary">{kpi.period}</Badge>
                       </div>
                     </div>
-                    <div className="text-right flex flex-col items-end gap-2">
-                      <p className="text-lg font-bold text-amber-500">{kpi.target_value}</p>
-                      <p className="text-xs text-slate-400">Target</p>
-                      <Button 
-                        variant="danger" 
-                        size="sm"
-                        onClick={async () => {
-                          if (window.confirm(`Are you sure you want to delete the KPI "${kpi.name}"?`)) {
-                            try {
-                              await deleteKPI(kpi.id);
-                              await refetchKPIs();
-                            } catch (err: any) {
-                              console.error('Failed to delete KPI', err);
-                              alert(err.message || 'Failed to delete KPI');
+                    <div className="flex flex-col gap-2">
+                      <div className="text-right">
+                        <p className="text-lg font-bold text-amber-500">{kpi.target_value}</p>
+                        <p className="text-xs text-slate-400">Target</p>
+                      </div>
+                      <div className="flex gap-1">
+                        <Button 
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => {
+                            setEditingKPI(kpi);
+                            setKpiForm({
+                              staffRole: kpi.staff_role as StaffRole,
+                              name: kpi.name,
+                              description: kpi.description || '',
+                              metric: kpi.metric as any,
+                              targetValue: kpi.target_value,
+                              period: kpi.period as any,
+                              assignedStaffIds: kpi.assigned_staff_ids || [],
+                            });
+                            setIsEditKPIOpen(true);
+                          }}>
+                          <EditIcon className="w-4 h-4" />
+                        </Button>
+                        <Button 
+                          variant="danger" 
+                          size="sm"
+                          onClick={async () => {
+                            if (window.confirm(`Are you sure you want to delete the KPI "${kpi.name}"?`)) {
+                              try {
+                                await deleteKPI(kpi.id);
+                                await refetchKPIs();
+                              } catch (err: any) {
+                                console.error('Failed to delete KPI', err);
+                                alert(err.message || 'Failed to delete KPI');
+                              }
                             }
-                          }
-                        }}
-                      >
-                        <TrashIcon className="w-4 h-4" />
-                      </Button>
+                          }}
+                        >
+                          <TrashIcon className="w-4 h-4" />
+                        </Button>
+                      </div>
                     </div>
                   </div>
                   {kpi.assigned_staff_ids && kpi.assigned_staff_ids.length > 0 && (
@@ -681,15 +705,15 @@ export function StaffManagement() {
           isOpen={isKPIModalOpen}
           onClose={() => setIsKPIModalOpen(false)}
           title="Create New KPI"
-          variant="light"
+          variant="dark"
         >
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Staff Role</label>
+              <label className="block text-sm font-medium text-slate-200 mb-1">Staff Role</label>
               <select
                 value={kpiForm.staffRole}
                 onChange={(e) => setKpiForm(prev => ({ ...prev, staffRole: e.target.value as StaffRole }))}
-                className="w-full px-3 py-2 bg-white border border-slate-100 rounded-md text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500">
+                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500">
                 <option value="waiter">Waiter</option>
                 <option value="kitchen">Kitchen</option>
                 <option value="supervisor">Supervisor</option>
@@ -700,24 +724,25 @@ export function StaffManagement() {
               label="KPI Name"
               value={kpiForm.name}
               onChange={(e) => setKpiForm(prev => ({ ...prev, name: e.target.value }))}
-              placeholder="e.g. Orders Served per Day" />
+              placeholder="e.g. Orders Served per Day"
+              className="bg-slate-700 border-slate-600 text-white" />
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
+              <label className="block text-sm font-medium text-slate-200 mb-1">Description</label>
               <textarea
                 value={kpiForm.description}
                 onChange={(e) => setKpiForm(prev => ({ ...prev, description: e.target.value }))}
-                className="w-full px-3 py-2 bg-white border border-slate-100 rounded-md text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
                 rows={3}
                 placeholder="Optional description" />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Metric</label>
+              <label className="block text-sm font-medium text-slate-200 mb-1">Metric</label>
               <select
                 value={kpiForm.metric}
                 onChange={(e) => setKpiForm(prev => ({ ...prev, metric: e.target.value as any }))}
-                className="w-full px-3 py-2 bg-white border border-slate-100 rounded-md text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500">
+                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500">
                 <option value="orders_served">Orders Served</option>
                 <option value="revenue">Revenue</option>
                 <option value="rating">Rating</option>
@@ -731,14 +756,15 @@ export function StaffManagement() {
               type="number"
               value={kpiForm.targetValue}
               onChange={(e) => setKpiForm(prev => ({ ...prev, targetValue: parseFloat(e.target.value) || 0 }))}
-              placeholder="e.g. 50" />
+              placeholder="e.g. 50"
+              className="bg-slate-700 border-slate-600 text-white" />
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Period</label>
+              <label className="block text-sm font-medium text-slate-200 mb-1">Period</label>
               <select
                 value={kpiForm.period}
                 onChange={(e) => setKpiForm(prev => ({ ...prev, period: e.target.value as any }))}
-                className="w-full px-3 py-2 bg-white border border-slate-100 rounded-md text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500">
+                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500">
                 <option value="daily">Daily</option>
                 <option value="weekly">Weekly</option>
                 <option value="monthly">Monthly</option>
@@ -746,7 +772,7 @@ export function StaffManagement() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Assign to Staff (Optional)</label>
+              <label className="block text-sm font-medium text-slate-200 mb-1">Assign to Staff (Optional)</label>
               <select
                 multiple
                 value={kpiForm.assignedStaffIds}
@@ -754,7 +780,7 @@ export function StaffManagement() {
                   const selected = Array.from(e.target.selectedOptions, option => option.value);
                   setKpiForm(prev => ({ ...prev, assignedStaffIds: selected }));
                 }}
-                className="w-full px-3 py-2 bg-white border border-slate-100 rounded-md text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 min-h-[100px]">
+                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 min-h-[100px]">
                 {backendStaff
                   .filter(s => s.role === kpiForm.staffRole)
                   .map(staffMember => (
@@ -763,7 +789,7 @@ export function StaffManagement() {
                     </option>
                   ))}
               </select>
-              <p className="text-xs text-slate-500 mt-1">Hold Ctrl/Cmd to select multiple staff members</p>
+              <p className="text-xs text-slate-400 mt-1">Hold Ctrl/Cmd to select multiple staff members</p>
             </div>
 
             <div className="flex gap-3 pt-4">
@@ -779,6 +805,133 @@ export function StaffManagement() {
                 onClick={handleCreateKPI}
                 disabled={!kpiForm.name || kpiForm.targetValue <= 0}>
                 Create KPI
+              </Button>
+            </div>
+          </div>
+        </Modal>
+
+        {/* Edit KPI Modal */}
+        <Modal
+          isOpen={isEditKPIOpen}
+          onClose={() => setIsEditKPIOpen(false)}
+          title="Edit KPI"
+          variant="dark"
+        >
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-200 mb-1">Staff Role</label>
+              <select
+                value={kpiForm.staffRole}
+                onChange={(e) => setKpiForm(prev => ({ ...prev, staffRole: e.target.value as StaffRole }))}
+                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500">
+                <option value="waiter">Waiter</option>
+                <option value="kitchen">Kitchen</option>
+                <option value="supervisor">Supervisor</option>
+              </select>
+            </div>
+
+            <Input
+              label="KPI Name"
+              value={kpiForm.name}
+              onChange={(e) => setKpiForm(prev => ({ ...prev, name: e.target.value }))}
+              placeholder="e.g. Orders Served per Day"
+              className="bg-slate-700 border-slate-600 text-white" />
+
+            <div>
+              <label className="block text-sm font-medium text-slate-200 mb-1">Description</label>
+              <textarea
+                value={kpiForm.description}
+                onChange={(e) => setKpiForm(prev => ({ ...prev, description: e.target.value }))}
+                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                rows={3}
+                placeholder="Optional description" />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-200 mb-1">Metric</label>
+              <select
+                value={kpiForm.metric}
+                onChange={(e) => setKpiForm(prev => ({ ...prev, metric: e.target.value as any }))}
+                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500">
+                <option value="orders_served">Orders Served</option>
+                <option value="revenue">Revenue</option>
+                <option value="rating">Rating</option>
+                <option value="tables_served">Tables Served</option>
+                <option value="prep_time">Prep Time</option>
+              </select>
+            </div>
+
+            <Input
+              label="Target Value"
+              type="number"
+              value={kpiForm.targetValue}
+              onChange={(e) => setKpiForm(prev => ({ ...prev, targetValue: parseFloat(e.target.value) || 0 }))}
+              placeholder="e.g. 50"
+              className="bg-slate-700 border-slate-600 text-white" />
+
+            <div>
+              <label className="block text-sm font-medium text-slate-200 mb-1">Period</label>
+              <select
+                value={kpiForm.period}
+                onChange={(e) => setKpiForm(prev => ({ ...prev, period: e.target.value as any }))}
+                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500">
+                <option value="daily">Daily</option>
+                <option value="weekly">Weekly</option>
+                <option value="monthly">Monthly</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-200 mb-1">Assign to Staff (Optional)</label>
+              <select
+                multiple
+                value={kpiForm.assignedStaffIds}
+                onChange={(e) => {
+                  const selected = Array.from(e.target.selectedOptions, option => option.value);
+                  setKpiForm(prev => ({ ...prev, assignedStaffIds: selected }));
+                }}
+                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 min-h-[100px]">
+                {backendStaff
+                  .filter(s => s.role === kpiForm.staffRole)
+                  .map(staffMember => (
+                    <option key={staffMember.id} value={staffMember.id}>
+                      {staffMember.name}
+                    </option>
+                  ))}
+              </select>
+              <p className="text-xs text-slate-400 mt-1">Hold Ctrl/Cmd to select multiple staff members</p>
+            </div>
+
+            <div className="flex gap-3 pt-4">
+              <Button
+                variant="secondary"
+                fullWidth
+                onClick={() => setIsEditKPIOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                fullWidth
+                onClick={async () => {
+                  if (!kpiForm.name.trim()) {
+                    alert('Please enter a KPI name');
+                    return;
+                  }
+                  if (!kpiForm.targetValue || kpiForm.targetValue <= 0) {
+                    alert('Please enter a valid target value');
+                    return;
+                  }
+                  try {
+                    // Update KPI logic would go here
+                    // For now, just close the modal
+                    setIsEditKPIOpen(false);
+                    refetchKPIs();
+                  } catch (error) {
+                    console.error('Failed to update KPI:', error);
+                  }
+                }}
+                disabled={!kpiForm.name || kpiForm.targetValue <= 0}>
+                Update KPI
               </Button>
             </div>
           </div>

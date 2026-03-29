@@ -281,7 +281,7 @@ export default function ManagerExpenseApproval() {
               {expense.category?.name || 'N/A'}
             </td>
             <td className="px-6 py-4 text-sm font-medium text-slate-100">
-              {expense.currency} {expense.amount.toFixed(2)}
+              {expense.currency} {Number(expense.amount).toFixed(2)}
             </td>
             <td className="px-6 py-4 text-sm text-slate-100">
               <span className="inline-block px-2 py-1 bg-amber-900/40 text-amber-200 rounded text-xs border border-amber-700">
@@ -337,7 +337,7 @@ export default function ManagerExpenseApproval() {
               </p>
               <p className="text-2xl font-bold text-slate-100">{item.count}</p>
               <p className="text-sm text-slate-400 mt-2">
-                ${item.total_amount?.toFixed(2) || '0.00'}
+                RWF {Number(item.total_amount || 0).toFixed(2)}
               </p>
             </div>
           ))}
@@ -443,7 +443,7 @@ export default function ManagerExpenseApproval() {
                     onChange={e =>
                       setFormData({ ...formData, categoryId: e.target.value })
                     }
-                    className="w-full border rounded-lg px-3 py-2"
+                    className="w-full border rounded-lg px-3 py-2 bg-slate-700 text-slate-200"
                     required
                   >
                     <option value="">Select Category</option>
@@ -467,7 +467,7 @@ export default function ManagerExpenseApproval() {
                         vendorName: e.target.value,
                       })
                     }
-                    className="w-full border rounded-lg px-3 py-2"
+                    className="w-full border border-slate-600 bg-slate-700 text-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500"
                     placeholder="e.g., ABC Supplies"
                   />
                 </div>
@@ -484,7 +484,7 @@ export default function ManagerExpenseApproval() {
                         description: e.target.value,
                       })
                     }
-                    className="w-full border rounded-lg px-3 py-2"
+                    className="w-full border border-slate-600 bg-slate-700 text-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500"
                     placeholder="Expense description"
                     required
                   />
@@ -502,7 +502,7 @@ export default function ManagerExpenseApproval() {
                         amount: parseFloat(e.target.value),
                       })
                     }
-                    className="w-full border rounded-lg px-3 py-2"
+                    className="w-full border border-slate-600 bg-slate-700 text-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500"
                     step="0.01"
                     required
                   />
@@ -520,7 +520,7 @@ export default function ManagerExpenseApproval() {
                         expenseDate: e.target.value,
                       })
                     }
-                    className="w-full border rounded-lg px-3 py-2"
+                    className="w-full border border-slate-600 bg-slate-700 text-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500"
                     required
                   />
                 </div>
@@ -536,7 +536,7 @@ export default function ManagerExpenseApproval() {
                         paymentMethod: e.target.value as any,
                       })
                     }
-                    className="w-full border rounded-lg px-3 py-2"
+                    className="w-full border border-slate-600 bg-slate-700 text-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500"
                   >
                     <option value="cash">Cash</option>
                     <option value="credit_card">Credit Card</option>
@@ -579,7 +579,7 @@ export default function ManagerExpenseApproval() {
                   <p className="text-sm text-slate-400">Amount</p>
                   <p className="font-medium text-slate-100">
                     {selectedExpense.currency}{' '}
-                    {selectedExpense.amount.toFixed(2)}
+                    {Number(selectedExpense.amount).toFixed(2)}
                   </p>
                 </div>
                 <div>

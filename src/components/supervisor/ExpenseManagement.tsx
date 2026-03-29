@@ -44,7 +44,7 @@ export default function SupervisorExpenseManagement() {
     vendorName: '',
     description: '',
     amount: 0,
-    currency: 'USD',
+    currency: 'RWF',
     expenseDate: new Date().toISOString().split('T')[0],
     paymentMethod: 'cash',
     paymentStatus: 'paid',
@@ -97,7 +97,7 @@ export default function SupervisorExpenseManagement() {
         vendorName: '',
         description: '',
         amount: 0,
-        currency: 'USD',
+        currency: 'RWF',
         expenseDate: new Date().toISOString().split('T')[0],
         paymentMethod: 'cash',
         paymentStatus: 'paid',
@@ -237,7 +237,7 @@ export default function SupervisorExpenseManagement() {
                   onChange={e =>
                     setFormData({ ...formData, categoryId: e.target.value })
                   }
-                  className="w-full border border-slate-600 rounded-lg px-3 py-2 bg-slate-700 text-slate-100 focus:outline-none focus:border-amber-500"
+                  className="w-full border border-slate-600 rounded-lg px-3 py-2 bg-slate-700 text-slate-200 focus:outline-none focus:border-amber-500"
                   required
                 >
                   <option value="">Select Category</option>
@@ -258,7 +258,7 @@ export default function SupervisorExpenseManagement() {
                   onChange={e =>
                     setFormData({ ...formData, vendorName: e.target.value })
                   }
-                  className="w-full border border-slate-600 bg-slate-900 text-slate-100 rounded-lg px-3 py-2 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500"
+                  className="w-full border border-slate-600 bg-slate-700 text-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500"
                   placeholder="e.g., ABC Supplies"
                 />
               </div>
@@ -272,7 +272,7 @@ export default function SupervisorExpenseManagement() {
                   onChange={e =>
                     setFormData({ ...formData, description: e.target.value })
                   }
-                  className="w-full border border-slate-600 bg-slate-900 text-slate-100 rounded-lg px-3 py-2 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500"
+                  className="w-full border border-slate-600 bg-slate-700 text-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500"
                   placeholder="Expense description"
                   required
                 />
@@ -290,7 +290,7 @@ export default function SupervisorExpenseManagement() {
                       amount: parseFloat(e.target.value),
                     })
                   }
-                  className="w-full border border-slate-600 bg-slate-900 text-slate-100 rounded-lg px-3 py-2 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500"
+                  className="w-full border border-slate-600 bg-slate-700 text-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500"
                   step="0.01"
                   required
                 />
@@ -305,7 +305,7 @@ export default function SupervisorExpenseManagement() {
                   onChange={e =>
                     setFormData({ ...formData, expenseDate: e.target.value })
                   }
-                  className="w-full border border-slate-600 bg-slate-900 text-slate-100 rounded-lg px-3 py-2 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500"
+                  className="w-full border border-slate-600 bg-slate-700 text-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500"
                   required
                 />
               </div>
@@ -321,7 +321,7 @@ export default function SupervisorExpenseManagement() {
                       paymentMethod: e.target.value as any,
                     })
                   }
-                  className="w-full border border-slate-600 bg-slate-900 text-slate-100 rounded-lg px-3 py-2 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500"
+                  className="w-full border border-slate-600 bg-slate-700 text-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500"
                 >
                   <option value="cash">Cash</option>
                   <option value="credit_card">Credit Card</option>
@@ -343,7 +343,7 @@ export default function SupervisorExpenseManagement() {
                       taxRate: parseFloat(e.target.value),
                     })
                   }
-                  className="w-full border border-slate-600 bg-slate-900 text-slate-100 rounded-lg px-3 py-2 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500"
+                  className="w-full border border-slate-600 bg-slate-700 text-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500"
                   step="0.01"
                   min="0"
                   max="100"
@@ -362,7 +362,7 @@ export default function SupervisorExpenseManagement() {
                       referenceNumber: e.target.value,
                     })
                   }
-                  className="w-full border border-slate-600 bg-slate-900 text-slate-100 rounded-lg px-3 py-2 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500"
+                  className="w-full border border-slate-600 bg-slate-700 text-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500"
                   placeholder="Invoice/Receipt number"
                 />
               </div>
@@ -374,7 +374,7 @@ export default function SupervisorExpenseManagement() {
                 onChange={e =>
                   setFormData({ ...formData, notes: e.target.value })
                 }
-                className="w-full border border-slate-600 bg-slate-900 text-slate-100 rounded-lg px-3 py-2 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500"
+                className="w-full border border-slate-600 bg-slate-700 text-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500"
                 rows={3}
                 placeholder="Additional notes"
               />

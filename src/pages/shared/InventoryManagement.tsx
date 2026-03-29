@@ -35,6 +35,7 @@ import type {
 import {
   updateInventoryRecord as apiUpdateInventoryRecord,
   adjustStock as apiAdjustStock,
+  deleteInventoryRecord as apiDeleteInventoryRecord,
   createSupplier as apiCreateSupplier,
   updateSupplier as apiUpdateSupplier,
   createPurchaseOrder as apiCreatePurchaseOrder,
@@ -220,14 +221,29 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
     if (Object.keys(updatePayload).length > 0) {
       try {
         await apiUpdateInventoryRecord(menuItemId, updatePayload);
+        await refresh();
+        alert('Inventory item updated successfully');
       } catch (err) {
         console.error('Failed to update inventory record', err);
+        alert(`Failed to update inventory item: ${err instanceof Error ? err.message : 'Unknown error'}`);
       }
     }
 
     setEditingRow(null);
     setEditValues({});
-    refresh();
+  };
+
+  const handleDeleteInventoryItem = async (menuItemId: string) => {
+    if (!isManager) return;
+    try {
+      await apiDeleteInventoryRecord(menuItemId);
+      await refresh();
+      // Show success message
+      alert('Inventory item deleted successfully');
+    } catch (err) {
+      console.error('Failed to delete inventory record', err);
+      alert(`Failed to delete inventory item: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    }
   };
 
   // ── Purchase Orders state ───────────────────────────────────────────────
@@ -263,11 +279,12 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
       });
     } catch (err) {
       console.error('Failed to create PO', err);
+      alert(`Failed to create purchase order: ${err instanceof Error ? err.message : 'Unknown error'}`);
     }
     setShowNewPO(false);
     setNewPO({ supplierId: '', expectedDelivery: '', notes: '' });
     setNewPOItems([]);
-    refresh();
+    await refresh();
   };
 
   const handleReceivePO = async () => {
@@ -278,9 +295,13 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
     }));
     try {
       await apiReceivePurchaseOrder(receiveModal.id, items, 'Manager');
-      refresh();
+      await refresh();
+      alert('Purchase order received successfully');
+      setReceiveModal(null);
+      setReceiveQtys({});
     } catch (err) {
       console.error('Failed to receive PO', err);
+      alert(`Failed to receive purchase order: ${err instanceof Error ? err.message : 'Unknown error'}`);
     }
     setReceiveModal(null);
     setReceiveQtys({});
@@ -312,13 +333,15 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
       } else {
         await apiCreateSupplier(payload);
       }
+      await refresh();
+      alert('Supplier saved successfully');
     } catch (err) {
       console.error('Failed to save supplier', err);
+      alert(`Failed to save supplier: ${err instanceof Error ? err.message : 'Unknown error'}`);
     }
     setShowSupplierModal(false);
     setEditingSupplier(null);
     setSupplierForm({});
-    refresh();
   };
 
   // ── Waste state ─────────────────────────────────────────────────────────
@@ -341,9 +364,11 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
         recorded_by: 'Manager',
         notes: wasteForm.notes || undefined,
       });
-      refresh();
+      await refresh();
+      alert('Waste recorded successfully');
     } catch (err) {
       console.error('Failed to record waste', err);
+      alert(`Failed to record waste: ${err instanceof Error ? err.message : 'Unknown error'}`);
     }
     setShowWasteModal(false);
     setWasteForm({ menuItemId: '', qty: 1, reason: 'expired', notes: '' });
@@ -724,14 +749,25 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                                   </button>
                                   <button
                                     onClick={() => {
-                                      setShowNewPO(true);
                                       setNewPO({ supplierId: suppliers[0]?.id ?? '', expectedDelivery: '', notes: `Auto reordering ${row.item.name} based on threshold` });
                                       setNewPOItems([{ menuItemId: row.item.id, orderedQty: Math.max((row.rec?.reorderQty ?? 5) - row.stock, 1), unitCost: row.rec?.unitCost ?? 0 }]);
+                                      setShowNewPO(true);
                                     }}
                                     className="p-1.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-500 transition"
                                     title="Smart Reorder"
                                   >
                                     <PlusIcon className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      if (window.confirm(`Delete inventory record for ${row.item.name}? This action cannot be undone.`)) {
+                                        handleDeleteInventoryItem(row.item.id);
+                                      }
+                                    }}
+                                    className="p-1.5 rounded-lg bg-red-600 text-white hover:bg-red-500 transition"
+                                    title="Delete"
+                                  >
+                                    <TrashIcon className="w-4 h-4" />
                                   </button>
                                 </div>
                               )}
@@ -925,13 +961,13 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                       {isManager && po.status === 'draft' && (
                         <div className="flex gap-1 mt-2 justify-end">
                           <button
-                            onClick={async (e) => { e.stopPropagation(); try { await apiUpdatePurchaseOrder(po.id, { status: 'sent' }); refresh(); } catch (err) { console.error('Failed to send PO', err); } }}
+                            onClick={async (e) => { e.stopPropagation(); try { await apiUpdatePurchaseOrder(po.id, { status: 'sent' }); await refresh(); alert('Purchase order sent successfully'); } catch (err) { console.error('Failed to send PO', err); alert(`Failed to send PO: ${err instanceof Error ? err.message : 'Unknown error'}`); } }}
                             className="px-3 py-1 rounded-lg bg-blue-500/20 text-blue-400 text-xs font-medium hover:bg-blue-500/30 transition"
                           >
                             Send PO
                           </button>
                           <button
-                            onClick={async (e) => { e.stopPropagation(); try { await apiUpdatePurchaseOrder(po.id, { status: 'cancelled' }); refresh(); } catch (err) { console.error('Failed to cancel PO', err); } }}
+                            onClick={async (e) => { e.stopPropagation(); try { await apiUpdatePurchaseOrder(po.id, { status: 'cancelled' }); await refresh(); alert('Purchase order cancelled successfully'); } catch (err) { console.error('Failed to cancel PO', err); alert(`Failed to cancel PO: ${err instanceof Error ? err.message : 'Unknown error'}`); } }}
                             className="px-3 py-1 rounded-lg bg-red-500/20 text-red-400 text-xs font-medium hover:bg-red-500/30 transition"
                           >
                             Cancel
@@ -999,7 +1035,7 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                         Edit
                       </button>
                       <button
-                        onClick={() => { apiUpdateSupplier(sup.id, { isActive: !sup.isActive }); refresh(); }}
+                        onClick={async () => { try { await apiUpdateSupplier(sup.id, { isActive: !sup.isActive }); await refresh(); alert(`Supplier ${sup.isActive ? 'deactivated' : 'activated'} successfully`); } catch (err) { console.error('Failed to update supplier', err); alert(`Failed to update supplier: ${err instanceof Error ? err.message : 'Unknown error'}`); } }}
                         className={`px-3 py-1 rounded-lg text-xs font-medium transition ${
                           sup.isActive ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30' : 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30'
                         }`}
@@ -1424,9 +1460,11 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                         setAdjustModal(null);
                         setAdjustQty('');
                         setAdjustNotes('');
-                        refresh();
+                        await refresh();
+                        alert('Stock adjusted successfully');
                       } catch (err) {
                         console.error('Failed manual adjustment', err);
+                        alert(`Failed to adjust stock: ${err instanceof Error ? err.message : 'Unknown error'}`);
                       }
                     }
                   }}

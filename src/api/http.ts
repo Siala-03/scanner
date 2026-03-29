@@ -50,6 +50,11 @@ export async function apiRequest<T>(
     throw new ApiError(0, 'Unable to connect to server. Please check your connection.');
   }
 
+  // Handle 204 No Content responses
+  if (res.status === 204) {
+    return {} as T;
+  }
+
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     const errorMessage = (data as any)?.error ?? `Request failed with status ${res.status}`;

@@ -83,7 +83,7 @@ export function Modal({
               relative w-full ${sizeStyles[size]}
               ${isLight 
                 ? 'bg-white rounded-2xl shadow-2xl border border-slate-100' 
-                : 'bg-[#2a2018] rounded-2xl shadow-2xl border border-[#3a2e20]'
+                : 'bg-slate-700 rounded-2xl shadow-2xl border border-slate-600'
               }
               max-h-[90vh] overflow-hidden flex flex-col
             `}>
