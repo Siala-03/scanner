@@ -209,28 +209,56 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
   const handleSaveRow = async (menuItemId: string, _name: string) => {
     if (!isManager) return;
     const current = inventoryMap[menuItemId];
-    if (!current) return;
+    if (!current) {
+      alert('Item not found');
+      return;
+    }
+    
     const updatePayload: any = {};
-    if (editValues.stock !== undefined && editValues.stock !== current.stock) updatePayload.stock = editValues.stock;
-    if (editValues.lowStockThreshold !== undefined && editValues.lowStockThreshold !== current.lowStockThreshold) updatePayload.low_stock_threshold = editValues.lowStockThreshold;
-    if (editValues.reorderPoint !== undefined && editValues.reorderPoint !== current.reorderPoint) updatePayload.reorder_point = editValues.reorderPoint;
-    if (editValues.reorderQty !== undefined && editValues.reorderQty !== current.reorderQty) updatePayload.reorder_qty = editValues.reorderQty;
-    if (editValues.unitCost !== undefined && editValues.unitCost !== current.unitCost) updatePayload.unit_cost = editValues.unitCost;
-    if (editValues.location !== undefined && editValues.location !== current.location) updatePayload.location = editValues.location;
-
-    if (Object.keys(updatePayload).length > 0) {
-      try {
-        await apiUpdateInventoryRecord(menuItemId, updatePayload);
-        await refresh();
-        alert('Inventory item updated successfully');
-      } catch (err) {
-        console.error('Failed to update inventory record', err);
-        alert(`Failed to update inventory item: ${err instanceof Error ? err.message : 'Unknown error'}`);
-      }
+    
+    // Check each field and add to payload if it changed
+    if (editValues.stock !== undefined && editValues.stock !== current.stock) {
+      updatePayload.stock = editValues.stock;
+    }
+    if (editValues.lowStockThreshold !== undefined && editValues.lowStockThreshold !== current.lowStockThreshold) {
+      updatePayload.low_stock_threshold = editValues.lowStockThreshold;
+    }
+    if (editValues.reorderPoint !== undefined && editValues.reorderPoint !== current.reorderPoint) {
+      updatePayload.reorder_point = editValues.reorderPoint;
+    }
+    if (editValues.reorderQty !== undefined && editValues.reorderQty !== current.reorderQty) {
+      updatePayload.reorder_qty = editValues.reorderQty;
+    }
+    if (editValues.unitCost !== undefined && editValues.unitCost !== current.unitCost) {
+      updatePayload.unit_cost = editValues.unitCost;
+    }
+    if (editValues.location !== undefined && editValues.location !== current.location) {
+      updatePayload.location = editValues.location;
     }
 
-    setEditingRow(null);
-    setEditValues({});
+    if (Object.keys(updatePayload).length === 0) {
+      alert('No changes made');
+      setEditingRow(null);
+      setEditValues({});
+      return;
+    }
+
+    try {
+      console.log('Saving inventory item:', { menuItemId, updatePayload });
+      await apiUpdateInventoryRecord(menuItemId, updatePayload);
+      
+      // Refresh the data
+      await refresh();
+      
+      alert('Inventory item updated successfully');
+      setEditingRow(null);
+      setEditValues({});
+    } catch (err) {
+      console.error('Failed to update inventory record:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      alert(`Failed to update inventory item: ${errorMessage}`);
+      // Don't clear edit state on error so user can retry
+    }
   };
 
   const handleDeleteInventoryItem = async (menuItemId: string) => {
@@ -679,7 +707,8 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                               <input
                                 type="number"
                                 value={editValues.unitCost ?? row.rec?.unitCost ?? 0}
-                                onChange={(e) => setEditValues((v) => ({ ...v, unitCost: parseInt(e.target.value || '0', 10) }))}
+                                onChange={(e) => setEditValues((v) => ({ ...v, unitCost: parseFloat(e.target.value || '0') }))}
+                                step="0.01"
                                 className="w-24 px-2 py-1 rounded bg-slate-900 border border-slate-600 text-white text-xs focus:outline-none focus:ring-1 focus:ring-amber-500"
                                 min={0}
                               />
@@ -721,14 +750,15 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                                 <div className="flex gap-1">
                                   <button
                                     onClick={() => {
+                                      const rec = inventoryMap[row.item.id];
                                       setEditingRow(row.item.id);
                                       setEditValues({
-                                        stock: row.stock,
-                                        lowStockThreshold: row.rec?.lowStockThreshold,
-                                        reorderPoint: row.rec?.reorderPoint,
-                                        reorderQty: row.rec?.reorderQty,
-                                        unitCost: row.rec?.unitCost,
-                                        location: row.rec?.location,
+                                        stock: rec?.stock ?? 0,
+                                        lowStockThreshold: rec?.lowStockThreshold ?? 0,
+                                        reorderPoint: rec?.reorderPoint ?? 0,
+                                        reorderQty: rec?.reorderQty ?? 0,
+                                        unitCost: rec?.unitCost ?? 0,
+                                        location: rec?.location ?? '',
                                       });
                                     }}
                                     className="p-1.5 rounded-lg bg-slate-700 text-slate-400 hover:text-amber-400 hover:bg-slate-600 transition"
@@ -1274,7 +1304,8 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                     type="number"
                     placeholder="Unit Cost"
                     value={item.unitCost}
-                    onChange={(e) => setNewPOItems((v) => v.map((i, j) => j === idx ? { ...i, unitCost: parseInt(e.target.value || '0', 10) } : i))}
+                    onChange={(e) => setNewPOItems((v) => v.map((i, j) => j === idx ? { ...i, unitCost: parseFloat(e.target.value || '0') } : i))}
+                    step="0.01"
                     className="px-3 py-2 rounded-lg bg-slate-900 border border-slate-600 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
                     min={0}
                   />

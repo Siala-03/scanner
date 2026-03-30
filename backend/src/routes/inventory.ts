@@ -134,7 +134,17 @@ router.put('/:id', authenticate, async (req: AuthenticatedRequest, res: Response
       }
 
       if (updateFields.length === 0) {
-        return res.json(simple.rows[0]);
+        // No updates to make - return normalized response
+        return res.json({
+          menuItemId: simple.rows[0].menu_item_id,
+          stock: simple.rows[0].stock,
+          lowStockThreshold: simple.rows[0].low_stock_threshold,
+          reorderPoint: simple.rows[0].reorder_point,
+          reorderQty: simple.rows[0].reorder_qty,
+          unitCost: simple.rows[0].unit_cost,
+          location: simple.rows[0].location,
+          updatedAt: simple.rows[0].updated_at,
+        });
       }
 
       updateFields.push('updated_at = NOW()');
