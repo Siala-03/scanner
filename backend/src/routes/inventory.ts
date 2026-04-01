@@ -102,32 +102,32 @@ router.put('/:id', authenticate, async (req: AuthenticatedRequest, res: Response
       const unitCost = updates.unit_cost ?? updates.unitCost;
       const location = updates.location;
 
-      if (stock !== undefined) {
+      if (updates.stock !== undefined) {
         updateFields.push(`stock = $${paramCount}`);
-        updateValues.push(stock);
+        updateValues.push(updates.stock);
         paramCount++;
       }
-      if (lowStockThreshold !== undefined) {
+      if (updates.low_stock_threshold !== undefined || updates.lowStockThreshold !== undefined) {
         updateFields.push(`low_stock_threshold = $${paramCount}`);
         updateValues.push(lowStockThreshold);
         paramCount++;
       }
-      if (reorderPoint !== undefined) {
+      if (updates.reorder_point !== undefined || updates.reorderPoint !== undefined) {
         updateFields.push(`reorder_point = $${paramCount}`);
         updateValues.push(reorderPoint);
         paramCount++;
       }
-      if (reorderQty !== undefined) {
+      if (updates.reorder_qty !== undefined || updates.reorderQty !== undefined) {
         updateFields.push(`reorder_qty = $${paramCount}`);
         updateValues.push(reorderQty);
         paramCount++;
       }
-      if (unitCost !== undefined) {
+      if (updates.unit_cost !== undefined || updates.unitCost !== undefined) {
         updateFields.push(`unit_cost = $${paramCount}`);
         updateValues.push(unitCost);
         paramCount++;
       }
-      if (location !== undefined) {
+      if (updates.location !== undefined) {
         updateFields.push(`location = $${paramCount}`);
         updateValues.push(location);
         paramCount++;

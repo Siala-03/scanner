@@ -11,7 +11,6 @@ import {
   TrashIcon,
   CheckCircleIcon,
   XCircleIcon,
-  ArrowUpIcon,
   StarIcon,
   MapPinIcon,
   MailIcon,
@@ -34,7 +33,6 @@ import type {
 } from '../../types/inventory';
 import {
   updateInventoryRecord as apiUpdateInventoryRecord,
-  adjustStock as apiAdjustStock,
   deleteInventoryRecord as apiDeleteInventoryRecord,
   createSupplier as apiCreateSupplier,
   updateSupplier as apiUpdateSupplier,
@@ -95,8 +93,12 @@ function StarRating({ rating }: { rating: number }) {
 // ── Helper Functions ─────────────────────────────────────────────────────────
 
 function normalizeInventoryRecord(rec: any): InventoryRecord {
+  const menuItemId = rec.menuItemId || rec.menu_item_id || rec.itemId || rec.item_id || '';
+  if (!menuItemId) {
+    console.warn('Inventory record has no menuItemId:', rec);
+  }
   return {
-    menuItemId: rec.menuItemId || rec.menu_item_id || '',
+    menuItemId,
     stock: rec.stock ?? 0,
     lowStockThreshold: rec.lowStockThreshold ?? rec.low_stock_threshold ?? 0,
     reorderPoint: rec.reorderPoint ?? rec.reorder_point ?? 0,
@@ -138,8 +140,13 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
     const map: Record<string, InventoryRecord> = {};
     inventory.forEach((rec) => {
       const normalized = normalizeInventoryRecord(rec);
-      map[normalized.menuItemId] = normalized;
+      if (normalized.menuItemId) {
+        map[normalized.menuItemId] = normalized;
+      }
     });
+    if (Object.keys(map).length === 0 && inventory.length > 0) {
+      console.warn('No valid inventory items found after normalization. Inventory count:', inventory.length);
+    }
     return map;
   }, [inventory]);
 
@@ -157,9 +164,6 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
   const [statusFilter, setStatusFilter] = useState<'all' | 'ok' | 'low' | 'out'>('all');
   const [editingRow, setEditingRow] = useState<string | null>(null);
   const [editValues, setEditValues] = useState<Partial<InventoryRecord>>({});
-  const [adjustModal, setAdjustModal] = useState<{ id: string; name: string; current: number } | null>(null);
-  const [adjustQty, setAdjustQty] = useState('');
-  const [adjustNotes, setAdjustNotes] = useState('');
   const [selectedItemDetails, setSelectedItemDetails] = useState<null | {
     item: any;
     rec?: InventoryRecord;
@@ -210,7 +214,8 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
     if (!isManager) return;
     const current = inventoryMap[menuItemId];
     if (!current) {
-      alert('Item not found');
+      console.error('Item not found in inventory map', { menuItemId, availableKeys: Object.keys(inventoryMap) });
+      alert(`Item not found. Please refresh the page and try again.`);
       return;
     }
     
@@ -284,10 +289,32 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
   const [receiveQtys, setReceiveQtys] = useState<Record<string, number>>({});
 
   const handleCreatePO = async () => {
-    if (!newPO.supplierId || newPOItems.length === 0) return;
+    // Validate required fields
+    if (!newPO.supplierId) {
+      alert('Please select a supplier');
+      return;
+    }
+    
+    if (newPOItems.length === 0) {
+      alert('Please add at least one item to the purchase order');
+      return;
+    }
+    
+    // Validate all items have required fields
+    const invalidItems = newPOItems.filter(i => !i.menuItemId || i.orderedQty <= 0);
+    if (invalidItems.length > 0) {
+      alert('Please fill in all item details (select item and enter valid quantity)');
+      return;
+    }
+    
     const sup = suppliers.find((s) => s.id === newPO.supplierId);
-    if (!sup) return;
+    if (!sup) {
+      alert('Selected supplier not found');
+      return;
+    }
+    
     try {
+      console.log('Creating purchase order:', { supplier: sup.name, itemCount: newPOItems.length });
       await apiCreatePurchaseOrder({
         supplierId: sup.id,
         supplierName: sup.name,
@@ -305,10 +332,14 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
         notes: newPO.notes,
         createdBy: 'Manager',
       });
+      
+      alert('Purchase order created successfully');
     } catch (err) {
       console.error('Failed to create PO', err);
       alert(`Failed to create purchase order: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      return; // Don't close modal on error
     }
+    
     setShowNewPO(false);
     setNewPO({ supplierId: '', expectedDelivery: '', notes: '' });
     setNewPOItems([]);
@@ -435,6 +466,25 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                 <Button variant="danger" size="sm" onClick={() => setShowWasteModal(true)}>
                   <PlusIcon className="w-4 h-4" />
                   Log Waste
+                </Button>
+              )}
+              {isManager && activeTab === 'purchase-orders' && (
+                <Button 
+                  variant="primary" 
+                  size="sm" 
+                  onClick={() => {
+                    if (suppliers.length === 0) {
+                      alert('Please add at least one supplier before creating a purchase order.');
+                      setActiveTab('suppliers');
+                      return;
+                    }
+                    setNewPO({ supplierId: suppliers[0].id, expectedDelivery: '', notes: '' });
+                    setNewPOItems([]);
+                    setShowNewPO(true);
+                  }}
+                >
+                  <PlusIcon className="w-4 h-4" />
+                  New PO
                 </Button>
               )}
               {isManager && activeTab === 'suppliers' && (
@@ -765,17 +815,6 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                                     title="Edit"
                                   >
                                     <EditIcon className="w-4 h-4" />
-                                  </button>
-                                  <button
-                                    onClick={() => {
-                                      setAdjustModal({ id: row.item.id, name: row.item.name, current: row.stock });
-                                      setAdjustQty('');
-                                      setAdjustNotes('');
-                                    }}
-                                    className="p-1.5 rounded-lg bg-slate-700 text-slate-400 hover:text-blue-400 hover:bg-slate-600 transition"
-                                    title="Quick Adjust"
-                                  >
-                                    <ArrowUpIcon className="w-4 h-4" />
                                   </button>
                                   <button
                                     onClick={() => {
@@ -1244,17 +1283,41 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
 
         {/* New PO Modal */}
         <Modal isOpen={showNewPO} onClose={() => setShowNewPO(false)} title="New Purchase Order">
-          <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
-              <select
-                value={newPO.supplierId}
+          {suppliers.length === 0 ? (
+            <div className="py-8 text-center">
+              <div className="mb-4 rounded-lg bg-amber-500/10 border border-amber-500/30 p-4">
+                <p className="text-slate-300 mb-3">No suppliers available</p>
+                <p className="text-xs text-slate-400 mb-4">Create at least one supplier before generating purchase orders.</p>
+                <button
+                  onClick={() => {
+                    setShowNewPO(false);
+                    setActiveTab('suppliers');
+                  }}
+                  className="px-4 py-2 rounded-lg bg-amber-500/20 text-amber-400 text-xs font-medium hover:bg-amber-500/30 transition"
+                >
+                  Go to Suppliers
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <select
+                  value={newPO.supplierId}
                 onChange={(e) => setNewPO((v) => ({ ...v, supplierId: e.target.value }))}
                 className="px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
               >
                 <option value="">Select Supplier</option>
-                {suppliers.map((s) => (
+                {suppliers.filter((s) => s.isActive).map((s) => (
                   <option key={s.id} value={s.id}>{s.name}</option>
                 ))}
+                {suppliers.filter((s) => !s.isActive).length > 0 && (
+                  <optgroup label="Inactive">
+                    {suppliers.filter((s) => !s.isActive).map((s) => (
+                      <option key={s.id} value={s.id}>{s.name} (Inactive)</option>
+                    ))}
+                  </optgroup>
+                )}
               </select>
               <input
                 type="date"
@@ -1323,13 +1386,16 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                 </button>
                 <button
                   onClick={handleCreatePO}
-                  className="px-3 py-1 rounded-lg bg-emerald-500/20 text-emerald-400 text-xs font-medium hover:bg-emerald-500/30 transition"
+                  disabled={!newPO.supplierId || newPOItems.length === 0 || newPOItems.some(i => !i.menuItemId || i.orderedQty <= 0)}
+                  className="px-3 py-1 rounded-lg bg-emerald-500/20 text-emerald-400 text-xs font-medium hover:bg-emerald-500/30 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  title={!newPO.supplierId ? 'Select a supplier' : newPOItems.length === 0 ? 'Add items to the order' : 'Fill in all item details'}
                 >
                   Create PO
                 </button>
               </div>
             </div>
-          </div>
+            </div>
+          )}
         </Modal>
 
         {/* Supplier Modal */}
@@ -1446,66 +1512,6 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
               </button>
             </div>
           </div>
-        </Modal>
-
-        {/* Quick Adjust Modal */}
-        <Modal isOpen={!!adjustModal} onClose={() => setAdjustModal(null)} title={`Adjust Stock: ${adjustModal?.name}`}>
-          {adjustModal && (
-            <div className="space-y-3">
-              <div className="flex items-center gap-3">
-                <div className="flex-1">
-                  <p className="text-slate-400 text-sm">Current Stock</p>
-                  <p className="text-xl font-bold text-white">{adjustModal.current}</p>
-                </div>
-                <div className="flex-1">
-                  <label className="block text-xs text-slate-400 mb-1">New Quantity</label>
-                  <input
-                    type="number"
-                    value={adjustQty}
-                    onChange={(e) => setAdjustQty(e.target.value)}
-                    min={0}
-                    className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
-                  />
-                </div>
-              </div>
-              <textarea
-                placeholder="Notes (optional)"
-                value={adjustNotes}
-                onChange={(e) => setAdjustNotes(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
-                rows={2}
-              />
-              <div className="flex justify-end gap-2 pt-3 border-t border-slate-700/30">
-                <button
-                  onClick={() => setAdjustModal(null)}
-                  className="px-3 py-1 rounded-lg bg-slate-700 text-slate-300 text-xs hover:bg-slate-600 transition"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={async () => {
-                    const qty = parseInt(adjustQty || '0', 10);
-                    if (qty >= 0 && adjustModal) {
-                      try {
-                        await apiAdjustStock(adjustModal.id, qty - adjustModal.current, adjustNotes || 'Manual adjustment', 'Manager');
-                        setAdjustModal(null);
-                        setAdjustQty('');
-                        setAdjustNotes('');
-                        await refresh();
-                        alert('Stock adjusted successfully');
-                      } catch (err) {
-                        console.error('Failed manual adjustment', err);
-                        alert(`Failed to adjust stock: ${err instanceof Error ? err.message : 'Unknown error'}`);
-                      }
-                    }
-                  }}
-                  className="px-3 py-1 rounded-lg bg-emerald-500/20 text-emerald-400 text-xs font-medium hover:bg-emerald-500/30 transition"
-                >
-                  Adjust
-                </button>
-              </div>
-            </div>
-          )}
         </Modal>
 
         {/* Waste Modal */}

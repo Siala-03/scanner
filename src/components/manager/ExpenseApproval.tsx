@@ -766,5 +766,6 @@ export default function ManagerExpenseApproval() {
         </div>
       )}
     </div>
+    </div>
   );
 }

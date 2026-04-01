@@ -24,6 +24,7 @@ import { locationsRouter } from './routes/locations.js';
 import { recipesRouter } from './routes/recipes.js';
 import { cycleCountRouter } from './routes/cycleCounts.js';
 import expensesRouter from './routes/expenses.js';
+import { aiRouter } from './routes/ai.js';
 import { initSocket } from './socket.js';
 import { logger } from './logger.js';
 import { pool } from './db.js';
@@ -149,6 +150,7 @@ app.use('/api/locations', locationsRouter);
 app.use('/api/recipes', recipesRouter);
 app.use('/api/cycle-counts', cycleCountRouter);
 app.use('/api/expenses', expensesRouter);
+app.use('/api/ai', aiRouter);
 
 app.use(
   (
