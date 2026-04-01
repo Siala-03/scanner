@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { pool } from '../db.js';
 import { emitWaiterCall } from '../socket.js';
+import { toCamelCase } from '../utils/camelCase.js';
 
 export const tablesRouter = Router();
 
@@ -8,7 +9,7 @@ export const tablesRouter = Router();
 tablesRouter.get('/', async (_req: Request, res: Response) => {
   try {
     const result = await pool.query('SELECT * FROM tables ORDER BY table_number');
-    res.json(result.rows);
+    res.json(toCamelCase(result.rows));
   } catch (err) {
     console.error('Error fetching tables:', err);
     res.status(500).json({ error: 'Failed to fetch tables' });
@@ -38,7 +39,7 @@ tablesRouter.post('/', async (req: Request, res: Response) => {
       [id, table_number, name || `Table ${table_number}`, capacity || 4, location || 'Main']
     );
     
-    res.status(201).json(result.rows[0]);
+    res.status(201).json(toCamelCase(result.rows[0]));
   } catch (err) {
     console.error('Error creating table:', err);
     res.status(500).json({ error: 'Failed to create table' });

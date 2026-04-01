@@ -1,31 +1,28 @@
 import { Router, Request, Response } from 'express';
 import { pool } from '../db.js';
 import { emitMenuUpdate } from '../socket.js';
+import { toCamelCase, rowsToCamelCase } from '../utils/camelCase.js';
 
 export const menuRouter = Router();
 
 // GET all menu items
 menuRouter.get('/', async (_req: Request, res: Response) => {
   try {
-    const result = await pool.query('SELECT * FROM menu_items ORDER BY category, name');
+    const result = await pool.query('SELECT * FROM menu_items WHERE is_available = true ORDER BY category, name');
+    
+    // Return empty array if no items, client will use defaults
+    if (result.rows.length === 0) {
+      res.json([]);
+      return;
+    }
+    
     // Transform snake_case to camelCase for frontend compatibility
-    const menuItems = result.rows.map(row => ({
-      id: row.id,
-      name: row.name,
-      description: row.description,
-      price: row.price,
-      category: row.category,
-      emoji: row.emoji,
-      prepTime: row.prep_time,
-      isAvailable: row.is_available,
-      isPopular: row.is_popular,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at
-    }));
+    const menuItems = rowsToCamelCase(result.rows);
     res.json(menuItems);
   } catch (err) {
     console.error('Error fetching menu:', err);
-    res.status(500).json({ error: 'Failed to fetch menu' });
+    // Return empty array on error to allow fallback to defaults
+    res.json([]);
   }
 });
 

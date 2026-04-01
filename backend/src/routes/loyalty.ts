@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { pool } from '../db.js';
 import { authenticate, AuthenticatedRequest } from '../middleware/auth.js';
+import { toCamelCase } from '../utils/camelCase.js';
 
 const router = Router();
 
@@ -15,7 +16,7 @@ router.get('/customers', authenticate, async (req: AuthenticatedRequest, res: Re
       ORDER BY last_visit DESC NULLS LAST, join_date DESC
     `, [restaurantId]);
 
-    res.json(result.rows);
+    res.json(toCamelCase(result.rows));
   } catch (error) {
     console.error('Error fetching customers:', error);
     res.status(500).json({ error: 'Failed to fetch customers' });
@@ -57,7 +58,7 @@ router.post('/customers', async (req, res) => {
         VALUES ($1, $2, $3, $4, $5)
         RETURNING *
       `, [customerId, phone, email, name, 'default_restaurant']);
-      customer = result.rows[0];
+      customer = toCamelCase(result.rows[0]);
     }
 
     res.json(customer);
@@ -104,9 +105,9 @@ router.get('/customers/:id', authenticate, async (req: AuthenticatedRequest, res
     `, [restaurantId, customer.total_points]);
 
     res.json({
-      customer,
-      recentTransactions: transactionsResult.rows,
-      availableRewards: rewardsResult.rows
+      customer: toCamelCase(customer),
+      recentTransactions: toCamelCase(transactionsResult.rows),
+      availableRewards: toCamelCase(rewardsResult.rows)
     });
   } catch (error) {
     console.error('Error fetching customer details:', error);
@@ -257,7 +258,7 @@ router.get('/rewards', async (req, res) => {
       ORDER BY points_required ASC
     `, ['default_restaurant']);
 
-    res.json(result.rows);
+    res.json(toCamelCase(result.rows));
   } catch (error) {
     console.error('Error fetching rewards:', error);
     res.status(500).json({ error: 'Failed to fetch rewards' });
@@ -280,7 +281,7 @@ router.post('/rewards', authenticate, async (req: AuthenticatedRequest, res: Res
       RETURNING *
     `, [rewardId, name, description, pointsRequired, rewardType, discountPercentage, freeItemId, req.restaurantId]);
 
-    res.json(result.rows[0]);
+    res.json(toCamelCase(result.rows[0]));
   } catch (error) {
     console.error('Error creating reward:', error);
     res.status(500).json({ error: 'Failed to create reward' });

@@ -4,36 +4,18 @@ import { HttpError } from '../http.js';
 import { createOrder as createOrderService } from '../services/orderService.js';
 import { emitOrderUpdate } from '../socket.js';
 import { createVubaVubaOrder, updateVubaVubaOrderStatus } from '../services/vubaVubaService.js';
+import { toCamelCase } from '../utils/camelCase.js';
 
 const router = Router();
 
 function normalizeOrder(row: any) {
-  return {
-    id: row.id,
-    orderNumber: row.order_number,
-    tableNumber: row.table_number,
-    customerName: row.customer_name,
-    customerId: row.customer_id,
-    status: row.status,
-    items: typeof row.items === 'string' ? JSON.parse(row.items) : row.items,
-    subtotal: row.subtotal,
-    tax: row.tax,
-    total: row.total,
-    notes: row.notes,
-    createdBy: row.created_by,
-    assignedTo: row.assigned_to,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-    completedAt: row.completed_at,
-    deliveryProvider: row.delivery_provider,
-    deliveryAddress: row.delivery_address,
-    deliveryOrderId: row.delivery_order_id,
-    deliveryStatus: row.delivery_status,
-    deliveryData: row.delivery_data,
-    loyaltyRewardId: row.loyalty_reward_id,
-    loyaltyDiscount: row.loyalty_discount,
-    loyaltyFreeItemId: row.loyalty_free_item_id
+  // Parse items if they're stored as JSON string
+  const order = {
+    ...row,
+    items: typeof row.items === 'string' ? JSON.parse(row.items) : row.items
   };
+  // Transform snake_case to camelCase
+  return toCamelCase(order);
 }
 
 // Generate order number
