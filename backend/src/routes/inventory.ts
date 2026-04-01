@@ -88,6 +88,24 @@ router.put('/:id', authenticate, async (req: AuthenticatedRequest, res: Response
       SELECT * FROM inventory_records WHERE menu_item_id = $1 AND restaurant_id = $2
     `, [id, restaurantId]);
 
+    // If record doesn't exist, create it first
+    if (simple.rows.length === 0) {
+      await pool.query(`
+        INSERT INTO inventory_records (id, menu_item_id, stock, low_stock_threshold, restaurant_id, created_at, updated_at)
+        VALUES ($1, $2, 0, 5, $3, NOW(), NOW())
+        ON CONFLICT (menu_item_id, restaurant_id) DO NOTHING
+      `, [`inv_${id}`, id, restaurantId]);
+      
+      // Fetch the created record
+      const created = await pool.query(`
+        SELECT * FROM inventory_records WHERE menu_item_id = $1 AND restaurant_id = $2
+      `, [id, restaurantId]);
+      
+      if (created.rows.length > 0) {
+        simple.rows = created.rows;
+      }
+    }
+
     if (simple.rows.length > 0) {
       // Update simple inventory record with snake_case support
       const updateFields: string[] = [];
