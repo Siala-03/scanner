@@ -8,7 +8,21 @@ export const menuRouter = Router();
 menuRouter.get('/', async (_req: Request, res: Response) => {
   try {
     const result = await pool.query('SELECT * FROM menu_items ORDER BY category, name');
-    res.json(result.rows);
+    // Transform snake_case to camelCase for frontend compatibility
+    const menuItems = result.rows.map(row => ({
+      id: row.id,
+      name: row.name,
+      description: row.description,
+      price: row.price,
+      category: row.category,
+      emoji: row.emoji,
+      prepTime: row.prep_time,
+      isAvailable: row.is_available,
+      isPopular: row.is_popular,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    }));
+    res.json(menuItems);
   } catch (err) {
     console.error('Error fetching menu:', err);
     res.status(500).json({ error: 'Failed to fetch menu' });
