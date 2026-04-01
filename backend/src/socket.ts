@@ -38,6 +38,18 @@ export function initSocket(httpServer: HTTPServer): SocketServer {
       console.log(`Socket ${socket.id} joined menu room`);
     });
 
+    // Join supplier room for supplier portal notifications
+    socket.on('join:supplier', (supplierId: string) => {
+      socket.join(`supplier:${supplierId}`);
+      console.log(`Socket ${socket.id} joined supplier:${supplierId}`);
+    });
+
+    // Join restaurant room for client notifications
+    socket.on('join:restaurant', (restaurantId: string) => {
+      socket.join(`restaurant:${restaurantId}`);
+      console.log(`Socket ${socket.id} joined restaurant:${restaurantId}`);
+    });
+
     socket.on('disconnect', () => {
       console.log('Client disconnected:', socket.id);
     });

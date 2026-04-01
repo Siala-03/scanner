@@ -1,6 +1,6 @@
 import React, { useCallback, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeftIcon, UtensilsIcon, BarChart3Icon, BriefcaseIcon, ChefHatIcon, QrCodeIcon, UsersIcon, TrendingUpIcon, ClockIcon, ShoppingBagIcon, LockIcon, LogOutIcon } from 'lucide-react';
+import { ArrowLeftIcon, UtensilsIcon, BarChart3Icon, BriefcaseIcon, ChefHatIcon, QrCodeIcon, UsersIcon, TrendingUpIcon, ClockIcon, ShoppingBagIcon, TruckIcon } from 'lucide-react';
 import { CartItem, Order, OrderStatus, Customer } from './types';
 import { useStaff } from './hooks/useStaff';
 import { useOrders } from './hooks/useOrders';

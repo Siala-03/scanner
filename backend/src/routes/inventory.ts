@@ -102,33 +102,33 @@ router.put('/:id', authenticate, async (req: AuthenticatedRequest, res: Response
       const unitCost = updates.unit_cost ?? updates.unitCost;
       const location = updates.location;
 
-      if (updates.stock !== undefined) {
-        updateFields.push(`stock = $${paramCount}`);
-        updateValues.push(updates.stock);
+      if (stock !== undefined) {
+        updateFields.push(`stock = ${paramCount}`);
+        updateValues.push(stock);
         paramCount++;
       }
-      if (updates.low_stock_threshold !== undefined || updates.lowStockThreshold !== undefined) {
-        updateFields.push(`low_stock_threshold = $${paramCount}`);
+      if (lowStockThreshold !== undefined) {
+        updateFields.push(`low_stock_threshold = ${paramCount}`);
         updateValues.push(lowStockThreshold);
         paramCount++;
       }
-      if (updates.reorder_point !== undefined || updates.reorderPoint !== undefined) {
-        updateFields.push(`reorder_point = $${paramCount}`);
+      if (reorderPoint !== undefined) {
+        updateFields.push(`reorder_point = ${paramCount}`);
         updateValues.push(reorderPoint);
         paramCount++;
       }
-      if (updates.reorder_qty !== undefined || updates.reorderQty !== undefined) {
-        updateFields.push(`reorder_qty = $${paramCount}`);
+      if (reorderQty !== undefined) {
+        updateFields.push(`reorder_qty = ${paramCount}`);
         updateValues.push(reorderQty);
         paramCount++;
       }
-      if (updates.unit_cost !== undefined || updates.unitCost !== undefined) {
-        updateFields.push(`unit_cost = $${paramCount}`);
+      if (unitCost !== undefined) {
+        updateFields.push(`unit_cost = ${paramCount}`);
         updateValues.push(unitCost);
         paramCount++;
       }
-      if (updates.location !== undefined) {
-        updateFields.push(`location = $${paramCount}`);
+      if (location !== undefined) {
+        updateFields.push(`location = ${paramCount}`);
         updateValues.push(location);
         paramCount++;
       }

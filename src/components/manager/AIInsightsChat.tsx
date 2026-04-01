@@ -49,11 +49,12 @@ export function AIInsightsChat({ alerts }: AIInsightsChatProps) {
         content: data.answer,
         actions: data.suggestedActions 
       }]);
-    } catch (error) {
+    } catch (error: any) {
       console.error('AI Insights Assistant Error:', error);
+      const errorMsg = error.message || "I encountered an error while analyzing your data. Please check your connection.";
       setMessages(prev => [...prev, { 
         role: 'assistant', 
-        content: "I'm sorry, I encountered an error while analyzing your data. Please check your connection and try again." 
+        content: `Sorry, I hit a snag: ${errorMsg}` 
       }]);
     } finally {
       setIsLoading(false);

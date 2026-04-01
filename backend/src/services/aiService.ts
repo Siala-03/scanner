@@ -76,7 +76,7 @@ const getTopSalesContext = async (restaurantId: string) => {
     `, [restaurantId]);
     return res.rows;
   } catch (e) {
-    console.warn('AI Context Warning (Sales):', e.message);
+    console.error('AI Context Error (Sales Query Failed):', e);
     return [];
   }
 };
@@ -91,7 +91,7 @@ const getWasteContext = async (restaurantId: string) => {
     `); 
     return res.rows;
   } catch (e) {
-    console.warn('AI Context Warning (Waste):', e.message);
+    console.error('AI Context Error (Waste Query Failed):', e);
     return [];
   }
 };
