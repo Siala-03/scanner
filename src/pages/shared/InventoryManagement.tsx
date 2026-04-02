@@ -1409,6 +1409,7 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                 </button>
               </div>
             </div>
+            </div>
           )}
         </Modal>
 
