@@ -51,10 +51,11 @@ export const analyzeRestaurantData = async (restaurantId: string, userPrompt: st
 const getLowStockContext = async (restaurantId: string) => {
   try {
     const res = await pool.query(`
-      SELECT ii.name, ist.quantity, ist.min_level
-      FROM inventory_items ii
-      JOIN inventory_stock ist ON ii.id = ist.inventory_item_id
-      WHERE ii.restaurant_id = $1 AND ist.quantity <= ist.min_level
+      SELECT mi.name, ir.stock, ir.low_stock_threshold, ir.reorder_point
+      FROM inventory_records ir
+      JOIN menu_items mi ON ir.menu_item_id = mi.id
+      WHERE ir.restaurant_id = $1 AND mi.restaurant_id = $1 AND ir.stock <= ir.low_stock_threshold
+      ORDER BY ir.stock ASC
       LIMIT 10
     `, [restaurantId]);
     return res.rows;
@@ -66,17 +67,19 @@ const getLowStockContext = async (restaurantId: string) => {
 
 const getTopSalesContext = async (restaurantId: string) => {
   try {
-    // This query assumes a specific 'orders' table structure. 
-    // We wrap it in a try-catch so the whole AI service doesn't crash if the table is different.
+    // Query order_items to get sales data for items in this restaurant's orders
     const res = await pool.query(`
-      SELECT menu_item_name, COUNT(*) as order_count
-      FROM orders, jsonb_to_recordset(items) as x(menu_item_name text)
-      WHERE restaurant_id = $1 AND status = 'served' AND created_at >= NOW() - INTERVAL '30 days'
-      GROUP BY menu_item_name ORDER BY order_count DESC LIMIT 5
+      SELECT oi.menu_item_name, COUNT(*) as order_count, SUM(oi.quantity) as total_qty
+      FROM order_items oi
+      JOIN orders o ON oi.order_id = o.id
+      WHERE o.restaurant_id = $1 AND o.status = 'served' AND o.created_at >= NOW() - INTERVAL '30 days'
+      GROUP BY oi.menu_item_name
+      ORDER BY order_count DESC
+      LIMIT 5
     `, [restaurantId]);
     return res.rows;
   } catch (e) {
-    console.error('AI Context Error (Sales Query Failed):', e);
+    console.warn('AI Context Warning (Sales Query Failed):', e.message);
     return [];
   }
 };
@@ -86,12 +89,14 @@ const getWasteContext = async (restaurantId: string) => {
     const res = await pool.query(`
       SELECT menu_item_name, SUM(qty) as total_qty, SUM(total_cost) as cost
       FROM waste_entries
-      WHERE timestamp >= NOW() - INTERVAL '30 days'
-      GROUP BY menu_item_name ORDER BY cost DESC LIMIT 3
-    `); 
+      WHERE restaurant_id = $1 AND timestamp >= NOW() - INTERVAL '30 days'
+      GROUP BY menu_item_name
+      ORDER BY cost DESC
+      LIMIT 3
+    `, [restaurantId]); 
     return res.rows;
   } catch (e) {
-    console.error('AI Context Error (Waste Query Failed):', e);
+    console.warn('AI Context Warning (Waste Query Failed):', e.message);
     return [];
   }
 };

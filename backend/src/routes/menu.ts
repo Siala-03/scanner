@@ -8,10 +8,18 @@ export const menuRouter = Router();
 // GET all menu items
 menuRouter.get('/', async (_req: Request, res: Response) => {
   try {
-    const result = await pool.query('SELECT * FROM menu_items WHERE is_available = true ORDER BY category, name');
+    const restaurantId = 'default_restaurant';
+    const result = await pool.query(
+      'SELECT * FROM menu_items WHERE restaurant_id = $1 AND is_available = true ORDER BY category, name',
+      [restaurantId]
+    );
+    
+    // Log for debugging
+    console.log(`Fetching menu for restaurant ${restaurantId}: found ${result.rows.length} items`);
     
     // Return empty array if no items, client will use defaults
     if (result.rows.length === 0) {
+      console.log('No menu items found, returning empty array (client will use defaults)');
       res.json([]);
       return;
     }
@@ -30,6 +38,7 @@ menuRouter.get('/', async (_req: Request, res: Response) => {
 menuRouter.post('/', async (req: Request, res: Response) => {
   try {
     const { items } = req.body;
+    const restaurantId = 'default_restaurant';
     
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: 'Invalid menu items' });
@@ -39,14 +48,16 @@ menuRouter.post('/', async (req: Request, res: Response) => {
     try {
       await client.query('BEGIN');
       
-      // Clear existing menu items
-      await client.query('DELETE FROM menu_items');
+      // Clear existing menu items for this restaurant
+      console.log(`Clearing menu items for restaurant ${restaurantId}`);
+      await client.query('DELETE FROM menu_items WHERE restaurant_id = $1', [restaurantId]);
       
       // Insert new items
+      console.log(`Inserting ${items.length} new menu items for restaurant ${restaurantId}`);
       for (const item of items) {
         await client.query(
-          `INSERT INTO menu_items (id, name, description, price, category, emoji, prep_time, is_available, is_popular)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+          `INSERT INTO menu_items (id, name, description, price, category, emoji, prep_time, is_available, is_popular, restaurant_id)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
           [
             item.id,
             item.name,
@@ -55,13 +66,15 @@ menuRouter.post('/', async (req: Request, res: Response) => {
             item.category,
             item.emoji || '🍽️',
             item.prepTime || 15,
-            item.isAvailable !== false,
-            item.isPopular || false
+            item.isAvailable !== false,  // Default to true if not specified
+            item.isPopular || false,
+            restaurantId
           ]
         );
       }
       
       await client.query('COMMIT');
+      console.log(`Successfully saved ${items.length} menu items for restaurant ${restaurantId}`);
       res.json({ message: 'Menu updated successfully', count: items.length });
       
       // Notify all connected clients about menu update
@@ -81,7 +94,9 @@ menuRouter.post('/', async (req: Request, res: Response) => {
 // DELETE reset to default (clear menu)
 menuRouter.delete('/', async (_req: Request, res: Response) => {
   try {
-    await pool.query('DELETE FROM menu_items');
+    const restaurantId = 'default_restaurant';
+    console.log(`Clearing menu for restaurant ${restaurantId}`);
+    await pool.query('DELETE FROM menu_items WHERE restaurant_id = $1', [restaurantId]);
     res.json({ message: 'Menu cleared' });
     
     // Notify all connected clients about menu update

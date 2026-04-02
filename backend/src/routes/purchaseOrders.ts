@@ -5,6 +5,31 @@ import { getIO } from '../socket.js';
 
 const router = Router();
 
+// Helper function to convert database row to camelCase format
+function normalizePurchaseOrder(row: any) {
+  return {
+    id: row.id,
+    supplierId: row.supplier_id,
+    supplierName: row.supplier_name,
+    status: row.status,
+    items: typeof row.items === 'string' ? JSON.parse(row.items) : row.items,
+    totalCost: row.total_cost,
+    expectedDelivery: row.expected_delivery,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    receivedAt: row.received_at,
+    notes: row.notes,
+    createdBy: row.created_by,
+    restaurantId: row.restaurant_id,
+    deliveryAddress: row.delivery_address,
+    receivedBy: row.received_by,
+    qualityCheckPassed: row.quality_check_passed,
+    qualityNotes: row.quality_notes,
+    expectedArrivalTime: row.expected_arrival_time,
+    actualArrivalTime: row.actual_arrival_time,
+  };
+}
+
 function emitToSupplier(supplierId: string, event: string, data: unknown) {
   const io = getIO();
   if (io) {
@@ -43,7 +68,11 @@ router.get('/', async (req: Request, res: Response) => {
     query += ' ORDER BY created_at DESC';
 
     const result = await pool.query(query, params);
-    res.json(result.rows);
+    
+    // Convert all rows to camelCase format
+    const normalizedRows = result.rows.map(normalizePurchaseOrder);
+    
+    res.json(normalizedRows);
   } catch (error) {
     console.error('Error fetching purchase orders:', error);
     res.status(500).json({ error: 'Failed to fetch purchase orders' });
@@ -58,7 +87,11 @@ router.get('/:id', async (req: Request, res: Response) => {
     if (result.rows.length === 0) {
       throw new HttpError(404, 'Purchase order not found');
     }
-    res.json(result.rows[0]);
+    
+    // Convert row to camelCase format
+    const normalizedRow = normalizePurchaseOrder(result.rows[0]);
+    
+    res.json(normalizedRow);
   } catch (error) {
     if (error instanceof HttpError) {
       res.status(error.status).json({ error: error.message });
@@ -104,12 +137,20 @@ router.post('/', async (req: Request, res: Response) => {
     const id = `po_${Date.now().toString(36)}`;
     const total_cost = items.reduce((sum: number, item: { totalCost: number }) => sum + (item.totalCost || 0), 0);
     
+    console.log('Creating PO with:', { 
+      supplierId: final_supplier_id, 
+      supplierName: final_supplier_name,
+      itemsCount: items.length,
+      totalCost: total_cost,
+      expectedDelivery: final_expected_delivery
+    });
+    
     const result = await pool.query(
       `INSERT INTO purchase_orders 
-        (id, supplier_id, supplier_name, status, items, total_cost, expected_delivery, notes, created_by, restaurant_id, restaurant_name, delivery_address)
-       VALUES ($1, $2, $3, 'sent', $4, $5, $6, $7, $8, $9, $10, $11)
+        (id, supplier_id, supplier_name, status, items, total_cost, expected_delivery, notes, created_by, restaurant_id, delivery_address)
+       VALUES ($1, $2, $3, 'sent', $4, $5, $6, $7, $8, $9, $10)
        RETURNING *`,
-      [id, final_supplier_id, final_supplier_name, JSON.stringify(items), total_cost, final_expected_delivery, notes, final_created_by, final_restaurant_id || null, final_restaurant_name || null, final_delivery_address || null]
+      [id, final_supplier_id, final_supplier_name, JSON.stringify(items), total_cost, final_expected_delivery, notes, final_created_by, final_restaurant_id || 'default_restaurant', final_delivery_address || null]
     );
 
     const newPO = result.rows[0];
@@ -138,10 +179,18 @@ router.post('/', async (req: Request, res: Response) => {
       io.to('inventory').emit('purchase-order:created', { order: newPO });
     }
     
-    res.status(201).json(newPO);
+    // Convert to camelCase format
+    const normalizedPO = normalizePurchaseOrder(newPO);
+    
+    console.log('Purchase order created successfully:', { id, supplierId: final_supplier_id });
+    res.status(201).json(normalizedPO);
   } catch (error) {
-    console.error('Error creating purchase order:', error);
-    res.status(500).json({ error: 'Failed to create purchase order' });
+    console.error('Error creating purchase order:', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      request: { supplier_id: final_supplier_id, items_count: items?.length ?? 0 }
+    });
+    res.status(500).json({ error: 'Failed to create purchase order', details: error instanceof Error ? error.message : 'Unknown error' });
   }
 });
 
@@ -188,7 +237,10 @@ router.put('/:id', async (req: Request, res: Response) => {
       throw new HttpError(404, 'Purchase order not found');
     }
 
-    res.json(result.rows[0]);
+    // Convert to camelCase format
+    const normalizedRow = normalizePurchaseOrder(result.rows[0]);
+
+    res.json(normalizedRow);
   } catch (error) {
     if (error instanceof HttpError) {
       res.status(error.status).json({ error: error.message });
@@ -289,7 +341,11 @@ router.post('/:id/receive', async (req: Request, res: Response) => {
 
     // Fetch updated PO
     const updatedPO = await pool.query('SELECT * FROM purchase_orders WHERE id = $1', [id]);
-    res.json(updatedPO.rows[0]);
+    
+    // Convert to camelCase format
+    const normalizedRow = normalizePurchaseOrder(updatedPO.rows[0]);
+    
+    res.json(normalizedRow);
   } catch (error) {
     await client.query('ROLLBACK');
     if (error instanceof HttpError) {
