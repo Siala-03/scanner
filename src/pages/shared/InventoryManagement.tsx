@@ -210,30 +210,38 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
 
   // lowStockItems loaded from backend state via fetchLowStockItems() and setLowStockItems()
 
-  const handleSaveRow = async (menuItemId: string, itemName: string) => {
+  const handleSaveRow = async (menuItemId: string, _name: string) => {
     if (!isManager) return;
     const current = inventoryMap[menuItemId];
+    if (!current) {
+      console.error('Item not found in inventory map', { menuItemId, availableKeys: Object.keys(inventoryMap) });
+      alert(`Item not found. Please refresh the page and try again.`);
+      return;
+    }
     
-    const updatePayload: any = {
-      menu_item_id: menuItemId,
-      stock: editValues.stock !== undefined ? editValues.stock : (current?.stock ?? 0),
-      low_stock_threshold: editValues.lowStockThreshold !== undefined ? editValues.lowStockThreshold : (current?.lowStockThreshold ?? 0),
-      reorder_point: editValues.reorderPoint !== undefined ? editValues.reorderPoint : (current?.reorderPoint ?? 0),
-      reorder_qty: editValues.reorderQty !== undefined ? editValues.reorderQty : (current?.reorderQty ?? 0),
-      unit_cost: editValues.unitCost !== undefined ? editValues.unitCost : (current?.unitCost ?? 0),
-      location: editValues.location !== undefined ? editValues.location : (current?.location ?? ''),
-    };
+    const updatePayload: any = {};
+    
+    // Check each field and add to payload if it changed
+    if (editValues.stock !== undefined && editValues.stock !== current.stock) {
+      updatePayload.stock = editValues.stock;
+    }
+    if (editValues.lowStockThreshold !== undefined && editValues.lowStockThreshold !== current.lowStockThreshold) {
+      updatePayload.low_stock_threshold = editValues.lowStockThreshold;
+    }
+    if (editValues.reorderPoint !== undefined && editValues.reorderPoint !== current.reorderPoint) {
+      updatePayload.reorder_point = editValues.reorderPoint;
+    }
+    if (editValues.reorderQty !== undefined && editValues.reorderQty !== current.reorderQty) {
+      updatePayload.reorder_qty = editValues.reorderQty;
+    }
+    if (editValues.unitCost !== undefined && editValues.unitCost !== current.unitCost) {
+      updatePayload.unit_cost = editValues.unitCost;
+    }
+    if (editValues.location !== undefined && editValues.location !== current.location) {
+      updatePayload.location = editValues.location;
+    }
 
-    // Check if any values changed
-    const hasChanges = 
-      (editValues.stock !== undefined && editValues.stock !== current?.stock) ||
-      (editValues.lowStockThreshold !== undefined && editValues.lowStockThreshold !== current?.lowStockThreshold) ||
-      (editValues.reorderPoint !== undefined && editValues.reorderPoint !== current?.reorderPoint) ||
-      (editValues.reorderQty !== undefined && editValues.reorderQty !== current?.reorderQty) ||
-      (editValues.unitCost !== undefined && editValues.unitCost !== current?.unitCost) ||
-      (editValues.location !== undefined && editValues.location !== current?.location);
-
-    if (!hasChanges) {
+    if (Object.keys(updatePayload).length === 0) {
       alert('No changes made');
       setEditingRow(null);
       setEditValues({});
@@ -241,21 +249,34 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
     }
 
     try {
-      console.log('Saving inventory item:', { menuItemId, itemName, updatePayload });
+      console.log('Saving inventory item:', { menuItemId, updatePayload, currentStock: current.stock, newStock: editValues.stock });
       
-      // Always use update endpoint - it automatically creates the record if it doesn't exist
-      await apiUpdateInventoryRecord(menuItemId, updatePayload);
+      // Send all field values, not just changed ones, to ensure consistency
+      const updateData = {
+        stock: editValues.stock !== undefined ? editValues.stock : current.stock,
+        low_stock_threshold: editValues.lowStockThreshold !== undefined ? editValues.lowStockThreshold : current.lowStockThreshold,
+        reorder_point: editValues.reorderPoint !== undefined ? editValues.reorderPoint : current.reorderPoint,
+        reorder_qty: editValues.reorderQty !== undefined ? editValues.reorderQty : current.reorderQty,
+        unit_cost: editValues.unitCost !== undefined ? editValues.unitCost : current.unitCost,
+        location: editValues.location !== undefined ? editValues.location : current.location,
+      };
+      console.log('Sending to backend:', updateData);
+      
+      const result = await apiUpdateInventoryRecord(menuItemId, updateData);
+      console.log('Update response from backend:', result);
       
       // Refresh the data
+      console.log('Calling refresh to fetch updated data...');
       await refresh();
+      console.log('Refresh complete');
       
       alert('Inventory item updated successfully');
       setEditingRow(null);
       setEditValues({});
     } catch (err) {
-      console.error('Failed to update inventory record:', err);
-      const errorMessage = err instanceof Error ? err.message : (typeof err === 'object' && err !== null ? JSON.stringify(err) : String(err));
-      alert(`Failed to update inventory item:\n\n${errorMessage}`);
+      console.error('Failed to update inventory record detailed:', { menuItemId, error: err });
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      alert(`Failed to update inventory item: ${errorMessage}`);
       // Don't clear edit state on error so user can retry
     }
   };
@@ -309,10 +330,10 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
     
     try {
       console.log('Creating purchase order:', { supplier: sup.name, itemCount: newPOItems.length });
-      // Convert camelCase to snake_case for backend
       await apiCreatePurchaseOrder({
         supplierId: sup.id,
         supplierName: sup.name,
+        status: 'draft',
         items: newPOItems.map((i) => ({
           menuItemId: i.menuItemId,
           menuItemName: menuItems.find((m) => m.id === i.menuItemId)?.name ?? i.menuItemId,
@@ -321,10 +342,11 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
           unitCost: i.unitCost,
           totalCost: i.orderedQty * i.unitCost,
         })),
+        totalCost: newPOItems.reduce((s, i) => s + i.orderedQty * i.unitCost, 0),
         expectedDelivery: newPO.expectedDelivery,
         notes: newPO.notes,
         createdBy: 'Manager',
-      } as any);
+      });
       
       alert('Purchase order created successfully');
     } catch (err) {
@@ -1386,7 +1408,6 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                   Create PO
                 </button>
               </div>
-            </div>
             </div>
           )}
         </Modal>

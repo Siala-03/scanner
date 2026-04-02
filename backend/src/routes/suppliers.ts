@@ -4,13 +4,30 @@ import { HttpError } from '../http.js';
 
 const router = Router();
 
-// GET all suppliers
+// GET all suppliers (both active and inactive)
 router.get('/', async (_req: Request, res: Response) => {
   try {
     const result = await pool.query(
-      'SELECT * FROM suppliers WHERE is_active = true ORDER BY name'
+      'SELECT id, name, contact_person, email, phone, address, categories, lead_time_days, payment_terms, rating, is_active, notes, created_at, updated_at FROM suppliers ORDER BY name DESC, is_active DESC'
     );
-    res.json(result.rows);
+    // Convert snake_case to camelCase
+    const suppliers = result.rows.map(row => ({
+      id: row.id,
+      name: row.name,
+      contactPerson: row.contact_person,
+      email: row.email,
+      phone: row.phone,
+      address: row.address,
+      categories: row.categories,
+      leadTimeDays: row.lead_time_days,
+      paymentTerms: row.payment_terms,
+      rating: row.rating,
+      isActive: row.is_active,
+      notes: row.notes,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    }));
+    res.json(suppliers);
   } catch (error) {
     console.error('Error fetching suppliers:', error);
     res.status(500).json({ error: 'Failed to fetch suppliers' });
@@ -110,7 +127,6 @@ router.put('/:id', async (req: Request, res: Response) => {
     let paramIndex = 1;
 
     if (name !== undefined) { updates.push(`name = $${paramIndex++}`); values.push(name); }
-    if (name !== undefined) { updates.push(`name = $${paramIndex++}`); values.push(name); }
     if (resolvedContactPerson !== undefined) { updates.push(`contact_person = $${paramIndex++}`); values.push(resolvedContactPerson); }
     if (email !== undefined) { updates.push(`email = $${paramIndex++}`); values.push(email); }
     if (phone !== undefined) { updates.push(`phone = $${paramIndex++}`); values.push(phone); }
@@ -135,7 +151,25 @@ router.put('/:id', async (req: Request, res: Response) => {
       throw new HttpError(404, 'Supplier not found');
     }
 
-    res.json(result.rows[0]);
+    // Convert snake_case to camelCase in response
+    const row = result.rows[0];
+    const supplier = {
+      id: row.id,
+      name: row.name,
+      contactPerson: row.contact_person,
+      email: row.email,
+      phone: row.phone,
+      address: row.address,
+      categories: row.categories,
+      leadTimeDays: row.lead_time_days,
+      paymentTerms: row.payment_terms,
+      rating: row.rating,
+      isActive: row.is_active,
+      notes: row.notes,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
+    res.json(supplier);
   } catch (error) {
     if (error instanceof HttpError) {
       res.status(error.status).json({ error: error.message });

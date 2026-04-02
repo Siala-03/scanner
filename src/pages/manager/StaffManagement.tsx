@@ -42,6 +42,7 @@ export function StaffManagement() {
   const [isEditKPIOpen, setIsEditKPIOpen] = useState(false);
   const [editingKPI, setEditingKPI] = useState<any>(null);
   const [kpiForm, setKpiForm] = useState({
+    selectedStaffId: '' as string,
     staffRole: 'waiter' as StaffRole,
     name: '',
     description: '',
@@ -155,6 +156,7 @@ export function StaffManagement() {
       await createKPI(kpiForm);
       setIsKPIModalOpen(false);
       setKpiForm({
+        selectedStaffId: '',
         staffRole: 'waiter',
         name: '',
         description: '',
@@ -523,7 +525,9 @@ export function StaffManagement() {
                                         size="sm"
                                         onClick={() => {
                                           setEditingKPI(kpi);
+                                          const assignedId = kpi.assigned_staff_ids && kpi.assigned_staff_ids.length > 0 ? kpi.assigned_staff_ids[0] : '';
                                           setKpiForm({
+                                            selectedStaffId: assignedId,
                                             staffRole: kpi.staff_role as StaffRole,
                                             name: kpi.name,
                                             description: kpi.description || '',
@@ -875,14 +879,26 @@ export function StaffManagement() {
         >
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-slate-200 mb-1">Staff Role</label>
+              <label className="block text-sm font-medium text-slate-200 mb-1">Staff Member</label>
               <select
-                value={kpiForm.staffRole}
-                onChange={(e) => setKpiForm(prev => ({ ...prev, staffRole: e.target.value as StaffRole }))}
+                value={kpiForm.selectedStaffId}
+                onChange={(e) => {
+                  const staffId = e.target.value;
+                  const member = backendStaff.find(s => s.id === staffId);
+                  setKpiForm(prev => ({
+                    ...prev,
+                    selectedStaffId: staffId,
+                    staffRole: member ? member.role as StaffRole : prev.staffRole,
+                    assignedStaffIds: staffId ? [staffId] : [],
+                  }));
+                }}
                 className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500">
-                <option value="waiter">Waiter</option>
-                <option value="kitchen">Kitchen</option>
-                <option value="supervisor">Supervisor</option>
+                <option value="">Select a staff member</option>
+                {backendStaff.map(member => (
+                  <option key={member.id} value={member.id}>
+                    {member.name} ({member.role})
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -937,27 +953,6 @@ export function StaffManagement() {
               </select>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-slate-200 mb-1">Assign to Staff (Optional)</label>
-              <select
-                multiple
-                value={kpiForm.assignedStaffIds}
-                onChange={(e) => {
-                  const selected = Array.from(e.target.selectedOptions, option => option.value);
-                  setKpiForm(prev => ({ ...prev, assignedStaffIds: selected }));
-                }}
-                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 min-h-[100px]">
-                {backendStaff
-                  .filter(s => s.role === kpiForm.staffRole)
-                  .map(staffMember => (
-                    <option key={staffMember.id} value={staffMember.id}>
-                      {staffMember.name}
-                    </option>
-                  ))}
-              </select>
-              <p className="text-xs text-slate-400 mt-1">Hold Ctrl/Cmd to select multiple staff members</p>
-            </div>
-
             <div className="flex gap-3 pt-4">
               <Button
                 variant="secondary"
@@ -986,7 +981,7 @@ export function StaffManagement() {
                     console.error('Failed to update KPI:', error);
                   }
                 }}
-                disabled={!kpiForm.name || kpiForm.targetValue <= 0}>
+                disabled={!kpiForm.selectedStaffId || !kpiForm.name || kpiForm.targetValue <= 0}>
                 Update KPI
               </Button>
             </div>
