@@ -4,7 +4,8 @@ import {
   PlusIcon,
   EditIcon,
   TrashIcon,
-  KeyIcon } from
+  KeyIcon,
+  ChevronDownIcon } from
 'lucide-react';
 import { Staff, StaffRole, StaffCredentials } from '../../types';
 import { addStaffCredential, staffCredentials } from '../../data/staffData';
@@ -49,6 +50,18 @@ export function StaffManagement() {
     period: 'daily' as 'daily' | 'weekly' | 'monthly',
     assignedStaffIds: [] as string[],
   });
+  const [expandedStaff, setExpandedStaff] = useState<Set<string>>(new Set());
+  const toggleStaffExpanded = (staffId: string) => {
+    setExpandedStaff(prev => {
+      const next = new Set(prev);
+      if (next.has(staffId)) {
+        next.delete(staffId);
+      } else {
+        next.add(staffId);
+      }
+      return next;
+    });
+  };
   const [addForm, setAddForm] = useState<{
     name: string;
     role: StaffRole;
@@ -431,76 +444,128 @@ export function StaffManagement() {
             </Button>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {kpis.length === 0 ? (
-              <Card className="p-4">
-                <p className="text-slate-400">No KPIs created yet. Create one to get started.</p>
-              </Card>
-            ) : (
-              kpis.map((kpi) => (
-                <Card key={kpi.id} className="p-4 bg-slate-800 border-slate-700">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h3 className="font-semibold text-white">{kpi.name}</h3>
-                      <p className="text-sm text-slate-400">{kpi.description || 'No description'}</p>
-                      <div className="mt-2 flex gap-2">
-                        <Badge variant="primary">{kpi.staff_role}</Badge>
-                        <Badge variant="secondary">{kpi.period}</Badge>
-                      </div>
+          {backendStaff.map((member) => {
+            const memberKPIs = kpis.filter(k => {
+              const roleMatch = k.staff_role === member.role;
+              const assignedTo = !k.assigned_staff_ids || k.assigned_staff_ids.length === 0 || k.assigned_staff_ids.includes(member.id);
+              return roleMatch && assignedTo;
+            });
+            const isExpanded = expandedStaff.has(member.id);
+            return (
+              <Card key={member.id} className="bg-slate-800 border-slate-700 overflow-hidden">
+                <button
+                  onClick={() => toggleStaffExpanded(member.id)}
+                  className="w-full flex items-center justify-between p-4 hover:bg-slate-700/50 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-white text-sm font-medium">
+                      {member.name.split(' ').map(n => n[0]).join('')}
                     </div>
-                    <div className="flex flex-col gap-2">
-                      <div className="text-right">
-                        <p className="text-lg font-bold text-amber-500">{kpi.target_value}</p>
-                        <p className="text-xs text-slate-400">Target</p>
-                      </div>
-                      <div className="flex gap-1">
-                        <Button 
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => {
-                            setEditingKPI(kpi);
-                            setKpiForm({
-                              staffRole: kpi.staff_role as StaffRole,
-                              name: kpi.name,
-                              description: kpi.description || '',
-                              metric: kpi.metric as any,
-                              targetValue: kpi.target_value,
-                              period: kpi.period as any,
-                              assignedStaffIds: kpi.assigned_staff_ids || [],
-                            });
-                            setIsEditKPIOpen(true);
-                          }}>
-                          <EditIcon className="w-4 h-4" />
-                        </Button>
-                        <Button 
-                          variant="danger" 
-                          size="sm"
-                          onClick={async () => {
-                            if (window.confirm(`Are you sure you want to delete the KPI "${kpi.name}"?`)) {
-                              try {
-                                await deleteKPI(kpi.id);
-                                await refetchKPIs();
-                              } catch (err: any) {
-                                console.error('Failed to delete KPI', err);
-                                alert(err.message || 'Failed to delete KPI');
-                              }
-                            }
-                          }}
-                        >
-                          <TrashIcon className="w-4 h-4" />
-                        </Button>
-                      </div>
+                    <div className="text-left">
+                      <h3 className="text-base font-semibold text-white">{member.name}</h3>
+                      <p className="text-xs text-slate-400 capitalize">{member.role}</p>
                     </div>
+                    <Badge variant="count">{memberKPIs.length}</Badge>
                   </div>
-                  {kpi.assigned_staff_ids && kpi.assigned_staff_ids.length > 0 && (
-                    <div className="mt-3 pt-3 border-t border-slate-700">
-                      <p className="text-xs text-slate-400">Assigned to: {kpi.assigned_staff_ids.length} staff member(s)</p>
-                    </div>
+                  <motion.div
+                    animate={{ rotate: isExpanded ? 180 : 0 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <ChevronDownIcon className="w-5 h-5 text-slate-400" />
+                  </motion.div>
+                </button>
+                <AnimatePresence>
+                  {isExpanded && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                    >
+                      {memberKPIs.length === 0 ? (
+                        <div className="px-4 pb-4 text-slate-400 text-sm">
+                          No KPIs assigned to {member.name} yet.
+                        </div>
+                      ) : (
+                        <div className="border-t border-slate-700">
+                          <table className="w-full">
+                            <thead>
+                              <tr className="text-xs text-slate-400 text-left">
+                                <th className="px-4 py-2 font-medium">Name</th>
+                                <th className="px-4 py-2 font-medium">Metric</th>
+                                <th className="px-4 py-2 font-medium">Target</th>
+                                <th className="px-4 py-2 font-medium">Period</th>
+                                <th className="px-4 py-2 font-medium text-right">Actions</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {memberKPIs.map((kpi) => (
+                                <tr key={kpi.id} className="border-t border-slate-700/50 hover:bg-slate-700/30">
+                                  <td className="px-4 py-3">
+                                    <p className="text-sm font-medium text-white">{kpi.name}</p>
+                                    {kpi.description && (
+                                      <p className="text-xs text-slate-400 mt-0.5">{kpi.description}</p>
+                                    )}
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    <Badge variant="secondary" size="sm">{kpi.metric.replace(/_/g, ' ')}</Badge>
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    <span className="text-sm font-bold text-amber-500">{kpi.target_value}</span>
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    <Badge variant="primary" size="sm">{kpi.period}</Badge>
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    <div className="flex gap-1 justify-end">
+                                      <Button
+                                        variant="secondary"
+                                        size="sm"
+                                        onClick={() => {
+                                          setEditingKPI(kpi);
+                                          setKpiForm({
+                                            staffRole: kpi.staff_role as StaffRole,
+                                            name: kpi.name,
+                                            description: kpi.description || '',
+                                            metric: kpi.metric as any,
+                                            targetValue: kpi.target_value,
+                                            period: kpi.period as any,
+                                            assignedStaffIds: kpi.assigned_staff_ids || [],
+                                          });
+                                          setIsEditKPIOpen(true);
+                                        }}>
+                                        <EditIcon className="w-4 h-4" />
+                                      </Button>
+                                      <Button
+                                        variant="danger"
+                                        size="sm"
+                                        onClick={async () => {
+                                          if (window.confirm(`Are you sure you want to delete the KPI "${kpi.name}"?`)) {
+                                            try {
+                                              await deleteKPI(kpi.id);
+                                              await refetchKPIs();
+                                            } catch (err: any) {
+                                              console.error('Failed to delete KPI', err);
+                                              alert(err.message || 'Failed to delete KPI');
+                                            }
+                                          }
+                                        }}>
+                                        <TrashIcon className="w-4 h-4" />
+                                      </Button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </motion.div>
                   )}
-                </Card>
-              ))
-            )}
-          </div>
+                </AnimatePresence>
+              </Card>
+            );
+          })}
         </div>
 
         {/* Credentials Modal */}
@@ -709,14 +774,26 @@ export function StaffManagement() {
         >
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-slate-200 mb-1">Staff Role</label>
+              <label className="block text-sm font-medium text-slate-200 mb-1">Staff Member</label>
               <select
-                value={kpiForm.staffRole}
-                onChange={(e) => setKpiForm(prev => ({ ...prev, staffRole: e.target.value as StaffRole }))}
+                value={kpiForm.selectedStaffId}
+                onChange={(e) => {
+                  const staffId = e.target.value;
+                  const member = backendStaff.find(s => s.id === staffId);
+                  setKpiForm(prev => ({
+                    ...prev,
+                    selectedStaffId: staffId,
+                    staffRole: member ? member.role as StaffRole : prev.staffRole,
+                    assignedStaffIds: staffId ? [staffId] : [],
+                  }));
+                }}
                 className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500">
-                <option value="waiter">Waiter</option>
-                <option value="kitchen">Kitchen</option>
-                <option value="supervisor">Supervisor</option>
+                <option value="">Select a staff member</option>
+                {backendStaff.map(member => (
+                  <option key={member.id} value={member.id}>
+                    {member.name} ({member.role})
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -771,27 +848,6 @@ export function StaffManagement() {
               </select>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-slate-200 mb-1">Assign to Staff (Optional)</label>
-              <select
-                multiple
-                value={kpiForm.assignedStaffIds}
-                onChange={(e) => {
-                  const selected = Array.from(e.target.selectedOptions, option => option.value);
-                  setKpiForm(prev => ({ ...prev, assignedStaffIds: selected }));
-                }}
-                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 min-h-[100px]">
-                {backendStaff
-                  .filter(s => s.role === kpiForm.staffRole)
-                  .map(staffMember => (
-                    <option key={staffMember.id} value={staffMember.id}>
-                      {staffMember.name}
-                    </option>
-                  ))}
-              </select>
-              <p className="text-xs text-slate-400 mt-1">Hold Ctrl/Cmd to select multiple staff members</p>
-            </div>
-
             <div className="flex gap-3 pt-4">
               <Button
                 variant="secondary"
@@ -803,7 +859,7 @@ export function StaffManagement() {
                 variant="primary"
                 fullWidth
                 onClick={handleCreateKPI}
-                disabled={!kpiForm.name || kpiForm.targetValue <= 0}>
+                disabled={!kpiForm.selectedStaffId || !kpiForm.name || kpiForm.targetValue <= 0}>
                 Create KPI
               </Button>
             </div>

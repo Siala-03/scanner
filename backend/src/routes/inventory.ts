@@ -121,32 +121,32 @@ router.put('/:id', authenticate, async (req: AuthenticatedRequest, res: Response
       const location = updates.location;
 
       if (stock !== undefined) {
-        updateFields.push(`stock = ${paramCount}`);
+        updateFields.push(`stock = $${paramCount}`);
         updateValues.push(stock);
         paramCount++;
       }
       if (lowStockThreshold !== undefined) {
-        updateFields.push(`low_stock_threshold = ${paramCount}`);
+        updateFields.push(`low_stock_threshold = $${paramCount}`);
         updateValues.push(lowStockThreshold);
         paramCount++;
       }
       if (reorderPoint !== undefined) {
-        updateFields.push(`reorder_point = ${paramCount}`);
+        updateFields.push(`reorder_point = $${paramCount}`);
         updateValues.push(reorderPoint);
         paramCount++;
       }
       if (reorderQty !== undefined) {
-        updateFields.push(`reorder_qty = ${paramCount}`);
+        updateFields.push(`reorder_qty = $${paramCount}`);
         updateValues.push(reorderQty);
         paramCount++;
       }
       if (unitCost !== undefined) {
-        updateFields.push(`unit_cost = ${paramCount}`);
+        updateFields.push(`unit_cost = $${paramCount}`);
         updateValues.push(unitCost);
         paramCount++;
       }
       if (location !== undefined) {
-        updateFields.push(`location = ${paramCount}`);
+        updateFields.push(`location = $${paramCount}`);
         updateValues.push(location);
         paramCount++;
       }
@@ -175,6 +175,10 @@ router.put('/:id', authenticate, async (req: AuthenticatedRequest, res: Response
         RETURNING *
       `, updateValues);
 
+      if (!result.rows[0]) {
+        throw new HttpError(404, 'Inventory record not found or update failed');
+      }
+
       const row = result.rows[0];
       return res.json({
         menuItemId: row.menu_item_id,
@@ -201,7 +205,8 @@ router.put('/:id', authenticate, async (req: AuthenticatedRequest, res: Response
       res.status(error.status).json({ error: error.message });
     } else {
       console.error('Error updating inventory item:', error);
-      res.status(500).json({ error: 'Failed to update inventory item' });
+      const errorDetails = error instanceof Error ? error.message : String(error);
+      res.status(500).json({ error: `Failed to update inventory item: ${errorDetails}` });
     }
   }
 });

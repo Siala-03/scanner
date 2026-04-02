@@ -210,38 +210,30 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
 
   // lowStockItems loaded from backend state via fetchLowStockItems() and setLowStockItems()
 
-  const handleSaveRow = async (menuItemId: string, _name: string) => {
+  const handleSaveRow = async (menuItemId: string, itemName: string) => {
     if (!isManager) return;
     const current = inventoryMap[menuItemId];
-    if (!current) {
-      console.error('Item not found in inventory map', { menuItemId, availableKeys: Object.keys(inventoryMap) });
-      alert(`Item not found. Please refresh the page and try again.`);
-      return;
-    }
     
-    const updatePayload: any = {};
-    
-    // Check each field and add to payload if it changed
-    if (editValues.stock !== undefined && editValues.stock !== current.stock) {
-      updatePayload.stock = editValues.stock;
-    }
-    if (editValues.lowStockThreshold !== undefined && editValues.lowStockThreshold !== current.lowStockThreshold) {
-      updatePayload.low_stock_threshold = editValues.lowStockThreshold;
-    }
-    if (editValues.reorderPoint !== undefined && editValues.reorderPoint !== current.reorderPoint) {
-      updatePayload.reorder_point = editValues.reorderPoint;
-    }
-    if (editValues.reorderQty !== undefined && editValues.reorderQty !== current.reorderQty) {
-      updatePayload.reorder_qty = editValues.reorderQty;
-    }
-    if (editValues.unitCost !== undefined && editValues.unitCost !== current.unitCost) {
-      updatePayload.unit_cost = editValues.unitCost;
-    }
-    if (editValues.location !== undefined && editValues.location !== current.location) {
-      updatePayload.location = editValues.location;
-    }
+    const updatePayload: any = {
+      menu_item_id: menuItemId,
+      stock: editValues.stock !== undefined ? editValues.stock : (current?.stock ?? 0),
+      low_stock_threshold: editValues.lowStockThreshold !== undefined ? editValues.lowStockThreshold : (current?.lowStockThreshold ?? 0),
+      reorder_point: editValues.reorderPoint !== undefined ? editValues.reorderPoint : (current?.reorderPoint ?? 0),
+      reorder_qty: editValues.reorderQty !== undefined ? editValues.reorderQty : (current?.reorderQty ?? 0),
+      unit_cost: editValues.unitCost !== undefined ? editValues.unitCost : (current?.unitCost ?? 0),
+      location: editValues.location !== undefined ? editValues.location : (current?.location ?? ''),
+    };
 
-    if (Object.keys(updatePayload).length === 0) {
+    // Check if any values changed
+    const hasChanges = 
+      (editValues.stock !== undefined && editValues.stock !== current?.stock) ||
+      (editValues.lowStockThreshold !== undefined && editValues.lowStockThreshold !== current?.lowStockThreshold) ||
+      (editValues.reorderPoint !== undefined && editValues.reorderPoint !== current?.reorderPoint) ||
+      (editValues.reorderQty !== undefined && editValues.reorderQty !== current?.reorderQty) ||
+      (editValues.unitCost !== undefined && editValues.unitCost !== current?.unitCost) ||
+      (editValues.location !== undefined && editValues.location !== current?.location);
+
+    if (!hasChanges) {
       alert('No changes made');
       setEditingRow(null);
       setEditValues({});
@@ -249,7 +241,9 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
     }
 
     try {
-      console.log('Saving inventory item:', { menuItemId, updatePayload });
+      console.log('Saving inventory item:', { menuItemId, itemName, updatePayload });
+      
+      // Always use update endpoint - it automatically creates the record if it doesn't exist
       await apiUpdateInventoryRecord(menuItemId, updatePayload);
       
       // Refresh the data
@@ -260,8 +254,8 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
       setEditValues({});
     } catch (err) {
       console.error('Failed to update inventory record:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-      alert(`Failed to update inventory item: ${errorMessage}`);
+      const errorMessage = err instanceof Error ? err.message : (typeof err === 'object' && err !== null ? JSON.stringify(err) : String(err));
+      alert(`Failed to update inventory item:\n\n${errorMessage}`);
       // Don't clear edit state on error so user can retry
     }
   };
@@ -315,10 +309,10 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
     
     try {
       console.log('Creating purchase order:', { supplier: sup.name, itemCount: newPOItems.length });
+      // Convert camelCase to snake_case for backend
       await apiCreatePurchaseOrder({
         supplierId: sup.id,
         supplierName: sup.name,
-        status: 'draft',
         items: newPOItems.map((i) => ({
           menuItemId: i.menuItemId,
           menuItemName: menuItems.find((m) => m.id === i.menuItemId)?.name ?? i.menuItemId,
@@ -327,11 +321,10 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
           unitCost: i.unitCost,
           totalCost: i.orderedQty * i.unitCost,
         })),
-        totalCost: newPOItems.reduce((s, i) => s + i.orderedQty * i.unitCost, 0),
         expectedDelivery: newPO.expectedDelivery,
         notes: newPO.notes,
         createdBy: 'Manager',
-      });
+      } as any);
       
       alert('Purchase order created successfully');
     } catch (err) {
@@ -1304,9 +1297,9 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
               <div className="grid grid-cols-2 gap-3">
                 <select
                   value={newPO.supplierId}
-                onChange={(e) => setNewPO((v) => ({ ...v, supplierId: e.target.value }))}
-                className="px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
-              >
+                  onChange={(e) => setNewPO((v) => ({ ...v, supplierId: e.target.value }))}
+                  className="px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                >
                 <option value="">Select Supplier</option>
                 {suppliers.filter((s) => s.isActive).map((s) => (
                   <option key={s.id} value={s.id}>{s.name}</option>

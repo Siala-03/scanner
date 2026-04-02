@@ -72,17 +72,34 @@ router.get('/:id', async (req: Request, res: Response) => {
 // POST create new purchase order
 router.post('/', async (req: Request, res: Response) => {
   try {
+    // Accept both camelCase and snake_case keys for flexibility
     const {
+      supplierId,
       supplier_id,
+      supplierName,
       supplier_name,
       items = [],
+      expectedDelivery,
       expected_delivery,
       notes,
+      createdBy,
       created_by,
+      restaurantId,
       restaurant_id,
+      restaurantName,
       restaurant_name,
+      deliveryAddress,
       delivery_address
     } = req.body;
+
+    // Use either camelCase or snake_case, preferring camelCase if available
+    const final_supplier_id = supplierId || supplier_id;
+    const final_supplier_name = supplierName || supplier_name;
+    const final_expected_delivery = expectedDelivery || expected_delivery;
+    const final_created_by = createdBy || created_by;
+    const final_restaurant_id = restaurantId || restaurant_id;
+    const final_restaurant_name = restaurantName || restaurant_name;
+    const final_delivery_address = deliveryAddress || delivery_address;
 
     const id = `po_${Date.now().toString(36)}`;
     const total_cost = items.reduce((sum: number, item: { totalCost: number }) => sum + (item.totalCost || 0), 0);
@@ -92,7 +109,7 @@ router.post('/', async (req: Request, res: Response) => {
         (id, supplier_id, supplier_name, status, items, total_cost, expected_delivery, notes, created_by, restaurant_id, restaurant_name, delivery_address)
        VALUES ($1, $2, $3, 'sent', $4, $5, $6, $7, $8, $9, $10, $11)
        RETURNING *`,
-      [id, supplier_id, supplier_name, JSON.stringify(items), total_cost, expected_delivery, notes, created_by, restaurant_id || null, restaurant_name || null, delivery_address || null]
+      [id, final_supplier_id, final_supplier_name, JSON.stringify(items), total_cost, final_expected_delivery, notes, final_created_by, final_restaurant_id || null, final_restaurant_name || null, final_delivery_address || null]
     );
 
     const newPO = result.rows[0];
@@ -102,16 +119,16 @@ router.post('/', async (req: Request, res: Response) => {
     await pool.query(
       `INSERT INTO purchase_order_status_history (id, purchase_order_id, status, changed_by, changed_by_type, notes)
        VALUES ($1, $2, 'sent', $3, 'client', 'Purchase order created')`,
-      [historyId, id, created_by]
+      [historyId, id, final_created_by]
     );
 
     // Emit notification to supplier
-    emitToSupplier(supplier_id, 'order:new', {
+    emitToSupplier(final_supplier_id, 'order:new', {
       orderId: id,
-      supplierName: supplier_name,
+      supplierName: final_supplier_name,
       totalCost: total_cost,
       itemCount: items.length,
-      expectedDelivery: expected_delivery,
+      expectedDelivery: final_expected_delivery,
       createdAt: newPO.created_at,
     });
 
