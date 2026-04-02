@@ -19,6 +19,7 @@ function normalizeExpense(expense: any) {
 // ============================================
 
 export async function getExpenseCategories(restaurantId: string) {
+  // Try to get restaurant-specific categories
   const result = await pool.query(
     `SELECT * FROM expense_categories 
      WHERE restaurant_id = $1 AND is_active = true 
@@ -26,17 +27,49 @@ export async function getExpenseCategories(restaurantId: string) {
     [restaurantId]
   );
   
-  // If no restaurant-specific categories exist, return default categories
-  if (result.rows.length === 0) {
-    const defaultResult = await pool.query(
-      `SELECT * FROM expense_categories 
-       WHERE restaurant_id = 'default' AND is_active = true 
-       ORDER BY name`
-    );
-    return defaultResult.rows;
+  // If restaurant-specific categories exist, return them
+  if (result.rows.length > 0) {
+    return result.rows;
   }
   
-  return result.rows;
+  // Otherwise, get default categories
+  const defaultResult = await pool.query(
+    `SELECT * FROM expense_categories 
+     WHERE restaurant_id = 'default' AND is_active = true 
+     ORDER BY name`
+  );
+  
+  // If default categories exist, copy them for this restaurant
+  if (defaultResult.rows.length > 0) {
+    try {
+      // Insert default categories for this restaurant
+      for (const category of defaultResult.rows) {
+        const catId = `cat_${restaurantId}_${category.name.toLowerCase().replace(/\s+/g, '_')}`;
+        await pool.query(
+          `INSERT INTO expense_categories (id, restaurant_id, name, description, color, icon, is_active)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)
+           ON CONFLICT DO NOTHING`,
+          [catId, restaurantId, category.name, category.description, category.color, category.icon, true]
+        );
+      }
+      
+      // Return the newly inserted categories
+      const newResult = await pool.query(
+        `SELECT * FROM expense_categories 
+         WHERE restaurant_id = $1 AND is_active = true 
+         ORDER BY name`,
+        [restaurantId]
+      );
+      return newResult.rows.length > 0 ? newResult.rows : defaultResult.rows;
+    } catch (err) {
+      console.error('Error copying default categories:', err);
+      // Fall back to returning default categories
+      return defaultResult.rows;
+    }
+  }
+  
+  // If no categories found at all, return an empty array
+  return [];
 }
 
 export async function createExpenseCategory(

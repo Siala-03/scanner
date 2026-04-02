@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   PlusIcon,
@@ -15,6 +15,7 @@ import { signUpStaff } from '../../api/auth';
 import { updateStaffAssignments, updateStaffStatus, updateStaffRole, deleteStaff } from '../../api/staff';
 import { useKPIs } from '../../hooks/useKPIs';
 import { createKPI, deleteKPI, assignKPI, unassignKPI } from '../../api/kpis';
+import { fetchOrdersByDateRange } from '../../api/orders';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
@@ -63,6 +64,78 @@ export function StaffManagement() {
       return next;
     });
   };
+  const [kpiProgress, setKpiProgress] = useState<Record<string, number>>({});
+
+  const getDateRange = (period: string) => {
+    const now = new Date();
+    let start: Date;
+    if (period === 'daily') {
+      start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    } else if (period === 'weekly') {
+      start = new Date(now);
+      start.setDate(start.getDate() - start.getDay());
+      start.setHours(0, 0, 0, 0);
+    } else {
+      start = new Date(now.getFullYear(), now.getMonth(), 1);
+    }
+    return { startDate: start.toISOString(), endDate: now.toISOString() };
+  };
+
+  const computeProgress = async (staffId: string, metric: string, period: string): Promise<number> => {
+    try {
+      const { startDate, endDate } = getDateRange(period);
+      const orders = await fetchOrdersByDateRange(startDate, endDate);
+      const staffOrders = orders.filter(o => o.createdBy === staffId || o.assignedTo === staffId);
+      switch (metric) {
+        case 'orders_served':
+          return staffOrders.filter(o => o.status === 'served').length;
+        case 'revenue':
+          return staffOrders.filter(o => o.status === 'served').reduce((sum, o) => sum + o.total, 0);
+        case 'tables_served':
+          return new Set(staffOrders.filter(o => o.status === 'served').map(o => o.tableNumber).filter(Boolean)).size;
+        case 'prep_time': {
+          const completed = staffOrders.filter(o => o.completedAt && o.createdAt);
+          if (completed.length === 0) return 0;
+          const totalMinutes = completed.reduce((sum, o) => {
+            return sum + (new Date(o.completedAt!).getTime() - new Date(o.createdAt).getTime()) / 60000;
+          }, 0);
+          return Math.round(totalMinutes / completed.length);
+        }
+        default:
+          return 0;
+      }
+    } catch {
+      return 0;
+    }
+  };
+
+  useEffect(() => {
+    if (kpis.length === 0 || backendStaff.length === 0) return;
+    let cancelled = false;
+    const fetchAll = async () => {
+      const results: Record<string, number> = {};
+      const promises: Promise<void>[] = [];
+      for (const member of backendStaff) {
+        const memberKPIs = kpis.filter(k => {
+          const roleMatch = k.staff_role === member.role;
+          const assignedTo = !k.assigned_staff_ids || k.assigned_staff_ids.length === 0 || k.assigned_staff_ids.includes(member.id);
+          return roleMatch && assignedTo;
+        });
+        for (const kpi of memberKPIs) {
+          const key = `${member.id}-${kpi.id}`;
+          promises.push(
+            computeProgress(member.id, kpi.metric, kpi.period).then(value => {
+              if (!cancelled) results[key] = value;
+            })
+          );
+        }
+      }
+      await Promise.all(promises);
+      if (!cancelled) setKpiProgress(results);
+    };
+    fetchAll();
+    return () => { cancelled = true; };
+  }, [kpis, backendStaff]);
   const [addForm, setAddForm] = useState<{
     name: string;
     role: StaffRole;
@@ -495,13 +568,18 @@ export function StaffManagement() {
                               <tr className="text-xs text-slate-400 text-left">
                                 <th className="px-4 py-2 font-medium">Name</th>
                                 <th className="px-4 py-2 font-medium">Metric</th>
-                                <th className="px-4 py-2 font-medium">Target</th>
                                 <th className="px-4 py-2 font-medium">Period</th>
+                                <th className="px-4 py-2 font-medium min-w-[180px]">Progress</th>
                                 <th className="px-4 py-2 font-medium text-right">Actions</th>
                               </tr>
                             </thead>
                             <tbody>
-                              {memberKPIs.map((kpi) => (
+                              {memberKPIs.map((kpi) => {
+                                const current = kpiProgress[`${member.id}-${kpi.id}`] ?? 0;
+                                const target = kpi.target_value;
+                                const pct = target > 0 ? Math.min(Math.round((current / target) * 100), 100) : 0;
+                                const barColor = pct >= 100 ? 'bg-emerald-500' : pct >= 60 ? 'bg-amber-500' : 'bg-red-500';
+                                return (
                                 <tr key={kpi.id} className="border-t border-slate-700/50 hover:bg-slate-700/30">
                                   <td className="px-4 py-3">
                                     <p className="text-sm font-medium text-white">{kpi.name}</p>
@@ -513,10 +591,21 @@ export function StaffManagement() {
                                     <Badge variant="secondary" size="sm">{kpi.metric.replace(/_/g, ' ')}</Badge>
                                   </td>
                                   <td className="px-4 py-3">
-                                    <span className="text-sm font-bold text-amber-500">{kpi.target_value}</span>
+                                    <Badge variant="primary" size="sm">{kpi.period}</Badge>
                                   </td>
                                   <td className="px-4 py-3">
-                                    <Badge variant="primary" size="sm">{kpi.period}</Badge>
+                                    <div className="flex items-center gap-2">
+                                      <div className="flex-1 h-2 bg-slate-700 rounded-full overflow-hidden">
+                                        <div
+                                          className={`h-full rounded-full transition-all duration-500 ${barColor}`}
+                                          style={{ width: `${pct}%` }}
+                                        />
+                                      </div>
+                                      <span className="text-xs text-slate-300 whitespace-nowrap">
+                                        {current} / {target}
+                                      </span>
+                                    </div>
+                                    <p className="text-[10px] text-slate-500 mt-1">{pct}% of target</p>
                                   </td>
                                   <td className="px-4 py-3">
                                     <div className="flex gap-1 justify-end">
@@ -559,7 +648,8 @@ export function StaffManagement() {
                                     </div>
                                   </td>
                                 </tr>
-                              ))}
+                                );
+                              })}
                             </tbody>
                           </table>
                         </div>

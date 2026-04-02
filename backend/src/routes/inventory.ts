@@ -19,8 +19,47 @@ const router = Router();
 // GET all inventory items with stock information
 router.get('/', authenticate, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const result = await getAllInventoryItems(req.restaurantId!);
-    res.json(result);
+    const restaurantId = req.restaurantId || 'default_restaurant';
+    
+    // First, ensure inventory records exist for all menu items
+    await pool.query(`
+      INSERT INTO inventory_records (id, menu_item_id, stock, low_stock_threshold, reorder_point, reorder_qty, restaurant_id, created_at, updated_at)
+      SELECT 
+        'inv_' || mi.id,
+        mi.id,
+        0,
+        5,
+        10,
+        20,
+        $1,
+        NOW(),
+        NOW()
+      FROM menu_items mi
+      WHERE NOT EXISTS (
+        SELECT 1 FROM inventory_records ir 
+        WHERE ir.menu_item_id = mi.id AND ir.restaurant_id = $1
+      )
+    `, [restaurantId]);
+    
+    // Fetch inventory records in the legacy format for frontend compatibility
+    const result = await pool.query(`
+      SELECT 
+        ir.id,
+        ir.menu_item_id as "menuItemId",
+        ir.stock,
+        ir.low_stock_threshold as "lowStockThreshold",
+        ir.reorder_point as "reorderPoint",
+        ir.reorder_qty as "reorderQty",
+        ir.unit_cost as "unitCost",
+        ir.supplier_id as "supplierId",
+        ir.location,
+        ir.updated_at as "updatedAt"
+      FROM inventory_records ir
+      WHERE ir.restaurant_id = $1
+      ORDER BY ir.menu_item_id
+    `, [restaurantId]);
+    
+    res.json(result.rows);
   } catch (error) {
     console.error('Error fetching inventory:', error);
     res.status(500).json({ error: 'Failed to fetch inventory' });

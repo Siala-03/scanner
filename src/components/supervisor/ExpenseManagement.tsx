@@ -62,16 +62,37 @@ export default function SupervisorExpenseManagement() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [categoriesData, expensesData] = await Promise.all([
-        fetchExpenseCategories(),
-        fetchExpenses({ createdByRole: 'supervisor' }),
-      ]);
-      setCategories(categoriesData);
-      setExpenses(expensesData.data);
       setError(null);
+      
+      // Fetch categories
+      let categoriesData: ExpenseCategory[] = [];
+      try {
+        categoriesData = await fetchExpenseCategories();
+        console.log('📋 Categories loaded:', categoriesData.length, 'categories');
+        
+        if (!categoriesData || categoriesData.length === 0) {
+          console.warn('⚠️ No expense categories available');
+          setError('No expense categories available. Please contact administrator.');
+        }
+      } catch (catErr) {
+        console.error('❌ Failed to load categories:', catErr);
+        setError('Failed to load expense categories');
+      }
+      
+      // Fetch expenses
+      let expensesData = { data: [] };
+      try {
+        expensesData = await fetchExpenses({ createdByRole: 'supervisor' });
+      } catch (expErr) {
+        console.error('❌ Failed to load expenses:', expErr);
+        if (!error) setError('Failed to load expenses');
+      }
+      
+      setCategories(categoriesData || []);
+      setExpenses(expensesData?.data || []);
     } catch (err) {
       setError('Failed to load data');
-      console.error(err);
+      console.error('❌ Critical error in loadData:', err);
     } finally {
       setLoading(false);
     }
@@ -232,21 +253,27 @@ export default function SupervisorExpenseManagement() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium mb-2 text-slate-300">Category*</label>
-                <select
-                  value={formData.categoryId}
-                  onChange={e =>
-                    setFormData({ ...formData, categoryId: e.target.value })
-                  }
-                  className="w-full border border-slate-600 rounded-lg px-3 py-2 bg-slate-700 text-slate-200 focus:outline-none focus:border-amber-500"
-                  required
-                >
-                  <option value="">Select Category</option>
-                  {categories.map(cat => (
-                    <option key={cat.id} value={cat.id}>
-                      {cat.name}
-                    </option>
-                  ))}
-                </select>
+                {categories.length === 0 ? (
+                  <div className="w-full border border-red-600 rounded-lg px-3 py-2 bg-red-900/20 text-red-300 text-sm">
+                    ⚠️ No categories available. Please refresh the page.
+                  </div>
+                ) : (
+                  <select
+                    value={formData.categoryId}
+                    onChange={e =>
+                      setFormData({ ...formData, categoryId: e.target.value })
+                    }
+                    className="w-full border border-slate-600 rounded-lg px-3 py-2 bg-slate-700 text-slate-200 focus:outline-none focus:border-amber-500"
+                    required
+                  >
+                    <option value="">Select Category</option>
+                    {categories.map(cat => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium mb-2 text-slate-300">

@@ -43,10 +43,15 @@ const router = Router();
 // GET all expense categories
 router.get('/categories', authenticate, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const categories = await getExpenseCategories(req.restaurantId!);
+    const restaurantId = req.restaurantId!;
+    console.log('📋 Fetching expense categories for restaurant:', restaurantId);
+    
+    const categories = await getExpenseCategories(restaurantId);
+    console.log('✅ Expense categories fetched:', categories.length, 'categories');
+    
     res.json(categories);
   } catch (error) {
-    console.error('Error fetching expense categories:', error);
+    console.error('❌ Error fetching expense categories:', error);
     res.status(500).json({ error: 'Failed to fetch expense categories' });
   }
 });

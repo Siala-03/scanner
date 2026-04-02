@@ -16,6 +16,11 @@ export async function fetchOrders(status?: string): Promise<Order[]> {
   return apiRequest<Order[]>(`${API_BASE}/orders${query}`);
 }
 
+// GET orders with date range
+export async function fetchOrdersByDateRange(startDate: string, endDate: string): Promise<Order[]> {
+  return apiRequest<Order[]>(`${API_BASE}/orders?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`);
+}
+
 // GET kitchen orders (pending, preparing, ready)
 export async function fetchKitchenOrders(): Promise<Order[]> {
   return apiRequest<Order[]>(`${API_BASE}/orders/kitchen`);

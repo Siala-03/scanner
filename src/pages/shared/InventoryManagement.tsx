@@ -93,7 +93,7 @@ function StarRating({ rating }: { rating: number }) {
 // ── Helper Functions ─────────────────────────────────────────────────────────
 
 function normalizeInventoryRecord(rec: any): InventoryRecord {
-  const menuItemId = rec.menuItemId || rec.menu_item_id || rec.itemId || rec.item_id || '';
+  const menuItemId = rec.menuItemId || rec.menu_item_id || rec.itemId || rec.item_id || rec.id || '';
   if (!menuItemId) {
     console.warn('Inventory record has no menuItemId:', rec);
   }
@@ -214,8 +214,16 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
     if (!isManager) return;
     const current = inventoryMap[menuItemId];
     if (!current) {
-      console.error('Item not found in inventory map', { menuItemId, availableKeys: Object.keys(inventoryMap) });
-      alert(`Item not found. Please refresh the page and try again.`);
+      const missingItemId = menuItemId;
+      const inventoryKeys = Object.keys(inventoryMap);
+      console.error('Item not found in inventory map', { 
+        menuItemId: missingItemId, 
+        availableKeys: inventoryKeys,
+        menuItemsCount: menuItems.length,
+        inventoryCount: inventory.length,
+        menuItemIds: menuItems.slice(0, 5).map(m => m.id)
+      });
+      alert(`Item not found (${missingItemId}). Please refresh the page and try again.`);
       return;
     }
     
@@ -249,32 +257,17 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
     }
 
     try {
-      console.log('Saving inventory item:', { menuItemId, updatePayload, currentStock: current.stock, newStock: editValues.stock });
-      
-      // Send all field values, not just changed ones, to ensure consistency
-      const updateData = {
-        stock: editValues.stock !== undefined ? editValues.stock : current.stock,
-        low_stock_threshold: editValues.lowStockThreshold !== undefined ? editValues.lowStockThreshold : current.lowStockThreshold,
-        reorder_point: editValues.reorderPoint !== undefined ? editValues.reorderPoint : current.reorderPoint,
-        reorder_qty: editValues.reorderQty !== undefined ? editValues.reorderQty : current.reorderQty,
-        unit_cost: editValues.unitCost !== undefined ? editValues.unitCost : current.unitCost,
-        location: editValues.location !== undefined ? editValues.location : current.location,
-      };
-      console.log('Sending to backend:', updateData);
-      
-      const result = await apiUpdateInventoryRecord(menuItemId, updateData);
-      console.log('Update response from backend:', result);
+      console.log('Saving inventory item:', { menuItemId, updatePayload });
+      await apiUpdateInventoryRecord(menuItemId, updatePayload);
       
       // Refresh the data
-      console.log('Calling refresh to fetch updated data...');
       await refresh();
-      console.log('Refresh complete');
       
       alert('Inventory item updated successfully');
       setEditingRow(null);
       setEditValues({});
     } catch (err) {
-      console.error('Failed to update inventory record detailed:', { menuItemId, error: err });
+      console.error('Failed to update inventory record:', err);
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
       alert(`Failed to update inventory item: ${errorMessage}`);
       // Don't clear edit state on error so user can retry
@@ -675,7 +668,7 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                   <tbody className="divide-y divide-slate-700/30">
                     {inventoryRows.map((row) => {
                       const isEditing = editingRow === row.item.id;
-                      const maxStock = Math.max(row.rec?.reorderQty ?? row.stock * 2 ?? 20, row.stock, 1);
+                      const maxStock = Math.max(row.rec?.reorderQty ?? row.stock * 2, row.stock, 1);
                       return (
                         <tr
                           key={row.item.id}
@@ -1340,7 +1333,7 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                 onChange={(e) => setNewPO((v) => ({ ...v, expectedDelivery: e.target.value }))}
                 className="px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
               />
-            </div>
+              </div>
             <textarea
               placeholder="Notes (optional)"
               value={newPO.notes}
