@@ -1,6 +1,6 @@
 # Servv Inventory Management - Improvement Documentation
 
-## 📋 Quick Start
+## Quick Start
 
 **New to this documentation?** Start here:
 
@@ -12,12 +12,12 @@
 
 ---
 
-## 📚 Documentation Index
+## Documentation Index
 
 ### 1. INVENTORY_IMPROVEMENTS_SUMMARY.md
-**🎯 Purpose:** Executive summary and overview
+** Purpose:** Executive summary and overview
 
-**📖 Contents:**
+** Contents:**
 - Overview of all improvements
 - Key problems addressed
 - Implementation roadmap

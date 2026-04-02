@@ -9,9 +9,15 @@ const MENU_API_BASE = import.meta.env.VITE_API_URL
 // Fetch menu from backend
 export async function fetchMenu(): Promise<MenuItem[]> {
   try {
-    return await apiRequest<MenuItem[]>(MENU_API_BASE);
+    const url = `${MENU_API_BASE}`;
+    console.log('Fetching menu from:', url);
+    const result = await apiRequest<MenuItem[]>(MENU_API_BASE);
+    console.log('Menu fetched successfully, items:', result?.length ?? 0);
+    return result || [];
   } catch (err) {
-    console.warn('Failed to fetch menu from backend, using local', err);
+    console.warn('Failed to fetch menu from backend:', err);
+    console.warn('MENU_API_BASE was:', MENU_API_BASE);
+    console.warn('VITE_API_URL env:', import.meta.env.VITE_API_URL);
     return [];
   }
 }

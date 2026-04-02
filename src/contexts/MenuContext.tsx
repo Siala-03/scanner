@@ -68,8 +68,12 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
         setMenuItems((items && items.length > 0) ? items : defaultMenuItems);
         setError(null);
       } catch (err) {
-        console.error('Failed to load menu:', err);
+        console.error('Failed to load menu from API:', err);
+        // Log API URL for debugging
+        const apiUrl = import.meta.env.VITE_API_URL || '(using relative path)';
+        console.warn('API URL being used:', apiUrl);
         if (!isMounted) return;
+        // Always fall back to default menu on error
         setMenuItems(defaultMenuItems);
         setError(err instanceof Error ? err.message : 'Unable to load menu');
       } finally {

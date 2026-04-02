@@ -82,7 +82,10 @@ async function runMigrations() {
       client.release();
     }
   } catch (err) {
-    logger.error('Migration failed', { err });
+    logger.error('Migration failed', { 
+      error: err instanceof Error ? err.message : String(err),
+      stack: err instanceof Error ? err.stack : undefined
+    });
     // Don't exit - let the server start anyway
   }
 }

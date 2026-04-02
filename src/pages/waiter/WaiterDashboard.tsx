@@ -8,15 +8,19 @@ import {
   MapIcon,
   TrendingUpIcon,
   StarIcon,
-  LogOutIcon } from
+  LogOutIcon,
+  PlusIcon,
+  QrCodeIcon } from
 'lucide-react';
-import { Order, Staff } from '../../types';
+import { Order, Staff, OrderItem, MenuItem } from '../../types';
 import { Tabs } from '../../components/ui/Tabs';
 import { Card } from '../../components/ui/Card';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { OrderCard } from '../../components/waiter/OrderCard';
 import { OrderDetailModal } from '../../components/waiter/OrderDetailModal';
 import { TableMapView } from './TableMapView';
+import { QRScanner } from '../../components/waiter/QRScanner';
+import { WaiterOrderEntry } from '../../components/waiter/WaiterOrderEntry';
 import { loadReviews } from '../../utils/reviewsStorage';
 import { useStaffKPIs } from '../../hooks/useKPIs';
 import { buildReceiptHtml } from '../../utils/receipt';
@@ -27,10 +31,15 @@ interface WaiterDashboardProps {
   waiter: Staff;
   orders: Order[];
   onUpdateOrderStatus: (
-  orderId: string,
-  status: 'verified' | 'preparing' | 'ready' | 'served' | 'cancelled',
-  opts?: { assignedWaiterId?: string })
-  => void;
+    orderId: string,
+    status: 'verified' | 'preparing' | 'ready' | 'served' | 'cancelled',
+    opts?: { assignedWaiterId?: string }
+  ) => void;
+  onCreateOrder?: (
+    tableNumber: number,
+    items: OrderItem[],
+    notes?: string
+  ) => Promise<void>;
   waiterCalls?: {
     tableNumber: number;
     timestamp: Date;
@@ -42,6 +51,7 @@ export function WaiterDashboard({
   waiter,
   orders,
   onUpdateOrderStatus,
+  onCreateOrder,
   waiterCalls = [],
   onDismissWaiterCall,
   onLogout
@@ -49,6 +59,9 @@ export function WaiterDashboard({
   const [activeTab, setActiveTab] = useState('new');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [showTableMap, setShowTableMap] = useState(false);
+  const [showQRScanner, setShowQRScanner] = useState(false);
+  const [showOrderEntry, setShowOrderEntry] = useState(false);
+  const [selectedTableNumber, setSelectedTableNumber] = useState<number | null>(null);
   const [socketCalls, setSocketCalls] = useState<{ tableNumber: number; timestamp: Date }[]>([]);
   const { socket, joinRole } = useSocket();
   const { kpis } = useStaffKPIs();
@@ -212,10 +225,19 @@ export function WaiterDashboard({
             </p>
           </div>
           <div className="flex items-center gap-3">
+            {/* Take Order Button */}
+            <button
+              onClick={() => setShowQRScanner(true)}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-500 text-white font-medium hover:bg-amber-600 transition-colors"
+              title="Scan QR or enter table manually">
+              <QrCodeIcon className="w-5 h-5" />
+              <span className="hidden sm:inline">Take Order</span>
+            </button>
+
             <button
               onClick={() => setShowTableMap(true)}
-              className="p-2 rounded-lg bg-slate-800 text-slate-400 hover:text-white transition-colors">
-
+              className="p-2 rounded-lg bg-slate-800 text-slate-400 hover:text-white transition-colors"
+              title="Table Map">
               <MapIcon className="w-5 h-5" />
             </button>
             <button className="relative p-2 rounded-lg bg-slate-800 text-slate-400 hover:text-white transition-colors">
@@ -320,7 +342,7 @@ export function WaiterDashboard({
                 key={kpi.id}
                 label={kpi.name}
                 value={kpi.progress?.currentValue || 0}
-                change={kpi.progress ? (kpi.progress.currentValue / kpi.targetValue) * 100 - 100 : 0}
+                change={kpi.progress ? (kpi.progress.currentValue / (kpi as any).targetValue) * 100 - 100 : 0}
                 trend={kpi.progress?.achieved ? 'up' : 'neutral'}
                 icon={<TrendingUpIcon className="w-5 h-5" />}
               />
@@ -483,6 +505,39 @@ export function WaiterDashboard({
           }
         </AnimatePresence>
       </div>
+
+      {/* QR Scanner Modal */}
+      {showQRScanner && (
+        <QRScanner
+          onScan={(tableNumber) => {
+            setShowQRScanner(false);
+            setSelectedTableNumber(tableNumber);
+            setShowOrderEntry(true);
+          }}
+          onClose={() => setShowQRScanner(false)}
+          onError={(error) => {
+            console.error('QR Scanner Error:', error);
+            alert(error);
+          }}
+        />
+      )}
+
+      {/* Order Entry Modal */}
+      {showOrderEntry && selectedTableNumber !== null && (
+        <WaiterOrderEntry
+          tableNumber={selectedTableNumber}
+          isOpen={showOrderEntry}
+          onClose={() => {
+            setShowOrderEntry(false);
+            setSelectedTableNumber(null);
+          }}
+          onSubmitOrder={async (items: OrderItem[], notes?: string) => {
+            if (onCreateOrder) {
+              await onCreateOrder(selectedTableNumber, items, notes);
+            }
+          }}
+        />
+      )}
 
       {/* Order detail modal */}
       <OrderDetailModal
