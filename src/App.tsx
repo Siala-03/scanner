@@ -20,6 +20,7 @@ import { QRCodeGenerator } from './pages/manager/QRCodeGenerator';
 import ExpenseApproval from './components/manager/ExpenseApproval';
 import SupervisorExpenseManagement from './components/supervisor/ExpenseManagement';
 import { InventoryManagement } from './pages/shared/InventoryManagement';
+import { QRScanner } from './components/waiter/QRScanner';
 import { KitchenDisplay } from './pages/kitchen/KitchenDisplay';
 import { LoginPage } from './pages/auth/LoginPage';
 import { SuperAdminDashboard } from './pages/superadmin/SuperAdminDashboard';
@@ -38,11 +39,8 @@ export function App() {
   const [managerPage, setManagerPage] = useState<ManagerPage>('dashboard');
   const [supervisorPage, setSupervisorPage] =
   useState<SupervisorPage>('dashboard');
-  const [isScanning, setIsScanning] = useState(false);
-  const [scanningTable, setScanningTable] = useState<number | null>(null);
-  const [detectedTable, setDetectedTable] = useState<number | null>(null);
-  const [showQRGrid, setShowQRGrid] = useState(false);
   const [routeResolved, setRouteResolved] = useState(false);
+  const [supervisorScannedTable, setSupervisorScannedTable] = useState<number | null>(null);
   const { tables, isLoading: isTablesLoading, addTable, removeTable, refetch: reloadTables } = useTables();
 
   const [waiterCalls, setWaiterCalls] = useState<
@@ -415,14 +413,28 @@ export function App() {
         {supervisorPage === 'revenue' && <RevenueReports />}
         {supervisorPage === 'staff' && <StaffPerformance />}
         {supervisorPage === 'qrcodes' && (
-          <QRCodeGenerator
-            tables={tables}
-            restaurantName={restaurantName}
-            onAddTable={() => {
-              const next = tables.length > 0 ? Math.max(...tables) + 1 : 1;
-              addTable(next).catch((err) => console.error('Failed to add table:', err));
-            }}
-          />
+          <div className="space-y-6">
+            <QRCodeGenerator
+              tables={tables}
+              restaurantName={restaurantName}
+              onAddTable={() => {
+                const next = tables.length > 0 ? Math.max(...tables) + 1 : 1;
+                addTable(next).catch((err) => console.error('Failed to add table:', err));
+              }}
+            />
+            <Card className="p-6">
+              <h3 className="text-lg font-semibold text-slate-100 mb-4">Scan QR Code to Verify Table</h3>
+              <QRScanner
+                onScan={(tableNum) => setSupervisorScannedTable(tableNum)}
+                onClose={() => {}}
+              />
+              {supervisorScannedTable && (
+                <p className="mt-4 text-green-400">
+                  Detected Table: {supervisorScannedTable}
+                </p>
+              )}
+            </Card>
+          </div>
         )}
         {supervisorPage === 'inventory' && <InventoryManagement role="supervisor" />}
         {supervisorPage === 'history' && <OrderHistoryPage onBack={() => setSupervisorPage('dashboard')} existingOrders={orders} />}
