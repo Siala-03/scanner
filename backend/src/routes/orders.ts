@@ -8,11 +8,13 @@ import { toCamelCase } from '../utils/camelCase.js';
 
 const router = Router();
 
-function normalizeOrder(row: any) {
+function normalizeOrder(row: any): any {
   // Parse items if they're stored as JSON string
+  const parsedItems = typeof row.items === 'string' ? JSON.parse(row.items) : row.items;
   const order = {
     ...row,
-    items: typeof row.items === 'string' ? JSON.parse(row.items) : row.items
+    items: parsedItems,
+    requires_kitchen: row.requires_kitchen ?? false
   };
   // Transform snake_case to camelCase
   return toCamelCase(order);
@@ -78,10 +80,22 @@ router.post('/seed', async (_req: Request, res: Response) => {
       
       await pool.query(
         `INSERT INTO orders 
-          (id, order_number, table_number, customer_name, status, items, subtotal, tax, total, notes)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+          (id, order_number, table_number, customer_name, status, items, subtotal, tax, total, notes, requires_kitchen)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
          ON CONFLICT DO NOTHING`,
-        [id, order_number, order.table_number, order.customer_name, order.status, JSON.stringify(order.items), order.subtotal, order.tax, order.total, order.notes]
+        [
+          id,
+          order_number,
+          order.table_number,
+          order.customer_name,
+          order.status,
+          JSON.stringify(order.items),
+          order.subtotal,
+          order.tax,
+          order.total,
+          order.notes,
+          true
+        ]
       );
       createdOrders.push({ id, order_number });
     }
@@ -136,7 +150,7 @@ router.get('/kitchen', async (_req: Request, res: Response) => {
   try {
     const result = await pool.query(
       `SELECT * FROM orders 
-       WHERE status IN ('pending', 'preparing', 'ready') 
+       WHERE requires_kitchen = true AND status IN ('pending', 'preparing', 'ready') 
        ORDER BY created_at ASC`
     );
     const orders = result.rows.map((row: any) => normalizeOrder(row));
@@ -158,7 +172,7 @@ router.get('/kitchen/analytics', async (_req: Request, res: Response) => {
 
     // Get orders for today
     const todayOrders = await pool.query(
-      `SELECT * FROM orders WHERE created_at >= $1 AND created_at < $2`,
+      `SELECT * FROM orders WHERE requires_kitchen = true AND created_at >= $1 AND created_at < $2`,
       [today.toISOString(), tomorrow.toISOString()]
     );
 
@@ -293,10 +307,11 @@ router.post('/', async (req: Request, res: Response) => {
       createdBy: created_by ?? createdBy ?? 'system',
       deliveryProvider: delivery_provider ?? deliveryProvider,
       deliveryAddress: delivery_address ?? deliveryAddress,
-      loyaltyRewardId: loyalty_reward_id ?? loyaltyRewardId
+      loyaltyRewardId: loyalty_reward_id ?? loyaltyRewardId,
+      requiresKitchen: req.body.requiresKitchen ?? req.body.requires_kitchen ?? false
     });
 
-    res.status(201).json(order);
+    res.status(201).json(normalizeOrder(order));
   } catch (error) {
     console.error('Error creating order:', error);
     res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to create order' });
@@ -367,15 +382,10 @@ router.put('/:id/status', async (req: Request, res: Response) => {
       throw new HttpError(404, 'Order not found');
     }
 
-    let order = {
-      ...result.rows[0],
-      items: typeof result.rows[0].items === 'string' 
-        ? JSON.parse(result.rows[0].items) 
-        : result.rows[0].items
-    };
+    const order = normalizeOrder(result.rows[0]);
 
     // Award loyalty points if order is completed and has a customer
-    if ((status === 'served' || status === 'completed') && order.customer_id) {
+    if ((status === 'served' || status === 'completed') && order.customerId) {
       try {
         // Calculate points (1 point per $10 spent)
         const pointsToAward = Math.floor(order.total / 1000); // total is in cents, so divide by 1000 for $10 = 100 points
@@ -386,7 +396,7 @@ router.put('/:id/status', async (req: Request, res: Response) => {
           await pool.query(`
             INSERT INTO loyalty_transactions (id, customer_id, order_id, transaction_type, points, description, restaurant_id)
             VALUES ($1, $2, $3, 'earned', $4, $5, $6)
-          `, [transactionId, order.customer_id, id, pointsToAward, `Order completion: ${order.order_number}`, 'default_restaurant']);
+          `, [transactionId, order.customerId, id, pointsToAward, `Order completion: ${order.orderNumber}`, 'default_restaurant']);
 
           await pool.query(`
             UPDATE customers
@@ -397,7 +407,7 @@ router.put('/:id/status', async (req: Request, res: Response) => {
               visit_count = visit_count + 1,
               updated_at = now()
             WHERE id = $3 AND restaurant_id = $4
-          `, [pointsToAward, order.total, order.customer_id, 'default_restaurant']);
+          `, [pointsToAward, order.total, order.customerId, 'default_restaurant']);
         }
       } catch (loyaltyError) {
         console.error('Error awarding loyalty points:', loyaltyError);
@@ -406,16 +416,16 @@ router.put('/:id/status', async (req: Request, res: Response) => {
     }
 
     // Notify delivery partner when order is served/completed
-    if ((status === 'served' || status === 'completed') && order.delivery_provider === 'VubaVuba' && order.delivery_order_id) {
+    if ((status === 'served' || status === 'completed') && order.deliveryProvider === 'VubaVuba' && order.deliveryOrderId) {
       try {
-        const deliveryResult = await updateVubaVubaOrderStatus(order.delivery_order_id, 'delivered');
+        const deliveryResult = await updateVubaVubaOrderStatus(order.deliveryOrderId, 'delivered');
         await pool.query(
           `UPDATE orders SET delivery_status=$1, delivery_data = $2, updated_at=$3 WHERE id=$4`,
           [deliveryResult.deliveryStatus, JSON.stringify(deliveryResult.rawResponse), new Date().toISOString(), id]
         );
 
-        order.delivery_status = deliveryResult.deliveryStatus;
-        order.delivery_data = deliveryResult.rawResponse;
+        order.deliveryStatus = deliveryResult.deliveryStatus;
+        order.deliveryData = deliveryResult.rawResponse;
       } catch (deliveryError) {
         console.error('Error syncing status to VubaVuba:', deliveryError);
       }
@@ -517,12 +527,7 @@ router.delete('/:id', async (req: Request, res: Response) => {
       throw new HttpError(404, 'Order not found');
     }
 
-    const order = {
-      ...result.rows[0],
-      items: typeof result.rows[0].items === 'string' 
-        ? JSON.parse(result.rows[0].items) 
-        : result.rows[0].items
-    };
+    const order = normalizeOrder(result.rows[0]);
 
     // Emit WebSocket event
     emitOrderUpdate({ type: 'status', order });

@@ -94,7 +94,7 @@ export function QRCodeGenerator({
                 <div className="w-40 h-40 mb-4">
                   <QRCode
                     id={`qr-${tableNum}`}
-                    value={`${resolvedBaseUrl}/?table=${tableNum}`}
+                    value={`${resolvedBaseUrl}/t/${tableNum}`}
                     size={160}
                     level="H"
                     includeMargin={true}
@@ -120,7 +120,7 @@ export function QRCodeGenerator({
                   Scan to order
                 </p>
                 <p className="text-xs text-slate-400 mt-1">
-                  {`${resolvedBaseUrl}/?table=${tableNum}`}
+                  {`${resolvedBaseUrl}/t/${tableNum}`}
                 </p>
               </Card>
             ))}

@@ -48,6 +48,9 @@ export function useOrders(): UseOrdersReturn {
     loadFromBackend();
   }, []);
 
+  const isFoodOrder = (items: CartItem[]) =>
+    items.some((item) => ['breakfast', 'lunch', 'dinner'].includes(item.menuItem.category));
+
   const addOrder = useCallback(
     async (
       tableNumber: number,
@@ -74,6 +77,7 @@ export function useOrders(): UseOrdersReturn {
       );
       const total = subtotal;
 
+      const requiresKitchen = isFoodOrder(items);
       const localOrder: Order = {
         id: `ORD-${Date.now()}`,
         orderNumber: `ORD-${Date.now().toString().slice(-6)}`,
@@ -86,6 +90,7 @@ export function useOrders(): UseOrdersReturn {
         tax: 0,
         total,
         notes: specialInstructions,
+        requiresKitchen,
         deliveryProvider: delivery?.provider,
         deliveryAddress: delivery?.address,
         createdAt: new Date().toISOString(),
@@ -106,6 +111,7 @@ export function useOrders(): UseOrdersReturn {
               unitPrice: Math.round(getEffectivePrice(item.menuItem) * 100)
             })),
             notes: specialInstructions,
+            requiresKitchen,
             deliveryProvider: delivery?.provider,
             deliveryAddress: delivery?.address,
             loyaltyRewardId
@@ -124,8 +130,7 @@ export function useOrders(): UseOrdersReturn {
 
   const updateOrderStatus = useCallback(
     async (orderId: string, status: OrderStatus, opts?: { assignedWaiterId?: string }) => {
-      // Map frontend status to backend status
-      const backendStatus = status === 'verified' ? 'preparing' : status;
+      const backendStatus = status;
       
       // Try to sync with backend
       if (backendAvailable) {

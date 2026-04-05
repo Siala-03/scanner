@@ -8,7 +8,7 @@ import { formatPrice } from '../../utils/currency';
 interface OrderCardProps {
   order: Order;
   onViewDetails: (order: Order) => void;
-  onApprove?: (orderId: string) => void;
+  onApprove?: (order: Order) => void;
   onReject?: (orderId: string) => void;
   onMarkReady?: (orderId: string) => void;
   onMarkServed?: (orderId: string) => void;
@@ -111,7 +111,7 @@ export function OrderCard({
               <Button
               variant="primary"
               size="sm"
-              onClick={() => onApprove(order.id)}>
+              onClick={() => onApprove(order)}>
 
                 Approve
               </Button>

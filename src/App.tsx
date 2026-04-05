@@ -170,7 +170,7 @@ export function App() {
         setSelectedRole('customer');
         setTableNumber(targetTable);
         // update URL so it matches what a real scan would point to
-        window.history.pushState({}, '', `/?table=${targetTable}`);
+        window.history.pushState({}, '', `/t/${targetTable}`);
         setDetectedTable(null);
         setScanningTable(null);
         setShowQRGrid(false);
@@ -190,7 +190,6 @@ export function App() {
       if (!isNaN(num)) {
         setSelectedRole('customer');
         setTableNumber(num);
-        window.history.replaceState({}, '', '/');
         return;
       }
     }
@@ -202,7 +201,6 @@ export function App() {
       if (!isNaN(num)) {
         setSelectedRole('customer');
         setTableNumber(num);
-        window.history.replaceState({}, '', '/');
         return;
       }
     }

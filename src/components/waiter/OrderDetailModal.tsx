@@ -16,7 +16,7 @@ interface OrderDetailModalProps {
   order: Order | null;
   isOpen: boolean;
   onClose: () => void;
-  onApprove?: (orderId: string) => void;
+  onApprove?: (order: Order) => void;
   onReject?: (orderId: string) => void;
   onMarkReady?: (orderId: string) => void;
   onMarkServed?: (orderId: string) => void;
@@ -181,7 +181,7 @@ export function OrderDetailModal({
               variant="primary"
               fullWidth
               onClick={() => {
-                onApprove(order.id);
+                onApprove(order);
                 onClose();
               }}>
 

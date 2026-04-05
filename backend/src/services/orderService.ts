@@ -22,6 +22,7 @@ export async function createOrder(orderInput: {
   deliveryProvider?: string;
   deliveryAddress?: string;
   loyaltyRewardId?: string;
+  requiresKitchen?: boolean;
 }) {
   const {
     tableNumber,
@@ -32,7 +33,8 @@ export async function createOrder(orderInput: {
     createdBy = 'system',
     deliveryProvider,
     deliveryAddress,
-    loyaltyRewardId
+    loyaltyRewardId,
+    requiresKitchen = false
   } = orderInput;
 
   if (!items || items.length === 0) {
@@ -108,8 +110,8 @@ export async function createOrder(orderInput: {
 
   const result = await pool.query(
     `INSERT INTO orders 
-      (id, order_number, table_number, customer_name, customer_id, status, items, subtotal, tax, total, notes, created_by, delivery_provider, delivery_address, delivery_status, loyalty_reward_id, loyalty_discount, loyalty_free_item_id)
-     VALUES ($1, $2, $3, $4, $5, 'pending', $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+      (id, order_number, table_number, customer_name, customer_id, status, items, subtotal, tax, total, notes, created_by, delivery_provider, delivery_address, delivery_status, loyalty_reward_id, loyalty_discount, loyalty_free_item_id, requires_kitchen)
+     VALUES ($1, $2, $3, $4, $5, 'pending', $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
      RETURNING *`,
     [
       id,
@@ -128,13 +130,14 @@ export async function createOrder(orderInput: {
       deliveryProvider ? 'pending' : null,
       loyaltyRewardId || null,
       loyaltyDiscount,
-      loyaltyFreeItemId
+      loyaltyFreeItemId,
+      requiresKitchen
     ]
   );
 
   await decrementStockForOrderLines(orderItems.map((i) => ({ menuItemId: i.menuItemId, menuItemName: i.menuItemName, quantity: i.quantity })), createdBy, orderNumber);
 
-  let order = { ...result.rows[0], items: orderItems };
+  let order = { ...result.rows[0], items: orderItems, requiresKitchen };
 
   if (deliveryProvider === 'VubaVuba') {
     try {

@@ -147,8 +147,9 @@ export function WaiterDashboard({
     count: completedOrders.length
   }];
 
-  const handleApprove = (orderId: string) => {
-    onUpdateOrderStatus(orderId, 'preparing', { assignedWaiterId: waiter.id });
+  const handleApprove = (order: Order) => {
+    const nextStatus = order.requiresKitchen ? 'preparing' : 'ready';
+    onUpdateOrderStatus(order.id, nextStatus, { assignedWaiterId: waiter.id });
   };
   const handleReject = (orderId: string) => {
     onUpdateOrderStatus(orderId, 'cancelled', { assignedWaiterId: waiter.id });

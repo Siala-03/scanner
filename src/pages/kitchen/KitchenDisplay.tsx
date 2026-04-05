@@ -16,6 +16,7 @@ interface KitchenOrder {
   createdAt: string;
   loyaltyFreeItemId?: string;
   loyaltyDiscount?: number;
+  requiresKitchen?: boolean;
 }
 
 interface KitchenStats {
@@ -69,21 +70,24 @@ async function fetchKitchenOrders(): Promise<KitchenOrder[]> {
     const res = await fetch(`${API_BASE}/api/orders/kitchen`);
     if (!res.ok) throw new Error('Failed to fetch');
     const data = await res.json();
-    return data.map((o: any) => ({
-      id: o.id,
-      orderNumber: o.order_number,
-      tableNumber: o.table_number,
-      status: o.status,
-      notes: o.notes,  // Order-level notes (allergies, special requests)
-      items: Array.isArray(o.items) ? o.items.map((item: any) => ({
-        name: item.menuItemName || 'Unknown',
-        quantity: item.quantity,
-        notes: item.notes  // Item-level notes
-      })) : [],
-      createdAt: o.created_at,
-      loyaltyFreeItemId: o.loyalty_free_item_id,
-      loyaltyDiscount: o.loyalty_discount
-    }));
+    return data
+      .filter((o: any) => o.requiresKitchen || o.requires_kitchen)
+      .map((o: any) => ({
+        id: o.id,
+        orderNumber: o.orderNumber || o.order_number,
+        tableNumber: o.tableNumber || o.table_number,
+        status: o.status,
+        notes: o.notes,  // Order-level notes (allergies, special requests)
+        items: Array.isArray(o.items) ? o.items.map((item: any) => ({
+          name: item.menuItemName || item.menu_item_name || 'Unknown',
+          quantity: item.quantity,
+          notes: item.notes  // Item-level notes
+        })) : [],
+        createdAt: o.createdAt || o.created_at,
+        loyaltyFreeItemId: o.loyaltyFreeItemId || o.loyalty_free_item_id,
+        loyaltyDiscount: o.loyaltyDiscount || o.loyalty_discount,
+        requiresKitchen: o.requiresKitchen ?? o.requires_kitchen
+      }));
   } catch (e) {
     console.error('Failed to fetch from API:', e);
     return [];

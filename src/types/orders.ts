@@ -78,6 +78,7 @@ export interface CreateOrderInput {
   deliveryProvider?: string;
   deliveryAddress?: string;
   loyaltyRewardId?: string;
+  requiresKitchen?: boolean;
 }
 
 // For updating order status
