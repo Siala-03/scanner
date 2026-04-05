@@ -7,6 +7,7 @@ import { OrdersHistoryTable } from '../../components/supervisor/OrdersHistoryTab
 import { OrderDetailModal } from '../../components/waiter/OrderDetailModal';
 import { fetchOrders } from '../../api/orders';
 import { downloadCsv, buildOrdersCsv } from '../../utils/csv';
+import { orderToReceiptData, buildReceiptHtml } from '../../utils/receipt';
 
 // Type alias to handle both API and local Order types
 type Order = OrderType & {
@@ -106,6 +107,40 @@ export function OrderHistoryPage({ onBack, existingOrders }: OrderHistoryPagePro
       order.id === orderId ? { ...order, status } : order
     ));
     setSelectedOrder(null);
+  };
+
+  const handlePrintReceipt = async (order: Order) => {
+    // Configuration for the receipt (in production, this would come from restaurant settings)
+    const receiptOptions: Parameters<typeof orderToReceiptData>[1] = {
+      restaurantName: 'Servv Restaurant',
+      restaurantAddress: '123 Main Street, City',
+      restaurantPhone: '(555) 123-4567',
+      restaurantEmail: 'info@servv.com',
+      taxRate: 18, // 18% tax (configurable by manager)
+      serverName: 'Supervisor',
+      orderType: order.deliveryAddress ? 'delivery' as const : 'dine-in' as const,
+      paymentMethod: 'Cash',
+      paymentStatus: 'paid' as const,
+      amountPaid: order.total,
+    };
+
+    try {
+      // Use the new comprehensive receipt system
+      const receiptData = orderToReceiptData(order, receiptOptions);
+      const html = buildReceiptHtml(receiptData);
+      const printWindow = window.open('', '_blank', 'width=450,height=900');
+      if (printWindow) {
+        printWindow.document.open();
+        printWindow.document.write(html);
+        printWindow.document.close();
+      } else {
+        console.warn('Unable to open print window');
+      }
+    } catch (error) {
+      console.error('Error generating receipt:', error);
+      // Fallback to browser print
+      window.print();
+    }
   };
 
   return (
@@ -261,6 +296,7 @@ export function OrderHistoryPage({ onBack, existingOrders }: OrderHistoryPagePro
         onReject={(id) => handleUpdateOrderStatus(id, 'cancelled')}
         onMarkReady={(id) => handleUpdateOrderStatus(id, 'ready')}
         onMarkServed={(id) => handleUpdateOrderStatus(id, 'served')}
+        onPrintReceipt={handlePrintReceipt}
       />
     </div>
   );

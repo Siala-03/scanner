@@ -101,11 +101,22 @@ export interface Staff {
   role: StaffRole;
   email: string;
   phone: string;
+  restaurantId?: string;
   avatar?: string;
   isOnDuty: boolean;
   assignedTables: number[];
   performance: StaffPerformance;
   hireDate: Date;
+}
+
+export interface Restaurant {
+  id: string;
+  name: string;
+  address?: string;
+  phone?: string;
+  email?: string;
+  timezone?: string;
+  currency?: string;
 }
 
 export interface StaffPerformance {

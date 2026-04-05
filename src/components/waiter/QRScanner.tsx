@@ -137,16 +137,19 @@ export function QRScanner({ onScan, onClose, onError }: QRScannerProps) {
   // Handle scanned QR data
   const handleQRData = (data: string) => {
     try {
-      // Expected QR format: "TABLE:{number}" or just the table number
-      let tableNumber: number;
-      
-      if (data.startsWith('TABLE:')) {
-        tableNumber = parseInt(data.substring(6));
+      let tableNumber: number | null = null;
+
+      // Support full deep-link URLs like https://example.com/t/12
+      const urlMatch = data.match(/\/t\/(\d+)/);
+      if (urlMatch) {
+        tableNumber = parseInt(urlMatch[1], 10);
+      } else if (data.startsWith('TABLE:')) {
+        tableNumber = parseInt(data.substring(6), 10);
       } else {
-        tableNumber = parseInt(data);
+        tableNumber = parseInt(data, 10);
       }
 
-      if (!isNaN(tableNumber) && tableNumber > 0) {
+      if (tableNumber !== null && !isNaN(tableNumber) && tableNumber > 0) {
         onScan(tableNumber);
       } else {
         onError?.('Invalid QR code. Please scan a table QR code.');

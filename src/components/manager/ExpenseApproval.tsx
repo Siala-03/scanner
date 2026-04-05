@@ -12,7 +12,7 @@ import {
   createExpenseNote,
   getExpenseAuditLog,
 } from '../../api/expenses';
-import { buildExpenseReceiptHtml, printHtml } from '../../utils/receipt';
+import { buildExpenseReceiptHtml, printExpenseReceipt } from '../../utils/receipt';
 import {
   Expense,
   ExpenseCategory,
@@ -205,7 +205,7 @@ export default function ManagerExpenseApproval() {
       ].find(e => e.id === expenseId) || selectedExpense;
       if (expenseToPrint) {
         const html = buildExpenseReceiptHtml(expenseToPrint as any);
-        printHtml(html);
+        printExpenseReceipt(html);
       }
       if (selectedExpense?.id === expenseId) {
         const updated = [

@@ -1,4 +1,3 @@
-import React from 'react';
 import { PrinterIcon, DownloadIcon } from 'lucide-react';
 import QRCode from 'react-qr-code';
 import { Button } from '../../components/ui/Button';
@@ -7,12 +6,14 @@ interface QRCodeGeneratorProps {
   tables: number[];
   onAddTable: () => void;
   baseUrl?: string;
+  restaurantName?: string;
 }
 
 export function QRCodeGenerator({
   tables,
   onAddTable,
-  baseUrl
+  baseUrl,
+  restaurantName
 }: QRCodeGeneratorProps) {
   // default to empty list if none
   const handlePrint = () => {
@@ -20,6 +21,8 @@ export function QRCodeGenerator({
   };
 
   const resolvedBaseUrl = baseUrl || window.location.origin;
+  const validTables = tables.filter((tableNum) => typeof tableNum === 'number' && Number.isFinite(tableNum));
+  const qrTitle = restaurantName ? `${restaurantName} QR Codes` : 'Table QR Codes';
 
   const handleDownload = (tableNum: number) => {
     const svg = document.getElementById(`qr-${tableNum}`) as SVGSVGElement | null;
@@ -54,11 +57,11 @@ export function QRCodeGenerator({
     <div className="dark min-h-screen bg-slate-900 p-4 md:p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header - Hidden when printing */}
-        <div className="flex flex-col sm:flex-row items-center justify-between mb-8 print:hidden">
+        <div className="flex flex-col sm:flex-row items-center justify-between mb-8">
           <div>
-            <h1 className="text-2xl font-bold text-gray-100">Table QR Codes</h1>
+            <h1 className="text-2xl font-bold text-gray-100">{qrTitle}</h1>
             <p className="text-slate-400">
-              Print or download codes to place on tables
+              Print or download table-specific codes for your restaurant.
             </p>
           </div>
           <div className="flex gap-3 mt-4 sm:mt-0">
@@ -74,56 +77,21 @@ export function QRCodeGenerator({
         </div>
 
         {/* QR Grid - Optimized for printing */}
-        {tables.length === 0 ? (
+        {validTables.length === 0 ? (
           <p className="text-center text-slate-300 py-20">
-            No tables created yet. Use the &quot;Add Table&quot; button above to
-            generate a new table number and QR code.
+            No tables created yet. Use the "Add Table" button above to generate a new table number and QR code.
           </p>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 print:grid-cols-3 print:gap-8">
-            {tables.map((tableNum) => (
-              <Card
-                key={tableNum}
-                className="bg-white p-6 flex flex-col items-center justify-center text-center print:shadow-none print:border print:border-gray-200"
-              >
-                <h2 className="text-2xl font-bold text-slate-900 mb-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            {validTables.map((tableNum) => {
+              const qrLink = `${resolvedBaseUrl}/t/${tableNum}`;
+              return (
+                <div key={tableNum}>
                   Table {tableNum}
-                </h2>
-
-                {/* Real QR Code */}
-                <div className="w-40 h-40 mb-4">
-                  <QRCode
-                    id={`qr-${tableNum}`}
-                    value={`${resolvedBaseUrl}/t/${tableNum}`}
-                    size={160}
-                    level="H"
-                    includeMargin={true}
-                  bgColor="#ecfdf3"
-                  fgColor="#16a34a"
-                  />
+                  <QRCode value={qrLink} size={160} />
                 </div>
-
-                <div className="flex gap-2 mb-2 print:hidden">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDownload(tableNum);
-                    }}
-                    className="flex items-center gap-1 px-3 py-1 rounded-lg bg-amber-500 text-white hover:bg-amber-600 transition-colors"
-                  >
-                    <DownloadIcon className="w-4 h-4" />
-                    Download
-                  </button>
-                </div>
-
-                <p className="text-sm text-slate-500 font-medium">
-                  Scan to order
-                </p>
-                <p className="text-xs text-slate-400 mt-1">
-                  {`${resolvedBaseUrl}/t/${tableNum}`}
-                </p>
-              </Card>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

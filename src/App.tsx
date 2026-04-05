@@ -1,8 +1,7 @@
-import React, { useCallback, useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeftIcon, UtensilsIcon, BarChart3Icon, BriefcaseIcon, ChefHatIcon, QrCodeIcon, UsersIcon, TrendingUpIcon, ClockIcon, ShoppingBagIcon, TruckIcon } from 'lucide-react';
-import { CartItem, Order, OrderStatus, Customer } from './types';
-import { useStaff } from './hooks/useStaff';
+import { useCallback, useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
+import { ArrowLeftIcon, QrCodeIcon } from 'lucide-react';
+import { CartItem, OrderStatus, Customer } from './types';
 import { useOrders } from './hooks/useOrders';
 import { useTables } from './hooks/useTables';
 import { callWaiter } from './api/tables';
@@ -21,19 +20,20 @@ import { QRCodeGenerator } from './pages/manager/QRCodeGenerator';
 import ExpenseApproval from './components/manager/ExpenseApproval';
 import SupervisorExpenseManagement from './components/supervisor/ExpenseManagement';
 import { InventoryManagement } from './pages/shared/InventoryManagement';
-import { SimpleInventory } from './pages/shared/SimpleInventory';
 import { KitchenDisplay } from './pages/kitchen/KitchenDisplay';
 import { LoginPage } from './pages/auth/LoginPage';
 import { SuperAdminDashboard } from './pages/superadmin/SuperAdminDashboard';
 import { Card } from './components/ui/Card';
 import { Button } from './components/ui/Button';
 import { Staff } from './types';
+import { fetchRestaurant } from './api/restaurants';
 type UserRole = 'customer' | 'waiter' | 'supervisor' | 'manager' | 'kitchen' | 'superadmin' | null;
 type ManagerPage = 'dashboard' | 'menu' | 'staff' | 'analytics' | 'performance' | 'qrcodes' | 'inventory' | 'history' | 'expenses';
 type SupervisorPage = 'dashboard' | 'revenue' | 'staff' | 'qrcodes' | 'inventory' | 'menu' | 'history' | 'expenses';
 export function App() {
   const [selectedRole, setSelectedRole] = useState<UserRole>(null);
   const [authUser, setAuthUser] = useState<Staff | null>(null);
+  const [restaurantName, setRestaurantName] = useState<string>('');
   const [tableNumber, setTableNumber] = useState<number | null>(null);
   const [managerPage, setManagerPage] = useState<ManagerPage>('dashboard');
   const [supervisorPage, setSupervisorPage] =
@@ -42,6 +42,7 @@ export function App() {
   const [scanningTable, setScanningTable] = useState<number | null>(null);
   const [detectedTable, setDetectedTable] = useState<number | null>(null);
   const [showQRGrid, setShowQRGrid] = useState(false);
+  const [routeResolved, setRouteResolved] = useState(false);
   const { tables, isLoading: isTablesLoading, addTable, removeTable, refetch: reloadTables } = useTables();
 
   const [waiterCalls, setWaiterCalls] = useState<
@@ -140,6 +141,7 @@ export function App() {
       logoutStaff();
       setSelectedRole(null);
       setAuthUser(null);
+      setRestaurantName('');
       setTableNumber(null);
       setManagerPage('dashboard');
       setSupervisorPage('dashboard');
@@ -190,6 +192,7 @@ export function App() {
       if (!isNaN(num)) {
         setSelectedRole('customer');
         setTableNumber(num);
+        setRouteResolved(true);
         return;
       }
     }
@@ -201,6 +204,7 @@ export function App() {
       if (!isNaN(num)) {
         setSelectedRole('customer');
         setTableNumber(num);
+        setRouteResolved(true);
         return;
       }
     }
@@ -208,18 +212,26 @@ export function App() {
     // Check for role-based URLs
     if (path === '/waiter' || path.startsWith('/waiter')) {
       setSelectedRole('waiter');
+      setRouteResolved(true);
+      return;
     } else if (path === '/kitchen' || path.startsWith('/kitchen')) {
       setSelectedRole('kitchen');
+      setRouteResolved(true);
+      return;
     } else if (path === '/manager' || path.startsWith('/manager')) {
       setSelectedRole('manager');
+      setRouteResolved(true);
+      return;
     } else if (path === '/supervisor' || path.startsWith('/supervisor')) {
       setSelectedRole('supervisor');
-    } else if (path === '/' || path.startsWith('/t/') || queryTable) {
-
-      // Unknown path fallback: keep app loadable and show friendly message
-      window.history.replaceState({}, '', '/');
-      setSelectedRole(null);
+      setRouteResolved(true);
+      return;
     }
+
+    // Unknown path fallback: keep app loadable and show friendly message
+    window.history.replaceState({}, '', '/');
+    setSelectedRole(null);
+    setRouteResolved(true);
   }, []);
 
   // Update URL when role changes
@@ -229,7 +241,33 @@ export function App() {
     }
   }, [selectedRole]);
 
+  useEffect(() => {
+    let active = true;
+    if (!authUser?.restaurantId) {
+      setRestaurantName('');
+      return;
+    }
+
+    fetchRestaurant(authUser.restaurantId)
+      .then((restaurant: { name?: string }) => {
+        if (!active) return;
+        setRestaurantName(restaurant.name || '');
+      })
+      .catch((err: unknown) => {
+        console.warn('Failed to fetch restaurant info:', err);
+        if (active) setRestaurantName('');
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [authUser?.restaurantId]);
+
   // Auth flow for staff roles - single login page
+  if (!routeResolved) {
+    return null;
+  }
+
   if (!authUser && selectedRole !== 'customer') {
     return (
       <LoginPage
@@ -379,6 +417,7 @@ export function App() {
         {supervisorPage === 'qrcodes' && (
           <QRCodeGenerator
             tables={tables}
+            restaurantName={restaurantName}
             onAddTable={() => {
               const next = tables.length > 0 ? Math.max(...tables) + 1 : 1;
               addTable(next).catch((err) => console.error('Failed to add table:', err));
@@ -460,6 +499,7 @@ export function App() {
             {managerPage === 'qrcodes' && (
               <QRCodeGenerator
                 tables={tables}
+                restaurantName={restaurantName}
                 onAddTable={() => {
                   const next = tables.length > 0 ? Math.max(...tables) + 1 : 1;
                   addTable(next).catch((err) => console.error('Failed to add table:', err));

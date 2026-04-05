@@ -23,8 +23,9 @@ import { QRScanner } from '../../components/waiter/QRScanner';
 import { WaiterOrderEntry } from '../../components/waiter/WaiterOrderEntry';
 import { loadReviews } from '../../utils/reviewsStorage';
 import { useStaffKPIs } from '../../hooks/useKPIs';
-import { buildReceiptHtml } from '../../utils/receipt';
+import { printOrderReceipt, buildReceiptHtml, orderToReceiptData } from '../../utils/receipt';
 import { printReceiptNetwork } from '../../api/printer';
+import { ReceiptShareModal } from '../../components/ui/ReceiptShareModal';
 import { KPICard } from '../../components/supervisor/KPICard';
 import { useSocket } from '../../hooks/useSocket';
 interface WaiterDashboardProps {
@@ -63,6 +64,8 @@ export function WaiterDashboard({
   const [showOrderEntry, setShowOrderEntry] = useState(false);
   const [selectedTableNumber, setSelectedTableNumber] = useState<number | null>(null);
   const [socketCalls, setSocketCalls] = useState<{ tableNumber: number; timestamp: Date }[]>([]);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [selectedOrderForShare, setSelectedOrderForShare] = useState<Order | null>(null);
   const { socket, joinRole } = useSocket();
   const { kpis } = useStaffKPIs();
 
@@ -162,6 +165,20 @@ export function WaiterDashboard({
   };
 
   const handlePrintReceipt = async (order: Order) => {
+    // Configuration for the receipt (in production, this would come from restaurant settings)
+    const receiptOptions: Parameters<typeof orderToReceiptData>[1] = {
+      restaurantName: 'Servv Restaurant',
+      restaurantAddress: '123 Main Street, City',
+      restaurantPhone: '(555) 123-4567',
+      restaurantEmail: 'info@servv.com',
+      taxRate: 18, // 18% tax (configurable by manager)
+      serverName: waiter.name,
+      orderType: order.deliveryAddress ? 'delivery' as const : 'dine-in' as const,
+      paymentMethod: 'Cash',
+      paymentStatus: 'paid' as const,
+      amountPaid: order.total,
+    };
+
     // Network print call to backend endpoint
     try {
       await printReceiptNetwork(order, waiter.name);
@@ -170,16 +187,34 @@ export function WaiterDashboard({
     }
 
     if (typeof window !== 'undefined') {
-      const html = buildReceiptHtml(order, waiter.name);
-      const printWindow = window.open('', '_blank', 'width=450,height=700');
-      if (printWindow) {
-        printWindow.document.open();
-        printWindow.document.write(html);
-        printWindow.document.close();
-      } else {
-        console.warn('Unable to open print window');
+      try {
+        // Use the new comprehensive receipt system
+        const receiptData = orderToReceiptData(order, receiptOptions);
+        const html = buildReceiptHtml(receiptData);
+        const printWindow = window.open('', '_blank', 'width=450,height=900');
+        if (printWindow) {
+          printWindow.document.open();
+          printWindow.document.write(html);
+          printWindow.document.close();
+        } else {
+          console.warn('Unable to open print window');
+        }
+      } catch (error) {
+        console.error('Error generating receipt:', error);
+        // Fallback to browser print
+        window.print();
       }
     }
+  };
+
+  const handleShareReceipt = (order: Order) => {
+    setSelectedOrderForShare(order);
+    setShowShareModal(true);
+  };
+
+  const handleShareModalClose = () => {
+    setShowShareModal(false);
+    setSelectedOrderForShare(null);
   };
   if (showTableMap) {
     return (
@@ -549,7 +584,29 @@ export function WaiterDashboard({
         onReject={handleReject}
         onMarkReady={handleMarkReady}
         onMarkServed={handleMarkServed}
-        onPrintReceipt={handlePrintReceipt} />
+        onPrintReceipt={handleShareReceipt} />
+
+      {/* Receipt Share Modal */}
+      {showShareModal && selectedOrderForShare && (
+        <ReceiptShareModal
+          isOpen={showShareModal}
+          onClose={handleShareModalClose}
+          receipt={orderToReceiptData(selectedOrderForShare, {
+            restaurantName: 'Servv Restaurant',
+            restaurantAddress: '123 Main Street, City',
+            restaurantPhone: '(555) 123-4567',
+            restaurantEmail: 'info@servv.com',
+            taxRate: 18,
+            serverName: waiter.name,
+            orderType: selectedOrderForShare.deliveryAddress ? 'delivery' : 'dine-in',
+            paymentMethod: 'Cash',
+            paymentStatus: 'paid',
+            amountPaid: selectedOrderForShare.total,
+          })}
+          customerPhone={selectedOrderForShare.customerId ? undefined : undefined}
+          customerEmail={selectedOrderForShare.customerId ? undefined : undefined}
+        />
+      )}
 
     </div>);
 
