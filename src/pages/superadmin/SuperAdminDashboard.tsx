@@ -4,6 +4,7 @@ import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Modal } from '../../components/ui/Modal';
 import { Input } from '../../components/ui/Input';
+import { apiRequest } from '../../api/http';
 import { changePassword } from '../../api/auth';
 
 interface Restaurant {
@@ -57,16 +58,8 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
   const loadRestaurants = async () => {
     setIsLoading(true);
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('/api/restaurants', {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setRestaurants(data);
-      }
+      const data = await apiRequest<Restaurant[]>('/api/restaurants');
+      setRestaurants(data);
     } catch (error) {
       console.error('Failed to load restaurants:', error);
     } finally {
@@ -102,13 +95,11 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
 
   const handleCreateOrUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
-    const token = localStorage.getItem('token');
-    
     try {
       const url = editingId ? `/api/restaurants/${editingId}` : '/api/restaurants';
       const method = editingId ? 'PUT' : 'POST';
 
-      const body = editingId 
+      const body = editingId
         ? {
             name: formData.name,
             email: formData.email,
@@ -119,20 +110,14 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
           }
         : formData;
 
-      const response = await fetch(url, {
+      await apiRequest(url, {
         method,
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify(body)
+        json: body
       });
 
-      if (response.ok) {
-        await loadRestaurants();
-        resetForm();
-        setShowCreateModal(false);
-      }
+      await loadRestaurants();
+      resetForm();
+      setShowCreateModal(false);
     } catch (error) {
       console.error('Failed to save restaurant:', error);
     }
@@ -153,19 +138,11 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
 
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this restaurant?')) return;
-
-    const token = localStorage.getItem('token');
     try {
-      const response = await fetch(`/api/restaurants/${id}`, {
-        method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
+      await apiRequest(`/api/restaurants/${id}`, {
+        method: 'DELETE'
       });
-
-      if (response.ok) {
-        await loadRestaurants();
-      }
+      await loadRestaurants();
     } catch (error) {
       console.error('Failed to delete restaurant:', error);
     }

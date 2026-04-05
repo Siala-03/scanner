@@ -215,8 +215,10 @@ authRouter.post('/signup', async (req: AuthenticatedRequest, res: Response, next
 authRouter.get('/staff', authenticate, async (req: AuthenticatedRequest, res, next) => {
   try {
     const staff = await withClient(async (client: pg.PoolClient) => {
-      const query = `SELECT id, name, role, email, phone, is_on_duty, assigned_tables, performance, hire_date, restaurant_id FROM staff WHERE restaurant_id = $1 ORDER BY name`;
-      const params = [req.restaurantId];
+      const query = req.staffRole === 'superadmin'
+        ? `SELECT id, name, role, email, phone, is_on_duty, assigned_tables, performance, hire_date, restaurant_id FROM staff ORDER BY name`
+        : `SELECT id, name, role, email, phone, is_on_duty, assigned_tables, performance, hire_date, restaurant_id FROM staff WHERE restaurant_id = $1 ORDER BY name`;
+      const params = req.staffRole === 'superadmin' ? [] : [req.restaurantId];
 
       const result = await client.query(query, params);
       return result.rows.map((row: any) => ({
@@ -252,7 +254,7 @@ authRouter.get('/staff/:id', authenticate, async (req: AuthenticatedRequest, res
         throw new HttpError(404, 'Staff not found');
       }
       const row = result.rows[0];
-      if (row.restaurant_id !== req.restaurantId) {
+      if (req.staffRole !== 'superadmin' && row.restaurant_id !== req.restaurantId) {
         throw new HttpError(403, 'Unauthorized access to staff member');
       }
       return {
