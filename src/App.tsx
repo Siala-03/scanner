@@ -50,19 +50,7 @@ export function App() {
     }[]>(
     []);
   const { orders, addOrder, updateOrderStatus } = useOrders();
-  const handlePlaceOrder = useCallback(
-    (tableNum: number, items: CartItem[], specialInstructions?: string, customer?: Customer | null, delivery?: { provider: string; address: string }, loyaltyRewardId?: string) => {
-      addOrder(tableNum, items, specialInstructions, customer, delivery, loyaltyRewardId);
-      handleCallWaiter(tableNum);
-    },
-    [addOrder, handleCallWaiter]
-  );
-  const handleUpdateOrderStatus = useCallback(
-    (orderId: string, status: OrderStatus, opts?: { assignedWaiterId?: string }) => {
-      updateOrderStatus(orderId, status, opts);
-    },
-    [updateOrderStatus]
-  );
+  
   const handleCallWaiter = useCallback((tableNum: number) => {
     // Add to local state first for immediate UI feedback
     setWaiterCalls((prev) => [
@@ -78,6 +66,22 @@ export function App() {
       console.warn('Failed to call waiter via API:', err);
     });
   }, []);
+
+  const handlePlaceOrder = useCallback(
+    (tableNum: number, items: CartItem[], specialInstructions?: string, customer?: Customer | null, delivery?: { provider: string; address: string }, loyaltyRewardId?: string) => {
+      addOrder(tableNum, items, specialInstructions, customer, delivery, loyaltyRewardId);
+      handleCallWaiter(tableNum);
+    },
+    [addOrder, handleCallWaiter]
+  );
+  
+  const handleUpdateOrderStatus = useCallback(
+    (orderId: string, status: OrderStatus, opts?: { assignedWaiterId?: string }) => {
+      updateOrderStatus(orderId, status, opts);
+    },
+    [updateOrderStatus]
+  );
+  
   const handleDismissWaiterCall = useCallback((tableNum: number) => {
     setWaiterCalls((prev) =>
     prev.filter((call) => call.tableNumber !== tableNum)
