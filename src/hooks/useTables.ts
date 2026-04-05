@@ -27,10 +27,11 @@ export function useTables() {
   }, [loadTables]);
 
   // Add table
-  const addTable = async (tableNumber: number) => {
+  const addTable = async () => {
     try {
-      await createTable(tableNumber);
-      setTables(prev => [...prev, tableNumber].sort((a, b) => a - b));
+      const nextTableNumber = tables.length > 0 ? Math.max(...tables) + 1 : 1;
+      await createTable(nextTableNumber);
+      setTables(prev => [...prev, nextTableNumber].sort((a, b) => a - b));
     } catch (err) {
       console.error('Failed to create table:', err);
       throw err;

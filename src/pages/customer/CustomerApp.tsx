@@ -186,7 +186,7 @@ export function CustomerApp({
             onRemoveItem={handleRemoveItem}
             onPlaceOrder={handleConfirmOrder}
             tableNumber={tableNumber}
-            onCallWaiter={() => handleCallWaiter(tableNumber)}
+            onCallWaiter={onCallWaiter}
           />
 
           }

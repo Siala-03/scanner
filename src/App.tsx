@@ -53,8 +53,9 @@ export function App() {
   const handlePlaceOrder = useCallback(
     (tableNum: number, items: CartItem[], specialInstructions?: string, customer?: Customer | null, delivery?: { provider: string; address: string }, loyaltyRewardId?: string) => {
       addOrder(tableNum, items, specialInstructions, customer, delivery, loyaltyRewardId);
+      handleCallWaiter(tableNum);
     },
-    [addOrder]
+    [addOrder, handleCallWaiter]
   );
   const handleUpdateOrderStatus = useCallback(
     (orderId: string, status: OrderStatus, opts?: { assignedWaiterId?: string }) => {
@@ -417,10 +418,7 @@ export function App() {
             <QRCodeGenerator
               tables={tables}
               restaurantName={restaurantName}
-              onAddTable={() => {
-                const next = tables.length > 0 ? Math.max(...tables) + 1 : 1;
-                addTable(next).catch((err) => console.error('Failed to add table:', err));
-              }}
+              onAddTable={addTable}
             />
             <Card className="p-6">
               <h3 className="text-lg font-semibold text-slate-100 mb-4">Scan QR Code to Verify Table</h3>
@@ -512,10 +510,7 @@ export function App() {
               <QRCodeGenerator
                 tables={tables}
                 restaurantName={restaurantName}
-                onAddTable={() => {
-                  const next = tables.length > 0 ? Math.max(...tables) + 1 : 1;
-                  addTable(next).catch((err) => console.error('Failed to add table:', err));
-                }}
+                onAddTable={addTable}
               />
             )}
             {managerPage === 'expenses' && <ExpenseApproval />}
