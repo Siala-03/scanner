@@ -307,7 +307,8 @@ export function App() {
           onPlaceOrder={handlePlaceOrder}
           onCallWaiter={() => handleCallWaiter(tableNumber)}
         />
-
+      </div>
+    );
   }
   // Waiter portal
   if (selectedRole === 'waiter' && authUser) {
@@ -418,20 +419,28 @@ export function App() {
         {supervisorPage === 'staff' && <StaffPerformance />}
         {supervisorPage === 'qrcodes' && (
           <div className="space-y-6">
-            <QRCodeGenerator
-              tables={tables}
-              restaurantName={restaurantName}
-              onAddTable={addTable}
-            />
+            {/* QR Code Generation Section */}
+            <div>
+              <h2 className="text-xl font-semibold text-slate-100 mb-4">Generate QR Codes for Tables</h2>
+              <p className="text-slate-400 mb-4">Create printable QR codes for customers to scan and order from their tables.</p>
+              <QRCodeGenerator
+                tables={tables}
+                restaurantName={restaurantName}
+                onAddTable={addTable}
+              />
+            </div>
+
+            {/* QR Code Verification Section */}
             <Card className="p-6">
-              <h3 className="text-lg font-semibold text-slate-100 mb-4">Scan QR Code to Verify Table</h3>
+              <h3 className="text-lg font-semibold text-slate-100 mb-4">Verify Table QR Codes (Backup)</h3>
+              <p className="text-slate-400 mb-4">Scan existing QR codes to verify they work correctly.</p>
               <QRScanner
                 onScan={(tableNum) => setSupervisorScannedTable(tableNum)}
                 onClose={() => {}}
               />
               {supervisorScannedTable && (
                 <p className="mt-4 text-green-400">
-                  Detected Table: {supervisorScannedTable}
+                  ✓ Verified Table: {supervisorScannedTable}
                 </p>
               )}
             </Card>
@@ -471,6 +480,7 @@ export function App() {
               { id: 'dashboard', label: 'Dashboard' },
               { id: 'inventory', label: 'Inventory' },
               { id: 'menu', label: 'Manage Menu' },
+              { id: 'qrcodes', label: 'QR Codes' },
               { id: 'history', label: 'Order History' },
               { id: 'analytics', label: 'Analytics' },
               { id: 'staff', label: 'Staff' },

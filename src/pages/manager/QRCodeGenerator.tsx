@@ -64,7 +64,7 @@ export function QRCodeGenerator({
           <div>
             <h1 className="text-2xl font-bold text-gray-100">{qrTitle}</h1>
             <p className="text-slate-400">
-              Print or download table-specific codes for your restaurant.
+              Generate QR codes for customers to scan and place orders from their tables.
             </p>
           </div>
           <div className="flex gap-3 mt-4 sm:mt-0">
@@ -120,7 +120,7 @@ export function QRCodeGenerator({
                   </button>
 
                   <p className="text-sm text-slate-500 font-medium">
-                    Scan to order
+                    Customers scan to order
                   </p>
                   <p className="text-xs text-slate-400 mt-1 break-all font-mono">
                     {qrLink}

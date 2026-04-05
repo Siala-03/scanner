@@ -1,6 +1,6 @@
 import React from 'react';
 import { Button } from '../../components/ui/Button';
-import { MenuIcon, LogOutIcon } from 'lucide-react';
+import { MenuIcon, LogOutIcon, QrCodeIcon } from 'lucide-react';
 import { AIInsightsChat } from '../../components/manager/AIInsightsChat';
 import { useInventoryData } from '../../hooks/useInventory';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, Legend } from 'recharts';
@@ -39,6 +39,9 @@ export function ManagerDashboard({ onNavigate, onLogout, totalOrders, activeOrde
           <div className="flex gap-2">
             <Button variant="secondary" onClick={() => onNavigate('menu')}>
               <MenuIcon className="w-4 h-4 mr-1" /> Manage Menu
+            </Button>
+            <Button variant="secondary" onClick={() => onNavigate('qrcodes')}>
+              <QrCodeIcon className="w-4 h-4 mr-1" /> QR Codes
             </Button>
             <Button variant="danger" onClick={onLogout}>
               <LogOutIcon className="w-4 h-4 mr-1" /> Logout

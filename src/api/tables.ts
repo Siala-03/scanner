@@ -1,7 +1,7 @@
 import { apiRequest } from './http';
 
 // API base URL
-const API_BASE = 'https://scanner-3cku.onrender.com/api/tables';
+const API_BASE = '/api/tables';
 
 export interface Table {
   id: string;
