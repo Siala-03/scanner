@@ -66,7 +66,7 @@ router.post('/', authenticate, requireSuperadmin, async (req: AuthenticatedReque
       phone,
       email,
       timezone = 'UTC',
-      currency = 'USD',
+      currency = 'RWF',
       managerName,
       managerEmail,
       managerPhone,

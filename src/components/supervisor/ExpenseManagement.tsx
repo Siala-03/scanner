@@ -9,6 +9,7 @@ import {
   createExpenseNote,
   getExpenseAuditLog,
 } from '../../api/expenses';
+import { buildExpenseReceiptHtml, printHtml } from '../../utils/receipt';
 import {
   Expense,
   ExpenseCategory,
@@ -155,6 +156,11 @@ export default function SupervisorExpenseManagement() {
     try {
       setLoading(true);
       await generateReceipt(expenseId);
+      const expenseToPrint = expenses.find(e => e.id === expenseId) || selectedExpense;
+      if (expenseToPrint) {
+        const html = buildExpenseReceiptHtml(expenseToPrint as any);
+        printHtml(html);
+      }
       if (selectedExpense?.id === expenseId) {
         const updated = expenses.find(e => e.id === expenseId);
         setSelectedExpense(updated || null);

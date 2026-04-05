@@ -12,6 +12,7 @@ import {
   createExpenseNote,
   getExpenseAuditLog,
 } from '../../api/expenses';
+import { buildExpenseReceiptHtml, printHtml } from '../../utils/receipt';
 import {
   Expense,
   ExpenseCategory,
@@ -53,7 +54,7 @@ export default function ManagerExpenseApproval() {
     vendorName: '',
     description: '',
     amount: 0,
-    currency: 'USD',
+    currency: 'RWF',
     expenseDate: new Date().toISOString().split('T')[0],
     paymentMethod: 'cash',
     paymentStatus: 'paid',
@@ -113,7 +114,7 @@ export default function ManagerExpenseApproval() {
         vendorName: '',
         description: '',
         amount: 0,
-        currency: 'USD',
+        currency: 'RWF',
         expenseDate: new Date().toISOString().split('T')[0],
         paymentMethod: 'cash',
         paymentStatus: 'paid',
@@ -197,6 +198,15 @@ export default function ManagerExpenseApproval() {
     try {
       setLoading(true);
       await generateReceipt(expenseId);
+      const expenseToPrint = [
+        ...pendingExpenses,
+        ...approvedExpenses,
+        ...rejectedExpenses,
+      ].find(e => e.id === expenseId) || selectedExpense;
+      if (expenseToPrint) {
+        const html = buildExpenseReceiptHtml(expenseToPrint as any);
+        printHtml(html);
+      }
       if (selectedExpense?.id === expenseId) {
         const updated = [
           ...pendingExpenses,

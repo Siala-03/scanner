@@ -1,0 +1,253 @@
+﻿src/__tests__/currency.test.ts(1,38): error TS2307: Cannot find module 'vitest' or its corresponding type declarations.
+src/__tests__/InventoryManagement.test.tsx(1,1): error TS6133: 'React' is declared but its value is never read.
+src/__tests__/InventoryManagement.test.tsx(2,54): error TS2307: Cannot find module 'vitest' or its corresponding type declarations.
+src/__tests__/InventoryManagement.test.tsx(3,41): error TS2307: Cannot find module '@testing-library/react' or its corresponding type declarations.
+src/api/inventory.ts(7,3): error TS6196: 'PurchaseOrderStatus' is declared but never used.
+src/api/inventory.ts(278,31): error TS6133: 'movements' is declared but its value is never read.
+src/api/loyalty.ts(2,25): error TS6196: 'LoyaltyTransaction' is declared but never used.
+src/api/loyalty.ts(2,53): error TS6196: 'RewardRedemption' is declared but never used.
+src/api/staff.ts(47,57): error TS2304: Cannot find name 'StaffRole'.
+src/App.tsx(1,8): error TS6133: 'React' is declared but its value is never read.
+src/App.tsx(2,18): error TS6133: 'AnimatePresence' is declared but its value is never read.
+src/App.tsx(3,25): error TS6133: 'UtensilsIcon' is declared but its value is never read.
+src/App.tsx(3,39): error TS6133: 'BarChart3Icon' is declared but its value is never read.
+src/App.tsx(3,54): error TS6133: 'BriefcaseIcon' is declared but its value is never read.
+src/App.tsx(3,69): error TS6133: 'ChefHatIcon' is declared but its value is never read.
+src/App.tsx(3,94): error TS6133: 'UsersIcon' is declared but its value is never read.
+src/App.tsx(3,105): error TS6133: 'TrendingUpIcon' is declared but its value is never read.
+src/App.tsx(3,121): error TS6133: 'ClockIcon' is declared but its value is never read.
+src/App.tsx(3,132): error TS6133: 'ShoppingBagIcon' is declared but its value is never read.
+src/App.tsx(3,149): error TS6133: 'TruckIcon' is declared but its value is never read.
+src/App.tsx(4,20): error TS6133: 'Order' is declared but its value is never read.
+src/App.tsx(5,1): error TS6133: 'useStaff' is declared but its value is never read.
+src/App.tsx(24,1): error TS6133: 'SimpleInventory' is declared but its value is never read.
+src/App.tsx(41,10): error TS6133: 'isScanning' is declared but its value is never read.
+src/App.tsx(42,10): error TS6133: 'scanningTable' is declared but its value is never read.
+src/App.tsx(43,10): error TS6133: 'detectedTable' is declared but its value is never read.
+src/App.tsx(44,10): error TS6133: 'showQRGrid' is declared but its value is never read.
+src/App.tsx(45,30): error TS6133: 'isTablesLoading' is declared but its value is never read.
+src/App.tsx(45,57): error TS6133: 'removeTable' is declared but its value is never read.
+src/App.tsx(45,79): error TS6133: 'reloadTables' is declared but its value is never read.
+src/components/customer/CartItem.tsx(1,1): error TS6133: 'React' is declared but its value is never read.
+src/components/customer/CustomerIdentification.tsx(84,13): error TS2322: Type '"outline"' is not assignable to type '"primary" | "secondary" | "danger" | "ghost" | undefined'.
+src/components/customer/CustomerIdentification.tsx(120,17): error TS2322: Type '"outline"' is not assignable to type '"primary" | "secondary" | "danger" | "ghost" | undefined'.
+src/components/customer/CustomerIdentification.tsx(183,17): error TS2322: Type '"outline"' is not assignable to type '"primary" | "secondary" | "danger" | "ghost" | undefined'.
+src/components/customer/MenuItemCard.tsx(1,1): error TS6133: 'React' is declared but its value is never read.
+src/components/customer/OrderTracker.tsx(1,8): error TS6133: 'React' is declared but its value is never read.
+src/components/customer/ServiceReviewModal.tsx(1,8): error TS6133: 'React' is declared but its value is never read.
+src/components/customer/ServiceReviewModal.tsx(101,17): error TS2322: Type 'number | undefined' is not assignable to type 'number'.
+  Type 'undefined' is not assignable to type 'number'.
+src/components/manager/AIInsightsChat.tsx(1,8): error TS6133: 'React' is declared but its value is never read.
+src/components/manager/AIInsightsChat.tsx(2,10): error TS6133: 'MessageSquare' is declared but its value is never read.
+src/components/manager/AIInsightsChat.tsx(2,34): error TS6133: 'Bot' is declared but its value is never read.
+src/components/manager/AIInsightsChat.tsx(4,24): error TS6133: 'AIResponse' is declared but its value is never read.
+src/components/manager/AIInsightsChat.tsx(19,32): error TS6133: 'alerts' is declared but its value is never read.
+src/components/manager/MenuItemEditor.tsx(1,8): error TS6133: 'React' is declared but its value is never read.
+src/components/manager/MenuItemEditor.tsx(1,28): error TS6133: 'useMemo' is declared but its value is never read.
+src/components/manager/StaffCard.tsx(1,1): error TS6133: 'React' is declared but its value is never read.
+src/components/manager/StaffCard.tsx(2,20): error TS6133: 'ClockIcon' is declared but its value is never read.
+src/components/manager/StaffCard.tsx(36,87): error TS7053: Element implicitly has an 'any' type because expression of type 'StaffRole' can't be used to index type '{ waiter: string; supervisor: string; manager: string; kitchen: string; }'.
+  Property 'superadmin' does not exist on type '{ waiter: string; supervisor: string; manager: string; kitchen: string; }'.
+src/components/supervisor/ExpenseManagement.tsx(86,9): error TS2322: Type '{ data: Expense[]; pagination: { page: number; limit: number; total: number; totalPages: number; }; }' is not assignable to type '{ data: never[]; }'.
+  Types of property 'data' are incompatible.
+    Type 'Expense[]' is not assignable to type 'never[]'.
+      Type 'Expense' is not assignable to type 'never'.
+src/components/supervisor/KPICard.tsx(1,8): error TS6133: 'React' is declared but its value is never read.
+src/components/supervisor/OrdersHistoryTable.tsx(1,8): error TS6133: 'React' is declared but its value is never read.
+src/components/supervisor/OrdersHistoryTable.tsx(4,1): error TS6192: All imports in import declaration are unused.
+src/components/supervisor/OrdersTable.tsx(4,29): error TS6133: 'SortDirection' is declared but its value is never read.
+src/components/supervisor/OrdersTable.tsx(31,17): error TS18048: 'a.tableNumber' is possibly 'undefined'.
+src/components/supervisor/OrdersTable.tsx(31,33): error TS18048: 'b.tableNumber' is possibly 'undefined'.
+src/components/supervisor/OrdersTable.tsx(35,29): error TS2339: Property 'getTime' does not exist on type 'string | Date'.
+  Property 'getTime' does not exist on type 'string'.
+src/components/supervisor/OrdersTable.tsx(35,53): error TS2339: Property 'getTime' does not exist on type 'string | Date'.
+  Property 'getTime' does not exist on type 'string'.
+src/components/supervisor/OrdersTable.tsx(122,30): error TS2551: Property 'toLocaleDateString' does not exist on type 'string | Date'. Did you mean 'toLocaleString'?
+  Property 'toLocaleDateString' does not exist on type 'string'.
+src/components/supervisor/OrdersTable.tsx(125,30): error TS2551: Property 'toLocaleTimeString' does not exist on type 'string | Date'. Did you mean 'toLocaleString'?
+  Property 'toLocaleTimeString' does not exist on type 'string'.
+src/components/supervisor/RevenueChart.tsx(1,1): error TS6133: 'React' is declared but its value is never read.
+src/components/ui/EmptyState.tsx(1,1): error TS6133: 'React' is declared but its value is never read.
+src/components/ui/EmptyState.tsx(5,9): error TS2304: Cannot find name 'ReactNode'.
+src/components/ui/Input.tsx(1,42): error TS6133: 'TextareaHTMLAttributes' is declared but its value is never read.
+src/components/ui/Modal.tsx(1,8): error TS6133: 'React' is declared but its value is never read.
+src/components/ui/NavigationHeader.tsx(2,25): error TS6133: 'MenuIcon' is declared but its value is never read.
+src/components/ui/ProgressBar.tsx(1,1): error TS6133: 'React' is declared but its value is never read.
+src/components/ui/SearchBar.tsx(1,8): error TS6133: 'React' is declared but its value is never read.
+src/components/ui/Tabs.tsx(1,8): error TS6133: 'React' is declared but its value is never read.
+src/components/waiter/OrderCard.tsx(1,1): error TS6133: 'React' is declared but its value is never read.
+src/components/waiter/OrderCard.tsx(26,35): error TS2339: Property 'getTime' does not exist on type 'string | Date'.
+  Property 'getTime' does not exist on type 'string'.
+src/components/waiter/OrderCard.tsx(59,17): error TS2322: Type '{ className: string; title: string; }' is not assignable to type 'IntrinsicAttributes & Omit<LucideProps, "ref"> & RefAttributes<SVGSVGElement>'.
+  Property 'title' does not exist on type 'IntrinsicAttributes & Omit<LucideProps, "ref"> & RefAttributes<SVGSVGElement>'.
+src/components/waiter/OrderCard.tsx(65,17): error TS2322: Type '{ className: string; title: string; }' is not assignable to type 'IntrinsicAttributes & Omit<LucideProps, "ref"> & RefAttributes<SVGSVGElement>'.
+  Property 'title' does not exist on type 'IntrinsicAttributes & Omit<LucideProps, "ref"> & RefAttributes<SVGSVGElement>'.
+src/components/waiter/OrderCard.tsx(79,33): error TS18048: 'item.menuItem' is possibly 'undefined'.
+src/components/waiter/OrderCard.tsx(138,41): error TS2304: Cannot find name 'onPrintReceipt'.
+src/components/waiter/OrderCard.tsx(142,30): error TS2304: Cannot find name 'onPrintReceipt'.
+src/components/waiter/OrderDetailModal.tsx(1,1): error TS6133: 'React' is declared but its value is never read.
+src/components/waiter/OrderDetailModal.tsx(36,35): error TS2339: Property 'getTime' does not exist on type 'string | Date'.
+  Property 'getTime' does not exist on type 'string'.
+src/components/waiter/OrderDetailModal.tsx(92,47): error TS18048: 'item.menuItem' is possibly 'undefined'.
+src/components/waiter/OrderDetailModal.tsx(95,24): error TS18048: 'item.menuItem' is possibly 'undefined'.
+src/components/waiter/OrderDetailModal.tsx(98,54): error TS2345: Argument of type 'MenuItem | undefined' is not assignable to parameter of type 'MenuItem'.
+  Type 'undefined' is not assignable to type 'MenuItem'.
+src/components/waiter/OrderDetailModal.tsx(103,50): error TS2345: Argument of type 'MenuItem | undefined' is not assignable to parameter of type 'MenuItem'.
+  Type 'undefined' is not assignable to type 'MenuItem'.
+src/components/waiter/OrderDetailModal.tsx(142,19): error TS2304: Cannot find name 'onPrintReceipt'.
+src/components/waiter/OrderDetailModal.tsx(143,17): error TS2304: Cannot find name 'onPrintReceipt'.
+src/components/waiter/QRScanner.tsx(15,10): error TS6133: 'scanRegion' is declared but its value is never read.
+src/components/waiter/WaiterOrderEntry.tsx(2,18): error TS6133: 'AnimatePresence' is declared but its value is never read.
+src/components/waiter/WaiterOrderEntry.tsx(18,1): error TS6133: 'Badge' is declared but its value is never read.
+src/data/analyticsData.ts(11,1): error TS6133: 'formatPrice' is declared but its value is never read.
+src/data/analyticsData.ts(187,3): error TS2353: Object literal may only specify known properties, and 'label' does not exist in type 'KPI'.
+src/data/analyticsData.ts(188,3): error TS2353: Object literal may only specify known properties, and 'label' does not exist in type 'KPI'.
+src/data/analyticsData.ts(190,3): error TS2353: Object literal may only specify known properties, and 'label' does not exist in type 'KPI'.
+src/data/analyticsData.ts(195,3): error TS2353: Object literal may only specify known properties, and 'label' does not exist in type 'KPI'.
+src/data/analyticsData.ts(196,3): error TS2353: Object literal may only specify known properties, and 'label' does not exist in type 'KPI'.
+src/data/analyticsData.ts(197,3): error TS2353: Object literal may only specify known properties, and 'label' does not exist in type 'KPI'.
+src/hooks/useKPIs.ts(29,41): error TS2345: Argument of type 'Omit<KPI, "id" | "updatedAt" | "createdAt" | "createdBy" | "restaurantId">' is not assignable to parameter of type '{ staffRole: string; name: string; description?: string | undefined; metric: string; targetValue: number; period: string; assignedStaffIds?: string[] | undefined; }'.
+  Type 'Omit<KPI, "id" | "updatedAt" | "createdAt" | "createdBy" | "restaurantId">' is missing the following properties from type '{ staffRole: string; name: string; description?: string | undefined; metric: string; targetValue: number; period: string; assignedStaffIds?: string[] | undefined; }': staffRole, targetValue
+src/hooks/useOrders.ts(138,49): error TS2322: Type 'import("C:/Users/PC/Desktop/Projects/scanner/src/types/index").OrderStatus' is not assignable to type 'import("C:/Users/PC/Desktop/Projects/scanner/src/types/orders").OrderStatus'.
+  Type '"verified"' is not assignable to type 'OrderStatus'.
+src/pages/customer/CustomerApp.tsx(189,33): error TS2552: Cannot find name 'handleCallWaiter'. Did you mean 'handleCallWaiterClick'?
+src/pages/customer/MenuPage.tsx(1,8): error TS6133: 'React' is declared but its value is never read.
+src/pages/customer/MenuPage.tsx(38,52): error TS2339: Property 'refetch' does not exist on type 'MenuContextValue'.
+src/pages/customer/OrderStatusPage.tsx(1,8): error TS6133: 'React' is declared but its value is never read.
+src/pages/customer/OrderStatusPage.tsx(101,41): error TS18048: 'item.menuItem' is possibly 'undefined'.
+src/pages/customer/OrderStatusPage.tsx(104,36): error TS18048: 'item.menuItem' is possibly 'undefined'.
+src/pages/kitchen/KitchenDisplay.tsx(302,75): error TS2551: Property 'targetValue' does not exist on type 'KPIWithProgress'. Did you mean 'target_value'?
+src/pages/manager/AnalyticsPage.tsx(1,8): error TS6133: 'React' is declared but its value is never read.
+src/pages/manager/AnalyticsPage.tsx(28,10): error TS6133: 'isLoading' is declared but its value is never read.
+src/pages/manager/AnalyticsPage.tsx(29,10): error TS6133: 'loadError' is declared but its value is never read.
+src/pages/manager/AnalyticsPage.tsx(338,13): error TS2322: Type 'Dispatch<SetStateAction<"month" | "week" | "year" | "today">>' is not assignable to type '(tabId: string) => void'.
+  Types of parameters 'value' and 'tabId' are incompatible.
+    Type 'string' is not assignable to type 'SetStateAction<"month" | "week" | "year" | "today">'.
+src/pages/manager/ManagerDashboard.tsx(1,1): error TS6133: 'React' is declared but its value is never read.
+src/pages/manager/MenuManagement.tsx(294,17): error TS2322: Type '{ children: (string | Element)[]; variant: "secondary"; onClick: () => void; ref: RefObject<HTMLButtonElement>; }' is not assignable to type 'IntrinsicAttributes & ButtonProps'.
+  Property 'ref' does not exist on type 'IntrinsicAttributes & ButtonProps'.
+src/pages/manager/QRCodeGenerator.tsx(1,1): error TS6133: 'React' is declared but its value is never read.
+src/pages/manager/QRCodeGenerator.tsx(100,21): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(props: QRCodeProps): QRCode', gave the following error.
+    Type '{ id: string; value: string; size: number; level: "H"; includeMargin: boolean; bgColor: "#ecfdf3"; fgColor: "#16a34a"; }' is not assignable to type 'IntrinsicAttributes & IntrinsicClassAttributes<QRCode> & Readonly<QRCodeProps>'.
+      Property 'includeMargin' does not exist on type 'IntrinsicAttributes & IntrinsicClassAttributes<QRCode> & Readonly<QRCodeProps>'.
+  Overload 2 of 2, '(props: QRCodeProps, context: any): QRCode', gave the following error.
+    Type '{ id: string; value: string; size: number; level: "H"; includeMargin: boolean; bgColor: "#ecfdf3"; fgColor: "#16a34a"; }' is not assignable to type 'IntrinsicAttributes & IntrinsicClassAttributes<QRCode> & Readonly<QRCodeProps>'.
+      Property 'includeMargin' does not exist on type 'IntrinsicAttributes & IntrinsicClassAttributes<QRCode> & Readonly<QRCodeProps>'.
+src/pages/manager/StaffManagement.tsx(1,8): error TS6133: 'React' is declared but its value is never read.
+src/pages/manager/StaffManagement.tsx(13,1): error TS6133: 'useTables' is declared but its value is never read.
+src/pages/manager/StaffManagement.tsx(17,32): error TS6133: 'assignKPI' is declared but its value is never read.
+src/pages/manager/StaffManagement.tsx(17,43): error TS6133: 'unassignKPI' is declared but its value is never read.
+src/pages/manager/StaffManagement.tsx(33,10): error TS6133: 'isAssignModalOpen' is declared but its value is never read.
+src/pages/manager/StaffManagement.tsx(44,10): error TS6133: 'editingKPI' is declared but its value is never read.
+src/pages/manager/StaffManagement.tsx(204,9): error TS6133: 'saveAssignedTables' is declared but its value is never read.
+src/pages/shared/InventoryManagement.REFACTORED.tsx(1,8): error TS6133: 'React' is declared but its value is never read.
+src/pages/shared/InventoryManagement.REFACTORED.tsx(7,3): error TS6133: 'TrendingUpIcon' is declared but its value is never read.
+src/pages/shared/InventoryManagement.REFACTORED.tsx(8,3): error TS6133: 'TruckIcon' is declared but its value is never read.
+src/pages/shared/InventoryManagement.REFACTORED.tsx(12,3): error TS6133: 'CheckCircleIcon' is declared but its value is never read.
+src/pages/shared/InventoryManagement.REFACTORED.tsx(13,3): error TS6133: 'XCircleIcon' is declared but its value is never read.
+src/pages/shared/InventoryManagement.REFACTORED.tsx(17,3): error TS6133: 'XIcon' is declared but its value is never read.
+src/pages/shared/InventoryManagement.REFACTORED.tsx(18,3): error TS6133: 'BellIcon' is declared but its value is never read.
+src/pages/shared/InventoryManagement.REFACTORED.tsx(31,3): error TS6196: 'PurchaseOrder' is declared but never used.
+src/pages/shared/InventoryManagement.REFACTORED.tsx(41,26): error TS6133: 'apiUpdatePurchaseOrder' is declared but its value is never read.
+src/pages/shared/InventoryManagement.REFACTORED.tsx(42,27): error TS6133: 'apiReceivePurchaseOrder' is declared but its value is never read.
+src/pages/shared/InventoryManagement.REFACTORED.tsx(71,10): error TS6133: 'StockBar' is declared but its value is never read.
+src/pages/shared/InventoryManagement.REFACTORED.tsx(149,5): error TS6133: 'lowStockItems' is declared but its value is never read.
+src/pages/shared/InventoryManagement.REFACTORED.tsx(152,5): error TS6133: 'movements' is declared but its value is never read.
+src/pages/shared/InventoryManagement.REFACTORED.tsx(155,13): error TS6133: 'inventoryAlerts' is declared but its value is never read.
+src/pages/shared/InventoryManagement.REFACTORED.tsx(156,5): error TS6133: 'forecasts' is declared but its value is never read.
+src/pages/shared/InventoryManagement.REFACTORED.tsx(157,5): error TS6133: 'forecastAlerts' is declared but its value is never read.
+src/pages/shared/InventoryManagement.REFACTORED.tsx(158,5): error TS6133: 'isGeneratingForecasts' is declared but its value is never read.
+src/pages/shared/InventoryManagement.REFACTORED.tsx(159,5): error TS6133: 'runForecasting' is declared but its value is never read.
+src/pages/shared/InventoryManagement.REFACTORED.tsx(163,5): error TS6133: 'locations' is declared but its value is never read.
+src/pages/shared/InventoryManagement.REFACTORED.tsx(206,54): error TS2881: This expression is never nullish.
+src/pages/shared/InventoryManagement.REFACTORED.tsx(439,39): error TS2322: Type '"outline"' is not assignable to type '"primary" | "secondary" | "danger" | "ghost" | undefined'.
+src/pages/shared/InventoryManagement.REFACTORED.tsx(459,35): error TS2322: Type '"outline"' is not assignable to type '"primary" | "secondary" | "danger" | "ghost" | undefined'.
+src/pages/shared/InventoryManagement.REFACTORED.tsx(636,124): error TS2322: Type '"outline"' is not assignable to type '"primary" | "secondary" | "danger" | "ghost" | undefined'.
+src/pages/shared/InventoryManagement.REFACTORED.tsx(670,10): error TS2739: Type '{}' is missing the following properties from type 'InventoryForecastingProps': forecasts, alerts, onGenerateForecasts, isGenerating
+src/pages/shared/InventoryManagement.REFACTORED.tsx(682,65): error TS2322: Type '"outline"' is not assignable to type '"primary" | "secondary" | "danger" | "ghost" | undefined'.
+src/pages/shared/InventoryManagement.REFACTORED.tsx(697,124): error TS2322: Type '"outline"' is not assignable to type '"primary" | "secondary" | "danger" | "ghost" | undefined'.
+src/pages/shared/InventoryManagement.REFACTORED.tsx(713,57): error TS2322: Type '"outline"' is not assignable to type '"primary" | "secondary" | "danger" | "ghost" | undefined'.
+src/pages/shared/InventoryManagement.REFACTORED.tsx(731,62): error TS2322: Type '"outline"' is not assignable to type '"primary" | "secondary" | "danger" | "ghost" | undefined'.
+src/pages/shared/InventoryManagementREFACTORED.tsx(1,8): error TS6133: 'React' is declared but its value is never read.
+src/pages/shared/InventoryManagementREFACTORED.tsx(7,3): error TS6133: 'TrendingUpIcon' is declared but its value is never read.
+src/pages/shared/InventoryManagementREFACTORED.tsx(8,3): error TS6133: 'TruckIcon' is declared but its value is never read.
+src/pages/shared/InventoryManagementREFACTORED.tsx(12,3): error TS6133: 'CheckCircleIcon' is declared but its value is never read.
+src/pages/shared/InventoryManagementREFACTORED.tsx(13,3): error TS6133: 'XCircleIcon' is declared but its value is never read.
+src/pages/shared/InventoryManagementREFACTORED.tsx(17,3): error TS6133: 'XIcon' is declared but its value is never read.
+src/pages/shared/InventoryManagementREFACTORED.tsx(18,3): error TS6133: 'BellIcon' is declared but its value is never read.
+src/pages/shared/InventoryManagementREFACTORED.tsx(31,3): error TS6196: 'PurchaseOrder' is declared but never used.
+src/pages/shared/InventoryManagementREFACTORED.tsx(41,26): error TS6133: 'apiUpdatePurchaseOrder' is declared but its value is never read.
+src/pages/shared/InventoryManagementREFACTORED.tsx(42,27): error TS6133: 'apiReceivePurchaseOrder' is declared but its value is never read.
+src/pages/shared/InventoryManagementREFACTORED.tsx(71,10): error TS6133: 'StockBar' is declared but its value is never read.
+src/pages/shared/InventoryManagementREFACTORED.tsx(153,5): error TS6133: 'lowStockItems' is declared but its value is never read.
+src/pages/shared/InventoryManagementREFACTORED.tsx(156,5): error TS6133: 'movements' is declared but its value is never read.
+src/pages/shared/InventoryManagementREFACTORED.tsx(159,13): error TS6133: 'inventoryAlerts' is declared but its value is never read.
+src/pages/shared/InventoryManagementREFACTORED.tsx(160,5): error TS6133: 'forecasts' is declared but its value is never read.
+src/pages/shared/InventoryManagementREFACTORED.tsx(161,5): error TS6133: 'forecastAlerts' is declared but its value is never read.
+src/pages/shared/InventoryManagementREFACTORED.tsx(162,5): error TS6133: 'isGeneratingForecasts' is declared but its value is never read.
+src/pages/shared/InventoryManagementREFACTORED.tsx(163,5): error TS6133: 'runForecasting' is declared but its value is never read.
+src/pages/shared/InventoryManagementREFACTORED.tsx(167,5): error TS6133: 'locations' is declared but its value is never read.
+src/pages/shared/InventoryManagementREFACTORED.tsx(210,54): error TS2881: This expression is never nullish.
+src/pages/shared/InventoryManagementREFACTORED.tsx(442,39): error TS2322: Type '"outline"' is not assignable to type '"primary" | "secondary" | "danger" | "ghost" | undefined'.
+src/pages/shared/InventoryManagementREFACTORED.tsx(462,35): error TS2322: Type '"outline"' is not assignable to type '"primary" | "secondary" | "danger" | "ghost" | undefined'.
+src/pages/shared/InventoryManagementREFACTORED.tsx(640,124): error TS2322: Type '"outline"' is not assignable to type '"primary" | "secondary" | "danger" | "ghost" | undefined'.
+src/pages/shared/InventoryManagementREFACTORED.tsx(676,10): error TS2739: Type '{}' is missing the following properties from type 'InventoryForecastingProps': forecasts, alerts, onGenerateForecasts, isGenerating
+src/pages/shared/InventoryManagementREFACTORED.tsx(688,65): error TS2322: Type '"outline"' is not assignable to type '"primary" | "secondary" | "danger" | "ghost" | undefined'.
+src/pages/shared/InventoryManagementREFACTORED.tsx(704,124): error TS2322: Type '"outline"' is not assignable to type '"primary" | "secondary" | "danger" | "ghost" | undefined'.
+src/pages/shared/InventoryManagementREFACTORED.tsx(720,57): error TS2322: Type '"outline"' is not assignable to type '"primary" | "secondary" | "danger" | "ghost" | undefined'.
+src/pages/shared/InventoryManagementREFACTORED.tsx(739,62): error TS2322: Type '"outline"' is not assignable to type '"primary" | "secondary" | "danger" | "ghost" | undefined'.
+src/pages/shared/SimpleInventory.tsx(1,8): error TS6133: 'React' is declared but its value is never read.
+src/pages/shared/SimpleInventory.tsx(2,18): error TS6133: 'AnimatePresence' is declared but its value is never read.
+src/pages/shared/SimpleInventory.tsx(9,3): error TS6133: 'CheckCircleIcon' is declared but its value is never read.
+src/pages/shared/SimpleInventory.tsx(10,3): error TS6133: 'XCircleIcon' is declared but its value is never read.
+src/pages/shared/SimpleInventory.tsx(11,3): error TS6133: 'AlertTriangleIcon' is declared but its value is never read.
+src/pages/shared/SimpleInventory.tsx(14,3): error TS6133: 'XIcon' is declared but its value is never read.
+src/pages/shared/test.tsx(2,18): error TS6133: 'AnimatePresence' is declared but its value is never read.
+src/pages/shared/test.tsx(8,3): error TS6133: 'TrendingDownIcon' is declared but its value is never read.
+src/pages/shared/test.tsx(9,3): error TS6133: 'ShoppingCartIcon' is declared but its value is never read.
+src/pages/shared/test.tsx(11,3): error TS6133: 'UsersIcon' is declared but its value is never read.
+src/pages/shared/test.tsx(12,3): error TS6133: 'BarChart2Icon' is declared but its value is never read.
+src/pages/shared/test.tsx(18,3): error TS6133: 'ClockIcon' is declared but its value is never read.
+src/pages/shared/test.tsx(21,3): error TS6133: 'SearchIcon' is declared but its value is never read.
+src/pages/shared/test.tsx(22,3): error TS6133: 'FilterIcon' is declared but its value is never read.
+src/pages/shared/test.tsx(23,3): error TS6133: 'DownloadIcon' is declared but its value is never read.
+src/pages/shared/test.tsx(26,3): error TS6133: 'PhoneIcon' is declared but its value is never read.
+src/pages/shared/test.tsx(28,3): error TS6133: 'CalendarIcon' is declared but its value is never read.
+src/pages/shared/test.tsx(29,3): error TS6133: 'AlertCircleIcon' is declared but its value is never read.
+src/pages/shared/test.tsx(30,3): error TS6133: 'ChevronDownIcon' is declared but its value is never read.
+src/pages/shared/test.tsx(31,3): error TS6133: 'ChevronUpIcon' is declared but its value is never read.
+src/pages/shared/test.tsx(45,3): error TS6196: 'StockMovement' is declared but never used.
+src/pages/shared/test.tsx(46,3): error TS6196: 'WasteEntry' is declared but never used.
+src/pages/shared/test.tsx(59,3): error TS6133: 'deleteSupplier' is declared but its value is never read.
+src/pages/shared/test.tsx(357,29): error TS2367: This comparison appears to be unintentional because the types 'Tab' and '"purchase-orders"' have no overlap.
+src/pages/shared/test.tsx(663,10): error TS2367: This comparison appears to be unintentional because the types 'Tab' and '"purchase-orders"' have no overlap.
+src/pages/shared/test.tsx(825,10): error TS2367: This comparison appears to be unintentional because the types 'Tab' and '"movements"' have no overlap.
+src/pages/shared/test.tsx(957,10): error TS2367: This comparison appears to be unintentional because the types 'Tab' and '"analytics"' have no overlap.
+src/pages/superadmin/SuperAdminDashboard.tsx(26,37): error TS6133: 'onNavigate' is declared but its value is never read.
+src/pages/superadmin/SuperAdminDashboard.tsx(127,17): error TS2345: Argument of type '{ name: string; email: string; phone: string; address: string; city: string; country: string; }' is not assignable to parameter of type 'SetStateAction<{ name: string; email: string; phone: string; address: string; city: string; country: string; managerName: string; managerEmail: string; managerPhone: string; managerUsername: string; managerPassword: string; }>'.
+  Type '{ name: string; email: string; phone: string; address: string; city: string; country: string; }' is missing the following properties from type '{ name: string; email: string; phone: string; address: string; city: string; country: string; managerName: string; managerEmail: string; managerPhone: string; managerUsername: string; managerPassword: string; }': managerName, managerEmail, managerPhone, managerUsername, managerPassword
+src/pages/supervisor/OrderHistoryPage.tsx(1,8): error TS6133: 'React' is declared but its value is never read.
+src/pages/supervisor/OrderHistoryPage.tsx(260,52): error TS2345: Argument of type 'Order' is not assignable to parameter of type 'string'.
+src/pages/supervisor/RevenueReports.tsx(1,8): error TS6133: 'React' is declared but its value is never read.
+src/pages/supervisor/RevenueReports.tsx(15,10): error TS6133: 'CalendarIcon' is declared but its value is never read.
+src/pages/supervisor/RevenueReports.tsx(15,54): error TS6133: 'TrendingDownIcon' is declared but its value is never read.
+src/pages/supervisor/RevenueReports.tsx(15,72): error TS6133: 'FileTextIcon' is declared but its value is never read.
+src/pages/supervisor/RevenueReports.tsx(389,30): error TS2339: Property 'name' does not exist on type '{ category: string; revenue: number; percentage: number; color: string; }'.
+src/pages/supervisor/StaffPerformance.tsx(1,1): error TS6192: All imports in import declaration are unused.
+src/pages/supervisor/SupervisorDashboard.tsx(132,75): error TS2551: Property 'targetValue' does not exist on type 'KPIWithProgress'. Did you mean 'target_value'?
+src/pages/supplier/SupplierDashboard.tsx(2,77): error TS6133: 'AlertCircleIcon' is declared but its value is never read.
+src/pages/waiter/TableMapView.tsx(1,1): error TS6133: 'React' is declared but its value is never read.
+src/pages/waiter/WaiterDashboard.tsx(12,3): error TS6133: 'PlusIcon' is declared but its value is never read.
+src/pages/waiter/WaiterDashboard.tsx(15,35): error TS6133: 'MenuItem' is declared but its value is never read.
+src/pages/waiter/WaiterDashboard.tsx(113,63): error TS2345: Argument of type 'number | undefined' is not assignable to parameter of type 'number'.
+  Type 'undefined' is not assignable to type 'number'.
+src/utils/csv.ts(2,1): error TS6133: 'MenuItem' is declared but its value is never read.
+src/utils/csv.ts(21,7): error TS2339: Property 'assignedTo' does not exist on type 'Order'.
+src/utils/inventoryStorage.ts(5,3): error TS6196: 'PurchaseOrderItem' is declared but never used.
+src/utils/inventoryStorage.ts(8,3): error TS6196: 'StockMovementType' is declared but never used.
+src/utils/inventoryStorage.ts(399,3): error TS6133: 'menuItemsRef' is declared but its value is never read.
+src/utils/inventoryStorage.ts(583,9): error TS6133: 'startOfMonth' is declared but its value is never read.
+src/utils/menuImportExport.ts(1,25): error TS6196: 'MenuCategory' is declared but never used.
+src/utils/receipt.ts(1,17): error TS2305: Module '"../types"' has no exported member 'Expense'.
+src/utils/receipt.ts(114,52): error TS18048: 'item.menuItem' is possibly 'undefined'.
