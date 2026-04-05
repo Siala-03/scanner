@@ -1,7 +1,7 @@
 import { PrinterIcon, DownloadIcon } from 'lucide-react';
 import QRCode from 'react-qr-code';
 import { Button } from '../../components/ui/Button';
-import { Card } from '../../components/ui/Card';
+
 interface QRCodeGeneratorProps {
   tables: number[];
   onAddTable: () => void;
@@ -15,7 +15,6 @@ export function QRCodeGenerator({
   baseUrl,
   restaurantName
 }: QRCodeGeneratorProps) {
-  // default to empty list if none
   const handlePrint = () => {
     window.print();
   };
@@ -25,7 +24,10 @@ export function QRCodeGenerator({
   const qrTitle = restaurantName ? `${restaurantName} QR Codes` : 'Table QR Codes';
 
   const handleDownload = (tableNum: number) => {
-    const svg = document.getElementById(`qr-${tableNum}`) as SVGSVGElement | null;
+    const container = document.getElementById(`qr-container-${tableNum}`) as HTMLDivElement | null;
+    if (!container) return;
+
+    const svg = container.querySelector('svg') as SVGSVGElement | null;
     if (!svg) return;
 
     const serializer = new XMLSerializer();
@@ -53,10 +55,11 @@ export function QRCodeGenerator({
     };
     img.src = url;
   };
+
   return (
     <div className="dark min-h-screen bg-slate-900 p-4 md:p-6">
       <div className="max-w-7xl mx-auto">
-        {/* Header - Hidden when printing */}
+        {/* Header */}
         <div className="flex flex-col sm:flex-row items-center justify-between mb-8">
           <div>
             <h1 className="text-2xl font-bold text-gray-100">{qrTitle}</h1>
@@ -76,7 +79,7 @@ export function QRCodeGenerator({
           </div>
         </div>
 
-        {/* QR Grid - Optimized for printing */}
+        {/* QR Grid */}
         {validTables.length === 0 ? (
           <p className="text-center text-slate-300 py-20">
             No tables created yet. Use the "Add Table" button above to generate a new table number and QR code.
@@ -86,9 +89,42 @@ export function QRCodeGenerator({
             {validTables.map((tableNum) => {
               const qrLink = `${resolvedBaseUrl}/t/${tableNum}`;
               return (
-                <div key={tableNum}>
-                  Table {tableNum}
-                  <QRCode value={qrLink} size={160} />
+                <div
+                  key={tableNum}
+                  className="bg-white p-6 rounded-xl border border-slate-200 flex flex-col items-center justify-center text-center shadow-md hover:shadow-lg transition-shadow"
+                >
+                  <h2 className="text-2xl font-bold text-slate-900 mb-2">
+                    Table {tableNum}
+                  </h2>
+                  {restaurantName && (
+                    <p className="text-sm text-slate-500 mb-4">{restaurantName}</p>
+                  )}
+
+                  {/* QR Code */}
+                  <div id={`qr-container-${tableNum}`} className="mb-4 p-2 bg-white rounded">
+                    <QRCode
+                      value={qrLink}
+                      size={160}
+                      level="H"
+                      includeMargin={true}
+                    />
+                  </div>
+
+                  {/* Download Button */}
+                  <button
+                    onClick={() => handleDownload(tableNum)}
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-500 text-white hover:bg-amber-600 transition-colors mb-3"
+                  >
+                    <DownloadIcon className="w-4 h-4" />
+                    Download
+                  </button>
+
+                  <p className="text-sm text-slate-500 font-medium">
+                    Scan to order
+                  </p>
+                  <p className="text-xs text-slate-400 mt-1 break-all font-mono">
+                    {qrLink}
+                  </p>
                 </div>
               );
             })}

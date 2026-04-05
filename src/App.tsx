@@ -305,9 +305,8 @@ export function App() {
           tableNumber={tableNumber}
           orders={orders}
           onPlaceOrder={handlePlaceOrder}
-          onCallWaiter={() => handleCallWaiter(tableNumber)} />
-
-      </div>);
+          onCallWaiter={() => handleCallWaiter(tableNumber)}
+        />
 
   }
   // Waiter portal
