@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import bcrypt from 'bcryptjs';
 import { pool } from '../db.js';
 import { HttpError } from '../http.js';
 import { authenticate, AuthenticatedRequest } from '../middleware/auth.js';
@@ -65,23 +66,72 @@ router.post('/', authenticate, requireSuperadmin, async (req: AuthenticatedReque
       phone,
       email,
       timezone = 'UTC',
-      currency = 'USD'
+      currency = 'USD',
+      managerName,
+      managerEmail,
+      managerPhone,
+      managerUsername,
+      managerPassword
     } = req.body;
 
-    const id = `restaurant_${Date.now().toString(36)}`;
+    if (!managerName || !managerEmail || !managerUsername || !managerPassword) {
+      throw new HttpError(400, 'Manager details are required');
+    }
 
-    const result = await pool.query(
-      `INSERT INTO restaurants
-        (id, name, address, phone, email, timezone, currency, is_active, subscription_status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, true, 'trial')
-       RETURNING id, name, address, phone, email, timezone, currency, is_active, subscription_status, created_at`,
-      [id, name, address, phone, email, timezone, currency]
-    );
+    const restaurantId = `restaurant_${Date.now().toString(36)}`;
+    const managerId = `manager_${Date.now().toString(36)}`;
 
-    res.status(201).json(result.rows[0]);
+    await pool.query('BEGIN');
+
+    try {
+      // Create restaurant
+      const restaurantResult = await pool.query(
+        `INSERT INTO restaurants
+          (id, name, address, phone, email, timezone, currency, is_active, subscription_status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, true, 'trial')
+         RETURNING id, name, address, phone, email, timezone, currency, is_active, subscription_status, created_at`,
+        [restaurantId, name, address, phone, email, timezone, currency]
+      );
+
+      // Create manager account
+      const hash = await bcrypt.hash(managerPassword, 10);
+
+      await pool.query(
+        `INSERT INTO staff
+          (id, name, role, email, phone, is_on_duty, assigned_tables, performance, hire_date, restaurant_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, now(), $9)`,
+        [managerId, managerName, 'manager', managerEmail, managerPhone, true, '{}', '{}', restaurantId]
+      );
+
+      await pool.query(
+        `INSERT INTO staff_credentials (staff_id, username, password_hash, restaurant_id)
+         VALUES ($1, $2, $3, $4)`,
+        [managerId, managerUsername, hash, restaurantId]
+      );
+
+      await pool.query('COMMIT');
+
+      res.status(201).json({
+        restaurant: restaurantResult.rows[0],
+        manager: {
+          id: managerId,
+          name: managerName,
+          email: managerEmail,
+          username: managerUsername,
+          role: 'manager'
+        }
+      });
+    } catch (error) {
+      await pool.query('ROLLBACK');
+      throw error;
+    }
   } catch (error) {
     console.error('Error creating restaurant:', error);
-    res.status(500).json({ error: 'Failed to create restaurant' });
+    if (error instanceof HttpError) {
+      res.status(error.status).json({ error: error.message });
+    } else {
+      res.status(500).json({ error: 'Failed to create restaurant' });
+    }
   }
 });
 

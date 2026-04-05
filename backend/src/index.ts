@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
 import { createServer } from 'http';
+import bcrypt from 'bcryptjs';
 import rateLimit from 'express-rate-limit';
 import { env } from './env.js';
 import { HttpError } from './http.js';
@@ -87,6 +88,73 @@ async function runMigrations() {
       stack: err instanceof Error ? err.stack : undefined
     });
     // Don't exit - let the server start anyway
+  }
+}
+
+const superadminAccounts = [
+  {
+    id: 'superadmin-002',
+    name: 'Servv Superadmin One',
+    email: 'servv.admin1@servv.com',
+    phone: '+11000000001',
+    username: 'servv_admin_1',
+    password: 'ServvAdmin1!'
+  },
+  {
+    id: 'superadmin-003',
+    name: 'Servv Superadmin Two',
+    email: 'servv.admin2@servv.com',
+    phone: '+11000000002',
+    username: 'servv_admin_2',
+    password: 'ServvAdmin2!'
+  },
+  {
+    id: 'superadmin-004',
+    name: 'Servv Superadmin Three',
+    email: 'servv.admin3@servv.com',
+    phone: '+11000000003',
+    username: 'servv_admin_3',
+    password: 'ServvAdmin3!'
+  }
+];
+
+async function ensureSuperadminAccounts() {
+  const client = await pool.connect();
+  try {
+    for (const account of superadminAccounts) {
+      const hash = await bcrypt.hash(account.password, 10);
+
+      await client.query('begin');
+      try {
+        await client.query(
+          `INSERT INTO staff
+            (id, name, role, email, phone, is_on_duty, assigned_tables, performance, hire_date, restaurant_id)
+           VALUES ($1, $2, 'superadmin', $3, $4, true, '{}', '{}', now(), 'default_restaurant')
+           ON CONFLICT (id) DO UPDATE SET
+             name = EXCLUDED.name,
+             role = 'superadmin',
+             email = EXCLUDED.email,
+             phone = EXCLUDED.phone`,
+          [account.id, account.name, account.email, account.phone]
+        );
+
+        await client.query(
+          `INSERT INTO staff_credentials (staff_id, username, password_hash, restaurant_id)
+           VALUES ($1, $2, $3, 'default_restaurant')
+           ON CONFLICT (restaurant_id, username) DO UPDATE SET
+             staff_id = EXCLUDED.staff_id,
+             password_hash = EXCLUDED.password_hash`,
+          [account.id, account.username, hash]
+        );
+
+        await client.query('commit');
+      } catch (err) {
+        await client.query('rollback');
+        logger.error('Failed to ensure superadmin account', { account: account.username, err });
+      }
+    }
+  } finally {
+    client.release();
   }
 }
 
@@ -194,6 +262,7 @@ httpServer.listen(env.PORT, async () => {
   
   // Run migrations on startup
   await runMigrations();
+  await ensureSuperadminAccounts();
 });
 
 // Graceful shutdown handling

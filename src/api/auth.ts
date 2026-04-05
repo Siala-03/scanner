@@ -10,10 +10,14 @@ export async function loginStaff(
   restaurantId?: string
 ): Promise<Staff> {
   try {
-    console.log('Attempting login for:', username, 'restaurant:', restaurantId || 'default_restaurant');
+    console.log('Attempting login for:', username, 'restaurant:', restaurantId || 'not specified');
+    const body: any = { username, password };
+    if (restaurantId) {
+      body.restaurantId = restaurantId;
+    }
     const data = await apiRequest<{ staff: Staff }>(`${API_BASE}/login`, {
       method: 'POST',
-      json: { username, password, restaurantId: restaurantId || 'default_restaurant' }
+      json: body
     });
     console.log('Login successful for user:', data.staff.name);
     return data.staff;
@@ -26,6 +30,13 @@ export async function loginStaff(
 export async function fetchAllStaff(): Promise<Staff[]> {
   const data = await apiRequest<{ staff: Staff[] }>(`${API_BASE}/staff`);
   return data.staff;
+}
+
+export async function changePassword(currentPassword: string, newPassword: string): Promise<void> {
+  await apiRequest(`${API_BASE}/me/password`, {
+    method: 'PUT',
+    json: { currentPassword, newPassword }
+  });
 }
 
 export async function fetchStaffById(id: string): Promise<Staff> {

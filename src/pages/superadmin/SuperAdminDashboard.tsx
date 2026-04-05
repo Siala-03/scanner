@@ -4,6 +4,7 @@ import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Modal } from '../../components/ui/Modal';
 import { Input } from '../../components/ui/Input';
+import { changePassword } from '../../api/auth';
 
 interface Restaurant {
   id: string;
@@ -26,13 +27,27 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordSuccess, setPasswordSuccess] = useState('');
+  const [isPasswordLoading, setIsPasswordLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     phone: '',
     address: '',
     city: '',
-    country: ''
+    country: '',
+    managerName: '',
+    managerEmail: '',
+    managerPhone: '',
+    managerUsername: '',
+    managerPassword: ''
   });
 
   useEffect(() => {
@@ -59,6 +74,32 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
     }
   };
 
+  const handlePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordError('');
+    setPasswordSuccess('');
+
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      setPasswordError('New password and confirmation must match.');
+      return;
+    }
+
+    setIsPasswordLoading(true);
+    try {
+      await changePassword(passwordForm.currentPassword, passwordForm.newPassword);
+      setPasswordSuccess('Password updated successfully.');
+      setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      setTimeout(() => setShowPasswordModal(false), 1200);
+    } catch (error) {
+      console.error('Failed to update password:', error);
+      setPasswordError(
+        error instanceof Error ? error.message : 'Failed to update password. Please try again.'
+      );
+    } finally {
+      setIsPasswordLoading(false);
+    }
+  };
+
   const handleCreateOrUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     const token = localStorage.getItem('token');
@@ -67,13 +108,24 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
       const url = editingId ? `/api/restaurants/${editingId}` : '/api/restaurants';
       const method = editingId ? 'PUT' : 'POST';
 
+      const body = editingId 
+        ? {
+            name: formData.name,
+            email: formData.email,
+            phone: formData.phone,
+            address: formData.address,
+            city: formData.city,
+            country: formData.country
+          }
+        : formData;
+
       const response = await fetch(url, {
         method,
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(body)
       });
 
       if (response.ok) {
@@ -126,7 +178,12 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
       phone: '',
       address: '',
       city: '',
-      country: ''
+      country: '',
+      managerName: '',
+      managerEmail: '',
+      managerPhone: '',
+      managerUsername: '',
+      managerPassword: ''
     });
     setEditingId(null);
   };
@@ -143,14 +200,22 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
             </h1>
             <p className="text-slate-300 mt-1">Manage restaurants and operators for Servv</p>
           </div>
-          <Button 
-            onClick={() => {
-              resetForm();
-              setShowCreateModal(true);
-            }}
-          >
-            <Plus className="w-4 h-4 mr-2" /> Add Restaurant
-          </Button>
+          <div className="flex flex-wrap gap-3">
+            <Button
+              onClick={() => setShowPasswordModal(true)}
+              variant="secondary"
+            >
+              <Lock className="w-4 h-4 mr-2" /> Change Password
+            </Button>
+            <Button 
+              onClick={() => {
+                resetForm();
+                setShowCreateModal(true);
+              }}
+            >
+              <Plus className="w-4 h-4 mr-2" /> Add Restaurant
+            </Button>
+          </div>
         </div>
 
         {/* Stats */}
@@ -251,6 +316,69 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
         </Card>
       </div>
 
+      {/* Change Password Modal */}
+      {showPasswordModal && (
+        <Modal
+          isOpen={showPasswordModal}
+          onClose={() => {
+            setShowPasswordModal(false);
+            setPasswordError('');
+            setPasswordSuccess('');
+          }}
+          title="Change Password"
+        >
+          <form onSubmit={handlePasswordChange} className="space-y-4">
+            <Input
+              label="Current Password"
+              type="password"
+              value={passwordForm.currentPassword}
+              onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
+              placeholder="Enter current password"
+              required
+            />
+            <Input
+              label="New Password"
+              type="password"
+              value={passwordForm.newPassword}
+              onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
+              placeholder="Enter new password"
+              required
+              minLength={6}
+            />
+            <Input
+              label="Confirm New Password"
+              type="password"
+              value={passwordForm.confirmPassword}
+              onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
+              placeholder="Confirm new password"
+              required
+              minLength={6}
+            />
+
+            {passwordError && <p className="text-red-400 text-sm">{passwordError}</p>}
+            {passwordSuccess && <p className="text-green-400 text-sm">{passwordSuccess}</p>}
+
+            <div className="flex gap-3 pt-4">
+              <Button type="submit" variant="primary" className="flex-1" isLoading={isPasswordLoading}>
+                Update Password
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                className="flex-1"
+                onClick={() => {
+                  setShowPasswordModal(false);
+                  setPasswordError('');
+                  setPasswordSuccess('');
+                }}
+              >
+                Cancel
+              </Button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
       {/* Create/Edit Modal */}
       {showCreateModal && (
         <Modal
@@ -309,6 +437,52 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
                 value={formData.country}
                 onChange={(e) => setFormData({ ...formData, country: e.target.value })}
                 placeholder="USA"
+                required
+              />
+            </div>
+
+            <div className="border-t border-slate-600 pt-4 mt-6">
+              <h3 className="text-lg font-semibold text-slate-200 mb-3">Manager Account</h3>
+              
+              <Input
+                label="Manager Name"
+                value={formData.managerName}
+                onChange={(e) => setFormData({ ...formData, managerName: e.target.value })}
+                placeholder="John Doe"
+                required
+              />
+
+              <Input
+                label="Manager Email"
+                type="email"
+                value={formData.managerEmail}
+                onChange={(e) => setFormData({ ...formData, managerEmail: e.target.value })}
+                placeholder="manager@restaurant.com"
+                required
+              />
+
+              <Input
+                label="Manager Phone"
+                value={formData.managerPhone}
+                onChange={(e) => setFormData({ ...formData, managerPhone: e.target.value })}
+                placeholder="+1 (555) 123-4567"
+                required
+              />
+
+              <Input
+                label="Manager Username"
+                value={formData.managerUsername}
+                onChange={(e) => setFormData({ ...formData, managerUsername: e.target.value })}
+                placeholder="manager_username"
+                required
+              />
+
+              <Input
+                label="Manager Password"
+                type="password"
+                value={formData.managerPassword}
+                onChange={(e) => setFormData({ ...formData, managerPassword: e.target.value })}
+                placeholder="Secure password"
                 required
               />
             </div>

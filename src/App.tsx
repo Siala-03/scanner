@@ -24,10 +24,11 @@ import { InventoryManagement } from './pages/shared/InventoryManagement';
 import { SimpleInventory } from './pages/shared/SimpleInventory';
 import { KitchenDisplay } from './pages/kitchen/KitchenDisplay';
 import { LoginPage } from './pages/auth/LoginPage';
+import { SuperAdminDashboard } from './pages/superadmin/SuperAdminDashboard';
 import { Card } from './components/ui/Card';
 import { Button } from './components/ui/Button';
 import { Staff } from './types';
-type UserRole = 'customer' | 'waiter' | 'supervisor' | 'manager' | 'kitchen' | null;
+type UserRole = 'customer' | 'waiter' | 'supervisor' | 'manager' | 'kitchen' | 'superadmin' | null;
 type ManagerPage = 'dashboard' | 'menu' | 'staff' | 'analytics' | 'performance' | 'qrcodes' | 'inventory' | 'history' | 'expenses';
 type SupervisorPage = 'dashboard' | 'revenue' | 'staff' | 'qrcodes' | 'inventory' | 'menu' | 'history' | 'expenses';
 export function App() {
@@ -230,15 +231,26 @@ export function App() {
     }
   }, [selectedRole]);
 
-  // Auth flow for staff roles
-  if (selectedRole && selectedRole !== 'customer' && !authUser) {
+  // Auth flow for staff roles - single login page
+  if (!authUser && selectedRole !== 'customer') {
     return (
       <LoginPage
-        role={selectedRole}
-        onLogin={setAuthUser}
-        onBack={handleBack} />);
-
-
+        onLogin={(user) => {
+          setAuthUser(user);
+          // Set selectedRole based on user's role
+          if (user.role === 'superadmin') {
+            setSelectedRole('superadmin');
+          } else if (user.role === 'manager') {
+            setSelectedRole('manager');
+          } else if (user.role === 'supervisor') {
+            setSelectedRole('supervisor');
+          } else if (user.role === 'waiter') {
+            setSelectedRole('waiter');
+          } else if (user.role === 'kitchen') {
+            setSelectedRole('kitchen');
+          }
+        }}
+        onBack={() => {}} />); // No back needed for main login
   }
   // Customer portal (table already assigned via QR scan)
   if (selectedRole === 'customer' && tableNumber !== null) {
@@ -486,374 +498,98 @@ export function App() {
     );
   }
 
-  // Role selection (landing page)
+  // Superadmin portal (requires auth)
+  if (selectedRole === 'superadmin' && authUser) {
+    return (
+      <div className="min-h-screen bg-slate-900">
+        {/* Fixed Header with Back Button */}
+        <div className="sticky top-0 z-50 bg-slate-800/90 backdrop-blur-sm border-b border-slate-700">
+          <div className="flex items-center gap-3 px-4 py-3">
+            <button
+              onClick={handleBack}
+              className="p-2 rounded-lg bg-slate-700/50 hover:bg-slate-700 text-slate-300 hover:text-white transition-all duration-200 active:scale-95"
+              aria-label="Back"
+            >
+              <ArrowLeftIcon className="w-5 h-5" />
+            </button>
+            <span className="text-white font-medium">Superadmin Dashboard</span>
+          </div>
+        </div>
+        <SuperAdminDashboard onNavigate={() => {}} />
+      </div>
+    );
+  }
+
+  // Login page (default landing page)
   return (
     <div className="min-h-screen bg-[#1a1410] flex items-center justify-center p-4 md:p-8">
-      <div className="w-full max-w-6xl">
+      <div className="w-full max-w-md">
         {/* Header */}
         <motion.div
-          initial={{
-            opacity: 0,
-            y: -20
-          }}
-          animate={{
-            opacity: 1,
-            y: 0
-          }}
-          className="text-center mb-12">
-
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-center mb-8"
+        >
           <div className="flex items-center justify-center gap-3 mb-4">
             <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center shadow-lg shadow-amber-500/20">
               <span className="text-2xl font-serif text-white font-bold">S</span>
             </div>
-            <h1 className="text-4xl md:text-5xl font-serif text-amber-500 tracking-tight">
+            <h1 className="text-3xl md:text-4xl font-serif text-amber-500 tracking-tight">
               SERVV
             </h1>
           </div>
-          <p className="text-lg text-[#a89f91] max-w-2xl mx-auto font-light">
-            A complete end-to-end solution for modern hospitality.
+          <p className="text-lg text-[#a89f91] max-w-sm mx-auto font-light">
+            Restaurant Management System
           </p>
+        </motion.div>
+
+        {/* Login Form */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+        >
+          <Card className="bg-gradient-to-br from-[#2a2018] to-[#1a1410] border border-[#3a2e20] p-8">
+            <LoginPage
+              onLogin={(user) => {
+                setAuthUser(user);
+                // Set selectedRole based on user's role
+                if (user.role === 'superadmin') {
+                  setSelectedRole('superadmin');
+                } else if (user.role === 'manager') {
+                  setSelectedRole('manager');
+                } else if (user.role === 'supervisor') {
+                  setSelectedRole('supervisor');
+                } else if (user.role === 'waiter') {
+                  setSelectedRole('waiter');
+                } else if (user.role === 'kitchen') {
+                  setSelectedRole('kitchen');
+                }
+              }}
+              onBack={() => {}} />
+          </Card>
         </motion.div>
 
         {/* Customer QR Scan Section */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="bg-gradient-to-br from-[#2a2018] to-[#1a1410] rounded-2xl border border-[#3a2e20] p-8 mb-12"
+          transition={{ delay: 0.2 }}
+          className="mt-8 text-center"
         >
-          <div className="flex flex-col md:flex-row items-center gap-8">
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-3">
-                <div className="w-8 h-8 rounded-lg bg-green-500/20 flex items-center justify-center">
-                  <ShoppingBagIcon className="w-4 h-4 text-green-400" />
-                </div>
-                <span className="text-xs font-medium text-green-400/60 uppercase tracking-wider">Customer</span>
-              </div>
-              <h2 className="text-2xl font-semibold text-[#e8e4dc] mb-3">
-                Scan QR to Order
-              </h2>
-              <p className="text-[#a89f91] mb-6">
-                Customers can scan the QR code on their table to access the digital menu and place orders directly from their phones.
-              </p>
-              <div className="flex flex-wrap gap-3">
-                <Button
-                  variant="primary"
-                  size="lg"
-                  className="px-8 py-3 rounded-full shadow-[0_0_30px_rgba(245,158,11,0.15)] hover:shadow-[0_0_40px_rgba(245,158,11,0.3)]"
-                  onClick={() => handleScanQR()}
-                >
-                  <QrCodeIcon className="w-5 h-5 mr-2" />
-                  Scan QR Code
-                </Button>
-                <Button
-                  variant="secondary"
-                  size="lg"
-                  className="px-8 py-3 rounded-full border-[#3a2e20] text-[#a89f91] hover:text-amber-500 hover:border-amber-500/50"
-                  onClick={() => setShowQRGrid(true)}
-                >
-                  Demo: Pick Table
-                </Button>
-              </div>
-            </div>
-            <div className="w-48 h-48 relative">
-              <div className="absolute inset-0 bg-gradient-to-br from-amber-500/10 to-transparent rounded-2xl" />
-              <div className="relative w-full h-full flex items-center justify-center">
-                <div className="grid grid-cols-5 gap-2 opacity-40">
-                  {Array.from({ length: 25 }).map((_, i) => (
-                    <div
-                      key={i}
-                      className={`w-4 h-4 rounded-sm ${[0, 2, 3, 5, 6, 8, 10, 12, 14, 15, 17, 18, 20, 22, 23, 24].includes(i) ? 'bg-amber-500' : 'bg-transparent'}`}
-                    />
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        </motion.div>
-
-        {/* Scanning / Detection Overlay */}
-        <AnimatePresence>
-            {(isScanning || detectedTable) &&
-            <motion.div
-              initial={{
-                opacity: 0,
-                scale: 0.9
-              }}
-              animate={{
-                opacity: 1,
-                scale: 1
-              }}
-              exit={{
-                opacity: 0,
-                scale: 0.9
-              }}
-              className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center">
-
-                <div className="text-center">
-                  {isScanning &&
-                <motion.div className="relative w-56 h-56 mx-auto mb-6">
-                      {/* QR frame corners */}
-                      <div className="absolute top-0 left-0 w-10 h-10 border-t-4 border-l-4 border-amber-500 rounded-tl-lg" />
-                      <div className="absolute top-0 right-0 w-10 h-10 border-t-4 border-r-4 border-amber-500 rounded-tr-lg" />
-                      <div className="absolute bottom-0 left-0 w-10 h-10 border-b-4 border-l-4 border-amber-500 rounded-bl-lg" />
-                      <div className="absolute bottom-0 right-0 w-10 h-10 border-b-4 border-r-4 border-amber-500 rounded-br-lg" />
-
-                      {/* Scanning line */}
-                      <motion.div
-                    animate={{
-                      y: [0, 200, 0]
-                    }}
-                    transition={{
-                      repeat: Infinity,
-                      duration: 2,
-                      ease: 'easeInOut'
-                    }}
-                    className="absolute left-2 right-2 h-0.5 bg-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.8)]" />
-
-
-                      {/* Simulated QR pattern */}
-                      <div className="absolute inset-8 flex items-center justify-center">
-                        <div className="grid grid-cols-5 gap-1.5 opacity-30">
-                          {Array.from({
-                        length: 25
-                      }).map((_, i) =>
-                      <div
-                        key={i}
-                        className={`w-5 h-5 rounded-sm ${Math.random() > 0.4 ? 'bg-white' : 'bg-transparent'}`} />
-
-                      )}
-                        </div>
-                      </div>
-
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <span className="text-amber-500/60 text-4xl font-bold">
-                          {scanningTable}
-                        </span>
-                      </div>
-                    </motion.div>
-                }
-
-                  {isScanning &&
-                <p className="text-[#a89f91] text-lg animate-pulse">
-                      Scanning QR code...
-                    </p>
-                }
-
-                  {detectedTable && !isScanning &&
-                <motion.div
-                  initial={{
-                    scale: 0.5,
-                    opacity: 0
-                  }}
-                  animate={{
-                    scale: 1,
-                    opacity: 1
-                  }}
-                  transition={{
-                    type: 'spring',
-                    damping: 15
-                  }}>
-
-                      <div className="w-24 h-24 rounded-full bg-green-500/20 border-2 border-green-500 flex items-center justify-center mx-auto mb-4">
-                        <svg
-                      className="w-12 h-12 text-green-500"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={3}>
-
-                          <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M5 13l4 4L19 7" />
-
-                        </svg>
-                      </div>
-                      <p className="text-white text-2xl font-semibold mb-1">
-                        Table {detectedTable}
-                      </p>
-                      <p className="text-green-400 text-lg">
-                        QR code detected! Opening menu...
-                      </p>
-                    </motion.div>
-                }
-                </div>
-              </motion.div>
-            }
-          </AnimatePresence>
-
-        {/* Staff Role Cards */}
-        <div className="mt-16">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="text-center mb-10"
+          <p className="text-[#a89f91] mb-4">
+            Or scan QR code to order as a customer
+          </p>
+          <Button
+            variant="secondary"
+            size="sm"
+            className="px-6 py-2 rounded-full border-[#3a2e20] text-[#a89f91] hover:text-amber-500 hover:border-amber-500/50"
+            onClick={() => handleScanQR()}
           >
-            <h2 className="text-2xl md:text-3xl font-medium text-[#e8e4dc] mb-3">
-              Staff Portals
-            </h2>
-            <p className="text-[#a89f91] max-w-xl mx-auto">
-              Access your dedicated workspace based on your role
-            </p>
-          </motion.div>
-
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-
-            {/* Waiter Portal */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
-            >
-              <Card
-                variant="interactive"
-                className="bg-gradient-to-br from-[#1e3a5f] to-[#0f172a] border border-blue-500/20 h-full p-6 group cursor-pointer"
-                onClick={() => setSelectedRole('waiter')}
-              >
-                <div className="flex items-center justify-between mb-4">
-                  <div className="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center group-hover:bg-blue-500/30 transition-colors">
-                    <UtensilsIcon className="w-6 h-6 text-blue-400" />
-                  </div>
-                  <span className="text-xs font-medium text-blue-400/60 uppercase tracking-wider">
-                    Service
-                  </span>
-                </div>
-                <h3 className="text-xl font-semibold text-white mb-2">
-                  Waiter
-                </h3>
-                <p className="text-blue-200/70 text-sm mb-4">
-                  Manage tables, approve orders, and track preparation status.
-                </p>
-                <div className="flex items-center gap-4 text-xs text-blue-300/60">
-                  <div className="flex items-center gap-1">
-                    <ShoppingBagIcon className="w-3.5 h-3.5" />
-                    <span>Orders</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <ClockIcon className="w-3.5 h-3.5" />
-                    <span>Real-time</span>
-                  </div>
-                </div>
-              </Card>
-            </motion.div>
-
-            {/* Supervisor Portal */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4 }}
-            >
-              <Card
-                variant="interactive"
-                className="bg-gradient-to-br from-[#3d1d5a] to-[#1a0a2e] border border-purple-500/20 h-full p-6 group cursor-pointer"
-                onClick={() => setSelectedRole('supervisor')}
-              >
-                <div className="flex items-center justify-between mb-4">
-                  <div className="w-12 h-12 rounded-xl bg-purple-500/20 flex items-center justify-center group-hover:bg-purple-500/30 transition-colors">
-                    <BarChart3Icon className="w-6 h-6 text-purple-400" />
-                  </div>
-                  <span className="text-xs font-medium text-purple-400/60 uppercase tracking-wider">
-                    Analytics
-                  </span>
-                </div>
-                <h3 className="text-xl font-semibold text-white mb-2">
-                  Supervisor
-                </h3>
-                <p className="text-purple-200/70 text-sm mb-4">
-                  Monitor operations, track revenue, and oversee staff performance.
-                </p>
-                <div className="flex items-center gap-4 text-xs text-purple-300/60">
-                  <div className="flex items-center gap-1">
-                    <TrendingUpIcon className="w-3.5 h-3.5" />
-                    <span>Revenue</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <UsersIcon className="w-3.5 h-3.5" />
-                    <span>Staff</span>
-                  </div>
-                </div>
-              </Card>
-            </motion.div>
-
-            {/* Manager Portal */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.5 }}
-            >
-              <Card
-                variant="interactive"
-                className="bg-gradient-to-br from-[#1d4d3a] to-[#0a1f17] border border-emerald-500/20 h-full p-6 group cursor-pointer"
-                onClick={() => setSelectedRole('manager')}
-              >
-                <div className="flex items-center justify-between mb-4">
-                  <div className="w-12 h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center group-hover:bg-emerald-500/30 transition-colors">
-                    <BriefcaseIcon className="w-6 h-6 text-emerald-400" />
-                  </div>
-                  <span className="text-xs font-medium text-emerald-400/60 uppercase tracking-wider">
-                    Admin
-                  </span>
-                </div>
-                <h3 className="text-xl font-semibold text-white mb-2">
-                  Manager
-                </h3>
-                <p className="text-emerald-200/70 text-sm mb-4">
-                  Full control: menu, staff, analytics, and system settings.
-                </p>
-                <div className="flex items-center gap-4 text-xs text-emerald-300/60">
-                  <div className="flex items-center gap-1">
-                    <UsersIcon className="w-3.5 h-3.5" />
-                    <span>Staff</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <BarChart3Icon className="w-3.5 h-3.5" />
-                    <span>Analytics</span>
-                  </div>
-                </div>
-              </Card>
-            </motion.div>
-
-            {/* Kitchen Portal */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.6 }}
-            >
-              <Card
-                variant="interactive"
-                className="bg-gradient-to-br from-[#5d2a2a] to-[#1f0f0f] border border-orange-500/20 h-full p-6 group cursor-pointer"
-                onClick={() => setSelectedRole('kitchen')}
-              >
-                <div className="flex items-center justify-between mb-4">
-                  <div className="w-12 h-12 rounded-xl bg-orange-500/20 flex items-center justify-center group-hover:bg-orange-500/30 transition-colors">
-                    <ChefHatIcon className="w-6 h-6 text-orange-400" />
-                  </div>
-                  <span className="text-xs font-medium text-orange-400/60 uppercase tracking-wider">
-                    Kitchen
-                  </span>
-                </div>
-                <h3 className="text-xl font-semibold text-white mb-2">
-                  Kitchen
-                </h3>
-                <p className="text-orange-200/70 text-sm mb-4">
-                  Real-time order display system for efficient food preparation.
-                </p>
-                <div className="flex items-center gap-4 text-xs text-orange-300/60">
-                  <div className="flex items-center gap-1">
-                    <ClockIcon className="w-3.5 h-3.5" />
-                    <span>Live Orders</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <UtensilsIcon className="w-3.5 h-3.5" />
-                    <span>KDS</span>
-                  </div>
-                </div>
-              </Card>
-            </motion.div>
-          </div>
-        </div>
+            <QrCodeIcon className="w-4 h-4 mr-2" />
+            Scan QR Code
+          </Button>
+        </motion.div>
       </div>
     </div>);
 

@@ -28,16 +28,30 @@ const LoginSchema = z.object({
 authRouter.post('/login', async (req, res, next) => {
   try {
     const body = LoginSchema.parse(req.body);
-    let restaurantId = body.restaurantId || 'default_restaurant';
     
     const staff = await withClient(async (client: pg.PoolClient) => {
-      // Find credentials with the specified restaurant
-      let credResult = await client.query(
-        `SELECT sc.staff_id, sc.password_hash, sc.restaurant_id 
-         FROM staff_credentials sc 
-         WHERE sc.username = $1 AND sc.restaurant_id = $2`,
-        [body.username, restaurantId]
-      );
+      let credResult;
+      
+      // First try to find credentials - for superadmin, search across all restaurants
+      if (body.restaurantId) {
+        credResult = await client.query(
+          `SELECT sc.staff_id, sc.password_hash, sc.restaurant_id, s.role
+           FROM staff_credentials sc 
+           JOIN staff s ON sc.staff_id = s.id
+           WHERE sc.username = $1 AND sc.restaurant_id = $2`,
+          [body.username, body.restaurantId]
+        );
+      } else {
+        // No restaurantId provided - try to find user, prioritizing superadmin
+        credResult = await client.query(
+          `SELECT sc.staff_id, sc.password_hash, sc.restaurant_id, s.role
+           FROM staff_credentials sc 
+           JOIN staff s ON sc.staff_id = s.id
+           WHERE sc.username = $1
+           ORDER BY CASE WHEN s.role = 'superadmin' THEN 1 ELSE 2 END`,
+          [body.username]
+        );
+      }
       
       if (credResult.rows.length === 0) {
         throw new HttpError(401, 'Invalid username or password');
@@ -52,8 +66,8 @@ authRouter.post('/login', async (req, res, next) => {
       
       const staffResult = await client.query(
         `SELECT id, name, role, email, phone, is_on_duty, assigned_tables, performance, hire_date, restaurant_id 
-         FROM staff WHERE id = $1 AND restaurant_id = $2`,
-        [cred.staff_id, restaurantId]
+         FROM staff WHERE id = $1`,
+        [cred.staff_id]
       );
       
       if (staffResult.rows.length === 0) {
@@ -255,6 +269,47 @@ authRouter.get('/staff/:id', authenticate, async (req: AuthenticatedRequest, res
       };
     });
     res.json({ staff });
+  } catch (e) {
+    next(e);
+  }
+});
+
+const PasswordChangeSchema = z.object({
+  currentPassword: z.string().min(1),
+  newPassword: z.string().min(6)
+});
+
+// PUT change current user's password
+authRouter.put('/me/password', authenticate, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const body = PasswordChangeSchema.parse(req.body);
+
+    await withClient(async (client: pg.PoolClient) => {
+      const credentialResult = await client.query(
+        `SELECT sc.password_hash, sc.username, sc.restaurant_id
+         FROM staff_credentials sc
+         WHERE sc.staff_id = $1 AND sc.restaurant_id = $2`,
+        [req.staffId, req.restaurantId]
+      );
+
+      if (credentialResult.rows.length === 0) {
+        throw new HttpError(404, 'Credentials not found');
+      }
+
+      const credential = credentialResult.rows[0];
+      const validPassword = await bcrypt.compare(body.currentPassword, credential.password_hash);
+      if (!validPassword) {
+        throw new HttpError(401, 'Current password is incorrect');
+      }
+
+      const newHash = await bcrypt.hash(body.newPassword, 10);
+      await client.query(
+        `UPDATE staff_credentials SET password_hash = $1 WHERE staff_id = $2 AND restaurant_id = $3`,
+        [newHash, req.staffId, req.restaurantId]
+      );
+    });
+
+    res.json({ message: 'Password updated successfully' });
   } catch (e) {
     next(e);
   }

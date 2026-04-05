@@ -1,23 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { LockIcon, UserIcon, ArrowLeftIcon, EyeIcon, EyeOffIcon, WifiIcon, WifiOffIcon } from 'lucide-react';
-import { StaffRole, Staff } from '../../types';
+import { Staff } from '../../types';
 import { loginStaff } from '../../api/auth';
 import { ApiError } from '../../api/http';
 import { Button } from '../../components/ui/Button';
-import { SignUpPage } from './SignUpPage';
 
 interface LoginPageProps {
-  role: StaffRole;
   onLogin: (user: Staff) => void;
   onBack: () => void;
 }
-export function LoginPage({ role, onLogin, onBack }: LoginPageProps) {
+export function LoginPage({ onLogin, onBack }: LoginPageProps) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [showPassword, setShowPassword] = useState(false);
   const [serverStatus, setServerStatus] = useState<'checking' | 'online' | 'offline'>('checking');
 
@@ -42,23 +39,12 @@ export function LoginPage({ role, onLogin, onBack }: LoginPageProps) {
     return () => clearInterval(interval);
   }, []);
 
-  // Render signup form if in signup mode
-  if (mode === 'signup') {
-    return (
-      <SignUpPage
-        role={role}
-        onSignedUp={onLogin}
-        onBack={() => setMode('login')}
-      />
-    );
-  }
-
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setIsLoading(true);
 
-    console.log('Login attempt:', { username, role });
+    console.log('Login attempt:', { username });
 
     try {
       const user = await loginStaff(username, password);
@@ -68,14 +54,8 @@ export function LoginPage({ role, onLogin, onBack }: LoginPageProps) {
       localStorage.setItem('staffId', user.id);
       localStorage.removeItem('token');
 
-      if (user.role === role) {
-        console.log('Login successful, redirecting...');
-        onLogin(user);
-      } else {
-        const errorMsg = `This account has ${user.role} privileges, but you're trying to log in as ${role}. Please use the correct portal.`;
-        console.warn('Role mismatch:', errorMsg);
-        setError(errorMsg);
-      }
+      console.log('Login successful, redirecting...');
+      onLogin(user);
     } catch (err) {
       console.error('Login error:', err);
       let errorMessage = 'Login failed. Please try again.';
@@ -107,7 +87,6 @@ export function LoginPage({ role, onLogin, onBack }: LoginPageProps) {
     }
   };
 
-  const roleTitle = role.charAt(0).toUpperCase() + role.slice(1);
   return (
     <div className="min-h-screen bg-[#1a1410] flex items-center justify-center p-4">
       <button
@@ -130,7 +109,7 @@ export function LoginPage({ role, onLogin, onBack }: LoginPageProps) {
 
         <div className="text-center mb-8">
           <h1 className="text-3xl font-serif text-[#e8e4dc] mb-2">
-            {roleTitle} Login
+            Staff Login
           </h1>
           <p className="text-[#a89f91] mb-3">
             Enter your credentials to access the portal
@@ -226,19 +205,9 @@ export function LoginPage({ role, onLogin, onBack }: LoginPageProps) {
             Sign In
           </Button>
 
-          {role === 'manager' ? (
-            <button
-              type="button"
-              onClick={() => setMode('signup')}
-              className="w-full text-sm text-amber-400 mt-3 hover:text-amber-300 transition-colors"
-            >
-              Create a new account
-            </button>
-          ) : (
-            <p className="text-xs text-slate-300 text-center mt-3">
-              Need an account? Ask your manager to create your login credentials.
-            </p>
-          )}
+          <p className="text-xs text-slate-300 text-center mt-3">
+            Need an account? Ask your manager or superadmin to create your login credentials.
+          </p>
         </form>
       </motion.div>
     </div>);
