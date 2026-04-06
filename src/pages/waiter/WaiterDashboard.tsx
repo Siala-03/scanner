@@ -9,10 +9,9 @@ import {
   TrendingUpIcon,
   StarIcon,
   LogOutIcon,
-  PlusIcon,
   QrCodeIcon } from
 'lucide-react';
-import { Order, Staff, OrderItem, MenuItem } from '../../types';
+import { Order, Staff, OrderItem } from '../../types';
 import { Tabs } from '../../components/ui/Tabs';
 import { Card } from '../../components/ui/Card';
 import { EmptyState } from '../../components/ui/EmptyState';
@@ -28,6 +27,7 @@ import { printReceiptNetwork } from '../../api/printer';
 import { ReceiptShareModal } from '../../components/ui/ReceiptShareModal';
 import { KPICard } from '../../components/supervisor/KPICard';
 import { useOfflineStatus } from '../../hooks/useOfflineStatus';
+import { useSocket } from '../../hooks/useSocket';
 interface WaiterDashboardProps {
   waiter: Staff;
   orders: Order[];
