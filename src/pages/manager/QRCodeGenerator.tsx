@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { PrinterIcon, DownloadIcon, PlusIcon } from 'lucide-react';
 import QRCode from 'react-qr-code';
 import { Button } from '../../components/ui/Button';
@@ -15,6 +16,21 @@ export function QRCodeGenerator({
   baseUrl,
   restaurantName
 }: QRCodeGeneratorProps) {
+  const [isAddingTable, setIsAddingTable] = useState(false);
+
+  const handleAddTable = async () => {
+    try {
+      console.log('Adding table...');
+      setIsAddingTable(true);
+      await onAddTable();
+      console.log('Table added successfully');
+    } catch (error) {
+      console.error('Failed to add table:', error);
+      alert('Failed to add table. Please try again.');
+    } finally {
+      setIsAddingTable(false);
+    }
+  };
   const handlePrint = () => {
     window.print();
   };
@@ -68,16 +84,14 @@ export function QRCodeGenerator({
             </p>
           </div>
           <div className="flex gap-3 mt-4 sm:mt-0">
-          <div className="flex gap-3 mt-4 sm:mt-0">
             <Button variant="secondary" onClick={handlePrint}>
               <PrinterIcon className="w-4 h-4" />
               Print All
             </Button>
-            <Button variant="primary" onClick={onAddTable}>
+            <Button variant="primary" onClick={handleAddTable} disabled={isAddingTable}>
               <PlusIcon className="w-4 h-4" />
-              Add Table
+              {isAddingTable ? 'Adding...' : 'Add Table'}
             </Button>
-          </div>
           </div>
         </div>
 

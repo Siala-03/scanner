@@ -24,6 +24,7 @@ export async function fetchTables(): Promise<Table[]> {
 
 // Create new table
 export async function createTable(tableNumber: number, name?: string, capacity?: number): Promise<Table> {
+  console.log('API: Creating table with number:', tableNumber);
   return apiRequest<Table>(`${API_BASE}`, {
     method: 'POST',
     json: { table_number: tableNumber, name, capacity }

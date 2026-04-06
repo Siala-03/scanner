@@ -29,11 +29,15 @@ export function useTables() {
   // Add table
   const addTable = async () => {
     try {
+      console.log('useTables: Adding table...');
       const nextTableNumber = tables.length > 0 ? Math.max(...tables) + 1 : 1;
+      console.log('useTables: Next table number:', nextTableNumber);
       await createTable(nextTableNumber);
+      console.log('useTables: Table created in backend');
       setTables(prev => [...prev, nextTableNumber].sort((a, b) => a - b));
+      console.log('useTables: Local state updated');
     } catch (err) {
-      console.error('Failed to create table:', err);
+      console.error('useTables: Failed to create table:', err);
       throw err;
     }
   };
