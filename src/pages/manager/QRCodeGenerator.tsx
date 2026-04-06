@@ -1,4 +1,4 @@
-import { PrinterIcon, DownloadIcon } from 'lucide-react';
+import { PrinterIcon, DownloadIcon, PlusIcon } from 'lucide-react';
 import QRCode from 'react-qr-code';
 import { Button } from '../../components/ui/Button';
 
@@ -57,7 +57,7 @@ export function QRCodeGenerator({
   };
 
   return (
-    <div className="dark min-h-screen bg-slate-900 p-4 md:p-6">
+    <div className="dark bg-slate-900 p-4 md:p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex flex-col sm:flex-row items-center justify-between mb-8">
@@ -68,14 +68,16 @@ export function QRCodeGenerator({
             </p>
           </div>
           <div className="flex gap-3 mt-4 sm:mt-0">
+          <div className="flex gap-3 mt-4 sm:mt-0">
             <Button variant="secondary" onClick={handlePrint}>
               <PrinterIcon className="w-4 h-4" />
               Print All
             </Button>
             <Button variant="primary" onClick={onAddTable}>
-              <DownloadIcon className="w-4 h-4" />
+              <PlusIcon className="w-4 h-4" />
               Add Table
             </Button>
+          </div>
           </div>
         </div>
 
