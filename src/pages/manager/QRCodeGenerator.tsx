@@ -5,7 +5,7 @@ import { Button } from '../../components/ui/Button';
 
 interface QRCodeGeneratorProps {
   tables: number[];
-  onAddTable: () => void;
+  onAddTable: () => Promise<void>;
   baseUrl?: string;
   restaurantName?: string;
 }
@@ -26,7 +26,8 @@ export function QRCodeGenerator({
       console.log('Table added successfully');
     } catch (error) {
       console.error('Failed to add table:', error);
-      alert('Failed to add table. Please try again.');
+      // Don't show alert - we handle backend failures gracefully now
+      // The table will still be added locally for QR code generation
     } finally {
       setIsAddingTable(false);
     }

@@ -1,6 +1,26 @@
 import { useState, useEffect, useCallback } from 'react';
 import { fetchTables, createTable, deleteTable } from '../api/tables';
 
+const TABLES_STORAGE_KEY = 'scanner_tables';
+
+// Helper functions for localStorage
+const getStoredTables = (): number[] => {
+  try {
+    const stored = localStorage.getItem(TABLES_STORAGE_KEY);
+    return stored ? JSON.parse(stored) : [];
+  } catch {
+    return [];
+  }
+};
+
+const setStoredTables = (tables: number[]) => {
+  try {
+    localStorage.setItem(TABLES_STORAGE_KEY, JSON.stringify(tables));
+  } catch (error) {
+    console.warn('Failed to store tables in localStorage:', error);
+  }
+};
+
 // Hook to get tables from backend
 export function useTables() {
   const [tables, setTables] = useState<number[]>([]);
@@ -12,10 +32,19 @@ export function useTables() {
       setIsLoading(true);
       const backendTables = await fetchTables();
       if (backendTables && backendTables.length > 0) {
-        setTables(backendTables.map(t => t.table_number));
+        const tableNumbers = backendTables.map(t => t.tableNumber || t.table_number);
+        setTables(tableNumbers);
+        setStoredTables(tableNumbers); // Also store locally
+      } else {
+        // If no backend tables, use locally stored ones
+        const localTables = getStoredTables();
+        setTables(localTables);
       }
     } catch (err) {
-      console.warn('Failed to fetch tables from backend:', err);
+      console.warn('Failed to fetch tables from backend, using local storage:', err);
+      // Fall back to locally stored tables
+      const localTables = getStoredTables();
+      setTables(localTables);
     } finally {
       setIsLoading(false);
     }
@@ -32,12 +61,23 @@ export function useTables() {
       console.log('useTables: Adding table...');
       const nextTableNumber = tables.length > 0 ? Math.max(...tables) + 1 : 1;
       console.log('useTables: Next table number:', nextTableNumber);
-      await createTable(nextTableNumber);
-      console.log('useTables: Table created in backend');
-      setTables(prev => [...prev, nextTableNumber].sort((a, b) => a - b));
+
+      // Always update local state first for immediate UI feedback
+      const newTables = [...tables, nextTableNumber].sort((a, b) => a - b);
+      setTables(newTables);
+      setStoredTables(newTables);
       console.log('useTables: Local state updated');
+
+      // Try to create table in backend
+      try {
+        await createTable(nextTableNumber);
+        console.log('useTables: Table created in backend');
+      } catch (backendError) {
+        console.warn('useTables: Backend not available, table stored locally only:', backendError);
+        // Table is already added locally, so this is fine
+      }
     } catch (err) {
-      console.error('useTables: Failed to create table:', err);
+      console.error('useTables: Failed to add table:', err);
       throw err;
     }
   };
@@ -45,12 +85,21 @@ export function useTables() {
   // Remove table
   const removeTable = async (tableNumber: number) => {
     try {
-      const allTables = await fetchTables();
-      const tableToDelete = allTables.find(t => t.table_number === tableNumber);
-      if (tableToDelete) {
-        await deleteTable(tableToDelete.id);
+      // Try to delete from backend
+      try {
+        const allTables = await fetchTables();
+        const tableToDelete = allTables.find(t => t.tableNumber || t.table_number === tableNumber);
+        if (tableToDelete) {
+          await deleteTable(tableToDelete.id);
+        }
+      } catch (backendError) {
+        console.warn('Backend not available for table deletion:', backendError);
       }
-      setTables(prev => prev.filter(t => t !== tableNumber));
+
+      // Always update local state and storage
+      const newTables = tables.filter(t => t !== tableNumber);
+      setTables(newTables);
+      setStoredTables(newTables);
     } catch (err) {
       console.error('Failed to delete table:', err);
       throw err;

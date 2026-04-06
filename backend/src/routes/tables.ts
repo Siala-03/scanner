@@ -2,13 +2,15 @@ import { Router, Request, Response } from 'express';
 import { pool } from '../db.js';
 import { emitWaiterCall } from '../socket.js';
 import { toCamelCase } from '../utils/camelCase.js';
+import { authenticate, AuthenticatedRequest } from '../middleware/auth.js';
 
 export const tablesRouter = Router();
 
 // GET all tables
-tablesRouter.get('/', async (_req: Request, res: Response) => {
+tablesRouter.get('/', authenticate, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const result = await pool.query('SELECT * FROM tables ORDER BY table_number');
+    const restaurantId = req.restaurantId || 'default_restaurant';
+    const result = await pool.query('SELECT * FROM tables WHERE restaurant_id = $1 ORDER BY table_number', [restaurantId]);
     res.json(toCamelCase(result.rows));
   } catch (err) {
     console.error('Error fetching tables:', err);
