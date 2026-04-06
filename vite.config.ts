@@ -69,15 +69,3 @@ export default defineConfig({
     },
   },
 });
-      '/health': 'http://localhost:4000'
-    }
-  },
-  test: {
-    environment: 'jsdom',
-    globals: true,
-    setupFiles: './src/setupTests.ts',
-    coverage: {
-      reporter: ['text', 'lcov'],
-    },
-  },
-});
