@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { Order, OrderStatus, CartItem, Customer } from '../types';
 import { getEffectivePrice } from '../utils/pricing';
 import { decrementInventoryForOrder, ensureInventoryInitialized } from '../utils/inventoryStorage';
-import { fetchOrders as fetchOrdersApi, createOrder as createOrderApi, updateOrderStatus as updateOrderStatusApi } from '../api/orders';
+import { OfflineAwareAPI } from '../api/offlineAware';
 
 interface UseOrdersReturn {
   orders: Order[];
@@ -36,7 +36,7 @@ export function useOrders(): UseOrdersReturn {
   useEffect(() => {
     async function loadFromBackend() {
       try {
-        const backendOrders = await fetchOrdersApi('all');
+        const backendOrders = await OfflineAwareAPI.fetchOrders('all');
         setOrders(backendOrders);
         setBackendAvailable(true);
       } catch (e) {
@@ -98,28 +98,26 @@ export function useOrders(): UseOrdersReturn {
       } as Order;
 
       let savedOrder: Order = localOrder;
-      if (backendAvailable) {
-        try {
-          savedOrder = await createOrderApi({
-            tableNumber,
-            customerName: customer?.name || 'Walk-in',
-            customerId: customer?.id,
-            items: orderItems.map(item => ({
-              menuItemId: item.menuItem.id,
-              menuItemName: item.menuItem.name,
-              quantity: item.quantity,
-              unitPrice: Math.round(getEffectivePrice(item.menuItem) * 100)
-            })),
-            notes: specialInstructions,
-            requiresKitchen,
-            deliveryProvider: delivery?.provider,
-            deliveryAddress: delivery?.address,
-            loyaltyRewardId
-          });
-        } catch (e) {
-          console.warn('Failed to sync order to backend:', e);
-          savedOrder = localOrder;
-        }
+      try {
+        savedOrder = await OfflineAwareAPI.createOrder({
+          tableNumber,
+          customerName: customer?.name || 'Walk-in',
+          customerId: customer?.id,
+          items: orderItems.map(item => ({
+            menuItemId: item.menuItem.id,
+            menuItemName: item.menuItem.name,
+            quantity: item.quantity,
+            unitPrice: Math.round(getEffectivePrice(item.menuItem) * 100)
+          })),
+          notes: specialInstructions,
+          requiresKitchen,
+          deliveryProvider: delivery?.provider,
+          deliveryAddress: delivery?.address,
+          loyaltyRewardId
+        });
+      } catch (e) {
+        console.warn('Failed to create order:', e);
+        savedOrder = localOrder;
       }
 
       setOrders((prev) => [savedOrder, ...prev]);
@@ -130,15 +128,10 @@ export function useOrders(): UseOrdersReturn {
 
   const updateOrderStatus = useCallback(
     async (orderId: string, status: OrderStatus, opts?: { assignedWaiterId?: string }) => {
-      const backendStatus = status;
-      
-      // Try to sync with backend
-      if (backendAvailable) {
-        try {
-          await updateOrderStatusApi(orderId, { status: backendStatus });
-        } catch (e) {
-          console.warn('Failed to sync order status to backend:', e);
-        }
+      try {
+        await OfflineAwareAPI.updateOrderStatus(orderId, { status, assignedTo: opts?.assignedWaiterId });
+      } catch (e) {
+        console.warn('Failed to update order status:', e);
       }
 
       // Always update local state
@@ -160,7 +153,7 @@ export function useOrders(): UseOrdersReturn {
         })
       );
     },
-    [backendAvailable]
+    []
   );
 
   const getOrdersByTable = useCallback(

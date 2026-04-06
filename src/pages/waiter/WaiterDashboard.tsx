@@ -27,7 +27,7 @@ import { printOrderReceipt, buildReceiptHtml, orderToReceiptData } from '../../u
 import { printReceiptNetwork } from '../../api/printer';
 import { ReceiptShareModal } from '../../components/ui/ReceiptShareModal';
 import { KPICard } from '../../components/supervisor/KPICard';
-import { useSocket } from '../../hooks/useSocket';
+import { useOfflineStatus } from '../../hooks/useOfflineStatus';
 interface WaiterDashboardProps {
   waiter: Staff;
   orders: Order[];
@@ -68,6 +68,7 @@ export function WaiterDashboard({
   const [selectedOrderForShare, setSelectedOrderForShare] = useState<Order | null>(null);
   const { socket, joinRole } = useSocket();
   const { kpis } = useStaffKPIs();
+  const { isOnline, pendingOperations } = useOfflineStatus();
 
   // Join waiter role room and listen for call events
   useEffect(() => {
@@ -259,6 +260,18 @@ export function WaiterDashboard({
             <p className="text-sm text-slate-400">
               Tables {waiter.assignedTables.join(', ')}
             </p>
+            {/* Offline Status Indicator */}
+            <div className="flex items-center gap-2 mt-1">
+              <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-green-500' : 'bg-red-500'}`}></div>
+              <span className={`text-xs ${isOnline ? 'text-green-400' : 'text-red-400'}`}>
+                {isOnline ? 'Online' : 'Offline'}
+              </span>
+              {!isOnline && pendingOperations > 0 && (
+                <span className="text-xs text-amber-400">
+                  {pendingOperations} pending sync
+                </span>
+              )}
+            </div>
           </div>
           <div className="flex items-center gap-3">
             {/* Take Order Button */}
