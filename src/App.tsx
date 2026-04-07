@@ -48,6 +48,29 @@ export function App() {
   const [supervisorScannedTable, setSupervisorScannedTable] = useState<number | null>(null);
   const { tables, isLoading: isTablesLoading, addTable, removeTable, refetch: reloadTables } = useTables();
 
+  // Load auth state from localStorage on mount
+  useEffect(() => {
+    const savedAuthUser = localStorage.getItem('authUser');
+    const savedSelectedRole = localStorage.getItem('selectedRole');
+    const savedRestaurantId = localStorage.getItem('restaurantId');
+    if (savedAuthUser) {
+      try {
+        const user = JSON.parse(savedAuthUser);
+        if (savedRestaurantId && !user.restaurantId) {
+          user.restaurantId = savedRestaurantId;
+        }
+        setAuthUser(user);
+      } catch (error) {
+        console.error('Failed to parse saved auth user:', error);
+        localStorage.removeItem('authUser');
+      }
+    }
+    if (savedSelectedRole) {
+      setSelectedRole(savedSelectedRole as UserRole);
+    }
+    setRouteResolved(true);
+  }, []);
+
   const [waiterCalls, setWaiterCalls] = useState<
     {
       tableNumber: number;
@@ -165,6 +188,10 @@ export function App() {
 
       setSelectedRole(null);
       setAuthUser(null);
+      // Clear localStorage
+      localStorage.removeItem('authUser');
+      localStorage.removeItem('selectedRole');
+      localStorage.removeItem('restaurantId');
       setRestaurantName('');
       setTableNumber(null);
       setManagerPage('dashboard');
@@ -338,6 +365,12 @@ export function App() {
             setSelectedRole('waiter');
           } else if (user.role === 'kitchen') {
             setSelectedRole('kitchen');
+          }
+          // Save to localStorage
+          localStorage.setItem('authUser', JSON.stringify(user));
+          localStorage.setItem('selectedRole', user.role);
+          if (user.restaurantId) {
+            localStorage.setItem('restaurantId', user.restaurantId);
           }
         }}
         onBack={() => {}} />); // No back needed for main login
@@ -661,6 +694,12 @@ export function App() {
                   setSelectedRole('waiter');
                 } else if (user.role === 'kitchen') {
                   setSelectedRole('kitchen');
+                }
+                // Save to localStorage
+                localStorage.setItem('authUser', JSON.stringify(user));
+                localStorage.setItem('selectedRole', user.role);
+                if (user.restaurantId) {
+                  localStorage.setItem('restaurantId', user.restaurantId);
                 }
               }}
               onBack={() => {}} />

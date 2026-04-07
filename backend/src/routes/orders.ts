@@ -14,7 +14,8 @@ function normalizeOrder(row: any): any {
   const order = {
     ...row,
     items: parsedItems,
-    requires_kitchen: row.requires_kitchen ?? false
+    requires_kitchen: row.requires_kitchen ?? false,
+    restaurant_id: row.restaurant_id
   };
   // Transform snake_case to camelCase
   return toCamelCase(order);
@@ -110,10 +111,14 @@ router.post('/seed', async (_req: Request, res: Response) => {
 // GET all orders (with optional status and date filter)
 router.get('/', async (req: Request, res: Response) => {
   try {
-    const { status, startDate, endDate } = req.query;
+    const { status, startDate, endDate, restaurantId } = req.query;
     let query = 'SELECT * FROM orders';
     const params: unknown[] = [];
     const conditions: string[] = [];
+
+    const resolvedRestaurantId = (restaurantId as string) || 'default_restaurant';
+    params.push(resolvedRestaurantId);
+    conditions.push(`restaurant_id = $${params.length}`);
 
     if (status && status !== 'all') {
       params.push(status);
@@ -146,12 +151,16 @@ router.get('/', async (req: Request, res: Response) => {
 });
 
 // GET kitchen view - orders that need to be prepared
-router.get('/kitchen', async (_req: Request, res: Response) => {
+router.get('/kitchen', async (req: Request, res: Response) => {
   try {
+    const { restaurantId } = req.query;
+    const resolvedRestaurantId = (restaurantId as string) || 'default_restaurant';
+
     const result = await pool.query(
       `SELECT * FROM orders 
-       WHERE requires_kitchen = true AND status IN ('pending', 'preparing', 'ready') 
-       ORDER BY created_at ASC`
+       WHERE restaurant_id = $1 AND requires_kitchen = true AND status IN ('pending', 'preparing', 'ready') 
+       ORDER BY created_at ASC`,
+      [resolvedRestaurantId]
     );
     const orders = result.rows.map((row: any) => normalizeOrder(row));
     res.json(orders);
@@ -170,10 +179,11 @@ router.get('/kitchen/analytics', async (_req: Request, res: Response) => {
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
+    const restaurantId = (_req.query as any)?.restaurantId || 'default_restaurant';
     // Get orders for today
     const todayOrders = await pool.query(
-      `SELECT * FROM orders WHERE requires_kitchen = true AND created_at >= $1 AND created_at < $2`,
-      [today.toISOString(), tomorrow.toISOString()]
+      `SELECT * FROM orders WHERE restaurant_id = $1 AND requires_kitchen = true AND created_at >= $2 AND created_at < $3`,
+      [restaurantId, today.toISOString(), tomorrow.toISOString()]
     );
 
     // Calculate stats
@@ -295,6 +305,7 @@ router.post('/', async (req: Request, res: Response) => {
       tableNumber: table_number ?? tableNumber,
       customerName: customer_name ?? customerName ?? 'Walk-in',
       customerId: customer_id ?? customerId,
+      restaurantId: req.body.restaurantId || req.query.restaurantId || 'default_restaurant',
       items: items.map((item: any) => ({
         menuItemId: item.menuItemId,
         menuItemName: item.menuItemName,
@@ -393,10 +404,11 @@ router.put('/:id/status', async (req: Request, res: Response) => {
         if (pointsToAward > 0) {
           const transactionId = `txn-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-          await pool.query(`
+          const orderRestaurantId = order.restaurantId || 'default_restaurant';
+        await pool.query(`
             INSERT INTO loyalty_transactions (id, customer_id, order_id, transaction_type, points, description, restaurant_id)
             VALUES ($1, $2, $3, 'earned', $4, $5, $6)
-          `, [transactionId, order.customerId, id, pointsToAward, `Order completion: ${order.orderNumber}`, 'default_restaurant']);
+          `, [transactionId, order.customerId, id, pointsToAward, `Order completion: ${order.orderNumber}`, orderRestaurantId]);
 
           await pool.query(`
             UPDATE customers
@@ -407,7 +419,7 @@ router.put('/:id/status', async (req: Request, res: Response) => {
               visit_count = visit_count + 1,
               updated_at = now()
             WHERE id = $3 AND restaurant_id = $4
-          `, [pointsToAward, order.total, order.customerId, 'default_restaurant']);
+          `, [pointsToAward, order.total, order.customerId, orderRestaurantId]);
         }
       } catch (loyaltyError) {
         console.error('Error awarding loyalty points:', loyaltyError);

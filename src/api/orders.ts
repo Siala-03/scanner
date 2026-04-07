@@ -11,19 +11,28 @@ export async function seedTestOrders(): Promise<{ message: string; count: number
 }
 
 // GET all orders
-export async function fetchOrders(status?: string): Promise<Order[]> {
-  const query = status && status !== 'all' ? `?status=${status}` : '';
+export async function fetchOrders(status?: string, restaurantId?: string): Promise<Order[]> {
+  const params = new URLSearchParams();
+  if (status && status !== 'all') params.set('status', status);
+  if (restaurantId) params.set('restaurantId', restaurantId);
+  const query = params.toString() ? `?${params.toString()}` : '';
   return apiRequest<Order[]>(`${API_BASE}/orders${query}`);
 }
 
 // GET orders with date range
-export async function fetchOrdersByDateRange(startDate: string, endDate: string): Promise<Order[]> {
-  return apiRequest<Order[]>(`${API_BASE}/orders?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`);
+export async function fetchOrdersByDateRange(startDate: string, endDate: string, restaurantId?: string): Promise<Order[]> {
+  const params = new URLSearchParams({
+    startDate: encodeURIComponent(startDate),
+    endDate: encodeURIComponent(endDate),
+  });
+  if (restaurantId) params.set('restaurantId', restaurantId);
+  return apiRequest<Order[]>(`${API_BASE}/orders?${params.toString()}`);
 }
 
 // GET kitchen orders (pending, preparing, ready)
-export async function fetchKitchenOrders(): Promise<Order[]> {
-  return apiRequest<Order[]>(`${API_BASE}/orders/kitchen`);
+export async function fetchKitchenOrders(restaurantId?: string): Promise<Order[]> {
+  const query = restaurantId ? `?restaurantId=${encodeURIComponent(restaurantId)}` : '';
+  return apiRequest<Order[]>(`${API_BASE}/orders/kitchen${query}`);
 }
 
 // GET single order

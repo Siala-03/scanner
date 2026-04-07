@@ -40,6 +40,7 @@ export interface Order {
   tableNumber?: number;
   customerName?: string;
   customerId?: string;
+  restaurantId?: string;
   status: OrderStatus;
   items: OrderItem[];
   subtotal: number;
@@ -65,6 +66,7 @@ export interface CreateOrderInput {
   tableNumber?: number;
   customerName?: string;
   customerId?: string;
+  restaurantId?: string;
   items: {
     menuItemId: string;
     menuItemName: string;

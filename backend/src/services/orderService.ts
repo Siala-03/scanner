@@ -16,6 +16,7 @@ export async function createOrder(orderInput: {
   tableNumber?: number;
   customerName?: string;
   customerId?: string;
+  restaurantId?: string;
   items: OrderLine[];
   notes?: string;
   createdBy?: string;
@@ -28,6 +29,7 @@ export async function createOrder(orderInput: {
     tableNumber,
     customerName = 'Walk-in',
     customerId,
+    restaurantId = 'default_restaurant',
     items,
     notes,
     createdBy = 'system',
@@ -110,8 +112,8 @@ export async function createOrder(orderInput: {
 
   const result = await pool.query(
     `INSERT INTO orders 
-      (id, order_number, table_number, customer_name, customer_id, status, items, subtotal, tax, total, notes, created_by, delivery_provider, delivery_address, delivery_status, loyalty_reward_id, loyalty_discount, loyalty_free_item_id, requires_kitchen)
-     VALUES ($1, $2, $3, $4, $5, 'pending', $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+      (id, order_number, table_number, customer_name, customer_id, restaurant_id, status, items, subtotal, tax, total, notes, created_by, delivery_provider, delivery_address, delivery_status, loyalty_reward_id, loyalty_discount, loyalty_free_item_id, requires_kitchen)
+     VALUES ($1, $2, $3, $4, $5, $6, 'pending', $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
      RETURNING *`,
     [
       id,
@@ -119,6 +121,7 @@ export async function createOrder(orderInput: {
       tableNumber,
       customerName,
       customerId,
+      restaurantId,
       JSON.stringify(orderItems),
       subtotal,
       tax,

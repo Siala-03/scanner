@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
+import { useSocket } from './useSocket';
 import { Order, OrderStatus, CartItem, Customer } from '../types';
 import { getEffectivePrice } from '../utils/pricing';
 import { decrementInventoryForOrder, ensureInventoryInitialized } from '../utils/inventoryStorage';
@@ -32,11 +33,33 @@ interface UseOrdersReturn {
 export function useOrders(): UseOrdersReturn {
   const [orders, setOrders] = useState<Order[]>([]);
   const [backendAvailable, setBackendAvailable] = useState(true);
+  const { socket, joinOrders } = useSocket();
+
+  const resolveRestaurantId = () => {
+    const storedRestaurantId = localStorage.getItem('restaurantId');
+    if (storedRestaurantId) return storedRestaurantId;
+
+    const storedAuthUser = localStorage.getItem('authUser');
+    if (storedAuthUser) {
+      try {
+        const parsed = JSON.parse(storedAuthUser);
+        if (parsed?.restaurantId) {
+          return parsed.restaurantId;
+        }
+      } catch {
+        // ignore invalid JSON
+      }
+    }
+
+    return 'default_restaurant';
+  };
+
+  const restaurantId = resolveRestaurantId();
 
   useEffect(() => {
     async function loadFromBackend() {
       try {
-        const backendOrders = await OfflineAwareAPI.fetchOrders('all');
+        const backendOrders = await OfflineAwareAPI.fetchOrders('all', restaurantId);
         setOrders(backendOrders);
         setBackendAvailable(true);
       } catch (e) {
@@ -45,11 +68,51 @@ export function useOrders(): UseOrdersReturn {
         setBackendAvailable(false);
       }
     }
+
     loadFromBackend();
-  }, []);
+    joinOrders();
+
+    const handleOrderUpdate = (data: any) => {
+      if (!data?.order || data.order.restaurantId !== restaurantId) {
+        return;
+      }
+
+      setOrders((prevOrders) => {
+        if (data.type === 'create') {
+          return [data.order, ...prevOrders];
+        }
+        if (data.type === 'update') {
+          return prevOrders.map((order) => (order.id === data.order.id ? data.order : order));
+        }
+        return prevOrders;
+      });
+    };
+
+    socket.on('order:update', handleOrderUpdate);
+    return () => {
+      socket.off('order:update', handleOrderUpdate);
+    };
+  }, [restaurantId, joinOrders, socket]);
+
+  const drinkCategories = new Set([
+    'beers',
+    'wine',
+    'alcoholic-drinks',
+    'soft-drinks',
+    'coffee',
+    'tea',
+    'juices',
+    'cocktails',
+    'mocktails',
+    'non-alcoholic',
+    'water',
+  ]);
 
   const isFoodOrder = (items: CartItem[]) =>
-    items.some((item) => ['breakfast', 'lunch', 'dinner'].includes(item.menuItem.category));
+    items.some((item) => {
+      const category = String(item.menuItem.category ?? '').toLowerCase();
+      return category === '' || !drinkCategories.has(category);
+    });
 
   const addOrder = useCallback(
     async (
@@ -84,6 +147,7 @@ export function useOrders(): UseOrdersReturn {
         tableNumber,
         customerName: customer?.name,
         customerId: customer?.id,
+        restaurantId,
         items: orderItems,
         status: 'pending',
         subtotal,
@@ -103,6 +167,7 @@ export function useOrders(): UseOrdersReturn {
           tableNumber,
           customerName: customer?.name || 'Walk-in',
           customerId: customer?.id,
+          restaurantId,
           items: orderItems.map(item => ({
             menuItemId: item.menuItem.id,
             menuItemName: item.menuItem.name,
