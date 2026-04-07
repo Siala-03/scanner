@@ -1,14 +1,15 @@
-import { Router, Request, Response } from 'express';
+import { Router, Response } from 'express';
 import { pool } from '../db.js';
 import { emitMenuUpdate } from '../socket.js';
-import { toCamelCase, rowsToCamelCase } from '../utils/camelCase.js';
+import { rowsToCamelCase } from '../utils/camelCase.js';
+import { authenticate, AuthenticatedRequest } from '../middleware/auth.js';
 
 export const menuRouter = Router();
 
 // GET all menu items
-menuRouter.get('/', async (_req: Request, res: Response) => {
+menuRouter.get('/', authenticate, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const restaurantId = 'default_restaurant';
+    const restaurantId = req.restaurantId || 'default_restaurant';
     const result = await pool.query(
       'SELECT * FROM menu_items WHERE restaurant_id = $1 AND is_available = true ORDER BY category, name',
       [restaurantId]
@@ -35,10 +36,10 @@ menuRouter.get('/', async (_req: Request, res: Response) => {
 });
 
 // POST import/replace menu items
-menuRouter.post('/', async (req: Request, res: Response) => {
+menuRouter.post('/', authenticate, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { items } = req.body;
-    const restaurantId = 'default_restaurant';
+    const restaurantId = req.restaurantId || 'default_restaurant';
     
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: 'Invalid menu items' });
@@ -92,9 +93,9 @@ menuRouter.post('/', async (req: Request, res: Response) => {
 });
 
 // DELETE reset to default (clear menu)
-menuRouter.delete('/', async (_req: Request, res: Response) => {
+menuRouter.delete('/', authenticate, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const restaurantId = 'default_restaurant';
+    const restaurantId = req.restaurantId || 'default_restaurant';
     console.log(`Clearing menu for restaurant ${restaurantId}`);
     await pool.query('DELETE FROM menu_items WHERE restaurant_id = $1', [restaurantId]);
     res.json({ message: 'Menu cleared' });

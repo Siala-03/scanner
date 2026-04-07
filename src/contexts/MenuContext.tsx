@@ -32,7 +32,7 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(true);
     try {
       const menu = await fetchMenu();
-      setMenuItems((menu && menu.length > 0) ? menu : defaultMenuItems);
+      setMenuItems(menu);
       setError(null);
     } catch (err) {
       console.error('Failed to refresh menu:', err);
@@ -65,7 +65,7 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
       try {
         const items = await fetchMenu();
         if (!isMounted) return;
-        setMenuItems((items && items.length > 0) ? items : defaultMenuItems);
+        setMenuItems(items);
         setError(null);
       } catch (err) {
         console.error('Failed to load menu from API:', err);

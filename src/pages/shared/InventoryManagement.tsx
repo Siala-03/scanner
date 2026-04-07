@@ -212,21 +212,27 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
 
   const handleSaveRow = async (menuItemId: string, _name: string) => {
     if (!isManager) return;
-    const current = inventoryMap[menuItemId];
-    if (!current) {
-      const missingItemId = menuItemId;
-      const inventoryKeys = Object.keys(inventoryMap);
-      console.error('Item not found in inventory map', { 
-        menuItemId: missingItemId, 
-        availableKeys: inventoryKeys,
+    const existingRecord = inventoryMap[menuItemId];
+    const current: InventoryRecord = existingRecord ?? {
+      menuItemId,
+      stock: 0,
+      lowStockThreshold: 5,
+      reorderPoint: 0,
+      reorderQty: 0,
+      unitCost: 0,
+      supplierId: undefined,
+      location: '',
+      updatedAt: new Date().toISOString(),
+    };
+
+    if (!existingRecord) {
+      console.warn('Item missing in inventory map, creating new record on save', {
+        menuItemId,
         menuItemsCount: menuItems.length,
         inventoryCount: inventory.length,
-        menuItemIds: menuItems.slice(0, 5).map(m => m.id)
       });
-      alert(`Item not found (${missingItemId}). Please refresh the page and try again.`);
-      return;
     }
-    
+
     const updatePayload: any = {};
     
     // Check each field and add to payload if it changed
