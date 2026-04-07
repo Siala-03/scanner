@@ -40,11 +40,20 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const migrationsDir = path.resolve(__dirname, '../migrations');
 
-// Auto-run migrations on startup
+// Delay helper for retries
+function delay(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// Auto-run migrations on startup with retry logic
 async function runMigrations() {
-  try {
-    const client = await pool.connect();
+  const maxRetries = env.DB_STARTUP_RETRIES;
+  const retryDelay = env.DB_STARTUP_RETRY_DELAY;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
+      const client = await pool.connect();
+      try {
       // Create migrations table if not exists
       await client.query(`
         create table if not exists schema_migrations (
@@ -79,16 +88,26 @@ async function runMigrations() {
           throw e;
         }
       }
-      logger.info('All migrations complete');
-    } finally {
-      client.release();
+        logger.info('All migrations complete');
+      } finally {
+        client.release();
+      }
+      return; // Success, exit the retry loop
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      logger.warn(`Migration attempt ${attempt}/${maxRetries} failed: ${errorMsg}`);
+      
+      if (attempt < maxRetries) {
+        logger.info(`Retrying in ${retryDelay}ms...`);
+        await delay(retryDelay);
+      } else {
+        logger.error('Migration failed after all retries', { 
+          error: errorMsg,
+          stack: err instanceof Error ? err.stack : undefined
+        });
+        // Don't exit - let the server start anyway
+      }
     }
-  } catch (err) {
-    logger.error('Migration failed', { 
-      error: err instanceof Error ? err.message : String(err),
-      stack: err instanceof Error ? err.stack : undefined
-    });
-    // Don't exit - let the server start anyway
   }
 }
 
@@ -120,42 +139,64 @@ const superadminAccounts = [
 ];
 
 async function ensureSuperadminAccounts() {
-  const client = await pool.connect();
-  try {
-    for (const account of superadminAccounts) {
-      const hash = await bcrypt.hash(account.password, 10);
-
-      await client.query('begin');
+  const maxRetries = env.DB_STARTUP_RETRIES;
+  const retryDelay = env.DB_STARTUP_RETRY_DELAY;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const client = await pool.connect();
       try {
-        await client.query(
-          `INSERT INTO staff
-            (id, name, role, email, phone, is_on_duty, assigned_tables, performance, hire_date, restaurant_id)
-           VALUES ($1, $2, 'superadmin', $3, $4, true, '{}', '{}', now(), 'default_restaurant')
-           ON CONFLICT (id) DO UPDATE SET
-             name = EXCLUDED.name,
-             role = 'superadmin',
-             email = EXCLUDED.email,
-             phone = EXCLUDED.phone`,
-          [account.id, account.name, account.email, account.phone]
-        );
+        for (const account of superadminAccounts) {
+          const hash = await bcrypt.hash(account.password, 10);
 
-        await client.query(
-          `INSERT INTO staff_credentials (staff_id, username, password_hash, restaurant_id)
-           VALUES ($1, $2, $3, 'default_restaurant')
-           ON CONFLICT (restaurant_id, username) DO UPDATE SET
-             staff_id = EXCLUDED.staff_id,
-             password_hash = EXCLUDED.password_hash`,
-          [account.id, account.username, hash]
-        );
+          await client.query('begin');
+          try {
+            await client.query(
+              `INSERT INTO staff
+                (id, name, role, email, phone, is_on_duty, assigned_tables, performance, hire_date, restaurant_id)
+               VALUES ($1, $2, 'superadmin', $3, $4, true, '{}', '{}', now(), 'default_restaurant')
+               ON CONFLICT (id) DO UPDATE SET
+                 name = EXCLUDED.name,
+                 role = 'superadmin',
+                 email = EXCLUDED.email,
+                 phone = EXCLUDED.phone`,
+              [account.id, account.name, account.email, account.phone]
+            );
 
-        await client.query('commit');
-      } catch (err) {
-        await client.query('rollback');
-        logger.error('Failed to ensure superadmin account', { account: account.username, err });
+            await client.query(
+              `INSERT INTO staff_credentials (staff_id, username, password_hash, restaurant_id)
+               VALUES ($1, $2, $3, 'default_restaurant')
+               ON CONFLICT (restaurant_id, username) DO UPDATE SET
+                 staff_id = EXCLUDED.staff_id,
+                 password_hash = EXCLUDED.password_hash`,
+              [account.id, account.username, hash]
+            );
+
+            await client.query('commit');
+          } catch (err) {
+            await client.query('rollback');
+            throw err; // Re-throw to trigger retry
+          }
+        }
+        return; // Success, exit the retry loop
+      } finally {
+        client.release();
+      }
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      logger.warn(`Ensure superadmin accounts attempt ${attempt}/${maxRetries} failed: ${errorMsg}`);
+      
+      if (attempt < maxRetries) {
+        logger.info(`Retrying in ${retryDelay}ms...`);
+        await delay(retryDelay);
+      } else {
+        logger.error('Failed to ensure superadmin accounts after all retries', { 
+          error: errorMsg,
+          stack: err instanceof Error ? err.stack : undefined
+        });
+        // Don't exit - let the server start anyway
       }
     }
-  } finally {
-    client.release();
   }
 }
 

@@ -11,8 +11,10 @@ const EnvSchema = z.object({
   RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(60 * 1000), // 1 minute window
   RATE_LIMIT_MAX_REQUESTS: z.coerce.number().int().positive().default(10000), // 10k requests/min for busy restaurants
   DB_POOL_SIZE: z.coerce.number().int().positive().default(20),
-  DB_IDLE_TIMEOUT: z.coerce.number().int().positive().default(30000),
-  DB_CONNECTION_TIMEOUT: z.coerce.number().int().positive().default(2000)
+  DB_IDLE_TIMEOUT: z.coerce.number().int().positive().default(60000),
+  DB_CONNECTION_TIMEOUT: z.coerce.number().int().positive().default(10000),
+  DB_STARTUP_RETRIES: z.coerce.number().int().positive().default(3),
+  DB_STARTUP_RETRY_DELAY: z.coerce.number().int().positive().default(3000)
 });
 
 export type Env = z.infer<typeof EnvSchema>;
@@ -25,6 +27,8 @@ export const env: Env = EnvSchema.parse({
   RATE_LIMIT_WINDOW_MS: process.env.RATE_LIMIT_WINDOW_MS ?? (60 * 1000), // 1 minute
   RATE_LIMIT_MAX_REQUESTS: process.env.RATE_LIMIT_MAX_REQUESTS ?? 10000, // 10k/min
   DB_POOL_SIZE: process.env.DB_POOL_SIZE ?? 20,
-  DB_IDLE_TIMEOUT: process.env.DB_IDLE_TIMEOUT ?? 30000,
-  DB_CONNECTION_TIMEOUT: process.env.DB_CONNECTION_TIMEOUT ?? 2000
+  DB_IDLE_TIMEOUT: process.env.DB_IDLE_TIMEOUT ?? 60000,
+  DB_CONNECTION_TIMEOUT: process.env.DB_CONNECTION_TIMEOUT ?? 10000,
+  DB_STARTUP_RETRIES: process.env.DB_STARTUP_RETRIES ?? 3,
+  DB_STARTUP_RETRY_DELAY: process.env.DB_STARTUP_RETRY_DELAY ?? 3000
 });
