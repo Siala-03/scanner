@@ -25,16 +25,20 @@ import { QRScanner } from './components/waiter/QRScanner';
 import { KitchenDisplay } from './pages/kitchen/KitchenDisplay';
 import { LoginPage } from './pages/auth/LoginPage';
 import { SuperAdminDashboard } from './pages/superadmin/SuperAdminDashboard';
+import { SupplierLoginPage } from './pages/supplier/SupplierLoginPage';
+import { SupplierDashboard } from './pages/supplier/SupplierDashboard';
 import { Card } from './components/ui/Card';
 import { Button } from './components/ui/Button';
 import { Staff } from './types';
+import { SupplierUser, getSupplierMe, clearSupplierToken } from './api/supplier';
 import { fetchRestaurant } from './api/restaurants';
-type UserRole = 'customer' | 'waiter' | 'supervisor' | 'manager' | 'kitchen' | 'superadmin' | null;
+type UserRole = 'customer' | 'waiter' | 'supervisor' | 'manager' | 'kitchen' | 'superadmin' | 'supplier' | null;
 type ManagerPage = 'dashboard' | 'menu' | 'staff' | 'analytics' | 'performance' | 'qrcodes' | 'inventory' | 'history' | 'expenses';
 type SupervisorPage = 'dashboard' | 'revenue' | 'staff' | 'qrcodes' | 'inventory' | 'menu' | 'history' | 'expenses';
 export function App() {
   const [selectedRole, setSelectedRole] = useState<UserRole>(null);
   const [authUser, setAuthUser] = useState<Staff | null>(null);
+  const [supplierUser, setSupplierUser] = useState<SupplierUser | null>(null);
   const [restaurantName, setRestaurantName] = useState<string>('');
   const [tableNumber, setTableNumber] = useState<number | null>(null);
   const [managerPage, setManagerPage] = useState<ManagerPage>('dashboard');
@@ -95,6 +99,11 @@ export function App() {
     );
   }, []);
 
+  const handleGoSupplierPortal = () => {
+    setSelectedRole('supplier');
+    window.history.pushState({}, '', '/supplier');
+  };
+
   const managerTotalOrders = orders.length;
   const managerActiveOrders = orders.filter((order) => ['pending', 'verified', 'preparing', 'ready'].includes(order.status)).length;
   const managerServedOrders = orders.filter((order) => order.status === 'served').length;
@@ -147,8 +156,13 @@ export function App() {
     }
 
     if (selectedRole && selectedRole !== 'customer') {
-      // Clear auth when leaving staff portal
-      logoutStaff();
+      if (selectedRole === 'supplier') {
+        clearSupplierToken();
+        setSupplierUser(null);
+      } else {
+        logoutStaff();
+      }
+
       setSelectedRole(null);
       setAuthUser(null);
       setRestaurantName('');
@@ -236,6 +250,10 @@ export function App() {
       setSelectedRole('supervisor');
       setRouteResolved(true);
       return;
+    } else if (path === '/supplier' || path.startsWith('/supplier')) {
+      setSelectedRole('supplier');
+      setRouteResolved(true);
+      return;
     }
 
     // Unknown path fallback: keep app loadable and show friendly message
@@ -250,6 +268,32 @@ export function App() {
       window.history.replaceState({}, '', `/${selectedRole}`);
     }
   }, [selectedRole]);
+
+  useEffect(() => {
+    if (selectedRole !== 'supplier') {
+      return;
+    }
+
+    const token = localStorage.getItem('supplier_token');
+    if (!token || supplierUser) {
+      return;
+    }
+
+    let active = true;
+    getSupplierMe()
+      .then((user) => {
+        if (!active) return;
+        setSupplierUser(user);
+      })
+      .catch(() => {
+        if (!active) return;
+        setSupplierUser(null);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [selectedRole, supplierUser]);
 
   useEffect(() => {
     let active = true;
@@ -317,6 +361,16 @@ export function App() {
       </div>
     );
   }
+
+  // Supplier portal
+  if (selectedRole === 'supplier' && !supplierUser) {
+    return <SupplierLoginPage onLogin={(user) => setSupplierUser(user)} onBack={handleBack} />;
+  }
+
+  if (selectedRole === 'supplier' && supplierUser) {
+    return <SupplierDashboard user={supplierUser} onLogout={handleBack} />;
+  }
+
   // Waiter portal
   if (selectedRole === 'waiter' && authUser) {
     return (
@@ -623,15 +677,25 @@ export function App() {
           <p className="text-[#a89f91] mb-4">
             Or scan QR code to order as a customer
           </p>
-          <Button
-            variant="secondary"
-            size="sm"
-            className="px-6 py-2 rounded-full border-[#3a2e20] text-[#a89f91] hover:text-amber-500 hover:border-amber-500/50"
-            onClick={() => handleScanQR()}
-          >
-            <QrCodeIcon className="w-4 h-4 mr-2" />
-            Scan QR Code
-          </Button>
+          <div className="flex flex-col items-center gap-3">
+            <Button
+              variant="secondary"
+              size="sm"
+              className="px-6 py-2 rounded-full border-[#3a2e20] text-[#a89f91] hover:text-amber-500 hover:border-amber-500/50"
+              onClick={() => handleScanQR()}
+            >
+              <QrCodeIcon className="w-4 h-4 mr-2" />
+              Scan QR Code
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="px-6 py-2 rounded-full border-[#3a2e20] text-[#a89f91] hover:text-slate-100 hover:border-slate-500"
+              onClick={handleGoSupplierPortal}
+            >
+              Supplier Portal
+            </Button>
+          </div>
         </motion.div>
       </div>
     </div>);
