@@ -5,6 +5,35 @@ import { getEffectivePrice } from '../utils/pricing';
 import { decrementInventoryForOrder, ensureInventoryInitialized } from '../utils/inventoryStorage';
 import { OfflineAwareAPI } from '../api/offlineAware';
 
+const normalizeOrderPayload = (rawOrder: any): Order | undefined => {
+  if (!rawOrder) return undefined;
+  const items = typeof rawOrder.items === 'string' ? JSON.parse(rawOrder.items) : rawOrder.items;
+  return {
+    ...rawOrder,
+    id: rawOrder.id,
+    orderNumber: rawOrder.orderNumber ?? rawOrder.order_number,
+    tableNumber: rawOrder.tableNumber ?? rawOrder.table_number,
+    customerName: rawOrder.customerName ?? rawOrder.customer_name,
+    customerId: rawOrder.customerId ?? rawOrder.customer_id,
+    restaurantId: rawOrder.restaurantId ?? rawOrder.restaurant_id,
+    status: rawOrder.status,
+    subtotal: rawOrder.subtotal,
+    tax: rawOrder.tax,
+    total: rawOrder.total,
+    notes: rawOrder.notes,
+    createdAt: rawOrder.createdAt ?? rawOrder.created_at,
+    updatedAt: rawOrder.updatedAt ?? rawOrder.updated_at,
+    requiresKitchen: rawOrder.requiresKitchen ?? rawOrder.requires_kitchen,
+    deliveryProvider: rawOrder.deliveryProvider ?? rawOrder.delivery_provider,
+    deliveryAddress: rawOrder.deliveryAddress ?? rawOrder.delivery_address,
+    loyaltyRewardId: rawOrder.loyaltyRewardId ?? rawOrder.loyalty_reward_id,
+    loyaltyDiscount: rawOrder.loyaltyDiscount ?? rawOrder.loyalty_discount,
+    loyaltyFreeItemId: rawOrder.loyaltyFreeItemId ?? rawOrder.loyalty_free_item_id,
+    assignedWaiterId: rawOrder.assignedWaiterId ?? rawOrder.assigned_waiter_id,
+    items: Array.isArray(items) ? items : [],
+  } as Order;
+};
+
 interface UseOrdersReturn {
   orders: Order[];
   addOrder: (
@@ -73,7 +102,8 @@ export function useOrders(): UseOrdersReturn {
     joinOrders();
 
     const handleOrderUpdate = (data: any) => {
-      if (!data?.order || data.order.restaurantId !== restaurantId) {
+      const updatedOrder = normalizeOrderPayload(data?.order);
+      if (!updatedOrder || updatedOrder.restaurantId !== restaurantId) {
         return;
       }
 

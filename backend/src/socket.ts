@@ -1,5 +1,6 @@
 import { Server as SocketServer } from 'socket.io';
 import type { Server as HTTPServer } from 'http';
+import { toCamelCase } from './utils/camelCase.js';
 
 let io: SocketServer | null = null;
 
@@ -118,7 +119,11 @@ export function emitOrderUpdate(data: {
   orderId?: string;
 }) {
   if (io) {
-    io.to('orders').emit('order:update', data);
+    const payload = {
+      ...data,
+      order: data.order ? toCamelCase(data.order) : undefined
+    };
+    io.to('orders').emit('order:update', payload);
   }
 }
 
