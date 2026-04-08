@@ -1,10 +1,11 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { ClockIcon, MapPinIcon, UtensilsIcon, WineIcon } from 'lucide-react';
+import { ClockIcon, MapPinIcon, UtensilsIcon, WineIcon, SmartphoneIcon } from 'lucide-react';
 import { Order } from '../../types';
 import { StatusBadge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { formatPrice } from '../../utils/currency';
+
 interface OrderCardProps {
   order: Order;
   onViewDetails: (order: Order) => void;
@@ -14,6 +15,7 @@ interface OrderCardProps {
   onMarkServed?: (orderId: string) => void;
   onPrintReceipt?: (order: Order) => void;
 }
+
 export function OrderCard({
   order,
   onViewDetails,
@@ -25,6 +27,10 @@ export function OrderCard({
   const minutesAgo = Math.floor(
     (Date.now() - order.createdAt.getTime()) / 60000
   );
+
+  // Determine if this is a customer menu order (from QR scan) or waiter-created
+  const isCustomerMenuOrder = !order.assignedWaiterId || order.status === 'pending';
+
   return (
     <motion.div
       layout
@@ -40,7 +46,7 @@ export function OrderCard({
         opacity: 0,
         x: -100
       }}
-      className="bg-slate-800 rounded-xl p-4 cursor-pointer hover:bg-slate-750 transition-colors"
+      className="bg-slate-800 rounded-xl p-4 cursor-pointer hover:bg-slate-750 transition-colors border border-slate-700"
       onClick={() => onViewDetails(order)}>
 
       <div className="flex items-start justify-between mb-3">
@@ -53,18 +59,21 @@ export function OrderCard({
               <span className="text-lg font-bold text-white">
                 Table {order.tableNumber}
               </span>
-              {order.requiresKitchen &&
-              <UtensilsIcon
-                className="w-4 h-4 text-orange-400"
-                title="Requires kitchen" />
-
-              }
-              {!order.requiresKitchen &&
-              <WineIcon
-                className="w-4 h-4 text-purple-400"
-                title="Bar only" />
-
-              }
+              {isCustomerMenuOrder && (
+                <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 text-xs font-medium">
+                  <SmartphoneIcon className="w-3 h-3" />
+                  <span>QR Order</span>
+                </div>
+              )}
+              {order.requiresKitchen ? (
+                <UtensilsIcon
+                  className="w-4 h-4 text-orange-400"
+                  title="Requires kitchen" />
+              ) : (
+                <WineIcon
+                  className="w-4 h-4 text-purple-400"
+                  title="Bar only" />
+              )}
             </div>
             <p className="text-sm text-slate-400">{order.id}</p>
           </div>
@@ -74,14 +83,14 @@ export function OrderCard({
 
       <div className="space-y-1 mb-3">
         {order.items.slice(0, 3).map((item, index) =>
-        <div key={index} className="flex justify-between text-sm">
+          <div key={index} className="flex justify-between text-sm">
             <span className="text-slate-300">
               {item.quantity}x {item.menuItem.name}
             </span>
           </div>
         )}
         {order.items.length > 3 &&
-        <p className="text-sm text-slate-500">
+          <p className="text-sm text-slate-500">
             +{order.items.length - 3} more items
           </p>
         }

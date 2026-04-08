@@ -8,7 +8,11 @@ import {
   LogOutIcon,
   QrCodeIcon,
   UtensilsIcon,
-  SquareStackIcon
+  SquareStackIcon,
+  UsersIcon,
+  ClockIcon,
+  TrendingUpIcon,
+  BellIcon
 } from 'lucide-react';
 import { Order, Staff, CartItem } from '../../types';
 import { Card } from '../../components/ui/Card';
@@ -57,7 +61,7 @@ export function WaiterDashboard({
   onDismissWaiterCall,
   onLogout
 }: WaiterDashboardProps) {
-  const [activeTab, setActiveTab] = useState('new');
+  const [activeTab, setActiveTab] = useState('overview');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [showQRScanner, setShowQRScanner] = useState(false);
   const [showOrderEntry, setShowOrderEntry] = useState(false);
@@ -73,6 +77,7 @@ export function WaiterDashboard({
     joinRole('waiter');
 
     const handleWaiterCall = (data: { tableNumber: number; timestamp: Date }) => {
+      console.log('Waiter call received:', data);
       setSocketCalls((prev) => [...prev, { ...data, timestamp: new Date(data.timestamp) }]);
     };
 
@@ -82,6 +87,27 @@ export function WaiterDashboard({
       socket.off('waiter:call', handleWaiterCall);
     };
   }, [socket, joinRole]);
+
+  // Filter orders for this waiter - include customer menu orders (those without assignedWaiterId initially)
+  const waiterOrders = useMemo(
+    () =>
+      orders.filter(
+        (order) =>
+          order.assignedWaiterId === waiter.id ||
+          (typeof order.tableNumber === 'number' && waiter.assignedTables.includes(order.tableNumber)) ||
+          order.status === 'pending' // Show all pending orders from customer menu so waiters can claim them
+      ),
+    [orders, waiter.id, waiter.assignedTables]
+  );
+
+  // Separate customer menu orders from waiter-created orders
+  const customerMenuOrders = waiterOrders.filter(order => !order.assignedWaiterId || order.assignedWaiterId === waiter.id);
+  const waiterCreatedOrders = waiterOrders.filter(order => order.assignedWaiterId === waiter.id);
+
+  const newOrders = waiterOrders.filter((order) => order.status === 'pending');
+  const kitchenOrders = waiterOrders.filter((order) => ['verified', 'preparing'].includes(order.status));
+  const readyOrders = waiterOrders.filter((order) => order.status === 'ready');
+  const completedOrders = waiterOrders.filter((order) => order.status === 'served');
 
   const allWaiterCalls = useMemo(() => {
     const map = new Map<number, Date>();
@@ -94,28 +120,18 @@ export function WaiterDashboard({
     return Array.from(map.entries()).map(([tableNumber, timestamp]) => ({ tableNumber, timestamp }));
   }, [waiterCalls, socketCalls]);
 
-  const waiterOrders = useMemo(
-    () =>
-      orders.filter(
-        (order) =>
-          order.assignedWaiterId === waiter.id ||
-          (typeof order.tableNumber === 'number' && waiter.assignedTables.includes(order.tableNumber)) ||
-          order.status === 'pending' // Show all pending orders so waiters can claim them
-      ),
-    [orders, waiter.id, waiter.assignedTables]
-  );
-
-  const newOrders = waiterOrders.filter((order) => order.status === 'pending');
-  const kitchenOrders = waiterOrders.filter((order) => ['verified', 'preparing'].includes(order.status));
-  const readyOrders = waiterOrders.filter((order) => order.status === 'ready');
-  const completedOrders = waiterOrders.filter((order) => order.status === 'served');
-
   const todayServed = completedOrders.length;
   const avgServiceTime = waiter.performance.avgServiceTime;
   const waiterReviews = useMemo(() => loadReviews().filter((review) => review.waiterId === waiter.id), [waiter.id]);
   const waiterAvgRating = waiterReviews.length > 0
     ? Math.round((waiterReviews.reduce((sum, review) => sum + review.rating, 0) / waiterReviews.length) * 10) / 10
     : null;
+
+  // Calculate customer menu order stats
+  const customerMenuOrderCount = customerMenuOrders.length;
+  const recentCustomerOrders = customerMenuOrders.filter(order =>
+    new Date(order.createdAt).getTime() > Date.now() - 24 * 60 * 60 * 1000 // Last 24 hours
+  ).length;
 
   const handleApprove = (order: Order) => {
     const nextStatus = order.requiresKitchen ? 'preparing' : 'ready';
@@ -188,6 +204,7 @@ export function WaiterDashboard({
 
   return (
     <div className="dark min-h-screen bg-slate-900">
+      {/* Header */}
       <div className="sticky top-0 z-20 bg-slate-900/95 backdrop-blur-sm border-b border-slate-800 px-4 py-4">
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -199,7 +216,7 @@ export function WaiterDashboard({
                 <span className="text-xs text-slate-500">Waiter Portal</span>
               </div>
               <h1 className="text-2xl font-bold text-white">Welcome back, {waiter.name.split(' ')[0]}</h1>
-              <p className="text-sm text-slate-400">Confirm incoming orders for tables {waiter.assignedTables.join(', ') || 'N/A'} and route food to kitchen.</p>
+              <p className="text-sm text-slate-400">Manage customer orders from QR menu scans and direct table service.</p>
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
@@ -210,7 +227,7 @@ export function WaiterDashboard({
                 <QrCodeIcon className="w-5 h-5" />
                 <span>Take Table Order</span>
               </button>
-                    <button
+              <button
                 className="p-2 rounded-lg bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 transition-colors"
                 title="Table map unavailable"
                 disabled
@@ -227,9 +244,12 @@ export function WaiterDashboard({
             </div>
           </div>
 
+          {/* Connection Status & Waiter Calls */}
           <div className="flex flex-wrap items-center gap-2">
             <div className={`inline-flex h-2 w-2 rounded-full ${isOnline ? 'bg-emerald-400' : 'bg-red-500'}`} />
-            <span className={`text-xs ${isOnline ? 'text-emerald-300' : 'text-red-400'}`}>{isOnline ? 'Live order feed' : 'Offline mode'}</span>
+            <span className={`text-xs ${isOnline ? 'text-emerald-300' : 'text-red-400'}`}>
+              {isOnline ? 'Connected to customer menu' : 'Offline mode'}
+            </span>
             {pendingOperations > 0 && <span className="text-xs text-amber-400">{pendingOperations} pending syncs</span>}
           </div>
 
@@ -237,9 +257,12 @@ export function WaiterDashboard({
             <div className="mb-4 space-y-3">
               {allWaiterCalls.map((call) => (
                 <div key={call.tableNumber} className="rounded-3xl border border-amber-500/20 bg-amber-500/10 p-4 flex items-center justify-between gap-4">
-                  <div>
-                    <p className="text-sm text-amber-200 font-semibold">Assistance requested</p>
-                    <p className="text-white">Table {call.tableNumber} needs help</p>
+                  <div className="flex items-center gap-3">
+                    <BellIcon className="w-5 h-5 text-amber-300" />
+                    <div>
+                      <p className="text-sm text-amber-200 font-semibold">Customer assistance needed</p>
+                      <p className="text-white">Table {call.tableNumber} - from QR menu</p>
+                    </div>
                   </div>
                   <button
                     onClick={() => handleDismissCall(call.tableNumber)}
@@ -252,62 +275,90 @@ export function WaiterDashboard({
             </div>
           )}
 
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {/* Stats Cards */}
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
             <Card className="bg-slate-800 border border-slate-700 p-4">
-              <p className="text-sm text-slate-400 mb-2">Pending orders</p>
+              <div className="flex items-center gap-2 mb-2">
+                <UsersIcon className="w-4 h-4 text-amber-400" />
+                <p className="text-sm text-slate-400">Customer Orders</p>
+              </div>
+              <p className="text-3xl font-bold text-white">{customerMenuOrderCount}</p>
+              <p className="text-xs text-slate-500">From QR menu scans</p>
+            </Card>
+            <Card className="bg-slate-800 border border-slate-700 p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <ClockIcon className="w-4 h-4 text-blue-400" />
+                <p className="text-sm text-slate-400">Pending</p>
+              </div>
               <p className="text-3xl font-bold text-white">{newOrders.length}</p>
-              <p className="text-xs text-slate-500">Needs table confirmation</p>
+              <p className="text-xs text-slate-500">Awaiting confirmation</p>
             </Card>
             <Card className="bg-slate-800 border border-slate-700 p-4">
-              <p className="text-sm text-slate-400 mb-2">Kitchen queue</p>
+              <div className="flex items-center gap-2 mb-2">
+                <UtensilsIcon className="w-4 h-4 text-orange-400" />
+                <p className="text-sm text-slate-400">Kitchen</p>
+              </div>
               <p className="text-3xl font-bold text-white">{kitchenOrders.length}</p>
-              <p className="text-xs text-slate-500">Food orders in progress</p>
+              <p className="text-xs text-slate-500">Food in preparation</p>
             </Card>
             <Card className="bg-slate-800 border border-slate-700 p-4">
-              <p className="text-sm text-slate-400 mb-2">Ready to serve</p>
+              <div className="flex items-center gap-2 mb-2">
+                <CheckCircleIcon className="w-4 h-4 text-green-400" />
+                <p className="text-sm text-slate-400">Ready</p>
+              </div>
               <p className="text-3xl font-bold text-white">{readyOrders.length}</p>
-              <p className="text-xs text-slate-500">Orders prepared and waiting</p>
+              <p className="text-xs text-slate-500">Ready to serve</p>
             </Card>
             <Card className="bg-slate-800 border border-slate-700 p-4">
-              <p className="text-sm text-slate-400 mb-2">Served today</p>
+              <div className="flex items-center gap-2 mb-2">
+                <TrendingUpIcon className="w-4 h-4 text-purple-400" />
+                <p className="text-sm text-slate-400">Served</p>
+              </div>
               <p className="text-3xl font-bold text-white">{completedOrders.length}</p>
-              <p className="text-xs text-slate-500">Orders completed on your shift</p>
+              <p className="text-xs text-slate-500">Completed today</p>
             </Card>
           </div>
         </div>
       </div>
 
+      {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 py-6">
         <section className="mb-6">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <h2 className="text-xl font-semibold text-white">Orders workflow</h2>
-              <p className="text-sm text-slate-400">Approve each order after confirming with the customer at the table, then route food to the kitchen.</p>
+              <h2 className="text-xl font-semibold text-white">Order Management</h2>
+              <p className="text-sm text-slate-400">Handle customer orders from QR menu scans and manage the complete service workflow.</p>
             </div>
             <div className="flex flex-wrap gap-2">
               <button
-                onClick={() => setActiveTab('new')}
-                className={`px-4 py-2 rounded-full ${activeTab === 'new' ? 'bg-amber-500 text-slate-950' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+                onClick={() => setActiveTab('overview')}
+                className={`px-4 py-2 rounded-full ${activeTab === 'overview' ? 'bg-amber-500 text-slate-950' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
               >
-                New
+                Overview
+              </button>
+              <button
+                onClick={() => setActiveTab('pending')}
+                className={`px-4 py-2 rounded-full ${activeTab === 'pending' ? 'bg-amber-500 text-slate-950' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+              >
+                Pending ({newOrders.length})
               </button>
               <button
                 onClick={() => setActiveTab('kitchen')}
                 className={`px-4 py-2 rounded-full ${activeTab === 'kitchen' ? 'bg-amber-500 text-slate-950' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
               >
-                Kitchen
+                Kitchen ({kitchenOrders.length})
               </button>
               <button
                 onClick={() => setActiveTab('ready')}
                 className={`px-4 py-2 rounded-full ${activeTab === 'ready' ? 'bg-amber-500 text-slate-950' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
               >
-                Ready
+                Ready ({readyOrders.length})
               </button>
               <button
                 onClick={() => setActiveTab('served')}
                 className={`px-4 py-2 rounded-full ${activeTab === 'served' ? 'bg-amber-500 text-slate-950' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
               >
-                Served
+                Served ({completedOrders.length})
               </button>
             </div>
           </div>
@@ -316,13 +367,62 @@ export function WaiterDashboard({
         <section className="grid gap-6 xl:grid-cols-[1.8fr_1fr]">
           <div className="space-y-4">
             <AnimatePresence mode="wait">
-              {activeTab === 'new' && (
-                <motion.div key="new" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -16 }} className="space-y-4">
+              {activeTab === 'overview' && (
+                <motion.div key="overview" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -16 }} className="space-y-6">
+                  {/* Customer Menu Integration Section */}
+                  <div className="rounded-3xl border border-slate-700 bg-slate-900/80 p-6">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="rounded-2xl bg-blue-500/10 p-3 text-blue-300">
+                        <UsersIcon className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-semibold text-white">Customer Menu Activity</h3>
+                        <p className="text-sm text-slate-400">Real-time orders from QR code scans</p>
+                      </div>
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="rounded-2xl bg-slate-800/50 p-4">
+                        <p className="text-sm text-slate-400 mb-1">Active Customer Orders</p>
+                        <p className="text-2xl font-bold text-white">{customerMenuOrderCount}</p>
+                      </div>
+                      <div className="rounded-2xl bg-slate-800/50 p-4">
+                        <p className="text-sm text-slate-400 mb-1">Orders in Last 24h</p>
+                        <p className="text-2xl font-bold text-white">{recentCustomerOrders}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Quick Actions */}
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    {newOrders.slice(0, 4).map((order) => (
+                      <OrderCard
+                        key={order.id}
+                        order={order}
+                        onViewDetails={setSelectedOrder}
+                        onApprove={handleApprove}
+                        onReject={handleReject}
+                        onPrintReceipt={handlePrintReceipt}
+                      />
+                    ))}
+                  </div>
+
+                  {newOrders.length === 0 && (
+                    <EmptyState
+                      icon={<ClipboardListIcon className="w-8 h-8" />}
+                      title="No active orders"
+                      description="Customer orders from QR menu scans will appear here automatically."
+                    />
+                  )}
+                </motion.div>
+              )}
+
+              {activeTab === 'pending' && (
+                <motion.div key="pending" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -16 }} className="space-y-4">
                   {newOrders.length === 0 ? (
                     <EmptyState
                       icon={<ClipboardListIcon className="w-8 h-8" />}
-                      title="No new orders"
-                      description="Incoming orders for your assigned tables will appear here."
+                      title="No pending orders"
+                      description="New orders from customer menu scans will appear here for approval."
                     />
                   ) : (
                     newOrders.map((order) => (
@@ -345,7 +445,7 @@ export function WaiterDashboard({
                     <EmptyState
                       icon={<UtensilsIcon className="w-8 h-8" />}
                       title="No kitchen orders"
-                      description="Food orders approved and being prepared appear here."
+                      description="Orders requiring kitchen preparation appear here."
                     />
                   ) : (
                     kitchenOrders.map((order) => (
@@ -367,7 +467,7 @@ export function WaiterDashboard({
                     <EmptyState
                       icon={<CheckCircleIcon className="w-8 h-8" />}
                       title="No ready orders"
-                      description="Orders ready to serve will appear here."
+                      description="Prepared orders ready for service appear here."
                     />
                   ) : (
                     readyOrders.map((order) => (
@@ -389,7 +489,7 @@ export function WaiterDashboard({
                     <EmptyState
                       icon={<StarIcon className="w-8 h-8" />}
                       title="No served orders"
-                      description="Orders served during your shift are visible here."
+                      description="Completed orders from your shift are tracked here."
                     />
                   ) : (
                     completedOrders.map((order) => (
@@ -406,18 +506,46 @@ export function WaiterDashboard({
             </AnimatePresence>
           </div>
 
+          {/* Sidebar */}
           <aside className="space-y-4">
+            {/* Performance Summary */}
             <div className="rounded-3xl border border-slate-700 bg-slate-900/80 p-5">
               <div className="flex items-center justify-between gap-3 mb-4">
                 <div>
-                  <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Your KPIs</p>
-                  <h3 className="text-lg font-semibold text-white">Progress tracker</h3>
+                  <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Performance</p>
+                  <h3 className="text-lg font-semibold text-white">Your Shift Summary</h3>
                 </div>
-                <span className="rounded-full bg-slate-800 px-3 py-1 text-xs text-slate-400">{kpis.length} targets</span>
+                <span className="rounded-full bg-slate-800 px-3 py-1 text-xs text-slate-400">{completedOrders.length} served</span>
+              </div>
+
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-slate-400">Avg Service Time</span>
+                  <span className="text-sm font-semibold text-white">{avgServiceTime} min</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-slate-400">Customer Rating</span>
+                  <span className="text-sm font-semibold text-white">{waiterAvgRating ?? '—'}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-slate-400">Tables Served</span>
+                  <span className="text-sm font-semibold text-white">{waiter.assignedTables.length}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* KPIs */}
+            <div className="rounded-3xl border border-slate-700 bg-slate-900/80 p-5">
+              <div className="flex items-center justify-between gap-3 mb-4">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Goals</p>
+                  <h3 className="text-lg font-semibold text-white">Daily Targets</h3>
+                </div>
+                <span className="rounded-full bg-slate-800 px-3 py-1 text-xs text-slate-400">{kpis.length} active</span>
               </div>
 
               {kpis.length === 0 ? (
-                <p className="text-sm text-slate-400">No KPIs assigned yet. Ask your manager to set daily goals.</p>
+                <p className="text-sm text-slate-400">No KPIs assigned yet. Check with your manager.</p>
               ) : (
                 <div className="space-y-4">
                   {kpis.map((kpi) => {
@@ -425,11 +553,11 @@ export function WaiterDashboard({
                     const target = kpi.target_value || 1;
                     const percent = Math.min(100, Math.round((current / target) * 100));
                     return (
-                      <div key={kpi.id} className="rounded-3xl border border-slate-700 bg-slate-800/80 p-4">
+                      <div key={kpi.id} className="rounded-2xl border border-slate-700 bg-slate-800/80 p-4">
                         <div className="flex items-start justify-between gap-3">
                           <div>
                             <p className="text-sm text-slate-400">{kpi.name}</p>
-                            <p className="text-xs text-slate-500">{kpi.period === 'daily' ? 'Daily target' : kpi.period === 'weekly' ? 'Weekly target' : 'Monthly target'}</p>
+                            <p className="text-xs text-slate-500">{kpi.period === 'daily' ? 'Daily' : kpi.period === 'weekly' ? 'Weekly' : 'Monthly'}</p>
                           </div>
                           <div className="text-right">
                             <p className="text-lg font-semibold text-white">{current}/{target}</p>
@@ -446,39 +574,28 @@ export function WaiterDashboard({
               )}
             </div>
 
+            {/* Customer Menu Connection Status */}
             <div className="rounded-3xl border border-slate-700 bg-slate-900/80 p-5">
               <div className="flex items-center gap-3 mb-4">
-                <div className="rounded-2xl bg-amber-500/10 p-3 text-amber-300">
-                  <SquareStackIcon className="w-5 h-5" />
+                <div className="rounded-2xl bg-green-500/10 p-3 text-green-300">
+                  <UsersIcon className="w-5 h-5" />
                 </div>
                 <div>
-                  <p className="text-sm text-slate-400">Waiter summary</p>
-                  <p className="text-lg font-semibold text-white">{waiter.name}</p>
+                  <p className="text-sm text-slate-400">Menu Integration</p>
+                  <p className="text-lg font-semibold text-white">Connected</p>
                 </div>
               </div>
-              <div className="grid gap-3 text-sm text-slate-400">
-                <div className="flex items-center justify-between">
-                  <span>Assigned tables</span>
-                  <span>{waiter.assignedTables.length}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span>Avg service</span>
-                  <span>{avgServiceTime} min</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span>Average rating</span>
-                  <span>{waiterAvgRating ?? '—'}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span>Completed today</span>
-                  <span>{todayServed}</span>
-                </div>
+              <p className="text-xs text-slate-500 mb-3">Real-time sync with customer QR orders</p>
+              <div className="flex items-center gap-2">
+                <div className="h-2 w-2 rounded-full bg-green-400" />
+                <span className="text-xs text-green-300">Live updates active</span>
               </div>
             </div>
           </aside>
         </section>
       </div>
 
+      {/* Modals */}
       {showQRScanner && (
         <QRScanner
           onScan={(tableNumber) => {
