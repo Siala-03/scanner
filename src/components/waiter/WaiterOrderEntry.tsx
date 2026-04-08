@@ -12,7 +12,7 @@ import {
   ClockIcon,
   CheckIcon
 } from 'lucide-react';
-import { MenuItem, OrderItem } from '../../types/index';
+import { MenuItem, OrderItem, CartItem } from '../../types/index';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
@@ -23,14 +23,14 @@ interface WaiterOrderEntryProps {
   tableNumber: number;
   isOpen: boolean;
   onClose: () => void;
-  onSubmitOrder: (items: OrderItem[], notes?: string) => void;
+  onSubmitOrder: (items: CartItem[], notes?: string) => void;
   existingOrder?: {
     id: string;
     items: OrderItem[];
   } | null;
 }
 
-interface CartItem extends OrderItem {
+interface LocalCartItem extends OrderItem {
   tempId: string;
   notes?: string;
   modifiers?: string[];
@@ -46,7 +46,7 @@ export function WaiterOrderEntry({
   const { menuItems, isLoading } = useMenu();
   const [activeCategory, setActiveCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [cart, setCart] = useState<CartItem[]>([]);
+  const [cart, setCart] = useState<LocalCartItem[]>([]);
   const [orderNotes, setOrderNotes] = useState('');
   const [showItemDetail, setShowItemDetail] = useState<MenuItem | null>(null);
   const [itemQuantity, setItemQuantity] = useState(1);
@@ -147,8 +147,11 @@ export function WaiterOrderEntry({
     
     setIsSubmitting(true);
     try {
-      // Remove tempId from items before submitting
-      const orderItems: OrderItem[] = cart.map(({ tempId, ...item }) => item);
+      const orderItems: CartItem[] = cart.map(({ tempId, ...item }) => ({
+        menuItem: item.menuItem as any,
+        quantity: item.quantity,
+        specialInstructions: item.specialInstructions
+      }));
       await onSubmitOrder(orderItems, orderNotes || undefined);
       setCart([]);
       setOrderNotes('');

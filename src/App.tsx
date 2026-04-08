@@ -21,7 +21,6 @@ import { QRCodeGenerator } from './pages/manager/QRCodeGenerator';
 import ExpenseApproval from './components/manager/ExpenseApproval';
 import SupervisorExpenseManagement from './components/supervisor/ExpenseManagement';
 import { InventoryManagement } from './pages/shared/InventoryManagement';
-import { QRScanner } from './components/waiter/QRScanner';
 import { KitchenDisplay } from './pages/kitchen/KitchenDisplay';
 import { LoginPage } from './pages/auth/LoginPage';
 import { SuperAdminDashboard } from './pages/superadmin/SuperAdminDashboard';
@@ -48,8 +47,11 @@ export function App() {
   const [supervisorPage, setSupervisorPage] =
   useState<SupervisorPage>('dashboard');
   const [routeResolved, setRouteResolved] = useState(false);
-  const [supervisorScannedTable, setSupervisorScannedTable] = useState<number | null>(null);
-  const { tables, isLoading: isTablesLoading, addTable, removeTable, refetch: reloadTables } = useTables();
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanningTable, setScanningTable] = useState<number | null>(null);
+  const [detectedTable, setDetectedTable] = useState<number | null>(null);
+  const [showQRGrid, setShowQRGrid] = useState(false);
+  const { tables, addTable, removeTable } = useTables();
 
   // Load auth state from localStorage on mount
   useEffect(() => {
@@ -112,8 +114,8 @@ export function App() {
   }, []);
 
   const handlePlaceOrder = useCallback(
-    (tableNum: number, items: CartItem[], specialInstructions?: string, customer?: Customer | null, delivery?: { provider: string; address: string }, loyaltyRewardId?: string) => {
-      addOrder(tableNum, items, specialInstructions, customer, delivery, loyaltyRewardId);
+    async (tableNum: number, items: CartItem[], specialInstructions?: string, customer?: Customer | null, delivery?: { provider: string; address: string }, loyaltyRewardId?: string) => {
+      await addOrder(tableNum, items, specialInstructions, customer, delivery, loyaltyRewardId);
       handleCallWaiter(tableNum);
     },
     [addOrder, handleCallWaiter]
@@ -470,6 +472,7 @@ export function App() {
           orders={orders}
           restaurantName={restaurantName}
           onUpdateOrderStatus={handleUpdateOrderStatus}
+          onCreateOrder={handlePlaceOrder}
           waiterCalls={waiterCalls}
           onDismissWaiterCall={handleDismissWaiterCall}
           onLogout={handleBack} />
