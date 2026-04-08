@@ -40,6 +40,7 @@ export function App() {
   const [authUser, setAuthUser] = useState<Staff | null>(null);
   const [supplierUser, setSupplierUser] = useState<SupplierUser | null>(null);
   const [restaurantName, setRestaurantName] = useState<string>('');
+  const [currentRestaurantId, setCurrentRestaurantId] = useState<string | null>(null);
   const [tableNumber, setTableNumber] = useState<number | null>(null);
   const [managerPage, setManagerPage] = useState<ManagerPage>('dashboard');
   const [supervisorPage, setSupervisorPage] =
@@ -60,10 +61,17 @@ export function App() {
           user.restaurantId = savedRestaurantId;
         }
         setAuthUser(user);
+        if (user.restaurantId) {
+          setCurrentRestaurantId(user.restaurantId);
+        } else if (savedRestaurantId) {
+          setCurrentRestaurantId(savedRestaurantId);
+        }
       } catch (error) {
         console.error('Failed to parse saved auth user:', error);
         localStorage.removeItem('authUser');
       }
+    } else if (savedRestaurantId) {
+      setCurrentRestaurantId(savedRestaurantId);
     }
     if (savedSelectedRole) {
       setSelectedRole(savedSelectedRole as UserRole);
@@ -120,6 +128,11 @@ export function App() {
     setWaiterCalls((prev) =>
     prev.filter((call) => call.tableNumber !== tableNum)
     );
+  }, []);
+
+  const persistRestaurantContext = useCallback((restaurantId: string) => {
+    localStorage.setItem('restaurantId', restaurantId);
+    setCurrentRestaurantId(restaurantId);
   }, []);
 
   const handleGoSupplierPortal = () => {
@@ -236,11 +249,29 @@ export function App() {
     const path = window.location.pathname;
     const query = new URLSearchParams(window.location.search);
 
+    // Check for restaurant-specific table QR code path: /r/:restaurantId/t/:table
+    const restaurantTableMatch = path.match(/^\/r\/([^/]+)\/t\/(\d+)/);
+    if (restaurantTableMatch) {
+      const parsedRestaurantId = decodeURIComponent(restaurantTableMatch[1]);
+      const num = parseInt(restaurantTableMatch[2], 10);
+      if (!isNaN(num)) {
+        persistRestaurantContext(parsedRestaurantId);
+        setSelectedRole('customer');
+        setTableNumber(num);
+        setRouteResolved(true);
+        return;
+      }
+    }
+
     // Check for query table: ?table=123
     const queryTable = query.get('table');
     if (queryTable) {
       const num = parseInt(queryTable, 10);
       if (!isNaN(num)) {
+        const restaurantIdFromQuery = query.get('restaurantId');
+        if (restaurantIdFromQuery) {
+          persistRestaurantContext(restaurantIdFromQuery);
+        }
         setSelectedRole('customer');
         setTableNumber(num);
         setRouteResolved(true);
@@ -253,6 +284,10 @@ export function App() {
     if (tableMatch) {
       const num = parseInt(tableMatch[1], 10);
       if (!isNaN(num)) {
+        const restaurantIdFromQuery = query.get('restaurantId');
+        if (restaurantIdFromQuery) {
+          persistRestaurantContext(restaurantIdFromQuery);
+        }
         setSelectedRole('customer');
         setTableNumber(num);
         setRouteResolved(true);
@@ -324,12 +359,12 @@ export function App() {
 
   useEffect(() => {
     let active = true;
-    if (!authUser?.restaurantId) {
+    if (!currentRestaurantId) {
       setRestaurantName('');
       return;
     }
 
-    fetchRestaurant(authUser.restaurantId)
+    fetchRestaurant(currentRestaurantId)
       .then((restaurant: { name?: string }) => {
         if (!active) return;
         setRestaurantName(restaurant.name || '');
@@ -342,7 +377,7 @@ export function App() {
     return () => {
       active = false;
     };
-  }, [authUser?.restaurantId]);
+  }, [currentRestaurantId]);
 
   // Auth flow for staff roles - single login page
   if (!routeResolved) {
@@ -388,6 +423,7 @@ export function App() {
         <CustomerApp
           tableNumber={tableNumber}
           orders={orders}
+          restaurantName={restaurantName}
           onPlaceOrder={handlePlaceOrder}
           onCallWaiter={() => handleCallWaiter(tableNumber)}
         />
@@ -424,6 +460,7 @@ export function App() {
         <WaiterDashboard
           waiter={authUser}
           orders={orders}
+          restaurantName={restaurantName}
           onUpdateOrderStatus={handleUpdateOrderStatus}
           waiterCalls={waiterCalls}
           onDismissWaiterCall={handleDismissWaiterCall}
@@ -514,6 +551,7 @@ export function App() {
         {supervisorPage === 'qrcodes' && (
           <QRCodeGenerator
             tables={tables}
+            restaurantId={currentRestaurantId ?? undefined}
             restaurantName={restaurantName}
             onAddTable={addTable}
           />
@@ -594,6 +632,7 @@ export function App() {
             {managerPage === 'qrcodes' && (
               <QRCodeGenerator
                 tables={tables}
+                restaurantId={currentRestaurantId ?? undefined}
                 restaurantName={restaurantName}
                 onAddTable={addTable}
               />
@@ -700,6 +739,7 @@ export function App() {
                 localStorage.setItem('selectedRole', user.role);
                 if (user.restaurantId) {
                   localStorage.setItem('restaurantId', user.restaurantId);
+                  setCurrentRestaurantId(user.restaurantId);
                 }
               }}
               onBack={() => {}} />

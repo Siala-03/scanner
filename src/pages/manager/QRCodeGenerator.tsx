@@ -7,6 +7,7 @@ interface QRCodeGeneratorProps {
   tables: number[];
   onAddTable: () => Promise<void>;
   baseUrl?: string;
+  restaurantId?: string;
   restaurantName?: string;
 }
 
@@ -14,6 +15,7 @@ export function QRCodeGenerator({
   tables,
   onAddTable,
   baseUrl,
+  restaurantId,
   restaurantName
 }: QRCodeGeneratorProps) {
   const [isAddingTable, setIsAddingTable] = useState(false);
@@ -104,7 +106,9 @@ export function QRCodeGenerator({
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {validTables.map((tableNum) => {
-              const qrLink = `${resolvedBaseUrl}/t/${tableNum}`;
+              const qrLink = restaurantId
+                ? `${resolvedBaseUrl}/r/${encodeURIComponent(restaurantId)}/t/${tableNum}`
+                : `${resolvedBaseUrl}/t/${tableNum}`;
               return (
                 <div
                   key={tableNum}

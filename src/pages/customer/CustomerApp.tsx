@@ -14,6 +14,7 @@ import { OrderStatusPage } from './OrderStatusPage';
 interface CustomerAppProps {
   tableNumber: number;
   orders: Order[];
+  restaurantName?: string;
   onPlaceOrder: (
   tableNumber: number,
   items: CartItem[],
@@ -29,6 +30,7 @@ type CustomerTab = 'menu' | 'cart' | 'orders';
 export function CustomerApp({
   tableNumber,
   orders,
+  restaurantName,
   onPlaceOrder,
   onCallWaiter
 }: CustomerAppProps) {
@@ -131,6 +133,12 @@ export function CustomerApp({
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-slate-100">
+      {restaurantName && (
+        <div className="bg-white/95 border-b border-slate-200 p-4 text-center shadow-sm">
+          <p className="text-xs uppercase tracking-[0.25em] text-slate-500">Dining at</p>
+          <h2 className="text-lg font-semibold text-slate-900">{restaurantName}</h2>
+        </div>
+      )}
       {/* Toast Notification */}
       <AnimatePresence>
         {showToast &&

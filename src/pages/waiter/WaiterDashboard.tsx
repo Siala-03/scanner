@@ -31,6 +31,7 @@ import { useSocket } from '../../hooks/useSocket';
 interface WaiterDashboardProps {
   waiter: Staff;
   orders: Order[];
+  restaurantName?: string;
   onUpdateOrderStatus: (
     orderId: string,
     status: 'verified' | 'preparing' | 'ready' | 'served' | 'cancelled',
@@ -51,6 +52,7 @@ interface WaiterDashboardProps {
 export function WaiterDashboard({
   waiter,
   orders,
+  restaurantName,
   onUpdateOrderStatus,
   onCreateOrder,
   waiterCalls = [],
@@ -168,8 +170,7 @@ export function WaiterDashboard({
   const handlePrintReceipt = async (order: Order) => {
     // Configuration for the receipt (in production, this would come from restaurant settings)
     const receiptOptions: Parameters<typeof orderToReceiptData>[1] = {
-      restaurantName: 'Servv Restaurant',
-      restaurantAddress: '123 Main Street, City',
+        restaurantName: restaurantName || 'Servv Restaurant',
       restaurantPhone: '(555) 123-4567',
       restaurantEmail: 'info@servv.com',
       taxRate: 18, // 18% tax (configurable by manager)
@@ -252,133 +253,129 @@ export function WaiterDashboard({
     <div className="dark min-h-screen bg-slate-900">
       {/* Header */}
       <div className="sticky top-0 z-20 bg-slate-900/95 backdrop-blur-sm border-b border-slate-800 px-4 py-4">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h1 className="text-xl font-bold text-white">
-              Hello, {waiter.name.split(' ')[0]}
-            </h1>
-            <p className="text-sm text-slate-400">
-              Tables {waiter.assignedTables.join(', ')}
-            </p>
-            {/* Offline Status Indicator */}
-            <div className="flex items-center gap-2 mt-1">
-              <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-green-500' : 'bg-red-500'}`}></div>
-              <span className={`text-xs ${isOnline ? 'text-green-400' : 'text-red-400'}`}>
-                {isOnline ? 'Online' : 'Offline'}
-              </span>
-              {!isOnline && pendingOperations > 0 && (
-                <span className="text-xs text-amber-400">
-                  {pendingOperations} pending sync
-                </span>
-              )}
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h1 className="text-xl font-bold text-white">
+                Hello, {waiter.name.split(' ')[0]}
+              </h1>
+              <p className="text-sm text-slate-400">{restaurantName || 'Restaurant'} · Waiter Dashboard</p>
+              <p className="text-sm text-slate-400">Tables {waiter.assignedTables.join(', ')}</p>
             </div>
-          </div>
-          <div className="flex items-center gap-3">
-            {/* Take Order Button */}
-            <button
-              onClick={() => setShowQRScanner(true)}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-500 text-white font-medium hover:bg-amber-600 transition-colors"
-              title="Scan QR or enter table manually">
-              <QrCodeIcon className="w-5 h-5" />
-              <span className="hidden sm:inline">Take Order</span>
-            </button>
 
-            <button
-              onClick={() => setShowTableMap(true)}
-              className="p-2 rounded-lg bg-slate-800 text-slate-400 hover:text-white transition-colors"
-              title="Table Map">
-              <MapIcon className="w-5 h-5" />
-            </button>
-            <button className="relative p-2 rounded-lg bg-slate-800 text-slate-400 hover:text-white transition-colors">
-              <BellIcon className="w-5 h-5" />
-              {(newOrders.length > 0 || allWaiterCalls.length > 0) &&
-              <span className="absolute -top-1 -right-1 w-5 h-5 bg-amber-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
-                  {newOrders.length + allWaiterCalls.length}
-                </span>
-              }
-            </button>
-            <button
-              onClick={onLogout}
-              className="p-2 rounded-lg bg-slate-800 text-slate-400 hover:text-red-400 transition-colors"
-              title="Logout">
-              <LogOutIcon className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
-
-        {/* Waiter Calls Alerts */}
-        {allWaiterCalls.length > 0 &&
-        <div className="mb-4 space-y-2">
-            {allWaiterCalls.map((call) =>
-          <div
-            key={call.tableNumber}
-            className="bg-amber-500/20 border border-amber-500/50 rounded-lg p-3 flex items-center justify-between">
-
-                <div className="flex items-center gap-2">
-                  <BellIcon className="w-5 h-5 text-amber-400" />
-                  <span className="text-amber-400 font-medium">
-                    Table {call.tableNumber} needs assistance
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                onClick={() => setShowQRScanner(true)}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-500 text-white font-medium hover:bg-amber-600 transition-colors"
+                title="Scan QR or enter table manually">
+                <QrCodeIcon className="w-5 h-5" />
+                <span className="hidden sm:inline">Take Order</span>
+              </button>
+              <button
+                onClick={() => setShowTableMap(true)}
+                className="p-2 rounded-lg bg-slate-800 text-slate-400 hover:text-white transition-colors"
+                title="Table Map">
+                <MapIcon className="w-5 h-5" />
+              </button>
+              <button className="relative p-2 rounded-lg bg-slate-800 text-slate-400 hover:text-white transition-colors">
+                <BellIcon className="w-5 h-5" />
+                {(newOrders.length > 0 || allWaiterCalls.length > 0) && (
+                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-amber-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
+                    {newOrders.length + allWaiterCalls.length}
                   </span>
-                </div>
-                <button
-              onClick={() => handleDismissCall(call.tableNumber)}
-              className="text-amber-400 hover:text-amber-300 text-sm font-medium px-2 py-1 bg-amber-500/20 rounded">
-
-                  Dismiss
-                </button>
-              </div>
-          )}
-          </div>
-        }
-
-        {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-4">
-          <Card className="bg-slate-800 p-3" padding="none">
-            <div className="text-center">
-              <p className="text-2xl font-bold text-amber-400">
-                {newOrders.length}
-              </p>
-              <p className="text-xs text-slate-400">Pending</p>
+                )}
+              </button>
+              <button
+                onClick={onLogout}
+                className="p-2 rounded-lg bg-slate-800 text-slate-400 hover:text-red-400 transition-colors"
+                title="Logout">
+                <LogOutIcon className="w-5 h-5" />
+              </button>
             </div>
-          </Card>
-          <Card className="bg-slate-800 p-3 col-span-2 md:col-span-1" padding="none">
-            <div className="text-center">
-              <div className="flex items-center justify-center gap-1 text-yellow-400 mb-1">
-                <StarIcon className="w-4 h-4" />
-                <p className="text-lg font-bold">
-                  {waiterAvgRating ?? '—'}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-green-500' : 'bg-red-500'}`} />
+            <span className={`text-xs ${isOnline ? 'text-green-400' : 'text-red-400'}`}>
+              {isOnline ? 'Online' : 'Offline'}
+            </span>
+            {!isOnline && pendingOperations > 0 && (
+              <span className="text-xs text-amber-400">
+                {pendingOperations} pending sync
+              </span>
+            )}
+          </div>
+
+          {allWaiterCalls.length > 0 && (
+            <div className="mb-4 space-y-2">
+              {allWaiterCalls.map((call) => (
+                <div
+                  key={call.tableNumber}
+                  className="bg-amber-500/20 border border-amber-500/50 rounded-lg p-3 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <BellIcon className="w-5 h-5 text-amber-400" />
+                    <span className="text-amber-400 font-medium">
+                      Table {call.tableNumber} needs assistance
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => handleDismissCall(call.tableNumber)}
+                    className="text-amber-400 hover:text-amber-300 text-sm font-medium px-2 py-1 bg-amber-500/20 rounded">
+                    Dismiss
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-4">
+            <Card className="bg-slate-800 p-3" padding="none">
+              <div className="text-center">
+                <p className="text-2xl font-bold text-amber-400">
+                  {newOrders.length}
+                </p>
+                <p className="text-xs text-slate-400">Pending</p>
+              </div>
+            </Card>
+            <Card className="bg-slate-800 p-3 col-span-2 md:col-span-1" padding="none">
+              <div className="text-center">
+                <div className="flex items-center justify-center gap-1 text-yellow-400 mb-1">
+                  <StarIcon className="w-4 h-4" />
+                  <p className="text-lg font-bold">
+                    {waiterAvgRating ?? '—'}
+                  </p>
+                </div>
+                <p className="text-xs text-slate-400">
+                  Your rating {waiterReviews.length > 0 ? `(${waiterReviews.length})` : ''}
                 </p>
               </div>
-              <p className="text-xs text-slate-400">
-                Your rating {waiterReviews.length > 0 ? `(${waiterReviews.length})` : ''}
-              </p>
-            </div>
-          </Card>
-          <Card className="bg-slate-800 p-3" padding="none">
-            <div className="text-center">
-              <p className="text-2xl font-bold text-blue-400">
-                {activeOrders.length}
-              </p>
-              <p className="text-xs text-slate-400">Active</p>
-            </div>
-          </Card>
-          <Card className="bg-slate-800 p-3" padding="none">
-            <div className="text-center">
-              <p className="text-2xl font-bold text-green-400">{todayServed}</p>
-              <p className="text-xs text-slate-400">Served</p>
-            </div>
-          </Card>
-          <Card className="bg-slate-800 p-3" padding="none">
-            <div className="text-center">
-              <p className="text-2xl font-bold text-purple-400">
-                {avgServiceTime}m
-              </p>
-              <p className="text-xs text-slate-400">Avg Time</p>
-            </div>
-          </Card>
-        </div>
+            </Card>
+            <Card className="bg-slate-800 p-3" padding="none">
+              <div className="text-center">
+                <p className="text-2xl font-bold text-blue-400">
+                  {activeOrders.length}
+                </p>
+                <p className="text-xs text-slate-400">Active</p>
+              </div>
+            </Card>
+            <Card className="bg-slate-800 p-3" padding="none">
+              <div className="text-center">
+                <p className="text-2xl font-bold text-green-400">{todayServed}</p>
+                <p className="text-xs text-slate-400">Served</p>
+              </div>
+            </Card>
+            <Card className="bg-slate-800 p-3" padding="none">
+              <div className="text-center">
+                <p className="text-2xl font-bold text-purple-400">
+                  {avgServiceTime}m
+                </p>
+                <p className="text-xs text-slate-400">Avg Time</p>
+              </div>
+            </Card>
+          </div>
 
-        <Tabs tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} />
+          <Tabs tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} />
+        </div>
       </div>
 
       {/* KPIs Section */}
