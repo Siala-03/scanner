@@ -65,9 +65,10 @@ function formatTime(createdAt: string): string {
   return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 }
 
-async function fetchKitchenOrders(): Promise<KitchenOrder[]> {
+async function fetchKitchenOrders(restaurantId?: string): Promise<KitchenOrder[]> {
   try {
-    const res = await fetch(`${API_BASE}/api/orders/kitchen`);
+    const query = restaurantId ? `?restaurantId=${encodeURIComponent(restaurantId)}` : '';
+    const res = await fetch(`${API_BASE}/api/orders/kitchen${query}`);
     if (!res.ok) throw new Error('Failed to fetch');
     const data = await res.json();
     return data
@@ -94,9 +95,10 @@ async function fetchKitchenOrders(): Promise<KitchenOrder[]> {
   }
 }
 
-async function fetchKitchenAnalytics(): Promise<any> {
+async function fetchKitchenAnalytics(restaurantId?: string): Promise<any> {
   try {
-    const res = await fetch(`${API_BASE}/api/orders/kitchen/analytics`);
+    const query = restaurantId ? `?restaurantId=${encodeURIComponent(restaurantId)}` : '';
+    const res = await fetch(`${API_BASE}/api/orders/kitchen/analytics${query}`);
     if (!res.ok) throw new Error('Failed to fetch analytics');
     return await res.json();
   } catch (e) {
@@ -153,7 +155,7 @@ function calculateStats(orders: KitchenOrder[], completedToday: number[]): Kitch
   };
 }
 
-export function KitchenDisplay({ onLogout }: { onLogout?: () => void } = {}) {
+export function KitchenDisplay({ onLogout, restaurantId, restaurantName }: { onLogout?: () => void; restaurantId?: string; restaurantName?: string } = {}) {
   const [orders, setOrders] = useState<KitchenOrder[]>([]);
   const [completedToday, setCompletedToday] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
@@ -175,15 +177,15 @@ export function KitchenDisplay({ onLogout }: { onLogout?: () => void } = {}) {
 
   const loadOrders = useCallback(async () => {
     const [data, analyticsData] = await Promise.all([
-      fetchKitchenOrders(),
-      fetchKitchenAnalytics()
+      fetchKitchenOrders(restaurantId),
+      fetchKitchenAnalytics(restaurantId)
     ]);
     
     setOrders(data);
     setAnalytics(analyticsData);
     setLastUpdate(new Date());
     setLoading(false);
-  }, []);
+  }, [restaurantId]);
 
   useEffect(() => {
     loadOrders();
@@ -233,17 +235,16 @@ export function KitchenDisplay({ onLogout }: { onLogout?: () => void } = {}) {
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
       {/* Header */}
       <header className="bg-slate-950/80 backdrop-blur-sm border-b border-slate-700 sticky top-0 z-50">
-        <div className="px-6 py-4 flex items-center justify-between">
+        <div className="px-6 py-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 bg-gradient-to-br from-amber-400 to-orange-500 rounded-xl flex items-center justify-center shadow-lg shadow-amber-500/20">
               <ChefHatIcon className="w-7 h-7 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-white tracking-tight">Kitchen Display</h1>
-              <p className="text-slate-400 text-sm">Real-time order management</p>
+              <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Kitchen Display</p>
+              <h1 className="text-2xl font-semibold text-white">{restaurantName || 'Restaurant Kitchen'}</h1>
             </div>
           </div>
-          
           <div className="flex items-center gap-4">
             {/* View Toggle */}
             <div className="flex bg-slate-800 rounded-lg p-1">

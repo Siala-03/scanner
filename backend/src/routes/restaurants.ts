@@ -27,6 +27,30 @@ router.get('/', authenticate, requireSuperadmin, async (_req: AuthenticatedReque
   }
 });
 
+// GET single restaurant (public information)
+router.get('/public/:restaurantId', async (req: Request, res: Response) => {
+  try {
+    const { restaurantId } = req.params;
+    const result = await pool.query(
+      'SELECT id, name, address, phone, email, timezone, currency, is_active, subscription_status, created_at FROM restaurants WHERE id = $1',
+      [restaurantId]
+    );
+
+    if (result.rows.length === 0) {
+      throw new HttpError(404, 'Restaurant not found');
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    if (error instanceof HttpError) {
+      res.status(error.status).json({ error: error.message });
+    } else {
+      console.error('Error fetching public restaurant info:', error);
+      res.status(500).json({ error: 'Failed to fetch restaurant' });
+    }
+  }
+});
+
 // GET single restaurant
 router.get('/:restaurantId', authenticate, async (req: AuthenticatedRequest, res: Response) => {
   try {

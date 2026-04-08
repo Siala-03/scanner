@@ -31,7 +31,9 @@ import { Card } from './components/ui/Card';
 import { Button } from './components/ui/Button';
 import { Staff } from './types';
 import { SupplierUser, getSupplierMe, clearSupplierToken } from './api/supplier';
-import { fetchRestaurant } from './api/restaurants';
+import { fetchRestaurantPublic } from './api/restaurants';
+const DEFAULT_RESTAURANT_ID = 'default_restaurant';
+
 type UserRole = 'customer' | 'waiter' | 'supervisor' | 'manager' | 'kitchen' | 'superadmin' | 'supplier' | null;
 type ManagerPage = 'dashboard' | 'menu' | 'staff' | 'analytics' | 'performance' | 'qrcodes' | 'inventory' | 'history' | 'expenses';
 type SupervisorPage = 'dashboard' | 'revenue' | 'staff' | 'qrcodes' | 'inventory' | 'menu' | 'history' | 'expenses';
@@ -265,12 +267,15 @@ export function App() {
 
     // Check for query table: ?table=123
     const queryTable = query.get('table');
+    const existingRestaurantId = localStorage.getItem('restaurantId');
     if (queryTable) {
       const num = parseInt(queryTable, 10);
       if (!isNaN(num)) {
         const restaurantIdFromQuery = query.get('restaurantId');
         if (restaurantIdFromQuery) {
           persistRestaurantContext(restaurantIdFromQuery);
+        } else if (!existingRestaurantId) {
+          persistRestaurantContext(DEFAULT_RESTAURANT_ID);
         }
         setSelectedRole('customer');
         setTableNumber(num);
@@ -287,6 +292,8 @@ export function App() {
         const restaurantIdFromQuery = query.get('restaurantId');
         if (restaurantIdFromQuery) {
           persistRestaurantContext(restaurantIdFromQuery);
+        } else if (!existingRestaurantId) {
+          persistRestaurantContext(DEFAULT_RESTAURANT_ID);
         }
         setSelectedRole('customer');
         setTableNumber(num);
@@ -364,7 +371,7 @@ export function App() {
       return;
     }
 
-    fetchRestaurant(currentRestaurantId)
+    fetchRestaurantPublic(currentRestaurantId)
       .then((restaurant: { name?: string }) => {
         if (!active) return;
         setRestaurantName(restaurant.name || '');
@@ -662,7 +669,11 @@ export function App() {
             <span className="text-white font-medium">Kitchen Display</span>
           </div>
         </div>
-        <KitchenDisplay onLogout={handleBack} />
+        <KitchenDisplay
+          onLogout={handleBack}
+          restaurantId={currentRestaurantId ?? undefined}
+          restaurantName={restaurantName}
+        />
       </div>
     );
   }
