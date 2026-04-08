@@ -50,9 +50,12 @@ export function LoginPage({ onLogin, onBack }: LoginPageProps) {
       const user = await loginStaff(username, password);
       console.log('Login response:', user);
 
-      // Persist staffId for authenticated requests (including manager staff creation)
+      // Persist staff authentication state and tenant for authenticated requests
       localStorage.setItem('staffId', user.id);
       localStorage.removeItem('token');
+      if (user.restaurantId) {
+        localStorage.setItem('restaurantId', user.restaurantId);
+      }
 
       console.log('Login successful, redirecting...');
       onLogin(user);

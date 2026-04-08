@@ -59,10 +59,12 @@ export async function signUpStaff(input: {
   restaurantId?: string;
 }): Promise<Staff> {
   try {
-    console.log('Attempting signup for:', input.username, 'role:', input.role);
+    const storedRestaurantId = localStorage.getItem('restaurantId');
+    const restaurantId = input.restaurantId || storedRestaurantId || 'default_restaurant';
+    console.log('Attempting signup for:', input.username, 'role:', input.role, 'restaurant:', restaurantId);
     const data = await apiRequest<{ staff: Staff }>(`${API_BASE}/signup`, {
       method: 'POST',
-      json: { ...input, restaurantId: input.restaurantId || 'default_restaurant' }
+      json: { ...input, restaurantId }
     });
     console.log('Signup successful for user:', data.staff.name);
     return data.staff;
