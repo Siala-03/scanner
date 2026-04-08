@@ -408,11 +408,12 @@ export function App() {
           } else if (user.role === 'kitchen') {
             setSelectedRole('kitchen');
           }
-          // Save to localStorage
+          // Save to localStorage and update state immediately
           localStorage.setItem('authUser', JSON.stringify(user));
           localStorage.setItem('selectedRole', user.role);
           if (user.restaurantId) {
             localStorage.setItem('restaurantId', user.restaurantId);
+            setCurrentRestaurantId(user.restaurantId);
           }
         }}
         onBack={() => {}} />); // No back needed for main login
