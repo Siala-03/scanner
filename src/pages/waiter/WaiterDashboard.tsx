@@ -116,14 +116,27 @@ export function WaiterDashboard({
     onDismissWaiterCall?.(tableNum);
   };
   const waiterOrders = useMemo(
-    () => orders.filter((o) => waiter.assignedTables.includes(o.tableNumber)),
-    [orders, waiter.assignedTables]
+    () => {
+      console.log('[WaiterDashboard] Waiter orders', {
+        waiterId: waiter.id,
+        totalOrders: orders.length,
+        orderIds: orders.map(o => `${o.id}(${o.status})`)
+      });
+      return orders;
+    },
+    [orders, waiter.id]
   );
   const newOrders = waiterOrders.filter((o) => o.status === 'pending');
   const activeOrders = waiterOrders.filter((o) =>
-  ['verified', 'preparing', 'ready'].includes(o.status)
+    ['verified', 'preparing', 'ready'].includes(o.status)
   );
   const completedOrders = waiterOrders.filter((o) => o.status === 'served');
+  
+  console.log('[WaiterDashboard] Order summary', {
+    newOrders: newOrders.length,
+    activeOrders: activeOrders.length,
+    completedOrders: completedOrders.length
+  });
   const todayServed = completedOrders.length;
   const avgServiceTime = waiter.performance.avgServiceTime;
   const waiterReviews = useMemo(

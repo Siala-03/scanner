@@ -103,16 +103,29 @@ export function useOrders(): UseOrdersReturn {
 
     const handleOrderUpdate = (data: any) => {
       const updatedOrder = normalizeOrderPayload(data?.order);
+      console.log('[useOrders] Socket order:update received', {
+        type: data?.type,
+        orderId: updatedOrder?.id,
+        orderRestaurant: updatedOrder?.restaurantId,
+        currentRestaurant: restaurantId,
+        orderNumber: updatedOrder?.orderNumber,
+        status: updatedOrder?.status,
+        matches: updatedOrder?.restaurantId === restaurantId
+      });
+      
       if (!updatedOrder || updatedOrder.restaurantId !== restaurantId) {
+        console.log('[useOrders] Skipping order update - restaurantId mismatch or missing order');
         return;
       }
 
       setOrders((prevOrders) => {
         if (data.type === 'create') {
-          return [data.order, ...prevOrders];
+          console.log('[useOrders] Creating new order:', updatedOrder.id);
+          return [updatedOrder, ...prevOrders];
         }
         if (data.type === 'update') {
-          return prevOrders.map((order) => (order.id === data.order.id ? data.order : order));
+          console.log('[useOrders] Updating order:', updatedOrder.id);
+          return prevOrders.map((order) => (order.id === updatedOrder.id ? updatedOrder : order));
         }
         return prevOrders;
       });

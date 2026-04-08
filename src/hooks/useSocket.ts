@@ -55,10 +55,12 @@ export function useSocket() {
   }, [socket]);
 
   const joinOrders = useCallback(() => {
+    console.log('[useSocket] Emitting join:orders');
     socket.emit('join:orders');
   }, [socket]);
 
   const joinRole = useCallback((role: string) => {
+    console.log(`[useSocket] Emitting join:role with role: ${role}`);
     socket.emit('join:role', role);
   }, [socket]);
 
