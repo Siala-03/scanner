@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, Building2, Users, TrendingUp, Lock } from 'lucide-react';
+import { Plus, Edit2, Trash2, Building2, Users, TrendingUp, Lock, QrCode, ChevronDown } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Modal } from '../../components/ui/Modal';
 import { Input } from '../../components/ui/Input';
 import { apiRequest } from '../../api/http';
 import { changePassword } from '../../api/auth';
+import { fetchTablesForRestaurant, deleteTable } from '../../api/tables';
 
 interface Restaurant {
   id: string;
@@ -19,6 +20,15 @@ interface Restaurant {
   createdAt: string;
 }
 
+interface Table {
+  id: string;
+  tableNumber: number;
+  name: string;
+  capacity: number;
+  location: string;
+  restaurantId: string;
+}
+
 interface SuperAdminDashboardProps {
   onNavigate: (page: 'dashboard' | 'restaurants' | 'analytics') => void;
 }
@@ -29,6 +39,9 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [selectedRestaurantId, setSelectedRestaurantId] = useState<string | null>(null);
+  const [restaurantTables, setRestaurantTables] = useState<Table[]>([]);
+  const [isLoadingTables, setIsLoadingTables] = useState(false);
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: '',
     newPassword: '',
@@ -64,6 +77,38 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
       console.error('Failed to load restaurants:', error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const loadTablesForRestaurant = async (restaurantId: string) => {
+    setIsLoadingTables(true);
+    try {
+      const tables = await fetchTablesForRestaurant(restaurantId);
+      setRestaurantTables(tables);
+    } catch (error) {
+      console.error('Failed to load tables:', error);
+      setRestaurantTables([]);
+    } finally {
+      setIsLoadingTables(false);
+    }
+  };
+
+  const handleViewTables = async (restaurantId: string) => {
+    setSelectedRestaurantId(restaurantId);
+    await loadTablesForRestaurant(restaurantId);
+  };
+
+  const handleDeleteTable = async (tableId: string) => {
+    if (!confirm('Are you sure you want to delete this QR code/table?')) return;
+    try {
+      await deleteTable(tableId);
+      // Reload tables after deletion
+      if (selectedRestaurantId) {
+        await loadTablesForRestaurant(selectedRestaurantId);
+      }
+    } catch (error) {
+      console.error('Failed to delete table:', error);
+      alert('Failed to delete QR code/table');
     }
   };
 
@@ -288,6 +333,94 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
                   ))}
                 </tbody>
               </table>
+            </div>
+          )}
+        </Card>
+
+        {/* QR Codes (Tables) Management */}
+        <Card className="bg-slate-800/50 border-slate-700 mt-6">
+          <div className="p-4 border-b border-slate-700">
+            <h2 className="text-xl font-bold flex items-center gap-2">
+              <QrCode className="w-5 h-5" />
+              QR Codes Overview
+            </h2>
+            <p className="text-slate-400 text-sm mt-1">View QR codes for each restaurant. QR code deletion is performed by the restaurant manager.</p>
+          </div>
+
+          {selectedRestaurantId === null ? (
+            <div className="p-4">
+              <div className="space-y-2">
+                <p className="text-slate-300 font-semibold mb-3">Select a restaurant to view its QR codes:</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                  {restaurants.map((restaurant) => (
+                    <button
+                      key={restaurant.id}
+                      onClick={() => handleViewTables(restaurant.id)}
+                      className="p-3 bg-slate-700 hover:bg-slate-600 rounded border border-slate-600 text-left transition"
+                    >
+                      <div className="font-medium text-slate-100">{restaurant.name}</div>
+                      <div className="text-xs text-slate-400">{restaurant.city}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="p-4">
+              <button
+                onClick={() => {
+                  setSelectedRestaurantId(null);
+                  setRestaurantTables([]);
+                }}
+                className="mb-4 flex items-center gap-2 text-blue-400 hover:text-blue-300 text-sm"
+              >
+                <ChevronDown className="w-4 h-4 rotate-90" />
+                Back to Restaurant Selection
+              </button>
+
+              <div className="space-y-3">
+                <div>
+                  <p className="text-slate-300 font-semibold">
+                    {restaurants.find(r => r.id === selectedRestaurantId)?.name}
+                  </p>
+                  <p className="text-slate-400 text-sm">QR Codes: {restaurantTables.length}</p>
+                </div>
+
+                {isLoadingTables ? (
+                  <div className="p-4 text-center text-slate-400">Loading QR codes...</div>
+                ) : restaurantTables.length === 0 ? (
+                  <div className="p-4 text-center text-slate-400">
+                    No QR codes/tables created yet for this restaurant.
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-slate-700">
+                          <th className="px-3 py-2 text-left font-semibold">Table #</th>
+                          <th className="px-3 py-2 text-left font-semibold">Name</th>
+                          <th className="px-3 py-2 text-left font-semibold">Capacity</th>
+                          <th className="px-3 py-2 text-left font-semibold">Location</th>
+                          <th className="px-3 py-2 text-left font-semibold">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {restaurantTables.map((table) => (
+                          <tr key={table.id} className="border-b border-slate-700 hover:bg-slate-700/30">
+                            <td className="px-3 py-2">#{table.tableNumber}</td>
+                            <td className="px-3 py-2">{table.name || '-'}</td>
+                            <td className="px-3 py-2">{table.capacity || '-'}</td>
+                            <td className="px-3 py-2 text-slate-400">{table.location || '-'}</td>
+                            <td className="px-3 py-2">
+                            <span className="text-slate-400 text-sm">Manager action only</span>
+                          </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </Card>

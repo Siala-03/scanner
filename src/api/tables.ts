@@ -5,19 +5,32 @@ const API_BASE = '/api/tables';
 
 export interface Table {
   id: string;
-  table_number: number;
+  tableNumber: number;
   name: string;
   capacity: number;
   location: string;
-  is_active: boolean;
+  restaurantId: string;
+  isActive?: boolean;
 }
 
-// Fetch all tables
+// Fetch all tables for current restaurant
 export async function fetchTables(): Promise<Table[]> {
   try {
     return await apiRequest<Table[]>(`${API_BASE}`);
   } catch (err) {
     console.warn('Failed to fetch tables from backend');
+    return [];
+  }
+}
+
+// Fetch tables for a specific restaurant (superadmin only)
+export async function fetchTablesForRestaurant(restaurantId: string): Promise<Table[]> {
+  try {
+    return await apiRequest<Table[]>(`${API_BASE}?restaurantId=${restaurantId}`, {
+      headers: { 'x-restaurant-id': restaurantId }
+    });
+  } catch (err) {
+    console.warn(`Failed to fetch tables for restaurant ${restaurantId}`);
     return [];
   }
 }

@@ -643,6 +643,7 @@ export function App() {
                 restaurantId={currentRestaurantId ?? undefined}
                 restaurantName={restaurantName}
                 onAddTable={addTable}
+                onDeleteTable={removeTable}
               />
             )}
             {managerPage === 'expenses' && <ExpenseApproval />}

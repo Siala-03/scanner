@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { PrinterIcon, DownloadIcon, PlusIcon } from 'lucide-react';
+import { PrinterIcon, DownloadIcon, PlusIcon, Trash2 } from 'lucide-react';
 import QRCode from 'react-qr-code';
 import { Button } from '../../components/ui/Button';
 
 interface QRCodeGeneratorProps {
   tables: number[];
   onAddTable: () => Promise<void>;
+  onDeleteTable?: (tableNumber: number) => Promise<void>;
   baseUrl?: string;
   restaurantId?: string;
   restaurantName?: string;
@@ -14,6 +15,7 @@ interface QRCodeGeneratorProps {
 export function QRCodeGenerator({
   tables,
   onAddTable,
+  onDeleteTable,
   baseUrl,
   restaurantId,
   restaurantName
@@ -36,6 +38,23 @@ export function QRCodeGenerator({
   };
   const handlePrint = () => {
     window.print();
+  };
+
+  const handleDeleteTable = async (tableNum: number) => {
+    if (!onDeleteTable) {
+      return;
+    }
+
+    if (!confirm(`Delete QR code for table ${tableNum}? This cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      await onDeleteTable(tableNum);
+    } catch (error) {
+      console.error('Failed to delete QR code:', error);
+      alert('Failed to delete the QR code. Please try again.');
+    }
   };
 
   const resolvedBaseUrl = baseUrl || window.location.origin;
@@ -132,13 +151,24 @@ export function QRCodeGenerator({
                   </div>
 
                   {/* Download Button */}
-                  <button
-                    onClick={() => handleDownload(tableNum)}
-                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-500 text-white hover:bg-amber-600 transition-colors mb-3"
-                  >
-                    <DownloadIcon className="w-4 h-4" />
-                    Download
-                  </button>
+                  <div className="flex flex-col sm:flex-row items-center gap-2 mb-3">
+                    <button
+                      onClick={() => handleDownload(tableNum)}
+                      className="flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-500 text-white hover:bg-amber-600 transition-colors"
+                    >
+                      <DownloadIcon className="w-4 h-4" />
+                      Download
+                    </button>
+                    {onDeleteTable && (
+                      <button
+                        onClick={() => handleDeleteTable(tableNum)}
+                        className="flex items-center gap-2 px-4 py-2 rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        Delete
+                      </button>
+                    )}
+                  </div>
 
                   <p className="text-sm text-slate-500 font-medium">
                     Customers scan to order
