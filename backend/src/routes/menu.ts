@@ -1,4 +1,4 @@
-import { Router, Response } from 'express';
+import { Router, Request, Response } from 'express';
 import { pool } from '../db.js';
 import { emitMenuUpdate } from '../socket.js';
 import { rowsToCamelCase } from '../utils/camelCase.js';
@@ -7,9 +7,9 @@ import { authenticate, AuthenticatedRequest } from '../middleware/auth.js';
 export const menuRouter = Router();
 
 // GET all menu items
-menuRouter.get('/', authenticate, async (req: AuthenticatedRequest, res: Response) => {
+menuRouter.get('/', async (req: Request, res: Response) => {
   try {
-    const restaurantId = req.restaurantId || 'default_restaurant';
+    const restaurantId = (req.query.restaurantId as string) || 'default_restaurant';
     const result = await pool.query(
       'SELECT * FROM menu_items WHERE restaurant_id = $1 AND is_available = true ORDER BY category, name',
       [restaurantId]

@@ -6,11 +6,31 @@ const MENU_API_BASE = import.meta.env.VITE_API_URL
   ? `${import.meta.env.VITE_API_URL.replace(/\/$/, '')}/api/menu`
   : '/api/menu';
 
+function getRestaurantIdFromUrl(): string | null {
+  if (typeof window === 'undefined') return null;
+  const path = window.location.pathname;
+  const restaurantTableMatch = path.match(/^\/r\/([^/]+)\/t\/(\d+)/);
+  if (restaurantTableMatch) {
+    return decodeURIComponent(restaurantTableMatch[1]);
+  }
+
+  const query = new URLSearchParams(window.location.search);
+  const restaurantId = query.get('restaurantId');
+  return restaurantId;
+}
+
+function getRestaurantId(): string | undefined {
+  if (typeof window === 'undefined') return undefined;
+  return localStorage.getItem('restaurantId') || getRestaurantIdFromUrl() || undefined;
+}
+
 // Fetch menu from backend
 export async function fetchMenu(): Promise<MenuItem[]> {
-  const url = `${MENU_API_BASE}`;
+  const restaurantId = getRestaurantId();
+  const query = restaurantId ? `?restaurantId=${encodeURIComponent(restaurantId)}` : '';
+  const url = `${MENU_API_BASE}${query}`;
   console.log('Fetching menu from:', url);
-  const result = await apiRequest<MenuItem[]>(MENU_API_BASE);
+  const result = await apiRequest<MenuItem[]>(url);
   console.log('Menu fetched successfully, items:', result?.length ?? 0);
   return result || [];
 }
