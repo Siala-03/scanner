@@ -231,7 +231,7 @@ export function useOrders(): UseOrdersReturn {
       setOrders((prev) => [savedOrder, ...prev]);
       return savedOrder;
     },
-    [backendAvailable]
+    [backendAvailable, restaurantId]
   );
 
   const updateOrderStatus = useCallback(

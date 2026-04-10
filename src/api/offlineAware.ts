@@ -3,6 +3,9 @@ import { offlineSync } from '../utils/offlineSync';
 // Wrapper for order operations that handles offline mode
 export class OfflineAwareAPI {
   static async createOrder(orderData: any): Promise<any> {
+    if (!orderData?.restaurantId) {
+      console.warn('createOrder called without restaurantId, order will default to default_restaurant', orderData);
+    }
     if (!offlineSync.isNetworkOnline()) {
       // Queue for later sync
       await offlineSync.queueOperation({

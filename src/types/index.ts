@@ -70,6 +70,7 @@ export interface Order {
   servedAt?: Date | string;
   completedAt?: Date | string;
   assignedWaiterId?: string;
+  restaurantId?: string;
   subtotal: number;
   serviceCharge?: number;
   tax?: number;
