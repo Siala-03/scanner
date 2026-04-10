@@ -301,11 +301,20 @@ router.post('/', async (req: Request, res: Response) => {
       loyaltyRewardId
     } = req.body;
 
+    const resolvedRestaurantId = req.body.restaurantId || req.query.restaurantId || 'default_restaurant';
+    console.log('POST /orders creating order for restaurantId:', resolvedRestaurantId, {
+      bodyRestaurantId: req.body.restaurantId,
+      queryRestaurantId: req.query.restaurantId,
+      tableNumber: table_number ?? tableNumber,
+      customerName: customer_name ?? customerName,
+      itemsCount: Array.isArray(items) ? items.length : 0,
+    });
+
     const order = await createOrderService({
       tableNumber: table_number ?? tableNumber,
       customerName: customer_name ?? customerName ?? 'Walk-in',
       customerId: customer_id ?? customerId,
-      restaurantId: req.body.restaurantId || req.query.restaurantId || 'default_restaurant',
+      restaurantId: resolvedRestaurantId,
       items: items.map((item: any) => ({
         menuItemId: item.menuItemId,
         menuItemName: item.menuItemName,
@@ -323,6 +332,7 @@ router.post('/', async (req: Request, res: Response) => {
     });
 
     const normalizedOrder = normalizeOrder(order);
+    console.log('Order created with restaurantId:', normalizedOrder.restaurantId, 'id:', normalizedOrder.id);
     emitOrderUpdate({ type: 'create', order: normalizedOrder });
     res.status(201).json(normalizedOrder);
   } catch (error) {

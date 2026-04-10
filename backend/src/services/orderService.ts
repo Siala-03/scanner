@@ -39,6 +39,14 @@ export async function createOrder(orderInput: {
     requiresKitchen = false
   } = orderInput;
 
+  console.log('createOrder service invoked', {
+    restaurantId,
+    tableNumber,
+    customerId,
+    itemsCount: Array.isArray(items) ? items.length : 0,
+    requiresKitchen,
+  });
+
   if (!items || items.length === 0) {
     throw new Error('Order must include at least one item');
   }
