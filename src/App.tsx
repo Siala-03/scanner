@@ -485,15 +485,18 @@ export function App() {
       <div className="min-h-screen bg-slate-900">
         {/* Fixed Header with Back Button */}
         <div className="sticky top-0 z-50 bg-slate-800/90 backdrop-blur-sm border-b border-slate-700">
-          <div className="flex items-center gap-3 px-4 py-3">
-            <button
-              onClick={handleBack}
-              className="p-2 rounded-lg bg-slate-700/50 hover:bg-slate-700 text-slate-300 hover:text-white transition-all duration-200 active:scale-95"
-              aria-label="Back"
-            >
-              <ArrowLeftIcon className="w-5 h-5" />
-            </button>
-            <span className="text-white font-medium">Supervisor Dashboard</span>
+          <div className="flex flex-col gap-2 px-4 py-3">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleBack}
+                className="p-2 rounded-lg bg-slate-700/50 hover:bg-slate-700 text-slate-300 hover:text-white transition-all duration-200 active:scale-95"
+                aria-label="Back"
+              >
+                <ArrowLeftIcon className="w-5 h-5" />
+              </button>
+              <span className="text-white font-medium">Supervisor Dashboard</span>
+            </div>
+            <div className="text-sm text-slate-400">{restaurantName || 'Restaurant'}</div>
           </div>
         </div>
 
@@ -591,6 +594,7 @@ export function App() {
             <div>
               <div className="text-sm text-slate-300 uppercase tracking-wider">Manager Portal</div>
               <div className="text-lg font-semibold">Welcome, {authUser.name}</div>
+              <div className="text-sm text-slate-400 mt-1">{restaurantName || 'Restaurant'}</div>
             </div>
           </div>
         </div>
@@ -663,15 +667,18 @@ export function App() {
       <div className="min-h-screen bg-slate-900">
         {/* Fixed Header with Back Button */}
         <div className="sticky top-0 z-50 bg-slate-800/90 backdrop-blur-sm border-b border-slate-700">
-          <div className="flex items-center gap-3 px-4 py-3">
-            <button
-              onClick={handleBack}
-              className="p-2 rounded-lg bg-slate-700/50 hover:bg-slate-700 text-slate-300 hover:text-white transition-all duration-200 active:scale-95"
-              aria-label="Back"
-            >
-              <ArrowLeftIcon className="w-5 h-5" />
-            </button>
-            <span className="text-white font-medium">Kitchen Display</span>
+          <div className="flex flex-col gap-2 px-4 py-3">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleBack}
+                className="p-2 rounded-lg bg-slate-700/50 hover:bg-slate-700 text-slate-300 hover:text-white transition-all duration-200 active:scale-95"
+                aria-label="Back"
+              >
+                <ArrowLeftIcon className="w-5 h-5" />
+              </button>
+              <span className="text-white font-medium">Kitchen Display</span>
+            </div>
+            <div className="text-sm text-slate-400">{restaurantName || 'Restaurant'}</div>
           </div>
         </div>
         <KitchenDisplay
@@ -689,15 +696,17 @@ export function App() {
       <div className="min-h-screen bg-slate-900">
         {/* Fixed Header with Back Button */}
         <div className="sticky top-0 z-50 bg-slate-800/90 backdrop-blur-sm border-b border-slate-700">
-          <div className="flex items-center gap-3 px-4 py-3">
-            <button
-              onClick={handleBack}
-              className="p-2 rounded-lg bg-slate-700/50 hover:bg-slate-700 text-slate-300 hover:text-white transition-all duration-200 active:scale-95"
-              aria-label="Back"
-            >
-              <ArrowLeftIcon className="w-5 h-5" />
-            </button>
-            <span className="text-white font-medium">Superadmin Dashboard</span>
+          <div className="flex flex-col gap-2 px-4 py-3">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleBack}
+                className="p-2 rounded-lg bg-slate-700/50 hover:bg-slate-700 text-slate-300 hover:text-white transition-all duration-200 active:scale-95"
+                aria-label="Back"
+              >
+                <ArrowLeftIcon className="w-5 h-5" />
+              </button>
+              <span className="text-white font-medium">Superadmin Dashboard</span>
+            </div>
           </div>
         </div>
         <SuperAdminDashboard onNavigate={() => {}} />
