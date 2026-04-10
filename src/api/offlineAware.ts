@@ -1,5 +1,4 @@
 import { offlineSync } from '../utils/offlineSync';
-import { ApiError } from './http';
 
 // Wrapper for order operations that handles offline mode
 export class OfflineAwareAPI {
@@ -127,19 +126,20 @@ export class OfflineAwareAPI {
     await cancelOrder(orderId);
   }
 
-  static async fetchOrders(status?: string): Promise<any[]> {
+  static async fetchOrders(status?: string, restaurantId?: string): Promise<any[]> {
     if (!offlineSync.isNetworkOnline()) {
       // Return cached orders
       const cachedOrders = await offlineSync.getCachedOrders();
       return cachedOrders.filter(order =>
-        !status || status === 'all' || order.status === status
+        (!status || status === 'all' || order.status === status) &&
+        (!restaurantId || order.restaurantId === restaurantId)
       );
     }
 
     try {
       // Online: fetch from server and cache
       const { fetchOrders } = await import('./orders');
-      const orders = await fetchOrders(status);
+      const orders = await fetchOrders(status, restaurantId);
 
       // Cache all orders
       for (const order of orders) {
@@ -152,7 +152,8 @@ export class OfflineAwareAPI {
       console.warn('Server fetch failed, using cached orders:', error);
       const cachedOrders = await offlineSync.getCachedOrders();
       return cachedOrders.filter(order =>
-        !status || status === 'all' || order.status === status
+        (!status || status === 'all' || order.status === status) &&
+        (!restaurantId || order.restaurantId === restaurantId)
       );
     }
   }
