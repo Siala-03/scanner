@@ -42,6 +42,17 @@ export function saveCustomMenu(items: MenuItem[]): void {
   localStorage.setItem(MENU_STORAGE_KEY, JSON.stringify(items));
 }
 
+export function loadCustomMenu(): MenuItem[] | null {
+  const stored = localStorage.getItem(MENU_STORAGE_KEY);
+  if (!stored) return null;
+  try {
+    return JSON.parse(stored) as MenuItem[];
+  } catch (err) {
+    console.warn('Failed to parse saved custom menu from localStorage:', err);
+    return null;
+  }
+}
+
 /**
  * Reset to default menu (clear local and backend)
  */

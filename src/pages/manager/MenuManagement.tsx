@@ -19,7 +19,7 @@ import { Badge } from '../../components/ui/Badge';
 import { MenuItemEditor } from '../../components/manager/MenuItemEditor';
 import { formatPrice } from '../../utils/currency';
 import { useMenu } from '../../hooks/useMenu';
-import { exportMenuToCsv, exportMenuToJson, importMenuFromFile } from '../../utils/menuImportExport';
+import { exportMenuToCsv, exportMenuToJson, importMenuFromFile, saveCustomMenu } from '../../utils/menuImportExport';
 
 // Default categories with emojis from dummy data
 const defaultCategories: MenuCategoryInfo[] = [
@@ -173,7 +173,8 @@ export function MenuManagement() {
       updatedItems = [newItem, ...menuItemsState];
     }
     
-    // Save to backend
+    // Save locally then sync backend
+    saveCustomMenu(updatedItems);
     setIsSaving(true);
     try {
       await saveMenu(updatedItems);
@@ -195,6 +196,7 @@ export function MenuManagement() {
     );
     
     // Save to backend
+    saveCustomMenu(updatedItems);
     setIsSaving(true);
     try {
       await saveMenu(updatedItems);
@@ -211,6 +213,7 @@ export function MenuManagement() {
       const updatedItems = menuItemsState.filter((item) => item.id !== itemId);
       
       // Save to backend
+      saveCustomMenu(updatedItems);
       setIsSaving(true);
       try {
         await saveMenu(updatedItems);

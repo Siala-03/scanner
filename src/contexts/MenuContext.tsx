@@ -3,6 +3,7 @@ import type { MenuItem } from '../types';
 import { fetchMenu, uploadMenu } from '../api/menu';
 import { getSocket } from '../hooks/useSocket';
 import { menuItems as defaultMenuItems } from '../data/menuData';
+import { loadCustomMenu } from '../utils/menuImportExport';
 
 interface MenuContextValue {
   menuItems: MenuItem[];
@@ -28,20 +29,36 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const loadFallbackMenu = useCallback(() => {
+    const storedMenu = loadCustomMenu();
+    if (storedMenu && storedMenu.length > 0) {
+      setMenuItems(storedMenu);
+      setError(null);
+      return true;
+    }
+    return false;
+  }, []);
+
   const refresh = useCallback(async () => {
     setIsLoading(true);
     try {
       const menu = await fetchMenu();
-      setMenuItems(menu);
+      if (menu.length > 0) {
+        setMenuItems(menu);
+      } else if (!loadFallbackMenu()) {
+        setMenuItems(defaultMenuItems);
+      }
       setError(null);
     } catch (err) {
       console.error('Failed to refresh menu:', err);
-      setMenuItems(defaultMenuItems);
+      if (!loadFallbackMenu()) {
+        setMenuItems(defaultMenuItems);
+      }
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [loadFallbackMenu]);
 
   const saveMenu = useCallback(async (items: MenuItem[]) => {
     setIsLoading(true);
@@ -65,7 +82,12 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
       try {
         const items = await fetchMenu();
         if (!isMounted) return;
-        setMenuItems(items);
+
+        if (items.length > 0) {
+          setMenuItems(items);
+        } else if (!loadFallbackMenu()) {
+          setMenuItems(defaultMenuItems);
+        }
         setError(null);
       } catch (err) {
         console.error('Failed to load menu from API:', err);
@@ -73,8 +95,9 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
         const apiUrl = import.meta.env.VITE_API_URL || '(using relative path)';
         console.warn('API URL being used:', apiUrl);
         if (!isMounted) return;
-        // Always fall back to default menu on error
-        setMenuItems(defaultMenuItems);
+        if (!loadFallbackMenu()) {
+          setMenuItems(defaultMenuItems);
+        }
         setError(err instanceof Error ? err.message : 'Unable to load menu');
       } finally {
         if (!isMounted) return;
