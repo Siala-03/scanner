@@ -107,16 +107,18 @@ export function exportMenuToCsv(items: MenuItem[]): void {
 function parseCsvContent(content: string): Partial<MenuItem>[] {
   const lines = content.trim().split('\n');
   if (lines.length < 2) return [];
-  
-  const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+
+  const headers = lines[0]
+    .split(',')
+    .map(h => h.trim().toLowerCase().replace(/[^a-z0-9]+/g, ''));
   const items: Partial<MenuItem>[] = [];
-  
+
   for (let i = 1; i < lines.length; i++) {
     // Handle quoted fields
     const values: string[] = [];
     let current = '';
     let inQuotes = false;
-    
+
     for (const char of lines[i]) {
       if (char === '"') {
         inQuotes = !inQuotes;
@@ -128,7 +130,7 @@ function parseCsvContent(content: string): Partial<MenuItem>[] {
       }
     }
     values.push(current.trim());
-    
+
     const item: Partial<MenuItem> = {};
     headers.forEach((header, index) => {
       const value = values[index] || '';
@@ -140,6 +142,7 @@ function parseCsvContent(content: string): Partial<MenuItem>[] {
           item.name = value;
           break;
         case 'description':
+        case 'desc':
           item.description = value.replace(/^"|"$/g, '');
           break;
         case 'price':
@@ -152,23 +155,45 @@ function parseCsvContent(content: string): Partial<MenuItem>[] {
           item.emoji = value;
           break;
         case 'preptime':
+        case 'prep_time':
+        case 'prep':
           item.prepTime = parseInt(value, 10) || 15;
           break;
         case 'isavailable':
+        case 'is_available':
+        case 'available':
           item.isAvailable = value.toLowerCase() === 'true';
           break;
         case 'ispopular':
+        case 'is_popular':
+        case 'popular':
           item.isPopular = value.toLowerCase() === 'true';
           break;
       }
     });
-    
+
     if (item.name) {
       items.push(item);
     }
   }
-  
+
   return items;
+}
+
+function normalizeExcelRow(row: Record<string, any>): Record<string, any> {
+  return Object.entries(row).reduce((acc, [key, value]) => {
+    if (!key) return acc;
+    const normalizedKey = key.toString().trim().toLowerCase().replace(/[^a-z0-9]+/g, '');
+    acc[normalizedKey] = value;
+    return acc;
+  }, {} as Record<string, any>);
+}
+
+function parseBoolean(value: unknown, defaultValue: boolean): boolean {
+  if (value === undefined || value === null || value === '') return defaultValue;
+  if (typeof value === 'boolean') return value;
+  const normalized = String(value).trim().toLowerCase();
+  return normalized === 'true' || normalized === '1' || normalized === 'yes';
 }
 
 /**
@@ -180,18 +205,21 @@ function parseExcelContent(arrayBuffer: ArrayBuffer): Partial<MenuItem>[] {
     const firstSheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[firstSheetName];
     const jsonData = XLSX.utils.sheet_to_json<Record<string, any>>(worksheet);
-    
-    return jsonData.map((row: Record<string, any>) => ({
-      id: row.id || row.ID || row.Id,
-      name: row.name || row.Name || row.ITEM || row.Item,
-      description: row.description || row.Description || row.desc || row.Desc || '',
-      price: parseFloat(row.price || row.Price || row.PRICE || row.amount || 0) || 0,
-      category: row.category || row.Category || row.type || row.Type || 'lunch',
-      emoji: row.emoji || row.Emoji || '🍽️',
-      prepTime: parseInt(row.prepTime || row.prep_time || row.prep || row.PrepTime || 15, 10) || 15,
-      isAvailable: row.isAvailable !== false && row.is_available !== false && row.Available !== false,
-      isPopular: row.isPopular === true || row.is_popular === true || row.Popular === true
-    }));
+
+    return jsonData.map((rawRow: Record<string, any>) => {
+      const row = normalizeExcelRow(rawRow);
+      return {
+        id: row.id || row.item || row.menuitem || row.itemid,
+        name: row.name || row.item || row.title || '',
+        description: row.description || row.desc || '',
+        price: parseFloat(row.price || row.amount || row.cost || 0) || 0,
+        category: row.category || row.type || row.section || 'lunch',
+        emoji: row.emoji || row.emoticon || '🍽️',
+        prepTime: parseInt(row.preptime || row.prep_time || row.prep || row.prepTime || row.preptime || 15, 10) || 15,
+        isAvailable: parseBoolean(row.isavailable ?? row.available ?? row.is_available, true),
+        isPopular: parseBoolean(row.ispopular ?? row.popular ?? row.is_popular, false)
+      };
+    });
   } catch (err) {
     console.error('Error parsing Excel:', err);
     return [];

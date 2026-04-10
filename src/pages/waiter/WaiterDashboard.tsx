@@ -422,7 +422,7 @@ export function WaiterDashboard({
                     <EmptyState
                       icon={<ClipboardListIcon className="w-8 h-8" />}
                       title="No pending orders"
-                      description="New orders from customer menu scans will appear here for approval."
+                      description="New orders from customer QR menu scans will appear here automatically for approval."
                     />
                   ) : (
                     newOrders.map((order) => (
