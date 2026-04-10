@@ -1,9 +1,26 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { MenuItem } from '../types';
 import { fetchMenu, uploadMenu } from '../api/menu';
 import { getSocket } from '../hooks/useSocket';
 import { menuItems as defaultMenuItems } from '../data/menuData';
 import { loadCustomMenu } from '../utils/menuImportExport';
+
+function getRestaurantIdFromUrl(): string | null {
+  if (typeof window === 'undefined') return null;
+  const path = window.location.pathname;
+  const restaurantTableMatch = path.match(/^\/r\/([^/]+)\/t\/(\d+)/);
+  if (restaurantTableMatch) {
+    return decodeURIComponent(restaurantTableMatch[1]);
+  }
+
+  const query = new URLSearchParams(window.location.search);
+  return query.get('restaurantId');
+}
+
+function getRestaurantId(): string {
+  if (typeof window === 'undefined') return 'default_restaurant';
+  return localStorage.getItem('restaurantId') || getRestaurantIdFromUrl() || 'default_restaurant';
+}
 
 interface MenuContextValue {
   menuItems: MenuItem[];
@@ -77,6 +94,8 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let isMounted = true;
+    const restaurantIdRef = { current: getRestaurantId() };
+
     const load = async () => {
       setIsLoading(true);
       try {
@@ -105,30 +124,47 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
       }
     };
 
+    const checkRestaurantId = async () => {
+      const currentId = getRestaurantId();
+      if (currentId !== restaurantIdRef.current) {
+        restaurantIdRef.current = currentId;
+        await refresh();
+      }
+    };
+
     load();
 
     const socket = getSocket();
+    const handleMenuUpdate = () => {
+      refresh();
+    };
+    const handleStorageEvent = (event: StorageEvent) => {
+      if (event.key === 'restaurantId') {
+        checkRestaurantId();
+      }
+    };
+
     try {
       if (!socket.connected) {
         socket.connect();
       }
       socket.emit('join:menu');
-      const handleMenuUpdate = () => {
-        refresh();
-      };
       socket.on('menu:update', handleMenuUpdate);
       socket.on('menu:changed', handleMenuUpdate);
-      return () => {
-        isMounted = false;
-        socket.off('menu:update', handleMenuUpdate);
-        socket.off('menu:changed', handleMenuUpdate);
-      };
+      window.addEventListener('restaurantIdChanged', checkRestaurantId);
+      window.addEventListener('storage', handleStorageEvent);
+      window.addEventListener('popstate', checkRestaurantId);
     } catch (err) {
       console.warn('Socket connect failed:', err);
     }
 
     return () => {
       isMounted = false;
+      socket.off('menu:update', handleMenuUpdate);
+      socket.off('menu:changed', handleMenuUpdate);
+      window.removeEventListener('restaurantIdChanged', checkRestaurantId);
+      window.removeEventListener('storage', handleStorageEvent);
+      window.removeEventListener('popstate', checkRestaurantId);
     };
   }, [refresh]);
 

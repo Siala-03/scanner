@@ -137,6 +137,7 @@ export function App() {
   const persistRestaurantContext = useCallback((restaurantId: string) => {
     localStorage.setItem('restaurantId', restaurantId);
     setCurrentRestaurantId(restaurantId);
+    window.dispatchEvent(new Event('restaurantIdChanged'));
   }, []);
 
   const handleGoSupplierPortal = () => {
@@ -416,6 +417,7 @@ export function App() {
           if (user.restaurantId) {
             localStorage.setItem('restaurantId', user.restaurantId);
             setCurrentRestaurantId(user.restaurantId);
+            window.dispatchEvent(new Event('restaurantIdChanged'));
           }
         }}
         onBack={() => {}} />); // No back needed for main login

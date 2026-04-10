@@ -123,7 +123,13 @@ export function emitOrderUpdate(data: {
       ...data,
       order: data.order ? toCamelCase(data.order) : undefined
     };
+
     io.to('orders').emit('order:update', payload);
+
+    const restaurantId = (payload.order as any)?.restaurantId || (payload.order as any)?.restaurant_id;
+    if (restaurantId) {
+      io.to(`restaurant:${restaurantId}`).emit('order:update', payload);
+    }
   }
 }
 

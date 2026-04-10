@@ -62,7 +62,7 @@ interface UseOrdersReturn {
 export function useOrders(): UseOrdersReturn {
   const [orders, setOrders] = useState<Order[]>([]);
   const [backendAvailable, setBackendAvailable] = useState(true);
-  const { socket, joinOrders } = useSocket();
+  const { socket, joinOrders, joinRestaurant } = useSocket();
 
   const resolveRestaurantId = () => {
     const storedRestaurantId = localStorage.getItem('restaurantId');
@@ -100,6 +100,7 @@ export function useOrders(): UseOrdersReturn {
 
     loadFromBackend();
     joinOrders();
+    joinRestaurant(restaurantId);
 
     const handleOrderUpdate = (data: any) => {
       const updatedOrder = normalizeOrderPayload(data?.order);
@@ -112,21 +113,35 @@ export function useOrders(): UseOrdersReturn {
         status: updatedOrder?.status,
         matches: updatedOrder?.restaurantId === restaurantId
       });
-      
-      if (!updatedOrder || updatedOrder.restaurantId !== restaurantId) {
-        console.log('[useOrders] Skipping order update - restaurantId mismatch or missing order');
+
+      if (!updatedOrder) {
+        console.log('[useOrders] Skipping order update - missing order payload');
+        return;
+      }
+      if (updatedOrder.restaurantId !== restaurantId) {
+        console.log('[useOrders] Skipping order update - restaurantId mismatch');
         return;
       }
 
       setOrders((prevOrders) => {
+        const orderExists = prevOrders.some((order) => order.id === updatedOrder.id);
+
         if (data.type === 'create') {
+          if (orderExists) {
+            return prevOrders.map((order) => (order.id === updatedOrder.id ? updatedOrder : order));
+          }
           console.log('[useOrders] Creating new order:', updatedOrder.id);
           return [updatedOrder, ...prevOrders];
         }
-        if (data.type === 'update') {
+
+        if (data.type === 'update' || data.type === 'status') {
           console.log('[useOrders] Updating order:', updatedOrder.id);
+          if (!orderExists) {
+            return [updatedOrder, ...prevOrders];
+          }
           return prevOrders.map((order) => (order.id === updatedOrder.id ? updatedOrder : order));
         }
+
         return prevOrders;
       });
     };
@@ -135,7 +150,7 @@ export function useOrders(): UseOrdersReturn {
     return () => {
       socket.off('order:update', handleOrderUpdate);
     };
-  }, [restaurantId, joinOrders, socket]);
+  }, [restaurantId, joinOrders, joinRestaurant, socket]);
 
   const drinkCategories = new Set([
     'beers',

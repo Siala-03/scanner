@@ -59,6 +59,12 @@ export function useSocket() {
     socket.emit('join:orders');
   }, [socket]);
 
+  const joinRestaurant = useCallback((restaurantId: string) => {
+    if (!restaurantId) return;
+    console.log(`[useSocket] Emitting join:restaurant with restaurantId: ${restaurantId}`);
+    socket.emit('join:restaurant', restaurantId);
+  }, [socket]);
+
   const joinRole = useCallback((role: string) => {
     console.log(`[useSocket] Emitting join:role with role: ${role}`);
     socket.emit('join:role', role);
@@ -68,6 +74,7 @@ export function useSocket() {
     socket,
     joinInventory,
     joinOrders,
+    joinRestaurant,
     joinRole,
   };
 }

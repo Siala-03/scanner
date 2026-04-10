@@ -322,7 +322,9 @@ router.post('/', async (req: Request, res: Response) => {
       requiresKitchen: req.body.requiresKitchen ?? req.body.requires_kitchen ?? false
     });
 
-    res.status(201).json(normalizeOrder(order));
+    const normalizedOrder = normalizeOrder(order);
+    emitOrderUpdate({ type: 'create', order: normalizedOrder });
+    res.status(201).json(normalizedOrder);
   } catch (error) {
     console.error('Error creating order:', error);
     res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to create order' });

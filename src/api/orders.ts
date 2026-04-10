@@ -53,9 +53,13 @@ export async function updateOrderStatus(
   id: string,
   status: UpdateOrderStatusInput
 ): Promise<Order> {
+  const body: any = { status: status.status };
+  if (status.assignedTo !== undefined) {
+    body.assigned_to = status.assignedTo;
+  }
   return apiRequest<Order>(`${API_BASE}/orders/${id}/status`, {
     method: 'PUT',
-    json: status,
+    json: body,
   });
 }
 
