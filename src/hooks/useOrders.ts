@@ -101,7 +101,7 @@ interface UseOrdersReturn {
 // API functions
 export function useOrders(): UseOrdersReturn {
   const [orders, setOrders] = useState<Order[]>([]);
-  const { socket, joinOrders, joinRestaurant } = useSocket();
+  const { socket, joinOrders, joinRestaurant, joinRole } = useSocket();
 
   const resolveRestaurantId = () => {
     const storedRestaurantId = localStorage.getItem('restaurantId');
@@ -128,6 +128,7 @@ export function useOrders(): UseOrdersReturn {
     async function loadFromBackend() {
       try {
         const backendOrders = await OfflineAwareAPI.fetchOrders('all', restaurantId);
+        console.log('[useOrders] Loaded orders from backend:', backendOrders.length);
         setOrders(backendOrders);
       } catch (e) {
         console.warn('Failed to load orders from backend', e);
@@ -138,6 +139,7 @@ export function useOrders(): UseOrdersReturn {
     loadFromBackend();
     joinOrders();
     joinRestaurant(restaurantId);
+    joinRole('waiter'); // Join waiter role room for order updates
 
     const handleOrderUpdate = (data: any) => {
       const updatedOrder = normalizeOrderPayload(data?.order);
@@ -187,7 +189,7 @@ export function useOrders(): UseOrdersReturn {
     return () => {
       socket.off('order:update', handleOrderUpdate);
     };
-  }, [restaurantId, joinOrders, joinRestaurant, socket]);
+  }, [restaurantId, joinOrders, joinRestaurant, joinRole, socket]);
 
   const drinkCategories = new Set([
     'beers',
