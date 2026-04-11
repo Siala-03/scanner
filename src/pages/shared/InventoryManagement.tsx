@@ -135,6 +135,15 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
   const menuCategories = useMemo(() => Array.from(new Set(menuItems.map((m) => m.category))), [menuItems]);
   const isManager = role === 'manager';
   const [activeTab, setActiveTab] = useState<Tab>('overview');
+  const [showAddInventoryModal, setShowAddInventoryModal] = useState(false);
+  const [newInventoryItemName, setNewInventoryItemName] = useState('');
+  const [newInventoryItemCategory, setNewInventoryItemCategory] = useState('Other');
+  const [newInventoryItemLocation, setNewInventoryItemLocation] = useState('');
+  const [newInventoryItemStock, setNewInventoryItemStock] = useState(0);
+  const [newInventoryItemLowThreshold, setNewInventoryItemLowThreshold] = useState(5);
+  const [newInventoryItemReorderPoint, setNewInventoryItemReorderPoint] = useState(10);
+  const [newInventoryItemReorderQty, setNewInventoryItemReorderQty] = useState(20);
+  const [newInventoryItemUnitCost, setNewInventoryItemUnitCost] = useState(0);
 
   const inventoryMap = useMemo(() => {
     const map: Record<string, InventoryRecord> = {};
@@ -150,12 +159,22 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
     return map;
   }, [inventory]);
 
+  const menuItemMap = useMemo(
+    () => Object.fromEntries(menuItems.map((item) => [item.id, item])),
+    [menuItems]
+  );
+
   const inventoryLocations = useMemo(() => {
     const locs = inventory
       .map((rec) => rec.location || '')
       .filter((l) => l && l.trim().length > 0);
     return ['all', ...Array.from(new Set(locs))];
   }, [inventory]);
+
+  const inventoryCategories = useMemo(
+    () => ['all', ...Array.from(new Set([...menuCategories, 'Other']))],
+    [menuCategories]
+  );
 
   // ── Overview state ──────────────────────────────────────────────────────
   const [query, setQuery] = useState('');
@@ -176,15 +195,18 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
 
   const inventoryRows = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return menuItems
-      .filter((i) => !q || i.name.toLowerCase().includes(q) || i.id.toLowerCase().includes(q))
-      .filter((i) => categoryFilter === 'all' || i.category === categoryFilter)
-      .filter((i) => locationFilter === 'all' || (inventoryMap[i.id]?.location || '').toLowerCase() === locationFilter.toLowerCase())
-      .map((item) => {
-        const rec = inventoryMap[item.id];
-        const stock = rec?.stock ?? 0;
-        const threshold = rec?.lowStockThreshold ?? 0;
-        const lastUpdatedDays = rec?.updatedAt ? Math.max(0, Math.floor((Date.now() - new Date(rec.updatedAt).getTime()) / (1000 * 60 * 60 * 24))) : null;
+    return inventory
+      .map(normalizeInventoryRecord)
+      .map((rec) => {
+        const menuItem = menuItemMap[rec.menuItemId];
+        const item = menuItem ?? {
+          id: rec.menuItemId,
+          name: rec.menuItemId,
+          category: 'Other',
+        };
+        const stock = rec.stock;
+        const threshold = rec.lowStockThreshold;
+        const lastUpdatedDays = rec.updatedAt ? Math.max(0, Math.floor((Date.now() - new Date(rec.updatedAt).getTime()) / (1000 * 60 * 60 * 24))) : null;
         return {
           item,
           rec,
@@ -195,10 +217,24 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
           lastUpdatedDays,
         };
       })
-      .filter((r) => {
-        if (statusFilter === 'ok') return !r.isLow && !r.isOut;
-        if (statusFilter === 'low') return r.isLow;
-        if (statusFilter === 'out') return r.isOut;
+      .filter((row) => {
+        if (q) {
+          const match =
+            row.item.name.toLowerCase().includes(q) ||
+            row.item.id.toLowerCase().includes(q) ||
+            row.item.category.toLowerCase().includes(q) ||
+            (row.rec?.location || '').toLowerCase().includes(q);
+          if (!match) return false;
+        }
+        if (categoryFilter !== 'all' && row.item.category !== categoryFilter) {
+          return false;
+        }
+        if (locationFilter !== 'all' && (row.rec?.location || '').toLowerCase() !== locationFilter.toLowerCase()) {
+          return false;
+        }
+        if (statusFilter === 'ok') return !row.isLow && !row.isOut;
+        if (statusFilter === 'low') return row.isLow;
+        if (statusFilter === 'out') return row.isOut;
         return true;
       })
       .sort((a, b) => {
@@ -206,9 +242,43 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
         if (a.isLow !== b.isLow) return Number(b.isLow) - Number(a.isLow);
         return a.item.name.localeCompare(b.item.name);
       });
-  }, [query, categoryFilter, locationFilter, statusFilter, menuItems, inventoryMap]);
+  }, [query, categoryFilter, locationFilter, statusFilter, inventory, menuItemMap]);
 
   // lowStockItems loaded from backend state via fetchLowStockItems() and setLowStockItems()
+
+  const handleCreateOtherInventoryItem = async () => {
+    if (!newInventoryItemName.trim()) {
+      alert('Please enter an item name');
+      return;
+    }
+
+    const menuItemId = newInventoryItemName.trim();
+    try {
+      await apiUpdateInventoryRecord(menuItemId, {
+        stock: newInventoryItemStock,
+        lowStockThreshold: newInventoryItemLowThreshold,
+        reorderPoint: newInventoryItemReorderPoint,
+        reorderQty: newInventoryItemReorderQty,
+        unitCost: newInventoryItemUnitCost,
+        location: newInventoryItemLocation,
+      });
+
+      await refresh();
+      setShowAddInventoryModal(false);
+      setNewInventoryItemName('');
+      setNewInventoryItemCategory('Other');
+      setNewInventoryItemLocation('');
+      setNewInventoryItemStock(0);
+      setNewInventoryItemLowThreshold(5);
+      setNewInventoryItemReorderPoint(10);
+      setNewInventoryItemReorderQty(20);
+      setNewInventoryItemUnitCost(0);
+      alert('Inventory item added successfully');
+    } catch (err) {
+      console.error('Failed to add inventory item:', err);
+      alert(`Failed to add inventory item: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    }
+  };
 
   const handleSaveRow = async (menuItemId: string, _name: string) => {
     if (!isManager) return;
@@ -476,6 +546,12 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
               <Button variant="ghost" size="sm" onClick={refresh}>
                 <RefreshCcwIcon className="w-4 h-4" />
               </Button>
+              {isManager && activeTab === 'overview' && (
+                <Button variant="primary" size="sm" onClick={() => setShowAddInventoryModal(true)}>
+                  <PlusIcon className="w-4 h-4" />
+                  Add Item
+                </Button>
+              )}
               {isManager && activeTab === 'waste' && (
                 <Button variant="danger" size="sm" onClick={() => setShowWasteModal(true)}>
                   <PlusIcon className="w-4 h-4" />
@@ -541,7 +617,7 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
             Loading inventory data from server. Please wait...
           </div>
         )}
-        {!isLoading && loadError && inventory.length === 0 && menuItems.length === 0 && (
+        {!isLoading && loadError && inventory.length === 0 && (
           <div className="mb-4 rounded-xl border border-red-400/30 bg-red-500/10 p-3 text-red-100 flex items-center justify-between gap-4">
             <div>
               <p className="font-semibold">Unable to load inventory data.</p>
@@ -625,8 +701,9 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                 onChange={(e) => setCategoryFilter(e.target.value)}
                 className="px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
               >
-                <option value="all">All Categories</option>
-                {menuCategories.map((c) => <option key={c} value={c}>{c}</option>)}
+                {inventoryCategories.map((c) => (
+                  <option key={c} value={c}>{c === 'all' ? 'All Categories' : c}</option>
+                ))}
               </select>
               <select
                 value={locationFilter}
@@ -1410,6 +1487,98 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
             </div>
             </div>
           )}
+        </Modal>
+
+        {/* Add Other Inventory Item Modal */}
+        <Modal isOpen={showAddInventoryModal} onClose={() => setShowAddInventoryModal(false)} title="Add Other Inventory Item">
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 gap-3">
+              <input
+                placeholder="Item name"
+                value={newInventoryItemName}
+                onChange={(e) => setNewInventoryItemName(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+              />
+              <select
+                value={newInventoryItemCategory}
+                onChange={(e) => setNewInventoryItemCategory(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+              >
+                <option value="Other">Other</option>
+                {menuCategories.map((category) => (
+                  <option key={category} value={category}>{category}</option>
+                ))}
+              </select>
+              <input
+                placeholder="Location"
+                value={newInventoryItemLocation}
+                onChange={(e) => setNewInventoryItemLocation(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <input
+                type="number"
+                placeholder="Stock"
+                value={newInventoryItemStock}
+                onChange={(e) => setNewInventoryItemStock(parseInt(e.target.value || '0', 10))}
+                min={0}
+                className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+              />
+              <input
+                type="number"
+                placeholder="Unit cost"
+                value={newInventoryItemUnitCost}
+                onChange={(e) => setNewInventoryItemUnitCost(parseFloat(e.target.value || '0'))}
+                min={0}
+                step="0.01"
+                className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+              />
+            </div>
+
+            <div className="grid grid-cols-3 gap-3">
+              <input
+                type="number"
+                placeholder="Low threshold"
+                value={newInventoryItemLowThreshold}
+                onChange={(e) => setNewInventoryItemLowThreshold(parseInt(e.target.value || '0', 10))}
+                min={0}
+                className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+              />
+              <input
+                type="number"
+                placeholder="Reorder point"
+                value={newInventoryItemReorderPoint}
+                onChange={(e) => setNewInventoryItemReorderPoint(parseInt(e.target.value || '0', 10))}
+                min={0}
+                className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+              />
+              <input
+                type="number"
+                placeholder="Reorder qty"
+                value={newInventoryItemReorderQty}
+                onChange={(e) => setNewInventoryItemReorderQty(parseInt(e.target.value || '0', 10))}
+                min={0}
+                className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-700/30">
+              <button
+                onClick={() => setShowAddInventoryModal(false)}
+                className="px-4 py-2 rounded-lg bg-slate-700 text-slate-300 text-sm hover:bg-slate-600 transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreateOtherInventoryItem}
+                className="px-4 py-2 rounded-lg bg-emerald-500 text-white text-sm font-medium hover:bg-emerald-400 transition"
+              >
+                Create Item
+              </button>
+            </div>
+          </div>
         </Modal>
 
         {/* Supplier Modal */}
