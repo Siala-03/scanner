@@ -43,7 +43,7 @@ vi.mock('../api/inventory', async () => {
   };
 });
 
-import { InventoryManagement } from '../pages/shared/InventoryManagementREFACTORED';
+import { InventoryManagement } from '../pages/shared/InventoryManagement';
 
 describe('InventoryManagement', () => {
   beforeEach(() => {
