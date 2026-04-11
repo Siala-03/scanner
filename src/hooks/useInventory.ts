@@ -58,35 +58,88 @@ export function useInventoryData() {
   const loadAll = useCallback(async () => {
     setIsLoading(true);
     setLoadError(null);
-    try {
-      const [inv, low, sup, po, mov, wasteEntries, analyticsData, locs, fc, fcAlerts] = await Promise.all([
-        fetchInventory(),
-        fetchLowStockItems(),
-        fetchSuppliers(),
-        fetchPurchaseOrders(),
-        fetchMovements({ limit: 200 }),
-        fetchWasteEntries({ limit: 200 }),
-        computeInventoryAnalytics(),
-        fetchLocations(),
-        fetchForecasts().catch(() => []),
-        fetchForecastAlerts().catch(() => []),
-      ]);
-      setInventory(inv);
-      setLowStockItems(low);
-      setSuppliers(sup);
-      setPurchaseOrders(po);
-      setMovements(mov);
-      setWaste(wasteEntries);
-      setAnalytics(analyticsData);
-      setLocations(locs);
-      setForecasts(fc);
-      setForecastAlerts(fcAlerts);
-    } catch (err) {
-      console.error('Failed to load inventory data', err);
-      setLoadError(err instanceof Error ? err.message : 'Unable to load inventory data right now. Please check your network or try again.');
-    } finally {
-      setIsLoading(false);
+
+    const results = await Promise.allSettled([
+      fetchInventory(),
+      fetchLowStockItems(),
+      fetchSuppliers(),
+      fetchPurchaseOrders(),
+      fetchMovements({ limit: 200 }),
+      fetchWasteEntries({ limit: 200 }),
+      computeInventoryAnalytics(),
+      fetchLocations(),
+      fetchForecasts(),
+      fetchForecastAlerts(),
+    ]);
+
+    const [invResult, lowResult, supResult, poResult, movResult, wasteResult, analyticsResult, locResult, fcResult, fcAlertsResult] = results;
+    const errors: string[] = [];
+
+    if (invResult.status === 'fulfilled') {
+      setInventory(invResult.value);
+    } else {
+      const message = invResult.reason instanceof Error ? invResult.reason.message : String(invResult.reason);
+      console.error('Critical inventory load failed:', message);
+      setLoadError(message || 'Failed to load inventory items.');
     }
+
+    if (lowResult.status === 'fulfilled') {
+      setLowStockItems(lowResult.value);
+    } else {
+      console.warn('Low stock fetch failed:', lowResult.reason);
+    }
+
+    if (supResult.status === 'fulfilled') {
+      setSuppliers(supResult.value);
+    } else {
+      console.warn('Suppliers fetch failed:', supResult.reason);
+    }
+
+    if (poResult.status === 'fulfilled') {
+      setPurchaseOrders(poResult.value);
+    } else {
+      console.warn('Purchase orders fetch failed:', poResult.reason);
+    }
+
+    if (movResult.status === 'fulfilled') {
+      setMovements(movResult.value);
+    } else {
+      console.warn('Stock movements fetch failed:', movResult.reason);
+    }
+
+    if (wasteResult.status === 'fulfilled') {
+      setWaste(wasteResult.value);
+    } else {
+      console.warn('Waste entries fetch failed:', wasteResult.reason);
+    }
+
+    if (analyticsResult.status === 'fulfilled') {
+      setAnalytics(analyticsResult.value);
+    } else {
+      console.warn('Inventory analytics fetch failed:', analyticsResult.reason);
+    }
+
+    if (locResult.status === 'fulfilled') {
+      setLocations(locResult.value);
+    } else {
+      console.warn('Locations fetch failed:', locResult.reason);
+    }
+
+    if (fcResult.status === 'fulfilled') {
+      setForecasts(fcResult.value);
+    } else {
+      setForecasts([]);
+      console.warn('Forecasts fetch failed:', fcResult.reason);
+    }
+
+    if (fcAlertsResult.status === 'fulfilled') {
+      setForecastAlerts(fcAlertsResult.value);
+    } else {
+      setForecastAlerts([]);
+      console.warn('Forecast alerts fetch failed:', fcAlertsResult.reason);
+    }
+
+    setIsLoading(false);
   }, []);
 
   const runForecasting = useCallback(async () => {

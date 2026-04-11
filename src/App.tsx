@@ -20,7 +20,7 @@ import { AnalyticsPage } from './pages/manager/AnalyticsPage';
 import { QRCodeGenerator } from './pages/manager/QRCodeGenerator';
 import ExpenseApproval from './components/manager/ExpenseApproval';
 import SupervisorExpenseManagement from './components/supervisor/ExpenseManagement';
-import { InventoryManagement } from './pages/shared/InventoryManagement';
+import { InventoryManagement } from './pages/shared/InventoryManagementREFACTORED';
 import { KitchenDisplay } from './pages/kitchen/KitchenDisplay';
 import { LoginPage } from './pages/auth/LoginPage';
 import { SuperAdminDashboard } from './pages/superadmin/SuperAdminDashboard';
