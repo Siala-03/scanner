@@ -12,7 +12,7 @@ import {
   createExpenseNote,
   getExpenseAuditLog,
 } from '../../api/expenses';
-import { buildExpenseReceiptHtml, printExpenseReceipt } from '../../utils/receipt';
+import { buildExpenseReceiptHtml, downloadExpenseReceiptHtml } from '../../utils/receipt';
 import {
   Expense,
   ExpenseCategory,
@@ -197,7 +197,7 @@ export default function ManagerExpenseApproval() {
   const handleGenerateReceipt = async (expenseId: string) => {
     try {
       setLoading(true);
-      await generateReceipt(expenseId);
+      const receipt = await generateReceipt(expenseId);
       const expenseToPrint = [
         ...pendingExpenses,
         ...approvedExpenses,
@@ -205,15 +205,22 @@ export default function ManagerExpenseApproval() {
       ].find(e => e.id === expenseId) || selectedExpense;
       if (expenseToPrint) {
         const html = buildExpenseReceiptHtml(expenseToPrint as any);
-        printExpenseReceipt(html);
+        downloadExpenseReceiptHtml(
+          html,
+          `expense-receipt-${(expenseToPrint.referenceNumber || expenseToPrint.id).replace(/\s+/g, '_')}.html`
+        );
       }
-      if (selectedExpense?.id === expenseId) {
-        const updated = [
-          ...pendingExpenses,
-          ...approvedExpenses,
-          ...rejectedExpenses,
-        ].find(e => e.id === expenseId);
-        setSelectedExpense(updated || null);
+      if (receipt && expenseToPrint) {
+        const updateReceipt = (expense: typeof pendingExpenses[number]) =>
+          expense.id === expenseId ? { ...expense, receipt } : expense;
+
+        setPendingExpenses(pendingExpenses.map(updateReceipt));
+        setApprovedExpenses(approvedExpenses.map(updateReceipt));
+        setRejectedExpenses(rejectedExpenses.map(updateReceipt));
+
+        if (selectedExpense?.id === expenseId) {
+          setSelectedExpense({ ...selectedExpense, receipt });
+        }
       }
       setError(null);
     } catch (err) {

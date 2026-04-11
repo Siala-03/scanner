@@ -29,6 +29,7 @@ import { cycleCountRouter } from './routes/cycleCounts.js';
 import expensesRouter from './routes/expenses.js';
 import { aiRouter } from './routes/ai.js';
 import { restaurantsRouter } from './routes/restaurants.js';
+import creditRouter from './routes/credit.js';
 import { initSocket } from './socket.js';
 import { logger } from './logger.js';
 import { pool } from './db.js';
@@ -269,6 +270,7 @@ app.use('/api/cycle-counts', cycleCountRouter);
 app.use('/api/expenses', expensesRouter);
 app.use('/api/ai', aiRouter);
 app.use('/api/restaurants', restaurantsRouter);
+app.use('/api/credit', creditRouter);
 
 app.use(
   (

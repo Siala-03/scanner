@@ -1,4 +1,4 @@
-import { Order, OrderItem } from '../types';
+import { Order } from '../types';
 
 // ============================================
 // CURRENCY FORMATTING
@@ -863,7 +863,7 @@ export function buildExpenseReceiptHtml(
   restaurantAddress = '123 Main St',
   restaurantPhone = '(555) 123-4567'
 ): string {
-  const taxAmount = expense.taxAmount || (expense.amount * expense.taxRate) / 100;
+  const taxAmount = expense.taxAmount !== undefined ? expense.taxAmount : (expense.amount * expense.taxRate) / 100;
   const total = expense.amount + taxAmount;
   const receiptDate = new Date(expense.expenseDate).toLocaleDateString();
 
@@ -935,7 +935,7 @@ export function buildExpenseReceiptHtml(
         <span class="label">Subtotal:</span>
         <span class="value">${expense.currency} ${Number(expense.amount).toFixed(2)}</span>
       </div>
-      ${expense.taxRate > 0 || expense.taxAmount > 0 ? `
+      ${expense.taxRate > 0 || (expense.taxAmount !== undefined && expense.taxAmount > 0) ? `
       <div class="row">
         <span class="label">Tax (${expense.taxRate}%):</span>
         <span class="value">${expense.currency} ${Number(taxAmount).toFixed(2)}</span>
@@ -983,6 +983,18 @@ export function buildExpenseReceiptHtml(
 /**
  * Print an expense receipt
  */
+export function downloadExpenseReceiptHtml(html: string, filename?: string): void {
+  const blob = new Blob([html], { type: 'text/html' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename || 'expense-receipt.html';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
 export function printExpenseReceipt(html: string): void {
   const printWindow = window.open('', '_blank', 'width=700,height=900');
   if (!printWindow) {

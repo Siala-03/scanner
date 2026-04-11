@@ -18,6 +18,7 @@ import { MenuManagement } from './pages/manager/MenuManagement';
 import { StaffManagement } from './pages/manager/StaffManagement';
 import { AnalyticsPage } from './pages/manager/AnalyticsPage';
 import { QRCodeGenerator } from './pages/manager/QRCodeGenerator';
+import CreditManagement from './pages/manager/CreditManagement';
 import ExpenseApproval from './components/manager/ExpenseApproval';
 import SupervisorExpenseManagement from './components/supervisor/ExpenseManagement';
 import { InventoryManagement } from './pages/shared/InventoryManagement';
@@ -34,7 +35,7 @@ import { fetchRestaurantPublic } from './api/restaurants';
 const DEFAULT_RESTAURANT_ID = 'default_restaurant';
 
 type UserRole = 'customer' | 'waiter' | 'supervisor' | 'manager' | 'kitchen' | 'superadmin' | 'supplier' | null;
-type ManagerPage = 'dashboard' | 'menu' | 'staff' | 'analytics' | 'performance' | 'qrcodes' | 'inventory' | 'history' | 'expenses';
+type ManagerPage = 'dashboard' | 'menu' | 'staff' | 'analytics' | 'performance' | 'qrcodes' | 'inventory' | 'history' | 'expenses' | 'credit';
 type SupervisorPage = 'dashboard' | 'revenue' | 'staff' | 'qrcodes' | 'inventory' | 'menu' | 'history' | 'expenses';
 export function App() {
   const [selectedRole, setSelectedRole] = useState<UserRole>(null);
@@ -632,6 +633,10 @@ export function App() {
               id: 'expenses',
               label: 'Expenses'
             },
+            {
+              id: 'credit',
+              label: 'Credit'
+            },
           ].map((item) => (
               <button
                 key={item.id}
@@ -672,6 +677,7 @@ export function App() {
               />
             )}
             {managerPage === 'expenses' && <ExpenseApproval />}
+            {managerPage === 'credit' && <CreditManagement />}
             {managerPage === 'history' && <OrderHistoryPage onBack={() => setManagerPage('dashboard')} existingOrders={orders} />}
           </main>
         </div>

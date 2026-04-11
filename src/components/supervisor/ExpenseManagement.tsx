@@ -9,7 +9,7 @@ import {
   createExpenseNote,
   getExpenseAuditLog,
 } from '../../api/expenses';
-import { buildExpenseReceiptHtml, printExpenseReceipt } from '../../utils/receipt';
+import { buildExpenseReceiptHtml, downloadExpenseReceiptHtml } from '../../utils/receipt';
 import {
   Expense,
   ExpenseCategory,
@@ -155,15 +155,20 @@ export default function SupervisorExpenseManagement() {
   const handleGenerateReceipt = async (expenseId: string) => {
     try {
       setLoading(true);
-      await generateReceipt(expenseId);
+      const receipt = await generateReceipt(expenseId);
       const expenseToPrint = expenses.find(e => e.id === expenseId) || selectedExpense;
       if (expenseToPrint) {
         const html = buildExpenseReceiptHtml(expenseToPrint as any);
-        printExpenseReceipt(html);
+        downloadExpenseReceiptHtml(
+          html,
+          `expense-receipt-${(expenseToPrint.referenceNumber || expenseToPrint.id).replace(/\s+/g, '_')}.html`
+        );
       }
-      if (selectedExpense?.id === expenseId) {
-        const updated = expenses.find(e => e.id === expenseId);
-        setSelectedExpense(updated || null);
+      if (receipt && expenseToPrint) {
+        setExpenses(expenses.map((e) => (e.id === expenseId ? { ...e, receipt } : e)));
+        if (selectedExpense?.id === expenseId) {
+          setSelectedExpense({ ...selectedExpense, receipt });
+        }
       }
       setError(null);
     } catch (err) {
