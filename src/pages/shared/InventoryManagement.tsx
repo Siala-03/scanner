@@ -651,15 +651,6 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
             Loading inventory data from server. Please wait...
           </div>
         )}
-        {!isLoading && loadError && inventory.length === 0 && (
-          <div className="mb-4 rounded-xl border border-red-400/30 bg-red-500/10 p-3 text-red-100 flex items-center justify-between gap-4">
-            <div>
-              <p className="font-semibold">Unable to load inventory data.</p>
-              <p className="text-xs text-red-200">{loadError}</p>
-            </div>
-            <Button variant="primary" size="sm" onClick={refresh}>Retry</Button>
-          </div>
-        )}
 
         {/* ── LOW STOCK BANNER ── */}
         {lowStockItems.length > 0 && activeTab === 'overview' && (
