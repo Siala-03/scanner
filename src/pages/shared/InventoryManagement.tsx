@@ -195,11 +195,36 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
 
   const inventoryRows = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return inventory
+
+    const inventoryByMenuItemId = inventory.reduce((map: Record<string, InventoryRecord>, rec) => {
+      const normalized = normalizeInventoryRecord(rec);
+      if (normalized.menuItemId) {
+        map[normalized.menuItemId] = normalized;
+      }
+      return map;
+    }, {});
+
+    const menuRows = menuItems.map((item) => {
+      const rec = inventoryByMenuItemId[item.id];
+      const stock = rec?.stock ?? 0;
+      const threshold = rec?.lowStockThreshold ?? 0;
+      const lastUpdatedDays = rec?.updatedAt ? Math.max(0, Math.floor((Date.now() - new Date(rec.updatedAt).getTime()) / (1000 * 60 * 60 * 24))) : null;
+      return {
+        item,
+        rec,
+        stock,
+        threshold,
+        isOut: stock === 0,
+        isLow: stock > 0 && stock <= threshold,
+        lastUpdatedDays,
+      };
+    });
+
+    const otherRows = inventory
       .map(normalizeInventoryRecord)
+      .filter((rec) => !menuItemMap[rec.menuItemId])
       .map((rec) => {
-        const menuItem = menuItemMap[rec.menuItemId];
-        const item = menuItem ?? {
+        const item = {
           id: rec.menuItemId,
           name: rec.menuItemId,
           category: 'Other',
@@ -216,7 +241,9 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
           isLow: stock > 0 && stock <= threshold,
           lastUpdatedDays,
         };
-      })
+      });
+
+    return [...menuRows, ...otherRows]
       .filter((row) => {
         if (q) {
           const match =
@@ -242,7 +269,7 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
         if (a.isLow !== b.isLow) return Number(b.isLow) - Number(a.isLow);
         return a.item.name.localeCompare(b.item.name);
       });
-  }, [query, categoryFilter, locationFilter, statusFilter, inventory, menuItemMap]);
+  }, [query, categoryFilter, locationFilter, statusFilter, inventory, menuItems, menuItemMap]);
 
   // lowStockItems loaded from backend state via fetchLowStockItems() and setLowStockItems()
 
@@ -1492,76 +1519,100 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
         {/* Add Other Inventory Item Modal */}
         <Modal isOpen={showAddInventoryModal} onClose={() => setShowAddInventoryModal(false)} title="Add Other Inventory Item">
           <div className="space-y-4">
-            <div className="grid grid-cols-1 gap-3">
-              <input
-                placeholder="Item name"
-                value={newInventoryItemName}
-                onChange={(e) => setNewInventoryItemName(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
-              />
-              <select
-                value={newInventoryItemCategory}
-                onChange={(e) => setNewInventoryItemCategory(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
-              >
-                <option value="Other">Other</option>
-                {menuCategories.map((category) => (
-                  <option key={category} value={category}>{category}</option>
-                ))}
-              </select>
-              <input
-                placeholder="Location"
-                value={newInventoryItemLocation}
-                onChange={(e) => setNewInventoryItemLocation(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
-              />
+            <div className="grid gap-3">
+              <label className="block text-sm text-slate-300">
+                Item name
+                <input
+                  placeholder="Item name"
+                  value={newInventoryItemName}
+                  onChange={(e) => setNewInventoryItemName(e.target.value)}
+                  className="mt-1 w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                />
+              </label>
+              <label className="block text-sm text-slate-300">
+                Category
+                <select
+                  value={newInventoryItemCategory}
+                  onChange={(e) => setNewInventoryItemCategory(e.target.value)}
+                  className="mt-1 w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                >
+                  <option value="Other">Other</option>
+                  {menuCategories.map((category) => (
+                    <option key={category} value={category}>{category}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="block text-sm text-slate-300">
+                Location
+                <input
+                  placeholder="Location"
+                  value={newInventoryItemLocation}
+                  onChange={(e) => setNewInventoryItemLocation(e.target.value)}
+                  className="mt-1 w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                />
+              </label>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-              <input
-                type="number"
-                placeholder="Stock"
-                value={newInventoryItemStock}
-                onChange={(e) => setNewInventoryItemStock(parseInt(e.target.value || '0', 10))}
-                min={0}
-                className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
-              />
-              <input
-                type="number"
-                placeholder="Unit cost"
-                value={newInventoryItemUnitCost}
-                onChange={(e) => setNewInventoryItemUnitCost(parseFloat(e.target.value || '0'))}
-                min={0}
-                step="0.01"
-                className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
-              />
+              <label className="block text-sm text-slate-300">
+                Stock quantity
+                <input
+                  type="number"
+                  placeholder="Stock"
+                  value={newInventoryItemStock}
+                  onChange={(e) => setNewInventoryItemStock(parseInt(e.target.value || '0', 10))}
+                  min={0}
+                  className="mt-1 w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                />
+              </label>
+              <label className="block text-sm text-slate-300">
+                Unit cost
+                <input
+                  type="number"
+                  placeholder="Unit cost"
+                  value={newInventoryItemUnitCost}
+                  onChange={(e) => setNewInventoryItemUnitCost(parseFloat(e.target.value || '0'))}
+                  min={0}
+                  step="0.01"
+                  className="mt-1 w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                />
+              </label>
             </div>
 
             <div className="grid grid-cols-3 gap-3">
-              <input
-                type="number"
-                placeholder="Low threshold"
-                value={newInventoryItemLowThreshold}
-                onChange={(e) => setNewInventoryItemLowThreshold(parseInt(e.target.value || '0', 10))}
-                min={0}
-                className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
-              />
-              <input
-                type="number"
-                placeholder="Reorder point"
-                value={newInventoryItemReorderPoint}
-                onChange={(e) => setNewInventoryItemReorderPoint(parseInt(e.target.value || '0', 10))}
-                min={0}
-                className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
-              />
-              <input
-                type="number"
-                placeholder="Reorder qty"
-                value={newInventoryItemReorderQty}
-                onChange={(e) => setNewInventoryItemReorderQty(parseInt(e.target.value || '0', 10))}
-                min={0}
-                className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
-              />
+              <label className="block text-sm text-slate-300">
+                Low threshold
+                <input
+                  type="number"
+                  placeholder="Low threshold"
+                  value={newInventoryItemLowThreshold}
+                  onChange={(e) => setNewInventoryItemLowThreshold(parseInt(e.target.value || '0', 10))}
+                  min={0}
+                  className="mt-1 w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                />
+              </label>
+              <label className="block text-sm text-slate-300">
+                Reorder point
+                <input
+                  type="number"
+                  placeholder="Reorder point"
+                  value={newInventoryItemReorderPoint}
+                  onChange={(e) => setNewInventoryItemReorderPoint(parseInt(e.target.value || '0', 10))}
+                  min={0}
+                  className="mt-1 w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                />
+              </label>
+              <label className="block text-sm text-slate-300">
+                Reorder qty
+                <input
+                  type="number"
+                  placeholder="Reorder qty"
+                  value={newInventoryItemReorderQty}
+                  onChange={(e) => setNewInventoryItemReorderQty(parseInt(e.target.value || '0', 10))}
+                  min={0}
+                  className="mt-1 w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                />
+              </label>
             </div>
 
             <div className="flex justify-end gap-2 pt-2 border-t border-slate-700/30">

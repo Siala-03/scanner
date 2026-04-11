@@ -77,10 +77,17 @@ export function useInventoryData() {
 
     if (invResult.status === 'fulfilled') {
       setInventory(invResult.value);
+      // Clear error if we successfully loaded data
+      if (invResult.value.length > 0) {
+        setLoadError(null);
+      }
     } else {
       const message = invResult.reason instanceof Error ? invResult.reason.message : String(invResult.reason);
       console.error('Critical inventory load failed:', message);
-      setLoadError(message || 'Failed to load inventory items.');
+      // Only set error if we don't have existing data
+      if (inventory.length === 0) {
+        setLoadError(message || 'Failed to load inventory items.');
+      }
     }
 
     if (lowResult.status === 'fulfilled') {
