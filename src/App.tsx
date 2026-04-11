@@ -53,6 +53,17 @@ export function App() {
   const [showQRGrid, setShowQRGrid] = useState(false);
   const { tables, addTable, removeTable } = useTables();
 
+  const restoreStaffIdFromAuthUser = useCallback((user: Staff | null) => {
+    if (!user?.id) {
+      return;
+    }
+
+    const storedStaffId = localStorage.getItem('staffId');
+    if (!storedStaffId) {
+      localStorage.setItem('staffId', user.id);
+    }
+  }, []);
+
   // Load auth state from localStorage on mount
   useEffect(() => {
     const savedAuthUser = localStorage.getItem('authUser');
@@ -65,10 +76,14 @@ export function App() {
           user.restaurantId = savedRestaurantId;
         }
         setAuthUser(user);
+        restoreStaffIdFromAuthUser(user);
         if (user.restaurantId) {
           setCurrentRestaurantId(user.restaurantId);
         } else if (savedRestaurantId) {
           setCurrentRestaurantId(savedRestaurantId);
+        }
+        if (!savedSelectedRole && user.role) {
+          setSelectedRole(user.role as UserRole);
         }
       } catch (error) {
         console.error('Failed to parse saved auth user:', error);
@@ -81,7 +96,7 @@ export function App() {
       setSelectedRole(savedSelectedRole as UserRole);
     }
     setRouteResolved(true);
-  }, []);
+  }, [restoreStaffIdFromAuthUser]);
 
   const [waiterCalls, setWaiterCalls] = useState<
     {
@@ -399,6 +414,7 @@ export function App() {
       <LoginPage
         onLogin={(user) => {
           setAuthUser(user);
+          restoreStaffIdFromAuthUser(user);
           // Set selectedRole based on user's role
           if (user.role === 'superadmin') {
             setSelectedRole('superadmin');

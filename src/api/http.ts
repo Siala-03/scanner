@@ -29,7 +29,21 @@ export async function apiRequest<T>(
   if (init.json !== undefined) headers.set('Content-Type', 'application/json');
 
   // Add authentication headers automatically from localStorage
-  const staffId = localStorage.getItem('staffId');
+  let staffId = localStorage.getItem('staffId');
+  if (!staffId) {
+    const savedAuthUser = localStorage.getItem('authUser');
+    if (savedAuthUser) {
+      try {
+        const authUser = JSON.parse(savedAuthUser);
+        if (authUser?.id) {
+          staffId = authUser.id;
+        }
+      } catch {
+        // ignore invalid auth user JSON
+      }
+    }
+  }
+
   const token = localStorage.getItem('token');
   if (staffId) {
     headers.set('x-staff-id', staffId);
