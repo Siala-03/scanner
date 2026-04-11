@@ -251,6 +251,7 @@ export function useOrders(): UseOrdersReturn {
       const subtotal = localItems.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
       const total = subtotal;
       const localOrderId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+      const now = new Date();
       const localOrder: Order = {
         id: localOrderId,
         orderNumber: `TEMP-${Date.now().toString().slice(-6)}`,
@@ -268,8 +269,8 @@ export function useOrders(): UseOrdersReturn {
         requiresKitchen,
         deliveryProvider: delivery?.provider,
         deliveryAddress: delivery?.address,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        createdAt: now,
+        updatedAt: now,
       } as Order;
 
       setOrders((prev) => [localOrder, ...prev]);

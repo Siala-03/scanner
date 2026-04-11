@@ -102,6 +102,8 @@ export function WaiterDashboard({
   // Separate customer menu orders from waiter-created orders
   const customerMenuOrders = waiterOrders.filter(order => !order.assignedWaiterId || order.assignedWaiterId === waiter.id);
   const newOrders = waiterOrders.filter((order) => order.status === 'pending');
+  const pendingCustomerMenuOrders = newOrders.filter((order) => !order.assignedWaiterId);
+  const pendingWaiterOrders = newOrders.filter((order) => order.assignedWaiterId === waiter.id);
   const kitchenOrders = waiterOrders.filter((order) => ['verified', 'preparing'].includes(order.status));
   const readyOrders = waiterOrders.filter((order) => order.status === 'ready');
   const completedOrders = waiterOrders.filter((order) => order.status === 'served');
@@ -421,16 +423,55 @@ export function WaiterDashboard({
                       description="New orders from customer QR menu scans will appear here automatically for approval."
                     />
                   ) : (
-                    newOrders.map((order) => (
-                      <OrderCard
-                        key={order.id}
-                        order={order}
-                        onViewDetails={setSelectedOrder}
-                        onApprove={handleApprove}
-                        onReject={handleReject}
-                        onPrintReceipt={handlePrintReceipt}
-                      />
-                    ))
+                    <div className="space-y-6">
+                      {pendingCustomerMenuOrders.length > 0 && (
+                        <div className="rounded-3xl border border-slate-700 bg-slate-900/80 p-5">
+                          <div className="flex items-center justify-between gap-4 mb-4">
+                            <div>
+                              <h3 className="text-lg font-semibold text-white">Customer QR Orders</h3>
+                              <p className="text-sm text-slate-400">Orders placed from the guest-facing QR menu appear here first.</p>
+                            </div>
+                            <span className="rounded-full bg-blue-500/15 text-blue-200 px-3 py-1 text-xs font-semibold">{pendingCustomerMenuOrders.length} QR orders</span>
+                          </div>
+                          <div className="space-y-4">
+                            {pendingCustomerMenuOrders.map((order) => (
+                              <OrderCard
+                                key={order.id}
+                                order={order}
+                                onViewDetails={setSelectedOrder}
+                                onApprove={handleApprove}
+                                onReject={handleReject}
+                                onPrintReceipt={handlePrintReceipt}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {pendingWaiterOrders.length > 0 && (
+                        <div className="rounded-3xl border border-slate-700 bg-slate-900/80 p-5">
+                          <div className="flex items-center justify-between gap-4 mb-4">
+                            <div>
+                              <h3 className="text-lg font-semibold text-white">Assigned Waiter Orders</h3>
+                              <p className="text-sm text-slate-400">Pending orders already assigned to you appear here.</p>
+                            </div>
+                            <span className="rounded-full bg-amber-500/15 text-amber-200 px-3 py-1 text-xs font-semibold">{pendingWaiterOrders.length} assigned</span>
+                          </div>
+                          <div className="space-y-4">
+                            {pendingWaiterOrders.map((order) => (
+                              <OrderCard
+                                key={order.id}
+                                order={order}
+                                onViewDetails={setSelectedOrder}
+                                onApprove={handleApprove}
+                                onReject={handleReject}
+                                onPrintReceipt={handlePrintReceipt}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   )}
                 </motion.div>
               )}
