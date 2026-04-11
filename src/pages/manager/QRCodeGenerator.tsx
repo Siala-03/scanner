@@ -75,20 +75,71 @@ export function QRCodeGenerator({
 
     const img = new Image();
     img.onload = () => {
+      const width = 420;
+      const height = 520;
+      const qrSize = 320;
       const canvas = document.createElement('canvas');
-      canvas.width = 320;
-      canvas.height = 320;
+      canvas.width = width;
+      canvas.height = height;
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      URL.revokeObjectURL(url);
 
+      const titleText = restaurantName || 'Restaurant';
+      const qrLink = restaurantId
+        ? `${resolvedBaseUrl}/r/${encodeURIComponent(restaurantId)}/t/${tableNum}`
+        : `${resolvedBaseUrl}/t/${tableNum}`;
+
+      // Background
+      ctx.fillStyle = '#f8fafc';
+      ctx.fillRect(0, 0, width, height);
+
+      // Card background
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(16, 16, width - 32, height - 32);
+      ctx.strokeStyle = '#d1d5db';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(16, 16, width - 32, height - 32);
+
+      // Header text
+      ctx.fillStyle = '#0f172a';
+      ctx.font = '700 26px Inter, sans-serif';
+      ctx.fillText(titleText, 34, 62);
+
+      ctx.fillStyle = '#475569';
+      ctx.font = '600 18px Inter, sans-serif';
+      ctx.fillText(`Table ${tableNum}`, 34, 94);
+
+      // QR image
+      const qrX = (width - qrSize) / 2;
+      const qrY = 120;
+      ctx.drawImage(img, qrX, qrY, qrSize, qrSize);
+
+      // Footer text
+      ctx.fillStyle = '#0f172a';
+      ctx.font = '600 16px Inter, sans-serif';
+      ctx.fillText('Scan to order from this table', 34, qrY + qrSize + 32);
+
+      ctx.fillStyle = '#64748b';
+      ctx.font = '400 12px Inter, sans-serif';
+      const linkText = qrLink;
+      const maxWidth = width - 68;
+      const linkY = qrY + qrSize + 54;
+      if (ctx.measureText(linkText).width <= maxWidth) {
+        ctx.fillText(linkText, 34, linkY);
+      } else {
+        const ellipsis = '...';
+        let truncated = linkText;
+        while (ctx.measureText(truncated + ellipsis).width > maxWidth && truncated.length > 0) {
+          truncated = truncated.slice(0, -1);
+        }
+        ctx.fillText(`${truncated}${ellipsis}`, 34, linkY);
+      }
+
+      URL.revokeObjectURL(url);
       const pngUrl = canvas.toDataURL('image/png');
       const link = document.createElement('a');
       link.href = pngUrl;
-      link.download = `table-${tableNum}.png`;
+      link.download = `${titleText.replace(/\s+/g, '_').toLowerCase()}_table-${tableNum}.png`;
       link.click();
     };
     img.src = url;
@@ -146,7 +197,6 @@ export function QRCodeGenerator({
                       value={qrLink}
                       size={160}
                       level="H"
-                      includeMargin={true}
                     />
                   </div>
 
