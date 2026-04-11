@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useCredit } from '../../hooks/useCredit';
-import { CreditAccount, CreditApplication } from '../../types/credit';
+import type { CustomerCreditAccount } from '../../types/credit';
 import { Staff } from '../../types';
 
 type TabType = 'accounts' | 'applications' | 'transactions' | 'reports';
@@ -21,7 +21,7 @@ const CreditManagement: React.FC = () => {
   }, []);
 
   const [activeTab, setActiveTab] = useState<TabType>('accounts');
-  const [selectedAccount, setSelectedAccount] = useState<CreditAccount | null>(null);
+  const [selectedAccount, setSelectedAccount] = useState<CustomerCreditAccount | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showTransactionModal, setShowTransactionModal] = useState(false);
@@ -31,37 +31,31 @@ const CreditManagement: React.FC = () => {
     accounts,
     applications,
     summary,
-    loading,
-    error,
-    fetchAccounts,
-    fetchApplications,
-    fetchSummary,
+    isLoading,
+    loadError,
+    loadCreditData,
     createAccount,
-    updateAccount,
-    deleteAccount,
+    chargeCredit,
+    makePayment,
+    adjustCredit,
     reviewApplication,
-    addCharge,
-    addPayment,
-    addAdjustment,
   } = useCredit();
 
   useEffect(() => {
-    if (user && (user.role === 'manager' || user.role === 'admin' || user.role === 'superadmin')) {
-      fetchAccounts();
-      fetchApplications();
-      fetchSummary();
+    if (user && (user.role === 'manager' || user.role === 'superadmin')) {
+      loadCreditData();
     }
-  }, [user, fetchAccounts, fetchApplications, fetchSummary]);
+  }, [user, loadCreditData]);
 
   // Filter accounts based on search
   const filteredAccounts = accounts.filter(account =>
-    account.customer_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    account.customer_phone.includes(searchTerm)
+    account.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    account.customerPhone.includes(searchTerm)
   );
 
   const filteredApplications = applications.filter(app =>
-    app.customer_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    app.customer_phone.includes(searchTerm)
+    app.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    app.customerPhone.includes(searchTerm)
   );
 
   // Format currency
@@ -150,13 +144,13 @@ const CreditManagement: React.FC = () => {
             {filteredAccounts.map((account) => (
               <tr key={account.id} className="hover:bg-gray-50">
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm font-medium text-gray-900">{account.customer_name}</div>
+                  <div className="text-sm font-medium text-gray-900">{account.customerName}</div>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{account.customer_phone}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{formatCurrency(account.credit_limit)}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{formatCurrency(account.current_balance)}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{account.customerPhone}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{formatCurrency(account.creditLimit)}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{formatCurrency(account.currentBalance)}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-medium">
-                  {formatCurrency(account.available_credit)}
+                  {formatCurrency(account.availableCredit)}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(account.status)}`}>
@@ -247,11 +241,11 @@ const CreditManagement: React.FC = () => {
             {filteredApplications.map((application) => (
               <tr key={application.id} className="hover:bg-gray-50">
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm font-medium text-gray-900">{application.customer_name}</div>
+                  <div className="text-sm font-medium text-gray-900">{application.customerName}</div>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{application.customer_phone}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{formatCurrency(application.requested_limit)}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{formatDate(application.requested_at)}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{application.customerPhone}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{formatCurrency(application.requestedLimit)}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{formatDate(application.requestedAt)}</td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(application.status)}`}>
                     {application.status}
@@ -262,10 +256,18 @@ const CreditManagement: React.FC = () => {
                     <>
                       <button
                         onClick={() => {
-                          const creditLimit = prompt('Enter approved credit limit:', application.requested_limit.toString());
-                          if (creditLimit) {
-                            reviewApplication(application.id, 'approved', parseFloat(creditLimit));
+                          const creditLimitValue = prompt('Enter approved credit limit:', application.requestedLimit.toString());
+                          const approvedLimit = creditLimitValue ? parseFloat(creditLimitValue) : NaN;
+                          if (isNaN(approvedLimit) || approvedLimit <= 0) {
+                            alert('Please enter a valid approved credit limit.');
+                            return;
                           }
+                          reviewApplication(application.id, {
+                            status: 'approved',
+                            creditLimit: approvedLimit,
+                            reviewedBy: user?.id || '',
+                            reviewedByName: user?.name || '',
+                          });
                         }}
                         className="text-green-600 hover:text-green-900"
                       >
@@ -275,7 +277,12 @@ const CreditManagement: React.FC = () => {
                         onClick={() => {
                           const reason = prompt('Enter rejection reason:');
                           if (reason) {
-                            reviewApplication(application.id, 'rejected', 0, reason);
+                            reviewApplication(application.id, {
+                              status: 'rejected',
+                              rejectionReason: reason,
+                              reviewedBy: user?.id || '',
+                              reviewedByName: user?.name || '',
+                            });
                           }
                         }}
                         className="text-red-600 hover:text-red-900"
@@ -340,7 +347,7 @@ const CreditManagement: React.FC = () => {
         <div className="bg-white overflow-hidden shadow rounded-lg">
           <div className="px-4 py-5 sm:p-6">
             <dt className="text-sm font-medium text-gray-500 truncate">Accounts Overdue</dt>
-            <dd className="mt-1 text-3xl font-semibold text-yellow-600">{summary?.accountsOverdue || 0}</dd>
+            <dd className="mt-1 text-3xl font-semibold text-yellow-600">{summary?.accountsOverLimit || 0}</dd>
           </div>
         </div>
       </div>
@@ -351,8 +358,8 @@ const CreditManagement: React.FC = () => {
         </div>
         <div className="p-6 space-y-4">
           <div className="flex justify-between">
-            <span className="text-gray-600">Total Available Credit</span>
-            <span className="font-medium">{formatCurrency(summary?.totalAvailableCredit || 0)}</span>
+            <span className="text-gray-600">Total Outstanding</span>
+            <span className="font-medium">{formatCurrency(summary?.totalOutstanding || 0)}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-gray-600">Average Credit Utilization</span>
@@ -391,7 +398,7 @@ const CreditManagement: React.FC = () => {
         });
         setShowCreateModal(false);
         setFormData({ customerName: '', customerPhone: '', creditLimit: '', notes: '' });
-        fetchAccounts();
+        loadCreditData();
       } catch (err) {
         console.error('Failed to create account:', err);
       }
@@ -479,9 +486,9 @@ const CreditManagement: React.FC = () => {
       try {
         switch (transactionType) {
           case 'charge':
-            await addCharge({
+            await chargeCredit({
               accountId: selectedAccount.id,
-              customerId: selectedAccount.customer_id,
+              customerId: selectedAccount.customerId,
               amount: parseFloat(amount),
               description: description || 'Credit charge',
               performedBy: user?.id || '',
@@ -489,9 +496,9 @@ const CreditManagement: React.FC = () => {
             });
             break;
           case 'payment':
-            await addPayment({
+            await makePayment({
               accountId: selectedAccount.id,
-              customerId: selectedAccount.customer_id,
+              customerId: selectedAccount.customerId,
               amount: parseFloat(amount),
               paymentMethod: 'cash',
               reference: reference,
@@ -500,9 +507,9 @@ const CreditManagement: React.FC = () => {
             });
             break;
           case 'adjustment':
-            await addAdjustment({
+            await adjustCredit({
               accountId: selectedAccount.id,
-              customerId: selectedAccount.customer_id,
+              customerId: selectedAccount.customerId,
               amount: parseFloat(amount),
               reason: description,
               performedBy: user?.id || '',
@@ -514,7 +521,7 @@ const CreditManagement: React.FC = () => {
         setAmount('');
         setDescription('');
         setReference('');
-        fetchAccounts();
+        loadCreditData();
       } catch (err) {
         console.error('Transaction failed:', err);
         alert('Transaction failed. Please try again.');
@@ -532,9 +539,9 @@ const CreditManagement: React.FC = () => {
             {transactionType === 'adjustment' && 'Manual Adjustment'}
           </h3>
           <div className="mb-4 p-3 bg-gray-50 rounded">
-            <p className="text-sm text-gray-600">Account: <strong>{selectedAccount.customer_name}</strong></p>
-            <p className="text-sm text-gray-600">Current Balance: <strong>{formatCurrency(selectedAccount.current_balance)}</strong></p>
-            <p className="text-sm text-gray-600">Available Credit: <strong>{formatCurrency(selectedAccount.available_credit)}</strong></p>
+            <p className="text-sm text-gray-600">Account: <strong>{selectedAccount.customerName}</strong></p>
+            <p className="text-sm text-gray-600">Current Balance: <strong>{formatCurrency(selectedAccount.currentBalance)}</strong></p>
+            <p className="text-sm text-gray-600">Available Credit: <strong>{formatCurrency(selectedAccount.availableCredit)}</strong></p>
           </div>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
@@ -601,19 +608,19 @@ const CreditManagement: React.FC = () => {
         <div className="px-4 py-6 sm:px-0">
           <h1 className="text-3xl font-bold text-gray-900 mb-6">Credit Management</h1>
 
-          {error && (
+          {loadError && (
             <div className="mb-4 bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded">
-              {error}
+              {loadError}
             </div>
           )}
 
-          {loading && !accounts.length && (
+          {isLoading && !accounts.length && (
             <div className="flex justify-center items-center py-12">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
             </div>
           )}
 
-          {!loading && (
+          {!isLoading && (
             <>
               {/* Tabs */}
               <div className="border-b border-gray-200 mb-6">
