@@ -7,7 +7,43 @@ import { OfflineAwareAPI } from '../api/offlineAware';
 
 const normalizeOrderPayload = (rawOrder: any): Order | undefined => {
   if (!rawOrder) return undefined;
-  const items = typeof rawOrder.items === 'string' ? JSON.parse(rawOrder.items) : rawOrder.items;
+  const itemsRaw = typeof rawOrder.items === 'string' ? JSON.parse(rawOrder.items) : rawOrder.items;
+  const items = Array.isArray(itemsRaw) ? itemsRaw : [];
+
+  const normalizeItem = (item: any) => {
+    const menuItem = item.menuItem || item.menu_item || {
+      id: item.menuItemId ?? item.menu_item_id ?? item.id ?? 'unknown',
+      name: item.menuItemName ?? item.menu_item_name ?? 'Unknown Item',
+      description: item.menuItem?.description ?? item.description ?? '',
+      price: item.unitPrice ?? item.unit_price ?? 0,
+      category: item.menuItem?.category ?? item.category ?? 'unknown',
+      emoji: item.menuItem?.emoji ?? '🍽',
+      prepTime: item.menuItem?.prepTime ?? item.prepTime ?? 0,
+      isAvailable: item.menuItem?.isAvailable ?? item.is_available ?? true,
+      isPopular: item.menuItem?.isPopular ?? item.is_popular ?? false,
+    };
+
+    return {
+      ...item,
+      id: item.id ?? item.menuItemId ?? item.menu_item_id,
+      menuItem,
+      menuItemId: item.menuItemId ?? item.menu_item_id,
+      menuItemName: item.menuItemName ?? item.menu_item_name ?? menuItem.name,
+      unitPrice: item.unitPrice ?? item.unit_price ?? menuItem.price,
+      totalPrice: item.totalPrice ?? item.total_price ?? (item.quantity * ((item.unitPrice ?? item.unit_price ?? menuItem.price) || 0)),
+      specialInstructions: item.specialInstructions ?? item.special_instructions,
+      status: item.status,
+      startedAt: item.startedAt ?? item.started_at,
+      completedAt: item.completedAt ?? item.completed_at,
+    };
+  };
+
+  const parseDate = (value: any) => {
+    if (!value) return undefined;
+    const date = value instanceof Date ? value : new Date(value);
+    return Number.isNaN(date.getTime()) ? undefined : date;
+  };
+
   return {
     ...rawOrder,
     id: rawOrder.id,
@@ -20,9 +56,13 @@ const normalizeOrderPayload = (rawOrder: any): Order | undefined => {
     subtotal: rawOrder.subtotal,
     tax: rawOrder.tax,
     total: rawOrder.total,
-    notes: rawOrder.notes,
-    createdAt: rawOrder.createdAt ?? rawOrder.created_at,
-    updatedAt: rawOrder.updatedAt ?? rawOrder.updated_at,
+    notes: rawOrder.notes ?? rawOrder.note,
+    specialInstructions: rawOrder.specialInstructions ?? rawOrder.special_instructions,
+    createdAt: parseDate(rawOrder.createdAt ?? rawOrder.created_at) ?? new Date(),
+    updatedAt: parseDate(rawOrder.updatedAt ?? rawOrder.updated_at) ?? new Date(),
+    verifiedAt: parseDate(rawOrder.verifiedAt ?? rawOrder.verified_at),
+    readyAt: parseDate(rawOrder.readyAt ?? rawOrder.ready_at),
+    servedAt: parseDate(rawOrder.servedAt ?? rawOrder.served_at),
     requiresKitchen: rawOrder.requiresKitchen ?? rawOrder.requires_kitchen,
     deliveryProvider: rawOrder.deliveryProvider ?? rawOrder.delivery_provider,
     deliveryAddress: rawOrder.deliveryAddress ?? rawOrder.delivery_address,
@@ -30,7 +70,7 @@ const normalizeOrderPayload = (rawOrder: any): Order | undefined => {
     loyaltyDiscount: rawOrder.loyaltyDiscount ?? rawOrder.loyalty_discount,
     loyaltyFreeItemId: rawOrder.loyaltyFreeItemId ?? rawOrder.loyalty_free_item_id,
     assignedWaiterId: rawOrder.assignedWaiterId ?? rawOrder.assigned_waiter_id,
-    items: Array.isArray(items) ? items : [],
+    items: items.map(normalizeItem),
   } as Order;
 };
 

@@ -89,18 +89,18 @@ export function OrderDetailModal({
               className="flex items-center justify-between p-3 rounded-lg bg-slate-700/50">
 
                 <div className="flex items-center gap-3">
-                  <span className="text-2xl">{item.menuItem.emoji}</span>
+                  <span className="text-2xl">{item.menuItem?.emoji ?? '🍽'}</span>
                   <div>
                     <p className="font-medium text-white">
-                      {item.menuItem.name}
+                      {item.menuItem?.name ?? item.menuItemName ?? 'Unknown item'}
                     </p>
                     <p className="text-sm text-slate-400">
-                      {formatPrice(getEffectivePrice(item.menuItem))} × {item.quantity}
+                      {formatPrice(item.unitPrice ?? getEffectivePrice(item.menuItem))} × {item.quantity}
                     </p>
                   </div>
                 </div>
                 <span className="font-semibold text-amber-400">
-                  {formatPrice(getEffectivePrice(item.menuItem) * item.quantity)}
+                  {formatPrice((item.unitPrice ?? getEffectivePrice(item.menuItem)) * item.quantity)}
                 </span>
               </div>
             )}

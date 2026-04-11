@@ -85,7 +85,7 @@ export function OrderCard({
         {order.items.slice(0, 3).map((item, index) =>
           <div key={index} className="flex justify-between text-sm">
             <span className="text-slate-300">
-              {item.quantity}x {item.menuItem.name}
+              {item.quantity}x {item.menuItem?.name ?? item.menuItemName ?? 'Unknown item'}
             </span>
           </div>
         )}
