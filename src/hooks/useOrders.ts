@@ -101,7 +101,6 @@ interface UseOrdersReturn {
 // API functions
 export function useOrders(): UseOrdersReturn {
   const [orders, setOrders] = useState<Order[]>([]);
-  const [backendAvailable, setBackendAvailable] = useState(true);
   const { socket, joinOrders, joinRestaurant } = useSocket();
 
   const resolveRestaurantId = () => {
@@ -130,11 +129,9 @@ export function useOrders(): UseOrdersReturn {
       try {
         const backendOrders = await OfflineAwareAPI.fetchOrders('all', restaurantId);
         setOrders(backendOrders);
-        setBackendAvailable(true);
       } catch (e) {
         console.warn('Failed to load orders from backend', e);
         setOrders([]);
-        setBackendAvailable(false);
       }
     }
 
@@ -212,6 +209,26 @@ export function useOrders(): UseOrdersReturn {
       return category === '' || !drinkCategories.has(category);
     });
 
+  const buildOrderItemPayload = (item: CartItem) => ({
+    menuItemId: item.menuItem.id,
+    menuItemName: item.menuItem.name,
+    quantity: item.quantity,
+    unitPrice: getEffectivePrice(item.menuItem),
+    notes: item.specialInstructions,
+  });
+
+  const buildLocalOrderItem = (item: CartItem) => ({
+    id: `local-${item.menuItem.id}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    menuItem: item.menuItem,
+    menuItemId: item.menuItem.id,
+    menuItemName: item.menuItem.name,
+    quantity: item.quantity,
+    unitPrice: getEffectivePrice(item.menuItem),
+    totalPrice: getEffectivePrice(item.menuItem) * item.quantity,
+    specialInstructions: item.specialInstructions,
+    status: 'pending',
+  });
+
   const addOrder = useCallback(
     async (
       tableNumber: number,
@@ -222,36 +239,32 @@ export function useOrders(): UseOrdersReturn {
       loyaltyRewardId?: string
     ): Promise<Order> => {
       ensureInventoryInitialized();
-      const orderItems = items.map((item) => ({
-        menuItem: item.menuItem,
-        quantity: item.quantity,
-        specialInstructions: item.specialInstructions
-      }));
-
-      decrementInventoryForOrder(
-        orderItems.map((i) => ({ menuItemId: i.menuItem.id, quantity: i.quantity }))
-      );
-
-      const subtotal = orderItems.reduce(
-        (sum, item) => sum + getEffectivePrice(item.menuItem) * item.quantity,
-        0
-      );
-      const total = subtotal;
 
       const requiresKitchen = isFoodOrder(items);
+      const payloadItems = items.map(buildOrderItemPayload);
+      const localItems = items.map(buildLocalOrderItem);
+
+      decrementInventoryForOrder(
+        localItems.map((i) => ({ menuItemId: i.menuItemId, quantity: i.quantity }))
+      );
+
+      const subtotal = localItems.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
+      const total = subtotal;
+      const localOrderId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
       const localOrder: Order = {
-        id: `ORD-${Date.now()}`,
-        orderNumber: `ORD-${Date.now().toString().slice(-6)}`,
+        id: localOrderId,
+        orderNumber: `TEMP-${Date.now().toString().slice(-6)}`,
         tableNumber,
         customerName: customer?.name,
         customerId: customer?.id,
         restaurantId,
-        items: orderItems,
+        items: localItems,
         status: 'pending',
         subtotal,
         tax: 0,
         total,
         notes: specialInstructions,
+        specialInstructions,
         requiresKitchen,
         deliveryProvider: delivery?.provider,
         deliveryAddress: delivery?.address,
@@ -259,34 +272,32 @@ export function useOrders(): UseOrdersReturn {
         updatedAt: new Date().toISOString(),
       } as Order;
 
+      setOrders((prev) => [localOrder, ...prev]);
+
       let savedOrder: Order = localOrder;
       try {
-        savedOrder = await OfflineAwareAPI.createOrder({
+        const createdOrder = await OfflineAwareAPI.createOrder({
           tableNumber,
           customerName: customer?.name || 'Walk-in',
           customerId: customer?.id,
           restaurantId,
-          items: orderItems.map(item => ({
-            menuItemId: item.menuItem.id,
-            menuItemName: item.menuItem.name,
-            quantity: item.quantity,
-            unitPrice: Math.round(getEffectivePrice(item.menuItem) * 100)
-          })),
+          items: payloadItems,
           notes: specialInstructions,
           requiresKitchen,
           deliveryProvider: delivery?.provider,
           deliveryAddress: delivery?.address,
           loyaltyRewardId
         });
+
+        savedOrder = normalizeOrderPayload(createdOrder) ?? localOrder;
+        setOrders((prev) => prev.map((order) => (order.id === localOrderId ? savedOrder : order)));
       } catch (e) {
         console.warn('Failed to create order:', e);
-        savedOrder = localOrder;
       }
 
-      setOrders((prev) => [savedOrder, ...prev]);
       return savedOrder;
     },
-    [backendAvailable, restaurantId]
+    [restaurantId]
   );
 
   const updateOrderStatus = useCallback(

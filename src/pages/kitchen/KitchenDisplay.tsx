@@ -78,11 +78,11 @@ async function fetchKitchenOrders(restaurantId?: string): Promise<KitchenOrder[]
         orderNumber: o.orderNumber || o.order_number,
         tableNumber: o.tableNumber || o.table_number,
         status: o.status,
-        notes: o.notes,  // Order-level notes (allergies, special requests)
+        notes: o.notes,
         items: Array.isArray(o.items) ? o.items.map((item: any) => ({
-          name: item.menuItemName || item.menu_item_name || 'Unknown',
-          quantity: item.quantity,
-          notes: item.notes  // Item-level notes
+          name: item.menuItem?.name || item.menuItemName || item.menu_item_name || getMenuItemName(item.menuItemId || item.menu_item_id || item.id),
+          quantity: item.quantity ?? 1,
+          notes: item.notes ?? item.specialInstructions
         })) : [],
         createdAt: o.createdAt || o.created_at,
         loyaltyFreeItemId: o.loyaltyFreeItemId || o.loyalty_free_item_id,
