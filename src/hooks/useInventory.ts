@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSocket } from './useSocket';
 import {
   fetchInventory,
@@ -27,7 +27,22 @@ import type {
 export function useInventoryData() {
   const { joinInventory, socket } = useSocket();
   const [inventory, setInventory] = useState<InventoryRecord[]>([]);
+  const inventoryRef = useRef<InventoryRecord[]>([]);
   const [lowStockItems, setLowStockItems] = useState<InventoryRecord[]>([]);
+
+  const upsertInventoryRecords = useCallback((records: InventoryRecord[]) => {
+    setInventory((prev) => {
+      const map = new Map<string, InventoryRecord>(prev.map((rec) => [rec.menuItemId, rec]));
+      records.forEach((rec) => {
+        if (rec.menuItemId) {
+          map.set(rec.menuItemId, rec);
+        }
+      });
+      const next = Array.from(map.values());
+      inventoryRef.current = next;
+      return next;
+    });
+  }, []);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
   const [movements, setMovements] = useState<StockMovement[]>([]);
@@ -73,10 +88,10 @@ export function useInventoryData() {
     ]);
 
     const [invResult, lowResult, supResult, poResult, movResult, wasteResult, analyticsResult, locResult, fcResult, fcAlertsResult] = results;
-    const errors: string[] = [];
 
     if (invResult.status === 'fulfilled') {
       setInventory(invResult.value);
+      inventoryRef.current = invResult.value;
       // Clear error if we successfully loaded data
       if (invResult.value.length > 0) {
         setLoadError(null);
@@ -85,7 +100,7 @@ export function useInventoryData() {
       const message = invResult.reason instanceof Error ? invResult.reason.message : String(invResult.reason);
       console.error('Critical inventory load failed:', message);
       // Only set error if we don't have existing data
-      if (inventory.length === 0) {
+      if (inventoryRef.current.length === 0) {
         setLoadError(message || 'Failed to load inventory items.');
       }
     }
@@ -206,5 +221,6 @@ export function useInventoryData() {
     isLoading,
     loadError,
     refresh: loadAll,
+    upsertInventoryRecords,
   };
 }

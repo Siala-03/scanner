@@ -54,7 +54,7 @@ export async function fetchInventory(): Promise<InventoryRecord[]> {
 }
 
 export async function fetchInventoryById(menuItemId: string): Promise<InventoryRecord> {
-  return apiRequest<InventoryRecord>(`${API_BASE}/inventory/${menuItemId}`);
+  return apiRequest<InventoryRecord>(`${API_BASE}/inventory/${encodeURIComponent(menuItemId)}`);
 }
 
 export async function createInventoryRecord(record: Partial<InventoryRecord>): Promise<InventoryRecord> {
@@ -68,7 +68,7 @@ export async function updateInventoryRecord(
   menuItemId: string,
   record: Partial<InventoryRecord>
 ): Promise<InventoryRecord> {
-  return apiRequest<InventoryRecord>(`${API_BASE}/inventory/${menuItemId}`, {
+  return apiRequest<InventoryRecord>(`${API_BASE}/inventory/${encodeURIComponent(menuItemId)}`, {
     method: 'PUT',
     json: record,
   });
@@ -80,14 +80,14 @@ export async function adjustStock(
   reason: string,
   performedBy: string
 ): Promise<InventoryRecord> {
-  return apiRequest<InventoryRecord>(`${API_BASE}/inventory/${menuItemId}/adjust`, {
+  return apiRequest<InventoryRecord>(`${API_BASE}/inventory/${encodeURIComponent(menuItemId)}/adjust`, {
     method: 'PATCH',
     json: { adjustment, reason, performed_by: performedBy, locationId: 'default' },
   });
 }
 
 export async function deleteInventoryRecord(menuItemId: string): Promise<void> {
-  return apiRequest<void>(`${API_BASE}/inventory/${menuItemId}`, {
+  return apiRequest<void>(`${API_BASE}/inventory/${encodeURIComponent(menuItemId)}`, {
     method: 'DELETE',
   });
 }

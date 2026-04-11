@@ -130,6 +130,7 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
     isLoading,
     loadError,
     refresh,
+    upsertInventoryRecords,
     locations,
   } = useInventoryData();
   const menuCategories = useMemo(() => Array.from(new Set(menuItems.map((m) => m.category))), [menuItems]);
@@ -281,7 +282,7 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
 
     const menuItemId = newInventoryItemName.trim();
     try {
-      await apiUpdateInventoryRecord(menuItemId, {
+      const created = await apiUpdateInventoryRecord(menuItemId, {
         stock: newInventoryItemStock,
         lowStockThreshold: newInventoryItemLowThreshold,
         reorderPoint: newInventoryItemReorderPoint,
@@ -289,6 +290,12 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
         unitCost: newInventoryItemUnitCost,
         location: newInventoryItemLocation,
       });
+
+      upsertInventoryRecords([created]);
+      setQuery('');
+      setCategoryFilter('all');
+      setLocationFilter('all');
+      setStatusFilter('all');
 
       await refresh();
       setShowAddInventoryModal(false);
@@ -1420,29 +1427,35 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
           ) : (
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
-                <select
-                  value={newPO.supplierId}
-                  onChange={(e) => setNewPO((v) => ({ ...v, supplierId: e.target.value }))}
-                  className="px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
-                >
-                <option value="">Select Supplier</option>
-                {suppliers.filter((s) => s.isActive).map((s) => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
-                ))}
-                {suppliers.filter((s) => !s.isActive).length > 0 && (
-                  <optgroup label="Inactive">
-                    {suppliers.filter((s) => !s.isActive).map((s) => (
-                      <option key={s.id} value={s.id}>{s.name} (Inactive)</option>
+                <div>
+                  <label className="block text-xs font-medium text-slate-300 mb-1">Supplier</label>
+                  <select
+                    value={newPO.supplierId}
+                    onChange={(e) => setNewPO((v) => ({ ...v, supplierId: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  >
+                    <option value="">Select Supplier</option>
+                    {suppliers.filter((s) => s.isActive).map((s) => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
                     ))}
-                  </optgroup>
-                )}
-              </select>
-              <input
-                type="date"
-                value={newPO.expectedDelivery}
-                onChange={(e) => setNewPO((v) => ({ ...v, expectedDelivery: e.target.value }))}
-                className="px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
-              />
+                    {suppliers.filter((s) => !s.isActive).length > 0 && (
+                      <optgroup label="Inactive">
+                        {suppliers.filter((s) => !s.isActive).map((s) => (
+                          <option key={s.id} value={s.id}>{s.name} (Inactive)</option>
+                        ))}
+                      </optgroup>
+                    )}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-300 mb-1">Expected Delivery</label>
+                  <input
+                    type="date"
+                    value={newPO.expectedDelivery}
+                    onChange={(e) => setNewPO((v) => ({ ...v, expectedDelivery: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
               </div>
             <textarea
               placeholder="Notes (optional)"
