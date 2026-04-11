@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { ClockIcon, ChefHatIcon, UtensilsIcon, RefreshCwIcon, CheckCircleIcon, FlameIcon, AlertTriangleIcon, BarChart3Icon, ListOrderedIcon, TrendingUpIcon, LogOutIcon } from 'lucide-react';
+import { useSocket } from '../../hooks/useSocket';
 import { useStaffKPIs } from '../../hooks/useKPIs';
 import { KPICard } from '../../components/supervisor/KPICard';
 
@@ -10,7 +11,7 @@ interface KitchenOrder {
   id: string;
   orderNumber: string;
   tableNumber: number;
-  status: 'pending' | 'preparing' | 'ready';
+  status: 'pending' | 'verified' | 'preparing' | 'ready';
   items: { name: string; quantity: number; notes?: string }[];
   notes?: string;  // Order-level notes (allergies, special requests)
   createdAt: string;
@@ -35,6 +36,13 @@ const STATUS_CONFIG = {
     color: 'bg-blue-600', 
     textColor: 'text-white',
     borderColor: 'border-blue-500',
+    pulse: true
+  },
+  verified: {
+    label: 'VERIFIED',
+    color: 'bg-cyan-600',
+    textColor: 'text-white',
+    borderColor: 'border-cyan-500',
     pulse: true
   },
   preparing: { 
@@ -148,7 +156,7 @@ function calculateStats(orders: KitchenOrder[], completedToday: number[]): Kitch
     totalOrders: orders.length + completedToday.length,
     completedOrders: completedToday.length,
     avgPrepTime: 12, // Demo value
-    pendingOrders: orders.filter(o => o.status === 'pending').length,
+    pendingOrders: orders.filter(o => o.status === 'pending' || o.status === 'verified').length,
     preparingOrders: orders.filter(o => o.status === 'preparing').length,
     readyOrders: orders.filter(o => o.status === 'ready').length,
     itemCounts: itemCountsArray
@@ -162,7 +170,95 @@ export function KitchenDisplay({ onLogout, restaurantId, restaurantName }: { onL
   const [lastUpdate, setLastUpdate] = useState(new Date());
   const [viewMode, setViewMode] = useState<'orders' | 'analytics'>('orders');
   const [analytics, setAnalytics] = useState<any>(null);
+  const { socket, joinOrders, joinRestaurant } = useSocket();
   const { kpis: staffKPIs } = useStaffKPIs();
+
+  const handleKitchenSocketUpdate = useCallback((data: any) => {
+    const rawOrder = data?.order;
+    if (!rawOrder) return;
+
+    const orderRestaurantId = rawOrder.restaurantId || rawOrder.restaurant_id;
+    if (restaurantId && orderRestaurantId !== restaurantId) return;
+
+    const requiresKitchen = rawOrder.requiresKitchen ?? rawOrder.requires_kitchen;
+    if (!requiresKitchen) return;
+
+    const status = rawOrder.status;
+    if (!['pending', 'verified', 'preparing', 'ready'].includes(status)) return;
+
+    const normalizedOrder: KitchenOrder = {
+      id: rawOrder.id,
+      orderNumber: rawOrder.orderNumber || rawOrder.order_number,
+      tableNumber: rawOrder.tableNumber ?? rawOrder.table_number,
+      status,
+      notes: rawOrder.notes || rawOrder.note,
+      items: Array.isArray(rawOrder.items)
+        ? rawOrder.items.map((item: any) => ({
+            name: item.menuItem?.name || item.menuItemName || item.menu_item_name || getMenuItemName(item.menuItemId || item.menu_item_id || item.id),
+            quantity: item.quantity ?? 1,
+            notes: item.notes ?? item.specialInstructions ?? item.special_instructions
+          }))
+        : [],
+      createdAt: rawOrder.createdAt || rawOrder.created_at,
+      loyaltyFreeItemId: rawOrder.loyaltyFreeItemId || rawOrder.loyalty_free_item_id,
+      loyaltyDiscount: rawOrder.loyaltyDiscount || rawOrder.loyalty_discount,
+      requiresKitchen
+    };
+
+    setOrders((prev) => {
+      const index = prev.findIndex((order) => order.id === normalizedOrder.id);
+      if (index >= 0) {
+        return prev.map((order) => (order.id === normalizedOrder.id ? normalizedOrder : order));
+      }
+      return [normalizedOrder, ...prev];
+    });
+  }, [restaurantId]);
+
+  useEffect(() => {
+    if (!restaurantId) return;
+    joinOrders();
+    joinRestaurant(restaurantId);
+    socket.on('order:update', handleKitchenSocketUpdate);
+    return () => {
+      socket.off('order:update', handleKitchenSocketUpdate);
+    };
+  }, [restaurantId, joinOrders, joinRestaurant, socket, handleKitchenSocketUpdate]);
+
+  const handlePrintReceipt = (order: KitchenOrder) => {
+    const html = `<!DOCTYPE html>
+      <html>
+        <head>
+          <title>Kitchen Ticket - ${order.orderNumber}</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 16px; color: #111; background: #fff; }
+            h1, h2, p { margin: 0 0 10px; }
+            .item { margin-bottom: 8px; }
+            .note { color: #555; font-size: 0.95rem; }
+            .header { margin-bottom: 16px; border-bottom: 1px solid #ddd; padding-bottom: 12px; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>${restaurantName || 'Kitchen'}</h1>
+            <h2>Order ${order.orderNumber}</h2>
+            <p>Table ${order.tableNumber} • Status: ${order.status.toUpperCase()}</p>
+          </div>
+          <div>
+            ${order.items.map((item) => `<div class="item"><strong>${item.quantity}x</strong> ${item.name}${item.notes ? ` <span class="note">(${item.notes})</span>` : ''}</div>`).join('')}
+          </div>
+          ${order.notes ? `<div class="note"><strong>Order Notes:</strong> ${order.notes}</div>` : ''}
+          <div style="margin-top:24px;"><small>Printed from Kitchen display</small></div>
+          <script>window.onload = function() { window.print(); }</script>
+        </body>
+      </html>`;
+
+    const printWindow = window.open('', '_blank', 'width=500,height=700');
+    if (printWindow) {
+      printWindow.document.open();
+      printWindow.document.write(html);
+      printWindow.document.close();
+    }
+  };
 
   // Use analytics from backend when available, otherwise calculate from orders
   const stats: KitchenStats = analytics ? {
@@ -216,7 +312,7 @@ export function KitchenDisplay({ onLogout, restaurantId, restaurantName }: { onL
   };
 
   // Group orders by status
-  const pendingOrders = orders.filter(o => o.status === 'pending');
+  const pendingOrders = orders.filter(o => o.status === 'pending' || o.status === 'verified');
   const preparingOrders = orders.filter(o => o.status === 'preparing');
   const readyOrders = orders.filter(o => o.status === 'ready');
 
@@ -300,7 +396,7 @@ export function KitchenDisplay({ onLogout, restaurantId, restaurantName }: { onL
                   key={kpi.id}
                   label={kpi.name}
                   value={kpi.progress?.currentValue || 0}
-                  change={kpi.progress ? (kpi.progress.currentValue / kpi.targetValue) * 100 - 100 : 0}
+                  change={kpi.progress ? (kpi.progress.currentValue / kpi.target_value) * 100 - 100 : 0}
                   trend={kpi.progress?.achieved ? 'up' : 'neutral'}
                   icon={<TrendingUpIcon className="w-5 h-5" />}
                 />
@@ -379,6 +475,7 @@ export function KitchenDisplay({ onLogout, restaurantId, restaurantName }: { onL
                       order={order} 
                       onStatusChange={handleStatusChange}
                       onComplete={handleComplete}
+                      onPrint={handlePrintReceipt}
                     />
                   ))}
                 </div>
@@ -396,6 +493,7 @@ export function KitchenDisplay({ onLogout, restaurantId, restaurantName }: { onL
                       order={order} 
                       onStatusChange={handleStatusChange}
                       onComplete={handleComplete}
+                      onPrint={handlePrintReceipt}
                     />
                   ))}
                 </div>
@@ -413,6 +511,7 @@ export function KitchenDisplay({ onLogout, restaurantId, restaurantName }: { onL
                       order={order} 
                       onStatusChange={handleStatusChange}
                       onComplete={handleComplete}
+                      onPrint={handlePrintReceipt}
                     />
                   ))}
                 </div>
@@ -430,11 +529,13 @@ export function KitchenDisplay({ onLogout, restaurantId, restaurantName }: { onL
 function OrderCard({ 
   order, 
   onStatusChange, 
-  onComplete 
+  onComplete,
+  onPrint
 }: { 
   order: KitchenOrder; 
   onStatusChange: (id: string, status: any) => void;
   onComplete: (id: string) => void;
+  onPrint: (order: KitchenOrder) => void;
 }) {
   const urgency = getUrgency(order.createdAt);
   const config = STATUS_CONFIG[order.status];
@@ -512,8 +613,8 @@ function OrderCard({
       </div>
 
       {/* Actions */}
-      <div className="p-2.5 pt-0">
-        {order.status === 'pending' && (
+      <div className="p-2.5 pt-0 space-y-2">
+        {(order.status === 'pending' || order.status === 'verified') && (
           <button
             onClick={() => onStatusChange(order.id, 'preparing')}
             className="w-full bg-amber-600 hover:bg-amber-500 text-white py-2 rounded-lg font-bold text-sm uppercase tracking-wider transition-all hover:scale-[1.02] active:scale-[0.98]"
@@ -538,6 +639,12 @@ function OrderCard({
             Complete
           </button>
         )}
+        <button
+          onClick={() => onPrint(order)}
+          className="w-full bg-slate-700 hover:bg-slate-600 text-white py-2 rounded-lg font-semibold text-sm uppercase tracking-wider transition-all hover:scale-[1.02] active:scale-[0.98]"
+        >
+          Print Ticket
+        </button>
       </div>
     </div>
   );

@@ -158,7 +158,7 @@ router.get('/kitchen', async (req: Request, res: Response) => {
 
     const result = await pool.query(
       `SELECT * FROM orders 
-       WHERE restaurant_id = $1 AND requires_kitchen = true AND status IN ('pending', 'preparing', 'ready') 
+       WHERE restaurant_id = $1 AND requires_kitchen = true AND status IN ('pending', 'verified', 'preparing', 'ready') 
        ORDER BY created_at ASC`,
       [resolvedRestaurantId]
     );

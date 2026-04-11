@@ -8,7 +8,6 @@ import {
   LogOutIcon,
   QrCodeIcon,
   UtensilsIcon,
-  SquareStackIcon,
   UsersIcon,
   ClockIcon,
   TrendingUpIcon,
@@ -102,8 +101,6 @@ export function WaiterDashboard({
 
   // Separate customer menu orders from waiter-created orders
   const customerMenuOrders = waiterOrders.filter(order => !order.assignedWaiterId || order.assignedWaiterId === waiter.id);
-  const waiterCreatedOrders = waiterOrders.filter(order => order.assignedWaiterId === waiter.id);
-
   const newOrders = waiterOrders.filter((order) => order.status === 'pending');
   const kitchenOrders = waiterOrders.filter((order) => ['verified', 'preparing'].includes(order.status));
   const readyOrders = waiterOrders.filter((order) => order.status === 'ready');
@@ -120,7 +117,6 @@ export function WaiterDashboard({
     return Array.from(map.entries()).map(([tableNumber, timestamp]) => ({ tableNumber, timestamp }));
   }, [waiterCalls, socketCalls]);
 
-  const todayServed = completedOrders.length;
   const avgServiceTime = waiter.performance.avgServiceTime;
   const waiterReviews = useMemo(() => loadReviews().filter((review) => review.waiterId === waiter.id), [waiter.id]);
   const waiterAvgRating = waiterReviews.length > 0
@@ -134,7 +130,7 @@ export function WaiterDashboard({
   ).length;
 
   const handleApprove = (order: Order) => {
-    const nextStatus = order.requiresKitchen ? 'preparing' : 'ready';
+    const nextStatus = order.requiresKitchen ? 'verified' : 'ready';
     onUpdateOrderStatus(order.id, nextStatus, { assignedWaiterId: waiter.id });
   };
 
