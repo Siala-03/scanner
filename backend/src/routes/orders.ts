@@ -129,7 +129,9 @@ router.get('/', async (req: Request, res: Response) => {
         } catch (_e) { /* ignore */ }
       }
     }
-    resolvedRestaurantId = resolvedRestaurantId || 'default_restaurant';
+    if (!resolvedRestaurantId) {
+      return res.status(400).json({ error: 'restaurantId is required' });
+    }
 
     params.push(resolvedRestaurantId);
     conditions.push(`restaurant_id = $${params.length}`);
@@ -167,14 +169,16 @@ router.get('/', async (req: Request, res: Response) => {
 // GET kitchen view - orders that need to be prepared
 router.get('/kitchen', async (req: Request, res: Response) => {
   try {
-    const { restaurantId } = req.query;
-    const resolvedRestaurantId = (restaurantId as string) || 'default_restaurant';
+    const restaurantId = req.query.restaurantId as string;
+    if (!restaurantId) {
+      return res.status(400).json({ error: 'restaurantId is required' });
+    }
 
     const result = await pool.query(
-      `SELECT * FROM orders 
-       WHERE restaurant_id = $1 AND requires_kitchen = true AND status IN ('pending', 'verified', 'preparing', 'ready') 
+      `SELECT * FROM orders
+       WHERE restaurant_id = $1 AND requires_kitchen = true AND status IN ('pending', 'verified', 'preparing', 'ready')
        ORDER BY created_at ASC`,
-      [resolvedRestaurantId]
+      [restaurantId]
     );
     const orders = result.rows.map((row: any) => normalizeOrder(row));
     res.json(orders);
@@ -193,7 +197,10 @@ router.get('/kitchen/analytics', async (_req: Request, res: Response) => {
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    const restaurantId = (_req.query as any)?.restaurantId || 'default_restaurant';
+    const restaurantId = (_req.query as any)?.restaurantId as string;
+    if (!restaurantId) {
+      return res.status(400).json({ error: 'restaurantId is required' });
+    }
     // Get orders for today
     const todayOrders = await pool.query(
       `SELECT * FROM orders WHERE restaurant_id = $1 AND requires_kitchen = true AND created_at >= $2 AND created_at < $3`,
@@ -315,7 +322,10 @@ router.post('/', async (req: Request, res: Response) => {
       loyaltyRewardId
     } = req.body;
 
-    const resolvedRestaurantId = req.body.restaurantId || req.query.restaurantId || 'default_restaurant';
+    const resolvedRestaurantId = req.body.restaurantId || req.query.restaurantId;
+    if (!resolvedRestaurantId) {
+      return res.status(400).json({ error: 'restaurantId is required to create an order' });
+    }
     console.log('POST /orders creating order for restaurantId:', resolvedRestaurantId, {
       bodyRestaurantId: req.body.restaurantId,
       queryRestaurantId: req.query.restaurantId,
@@ -430,7 +440,7 @@ router.put('/:id/status', async (req: Request, res: Response) => {
         if (pointsToAward > 0) {
           const transactionId = `txn-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-          const orderRestaurantId = order.restaurantId || 'default_restaurant';
+          const orderRestaurantId = order.restaurantId;
         await pool.query(`
             INSERT INTO loyalty_transactions (id, customer_id, order_id, transaction_type, points, description, restaurant_id)
             VALUES ($1, $2, $3, 'earned', $4, $5, $6)

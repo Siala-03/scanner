@@ -60,7 +60,10 @@ export async function signUpStaff(input: {
 }): Promise<Staff> {
   try {
     const storedRestaurantId = localStorage.getItem('restaurantId');
-    const restaurantId = input.restaurantId || storedRestaurantId || 'default_restaurant';
+    const restaurantId = input.restaurantId || storedRestaurantId;
+    if (!restaurantId) {
+      throw new Error('restaurantId is required to create a staff account');
+    }
     console.log('Attempting signup for:', input.username, 'role:', input.role, 'restaurant:', restaurantId);
     const data = await apiRequest<{ staff: Staff }>(`${API_BASE}/signup`, {
       method: 'POST',

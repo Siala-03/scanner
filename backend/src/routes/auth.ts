@@ -116,7 +116,11 @@ authRouter.post('/signup', async (req: AuthenticatedRequest, res: Response, next
       }
     }
 
-    let restaurantId = body.restaurantId || 'default_restaurant';
+    let restaurantId = body.restaurantId;
+    if (!restaurantId && !isAuthenticated) {
+      throw new HttpError(400, 'restaurantId is required when registering');
+    }
+    restaurantId = restaurantId || req.restaurantId || '';
 
     // Allow any unauthenticated user to create a manager account (no superadmin required)
     // Managers can self-register without authentication

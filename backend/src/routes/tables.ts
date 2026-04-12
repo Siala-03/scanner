@@ -9,7 +9,8 @@ export const tablesRouter = Router();
 // GET all tables
 tablesRouter.get('/', authenticate, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const restaurantId = req.query.restaurantId as string || req.restaurantId || 'default_restaurant';
+    const restaurantId = req.query.restaurantId as string || req.restaurantId;
+    if (!restaurantId) return res.status(400).json({ error: 'restaurantId is required' });
     
     // Superadmin can view any restaurant's tables, others only their own
     if (req.staffRole !== 'superadmin' && req.restaurantId !== restaurantId) {
@@ -31,7 +32,8 @@ tablesRouter.get('/', authenticate, async (req: AuthenticatedRequest, res: Respo
 tablesRouter.post('/', authenticate, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { table_number, name, capacity, location } = req.body;
-    const restaurantId = req.restaurantId || 'default_restaurant';
+    const restaurantId = req.restaurantId;
+    if (!restaurantId) return res.status(400).json({ error: 'restaurantId is required' });
     
     // Check if table number already exists for this restaurant
     const existing = await pool.query(

@@ -362,12 +362,13 @@ export function MenuManagement() {
                 opacity: 0,
                 scale: 0.9
               }}
+              className="h-full"
               transition={{
                 delay: index * 0.02
               }}>
 
                 <Card
-                className={`bg-slate-800 ${!item.isAvailable ? 'opacity-60' : ''}`}>
+                className={`bg-slate-800 h-full flex flex-col ${!item.isAvailable ? 'opacity-60' : ''}`}>
 
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center gap-3">

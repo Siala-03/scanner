@@ -33,7 +33,12 @@ export function CustomerIdentification({
 
     setIsLoading(true);
     try {
-      const customer = await createOrFindCustomer({ phone, email, name });
+      const restaurantId = localStorage.getItem('restaurantId');
+      if (!restaurantId) {
+        setError('Unable to join loyalty program: restaurant context is missing.');
+        return;
+      }
+      const customer = await createOrFindCustomer({ phone, email, name, restaurantId });
       onCustomerIdentified(customer);
       setIsExpanded(false);
     } catch (err: any) {

@@ -7,7 +7,8 @@ const router = Router();
 // GET all inventory items with menu item names
 router.get('/', authenticate, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const restaurantId = req.restaurantId || 'default_restaurant';
+    const restaurantId = req.restaurantId;
+    if (!restaurantId) return res.status(400).json({ error: 'restaurantId is required' });
     
     const result = await pool.query(`
       SELECT 
@@ -44,7 +45,8 @@ router.put('/:menuItemId', authenticate, async (req: AuthenticatedRequest, res: 
   try {
     const { menuItemId } = req.params;
     const { stock, low_stock_threshold } = req.body;
-    const restaurantId = req.restaurantId || 'default_restaurant';
+    const restaurantId = req.restaurantId;
+    if (!restaurantId) return res.status(400).json({ error: 'restaurantId is required' });
     
     // Use UPSERT to create or update
     const result = await pool.query(`
@@ -82,7 +84,8 @@ router.patch('/:menuItemId/adjust', authenticate, async (req: AuthenticatedReque
   try {
     const { menuItemId } = req.params;
     const { adjustment, reason, performed_by } = req.body;
-    const restaurantId = req.restaurantId || 'default_restaurant';
+    const restaurantId = req.restaurantId;
+    if (!restaurantId) return res.status(400).json({ error: 'restaurantId is required' });
     
     // Get current stock (or create record if doesn't exist)
     let current = await pool.query(
@@ -133,7 +136,8 @@ router.patch('/:menuItemId/adjust', authenticate, async (req: AuthenticatedReque
 router.post('/', authenticate, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { menuItemId, stock = 0, lowStockThreshold = 5, unitCost = 0 } = req.body;
-    const restaurantId = req.restaurantId || 'default_restaurant';
+    const restaurantId = req.restaurantId;
+    if (!restaurantId) return res.status(400).json({ error: 'restaurantId is required' });
     
     if (!menuItemId) {
       res.status(400).json({ error: 'menuItemId is required' });

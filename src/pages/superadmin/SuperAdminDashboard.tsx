@@ -220,7 +220,7 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
               <Lock className="w-8 h-8" />
               SuperAdmin Dashboard
             </h1>
-            <p className="text-slate-300 mt-1">Manage restaurants and operators for Servv</p>
+            <p className="text-slate-300 mt-1">Manage restaurants and operators for Servv IQ</p>
           </div>
           <div className="flex flex-wrap gap-3">
             <Button

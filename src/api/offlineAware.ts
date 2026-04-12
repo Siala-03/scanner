@@ -4,7 +4,7 @@ import { offlineSync } from '../utils/offlineSync';
 export class OfflineAwareAPI {
   static async createOrder(orderData: any): Promise<any> {
     if (!orderData?.restaurantId) {
-      console.warn('createOrder called without restaurantId, order will default to default_restaurant', orderData);
+      console.warn('createOrder called without restaurantId — order will be rejected by the server', orderData);
     }
     if (!offlineSync.isNetworkOnline()) {
       // Queue for later sync

@@ -27,11 +27,12 @@ function getRestaurantId(): string | undefined {
 // Fetch menu from backend
 export async function fetchMenu(): Promise<MenuItem[]> {
   const restaurantId = getRestaurantId();
-  const query = restaurantId ? `?restaurantId=${encodeURIComponent(restaurantId)}` : '';
-  const url = `${MENU_API_BASE}${query}`;
-  console.log('Fetching menu from:', url);
+  if (!restaurantId) {
+    // No restaurant context — return empty so caller falls back to local defaults
+    return [];
+  }
+  const url = `${MENU_API_BASE}?restaurantId=${encodeURIComponent(restaurantId)}`;
   const result = await apiRequest<MenuItem[]>(url);
-  console.log('Menu fetched successfully, items:', result?.length ?? 0);
   return result || [];
 }
 

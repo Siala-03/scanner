@@ -29,7 +29,7 @@ export async function createOrder(orderInput: {
     tableNumber,
     customerName = 'Walk-in',
     customerId,
-    restaurantId = 'default_restaurant',
+    restaurantId,
     items,
     notes,
     createdBy = 'system',
@@ -38,6 +38,10 @@ export async function createOrder(orderInput: {
     loyaltyRewardId,
     requiresKitchen = false
   } = orderInput;
+
+  if (!restaurantId) {
+    throw new Error('restaurantId is required to create an order');
+  }
 
   console.log('createOrder service invoked', {
     restaurantId,

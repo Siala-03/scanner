@@ -17,9 +17,9 @@ function getRestaurantIdFromUrl(): string | null {
   return query.get('restaurantId');
 }
 
-function getRestaurantId(): string {
-  if (typeof window === 'undefined') return 'default_restaurant';
-  return localStorage.getItem('restaurantId') || getRestaurantIdFromUrl() || 'default_restaurant';
+function getRestaurantId(): string | null {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem('restaurantId') || getRestaurantIdFromUrl() || null;
 }
 
 interface MenuContextValue {

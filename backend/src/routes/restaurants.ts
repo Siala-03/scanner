@@ -248,11 +248,6 @@ router.delete('/:restaurantId', authenticate, requireSuperadmin, async (req: Aut
   try {
     const { restaurantId } = req.params;
 
-    // Prevent deleting the default restaurant
-    if (restaurantId === 'default_restaurant') {
-      throw new HttpError(400, 'Cannot delete default restaurant');
-    }
-
     await pool.query('DELETE FROM restaurants WHERE id = $1', [restaurantId]);
     res.status(204).send();
   } catch (error) {

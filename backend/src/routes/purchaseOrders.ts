@@ -150,7 +150,7 @@ router.post('/', async (req: Request, res: Response) => {
         (id, supplier_id, supplier_name, status, items, total_cost, expected_delivery, notes, created_by, restaurant_id, delivery_address)
        VALUES ($1, $2, $3, 'sent', $4, $5, $6, $7, $8, $9, $10)
        RETURNING *`,
-      [id, final_supplier_id, final_supplier_name, JSON.stringify(items), total_cost, final_expected_delivery, notes, final_created_by, final_restaurant_id || 'default_restaurant', final_delivery_address || null]
+      [id, final_supplier_id, final_supplier_name, JSON.stringify(items), total_cost, final_expected_delivery, notes, final_created_by, final_restaurant_id, final_delivery_address || null]
     );
 
     const newPO = result.rows[0];

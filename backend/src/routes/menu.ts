@@ -9,7 +9,10 @@ export const menuRouter = Router();
 // GET all menu items
 menuRouter.get('/', async (req: Request, res: Response) => {
   try {
-    const restaurantId = (req.query.restaurantId as string) || 'default_restaurant';
+    const restaurantId = req.query.restaurantId as string;
+    if (!restaurantId) {
+      return res.status(400).json({ error: 'restaurantId is required' });
+    }
     const result = await pool.query(
       'SELECT * FROM menu_items WHERE restaurant_id = $1 AND is_available = true ORDER BY category, name',
       [restaurantId]
@@ -39,7 +42,8 @@ menuRouter.get('/', async (req: Request, res: Response) => {
 menuRouter.post('/', authenticate, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { items } = req.body;
-    const restaurantId = req.restaurantId || 'default_restaurant';
+    const restaurantId = req.restaurantId;
+    if (!restaurantId) return res.status(400).json({ error: 'restaurantId is required' });
     
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: 'Invalid menu items' });
@@ -95,7 +99,8 @@ menuRouter.post('/', authenticate, async (req: AuthenticatedRequest, res: Respon
 // DELETE reset to default (clear menu)
 menuRouter.delete('/', authenticate, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const restaurantId = req.restaurantId || 'default_restaurant';
+    const restaurantId = req.restaurantId;
+    if (!restaurantId) return res.status(400).json({ error: 'restaurantId is required' });
     console.log(`Clearing menu for restaurant ${restaurantId}`);
     await pool.query('DELETE FROM menu_items WHERE restaurant_id = $1', [restaurantId]);
     res.json({ message: 'Menu cleared' });

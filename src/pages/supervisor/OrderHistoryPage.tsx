@@ -112,7 +112,7 @@ export function OrderHistoryPage({ onBack, existingOrders }: OrderHistoryPagePro
   const handlePrintReceipt = async (order: Order) => {
     // Configuration for the receipt (in production, this would come from restaurant settings)
     const receiptOptions: Parameters<typeof orderToReceiptData>[1] = {
-      restaurantName: 'Servv Restaurant',
+      restaurantName: 'Servv IQ',
       restaurantAddress: '123 Main Street, City',
       restaurantPhone: '(555) 123-4567',
       restaurantEmail: 'info@servv.com',

@@ -50,7 +50,7 @@ export interface ReceiptConfig {
  */
 export const defaultReceiptConfig: ReceiptConfig = {
   // Restaurant Information
-  restaurantName: 'Servv Restaurant',
+  restaurantName: 'Servv IQ',
   restaurantAddress: '123 Main Street, City',
   restaurantPhone: '(555) 123-4567',
   restaurantEmail: 'info@servv.com',

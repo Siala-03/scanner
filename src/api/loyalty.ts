@@ -8,6 +8,7 @@ export async function createOrFindCustomer(customerData: {
   phone?: string;
   email?: string;
   name?: string;
+  restaurantId: string;
 }): Promise<Customer> {
   return apiRequest<Customer>(`${API_BASE}/loyalty/customers`, {
     method: 'POST',
@@ -37,8 +38,8 @@ export async function awardPoints(data: {
 }
 
 // Rewards management
-export async function getRewards(): Promise<Reward[]> {
-  return apiRequest<Reward[]>(`${API_BASE}/loyalty/rewards`);
+export async function getRewards(restaurantId: string): Promise<Reward[]> {
+  return apiRequest<Reward[]>(`${API_BASE}/loyalty/rewards?restaurantId=${encodeURIComponent(restaurantId)}`);
 }
 
 export async function createReward(rewardData: {

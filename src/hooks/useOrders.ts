@@ -119,18 +119,20 @@ export function useOrders(): UseOrdersReturn {
       }
     }
 
-    return 'default_restaurant';
+    return null;
   };
 
-  const restaurantId = resolveRestaurantId();
+  const restaurantId = resolveRestaurantId() ?? undefined;
 
   useEffect(() => {
     async function loadFromBackend() {
-      console.log('[useOrders] Loading orders for restaurantId:', restaurantId);
+      if (!restaurantId) {
+        // No restaurant context yet (unauthenticated or customer without embedded QR)
+        setOrders([]);
+        return;
+      }
       try {
-        // Pass restaurantId so backend uses the correct restaurant (not default_restaurant)
         const backendOrders = await OfflineAwareAPI.fetchOrders('all', restaurantId);
-        console.log('[useOrders] Loaded orders from backend:', backendOrders.length);
         setOrders(backendOrders);
       } catch (e) {
         console.warn('Failed to load orders from backend', e);
@@ -140,8 +142,8 @@ export function useOrders(): UseOrdersReturn {
 
     loadFromBackend();
     joinOrders();
-    joinRestaurant(restaurantId);
-    joinRole('waiter'); // Join waiter role room for order updates
+    if (restaurantId) joinRestaurant(restaurantId);
+    joinRole('waiter');
 
     const handleOrderUpdate = (data: any) => {
       const updatedOrder = normalizeOrderPayload(data?.order);
@@ -150,17 +152,11 @@ export function useOrders(): UseOrdersReturn {
         return;
       }
 
-      // Accept orders that match our restaurant, OR orders with no restaurantId,
-      // OR orders from 'default_restaurant' (customer QR scans without embedded restaurantId)
+      // Accept orders that match our restaurant, or if we have no restaurant context yet
       const orderRestaurant = updatedOrder.restaurantId;
-      const isMatch =
-        !orderRestaurant ||
-        orderRestaurant === restaurantId ||
-        orderRestaurant === 'default_restaurant' ||
-        restaurantId === 'default_restaurant';
+      const isMatch = !restaurantId || !orderRestaurant || orderRestaurant === restaurantId;
 
       if (!isMatch) {
-        console.log('[useOrders] Skipping order update - restaurantId mismatch', orderRestaurant, 'vs', restaurantId);
         return;
       }
 
@@ -243,7 +239,9 @@ export function useOrders(): UseOrdersReturn {
       loyaltyRewardId?: string
     ): Promise<Order> => {
       const currentRestaurantId = resolveRestaurantId();
-      console.log('[addOrder] Creating order for restaurantId:', currentRestaurantId, 'table:', tableNumber);
+      if (!currentRestaurantId) {
+        throw new Error('Cannot place order: restaurant context is missing. Please scan the restaurant QR code.');
+      }
       ensureInventoryInitialized();
 
       const requiresKitchen = isFoodOrder(items);

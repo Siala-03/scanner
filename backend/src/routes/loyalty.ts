@@ -8,7 +8,8 @@ const router = Router();
 // GET /api/loyalty/customers - Get all customers (staff only)
 router.get('/customers', authenticate, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const restaurantId = req.restaurantId || 'default_restaurant';
+    const restaurantId = req.restaurantId;
+    if (!restaurantId) return res.status(400).json({ error: 'restaurantId is required' });
     const result = await pool.query(`
       SELECT id, phone, email, name, total_points, total_spent, join_date, last_visit, visit_count
       FROM customers
@@ -25,10 +26,13 @@ router.get('/customers', authenticate, async (req: AuthenticatedRequest, res: Re
 
 // POST /api/loyalty/customers - Create or find customer
 router.post('/customers', async (req, res) => {
-  const { phone, email, name } = req.body;
+  const { phone, email, name, restaurantId } = req.body;
 
   if (!phone && !email) {
     return res.status(400).json({ error: 'Phone or email is required' });
+  }
+  if (!restaurantId) {
+    return res.status(400).json({ error: 'restaurantId is required' });
   }
 
   try {
@@ -37,7 +41,7 @@ router.post('/customers', async (req, res) => {
     if (phone) {
       const result = await pool.query(
         'SELECT * FROM customers WHERE phone = $1 AND restaurant_id = $2',
-        [phone, 'default_restaurant']
+        [phone, restaurantId]
       );
       customer = result.rows[0];
     }
@@ -45,7 +49,7 @@ router.post('/customers', async (req, res) => {
     if (!customer && email) {
       const result = await pool.query(
         'SELECT * FROM customers WHERE email = $1 AND restaurant_id = $2',
-        [email, 'default_restaurant']
+        [email, restaurantId]
       );
       customer = result.rows[0];
     }
@@ -57,7 +61,7 @@ router.post('/customers', async (req, res) => {
         INSERT INTO customers (id, phone, email, name, restaurant_id)
         VALUES ($1, $2, $3, $4, $5)
         RETURNING *
-      `, [customerId, phone, email, name, 'default_restaurant']);
+      `, [customerId, phone, email, name, restaurantId]);
       customer = toCamelCase(result.rows[0]);
     }
 
@@ -71,7 +75,8 @@ router.post('/customers', async (req, res) => {
 // GET /api/loyalty/customers/:id - Get customer details with transactions
 router.get('/customers/:id', authenticate, async (req: AuthenticatedRequest, res: Response) => {
   const { id } = req.params;
-  const restaurantId = req.restaurantId || 'default_restaurant';
+  const restaurantId = req.restaurantId;
+  if (!restaurantId) return res.status(400).json({ error: 'restaurantId is required' });
 
   try {
     // Get customer
@@ -118,7 +123,8 @@ router.get('/customers/:id', authenticate, async (req: AuthenticatedRequest, res
 // POST /api/loyalty/points/earn - Award points to customer
 router.post('/points/earn', authenticate, async (req: AuthenticatedRequest, res: Response) => {
   const { customerId, orderId, points, description } = req.body;
-  const restaurantId = req.restaurantId || 'default_restaurant';
+  const restaurantId = req.restaurantId;
+  if (!restaurantId) return res.status(400).json({ error: 'restaurantId is required' });
 
   if (!customerId || !points || points <= 0) {
     return res.status(400).json({ error: 'Customer ID and positive points required' });
@@ -177,7 +183,8 @@ router.post('/rewards/redeem', authenticate, async (req: AuthenticatedRequest, r
       await client.query('BEGIN');
 
       // Get reward details
-      const restaurantId = req.restaurantId || 'default_restaurant';
+      const restaurantId = req.restaurantId;
+      if (!restaurantId) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'restaurantId is required' }); }
       const rewardResult = await client.query(`
         SELECT * FROM rewards
         WHERE id = $1 AND restaurant_id = $2 AND is_active = true
@@ -250,13 +257,17 @@ router.post('/rewards/redeem', authenticate, async (req: AuthenticatedRequest, r
 
 // GET /api/loyalty/rewards - Get all active rewards
 router.get('/rewards', async (req, res) => {
+  const restaurantId = req.query.restaurantId as string;
+  if (!restaurantId) {
+    return res.status(400).json({ error: 'restaurantId is required' });
+  }
   try {
     const result = await pool.query(`
       SELECT id, name, description, points_required, reward_type, discount_percentage, free_item_id
       FROM rewards
       WHERE is_active = true AND restaurant_id = $1
       ORDER BY points_required ASC
-    `, ['default_restaurant']);
+    `, [restaurantId]);
 
     res.json(toCamelCase(result.rows));
   } catch (error) {

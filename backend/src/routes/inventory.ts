@@ -19,7 +19,8 @@ const router = Router();
 // GET all inventory items with stock information
 router.get('/', authenticate, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const restaurantId = req.restaurantId || 'default_restaurant';
+    const restaurantId = req.restaurantId;
+    if (!restaurantId) return res.status(400).json({ error: 'restaurantId is required' });
 
     // Detect legacy schema compatibility for restaurant_id
     const schemaCheck = await pool.query(`
@@ -148,7 +149,8 @@ router.put('/:id', authenticate, async (req: AuthenticatedRequest, res: Response
   try {
     const { id } = req.params;
     const updates = req.body;
-    const restaurantId = req.restaurantId || 'default_restaurant';
+    const restaurantId = req.restaurantId;
+    if (!restaurantId) return res.status(400).json({ error: 'restaurantId is required' });
 
     // Check if this is a simple inventory record first
     const simple = await pool.query(`
@@ -305,7 +307,8 @@ router.patch('/:id/adjust', authenticate, async (req: AuthenticatedRequest, res:
   try {
     const { id } = req.params;
     const { locationId = 'default', adjustment, reason, performedBy } = req.body;
-    const restaurantId = req.restaurantId || 'default_restaurant';
+    const restaurantId = req.restaurantId;
+    if (!restaurantId) return res.status(400).json({ error: 'restaurantId is required' });
     
     if (adjustment === undefined) {
       throw new HttpError(400, 'adjustment is required');

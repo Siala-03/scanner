@@ -33,7 +33,6 @@ import { Button } from './components/ui/Button';
 import { Staff } from './types';
 import { SupplierUser, getSupplierMe, clearSupplierToken } from './api/supplier';
 import { fetchRestaurantPublic } from './api/restaurants';
-const DEFAULT_RESTAURANT_ID = 'default_restaurant';
 
 type UserRole = 'customer' | 'waiter' | 'supervisor' | 'manager' | 'kitchen' | 'superadmin' | 'supplier' | null;
 type ManagerPage = 'dashboard' | 'menu' | 'staff' | 'analytics' | 'performance' | 'qrcodes' | 'inventory' | 'history' | 'expenses' | 'credit' | 'loyalty';
@@ -294,8 +293,6 @@ export function App() {
         const restaurantIdFromQuery = query.get('restaurantId');
         if (restaurantIdFromQuery) {
           persistRestaurantContext(restaurantIdFromQuery);
-        } else if (!existingRestaurantId) {
-          persistRestaurantContext(DEFAULT_RESTAURANT_ID);
         }
         setSelectedRole('customer');
         setTableNumber(num);
@@ -312,8 +309,6 @@ export function App() {
         const restaurantIdFromQuery = query.get('restaurantId');
         if (restaurantIdFromQuery) {
           persistRestaurantContext(restaurantIdFromQuery);
-        } else if (!existingRestaurantId) {
-          persistRestaurantContext(DEFAULT_RESTAURANT_ID);
         }
         setSelectedRole('customer');
         setTableNumber(num);
@@ -766,11 +761,11 @@ export function App() {
               <span className="text-2xl font-serif text-white font-bold">S</span>
             </div>
             <h1 className="text-3xl md:text-4xl font-serif text-amber-500 tracking-tight">
-              SERVV
+              SERVV IQ
             </h1>
           </div>
           <p className="text-lg text-[#a89f91] max-w-sm mx-auto font-light">
-            Restaurant Management System
+            The Intelligence Layer of Servv
           </p>
         </motion.div>
 
