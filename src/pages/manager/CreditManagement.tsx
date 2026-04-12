@@ -90,9 +90,11 @@ const CreditManagement: React.FC = () => {
 
   // Format currency
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-ZA', {
+    return new Intl.NumberFormat('en-RW', {
       style: 'currency',
-      currency: 'ZAR',
+      currency: 'RWF',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
     }).format(amount);
   };
 
@@ -252,7 +254,7 @@ const CreditManagement: React.FC = () => {
                 value={orderLookupId}
                 onChange={(e) => setOrderLookupId(e.target.value)}
                 placeholder="Order ID or number"
-                className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-slate-100 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                className="w-full rounded-2xl border border-slate-700 bg-slate-900 px-4 py-3 text-slate-100 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
               />
               <button
                 type="button"
@@ -271,7 +273,7 @@ const CreditManagement: React.FC = () => {
             )}
 
             {orderData && (
-              <div className="rounded-3xl border border-slate-700 bg-slate-950 p-4 text-slate-100">
+              <div className="rounded-3xl border border-slate-700 bg-slate-900 p-4 text-slate-100">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <p className="text-sm uppercase tracking-wide text-cyan-300">Order details</p>
@@ -284,7 +286,7 @@ const CreditManagement: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="mt-4 rounded-2xl bg-slate-900 p-4 border border-slate-700">
+                <div className="mt-4 rounded-2xl bg-slate-800 p-4 border border-slate-700">
                   <p className="text-sm text-slate-400">Items</p>
                   <ul className="mt-3 space-y-3">
                     {orderData.items.map((item) => (
@@ -302,7 +304,7 @@ const CreditManagement: React.FC = () => {
             )}
           </div>
 
-          <div className="rounded-3xl border border-slate-700 bg-slate-950 p-5 text-slate-100">
+          <div className="rounded-3xl border border-slate-700 bg-slate-900 p-5 text-slate-100">
             <div className="space-y-4">
               <div>
                 <label className="block text-sm text-slate-300">Customer name</label>
@@ -419,7 +421,7 @@ const CreditManagement: React.FC = () => {
             placeholder="Search by name or phone..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 rounded-2xl border border-slate-700 bg-slate-950 text-slate-100 focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+            className="w-full pl-10 pr-4 py-2 rounded-2xl border border-slate-700 bg-slate-900 text-slate-100 focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
           />
           <svg
             className="w-5 h-5 absolute left-3 top-2.5 text-slate-500"
@@ -438,9 +440,9 @@ const CreditManagement: React.FC = () => {
         </button>
       </div>
 
-      <div className="bg-slate-900/95 shadow overflow-hidden sm:rounded-3xl border border-slate-700">
+      <div className="bg-slate-900 shadow overflow-hidden sm:rounded-3xl border border-slate-700">
         <table className="min-w-full divide-y divide-slate-700">
-          <thead className="bg-slate-950">
+          <thead className="bg-slate-800">
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Customer</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Phone</th>
@@ -451,7 +453,7 @@ const CreditManagement: React.FC = () => {
               <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Actions</th>
             </tr>
           </thead>
-          <tbody className="bg-slate-950 divide-y divide-slate-800">
+          <tbody className="bg-slate-900 divide-y divide-slate-800">
             {filteredAccounts.map((account) => (
               <tr key={account.id} className="hover:bg-slate-900">
                 <td className="px-6 py-4 whitespace-nowrap">
@@ -523,7 +525,7 @@ const CreditManagement: React.FC = () => {
             placeholder="Search applications..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 rounded-2xl border border-slate-700 bg-slate-950 text-slate-100 focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+            className="w-full pl-10 pr-4 py-2 rounded-2xl border border-slate-700 bg-slate-900 text-slate-100 focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
           />
           <svg
             className="w-5 h-5 absolute left-3 top-2.5 text-slate-500"
@@ -538,7 +540,7 @@ const CreditManagement: React.FC = () => {
 
       <div className="bg-slate-900 shadow overflow-hidden sm:rounded-3xl border border-slate-700">
         <table className="min-w-full divide-y divide-slate-800">
-          <thead className="bg-slate-950">
+          <thead className="bg-slate-800">
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Customer</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Phone</th>
@@ -548,7 +550,7 @@ const CreditManagement: React.FC = () => {
               <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Actions</th>
             </tr>
           </thead>
-          <tbody className="bg-slate-950 divide-y divide-slate-800">
+          <tbody className="bg-slate-900 divide-y divide-slate-800">
             {filteredApplications.map((application) => (
               <tr key={application.id} className="hover:bg-slate-900">
                 <td className="px-6 py-4 whitespace-nowrap">
@@ -718,8 +720,8 @@ const CreditManagement: React.FC = () => {
     if (!showCreateModal) return null;
 
     return (
-      <div className="fixed inset-0 bg-slate-950 bg-opacity-80 overflow-y-auto h-full w-full">
-        <div className="relative top-20 mx-auto p-5 border border-slate-700 w-96 shadow-2xl rounded-3xl bg-slate-950 text-slate-100">
+      <div className="fixed inset-0 bg-slate-900 bg-opacity-80 overflow-y-auto h-full w-full">
+        <div className="relative top-20 mx-auto p-5 border border-slate-700 w-96 shadow-2xl rounded-3xl bg-slate-900 text-slate-100">
           <h3 className="text-lg font-medium text-white mb-4">Create New Credit Account</h3>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
@@ -729,7 +731,7 @@ const CreditManagement: React.FC = () => {
                 required
                 value={formData.customerName}
                 onChange={(e) => setFormData({ ...formData, customerName: e.target.value })}
-                className="mt-1 block w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100 focus:outline-none focus:ring-cyan-500 focus:border-cyan-500"
+                className="mt-1 block w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100 focus:outline-none focus:ring-cyan-500 focus:border-cyan-500"
               />
             </div>
             <div>
@@ -739,11 +741,11 @@ const CreditManagement: React.FC = () => {
                 required
                 value={formData.customerPhone}
                 onChange={(e) => setFormData({ ...formData, customerPhone: e.target.value })}
-                className="mt-1 block w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100 focus:outline-none focus:ring-cyan-500 focus:border-cyan-500"
+                className="mt-1 block w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100 focus:outline-none focus:ring-cyan-500 focus:border-cyan-500"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-300">Credit Limit (R)</label>
+              <label className="block text-sm font-medium text-slate-300">Credit Limit (RWF)</label>
               <input
                 type="number"
                 required
@@ -751,7 +753,7 @@ const CreditManagement: React.FC = () => {
                 step="0.01"
                 value={formData.creditLimit}
                 onChange={(e) => setFormData({ ...formData, creditLimit: e.target.value })}
-                className="mt-1 block w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100 focus:outline-none focus:ring-cyan-500 focus:border-cyan-500"
+                className="mt-1 block w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100 focus:outline-none focus:ring-cyan-500 focus:border-cyan-500"
               />
             </div>
             <div>
@@ -760,14 +762,14 @@ const CreditManagement: React.FC = () => {
                 value={formData.notes}
                 onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                 rows={3}
-                className="mt-1 block w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100 focus:outline-none focus:ring-cyan-500 focus:border-cyan-500"
+                className="mt-1 block w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100 focus:outline-none focus:ring-cyan-500 focus:border-cyan-500"
               />
             </div>
             <div className="flex justify-end space-x-3">
               <button
                 type="button"
                 onClick={() => setShowCreateModal(false)}
-                className="px-4 py-2 rounded-md border border-slate-700 bg-slate-950 text-sm font-medium text-slate-200 hover:bg-slate-900"
+                className="px-4 py-2 rounded-md border border-slate-700 bg-slate-900 text-sm font-medium text-slate-200 hover:bg-slate-900"
               >
                 Cancel
               </button>
@@ -842,8 +844,8 @@ const CreditManagement: React.FC = () => {
     if (!showTransactionModal || !selectedAccount) return null;
 
     return (
-      <div className="fixed inset-0 bg-slate-950 bg-opacity-80 overflow-y-auto h-full w-full">
-        <div className="relative top-20 mx-auto p-5 border border-slate-700 w-96 shadow-2xl rounded-3xl bg-slate-950 text-slate-100">
+      <div className="fixed inset-0 bg-slate-900 bg-opacity-80 overflow-y-auto h-full w-full">
+        <div className="relative top-20 mx-auto p-5 border border-slate-700 w-96 shadow-2xl rounded-3xl bg-slate-900 text-slate-100">
           <h3 className="text-lg font-medium text-white mb-4">
             {transactionType === 'charge' && 'Add Charge'}
             {transactionType === 'payment' && 'Record Payment'}
@@ -856,7 +858,7 @@ const CreditManagement: React.FC = () => {
           </div>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-slate-300">Amount (R)</label>
+              <label className="block text-sm font-medium text-slate-300">Amount (RWF)</label>
               <input
                 type="number"
                 required
@@ -864,7 +866,7 @@ const CreditManagement: React.FC = () => {
                 step="0.01"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
-                className="mt-1 block w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100 focus:outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/40"
+                className="mt-1 block w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100 focus:outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/40"
               />
             </div>
             {transactionType !== 'payment' && (
@@ -875,7 +877,7 @@ const CreditManagement: React.FC = () => {
                   required
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  className="mt-1 block w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100 focus:outline-none focus:ring-cyan-500 focus:border-cyan-500"
+                  className="mt-1 block w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100 focus:outline-none focus:ring-cyan-500 focus:border-cyan-500"
                 />
               </div>
             )}
@@ -886,7 +888,7 @@ const CreditManagement: React.FC = () => {
                   type="text"
                   value={reference}
                   onChange={(e) => setReference(e.target.value)}
-                  className="mt-1 block w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100 focus:outline-none focus:ring-cyan-500 focus:border-cyan-500"
+                  className="mt-1 block w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100 focus:outline-none focus:ring-cyan-500 focus:border-cyan-500"
                 />
               </div>
             )}
@@ -894,7 +896,7 @@ const CreditManagement: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setShowTransactionModal(false)}
-                className="px-4 py-2 rounded-md border border-slate-700 bg-slate-950 text-sm font-medium text-slate-200 hover:bg-slate-900"
+                className="px-4 py-2 rounded-md border border-slate-700 bg-slate-900 text-sm font-medium text-slate-200 hover:bg-slate-900"
               >
                 Cancel
               </button>
@@ -914,7 +916,7 @@ const CreditManagement: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100">
+    <div className="min-h-screen bg-slate-900 text-slate-100">
       <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
           <div className="flex justify-between items-center mb-6">
