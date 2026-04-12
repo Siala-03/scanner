@@ -694,9 +694,11 @@ const CreditManagement: React.FC = () => {
       creditLimit: '',
       notes: '',
     });
+    const [submitError, setSubmitError] = useState('');
 
     const handleSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
+      setSubmitError('');
       try {
         await createAccount({
           customerName: formData.customerName,
@@ -707,8 +709,9 @@ const CreditManagement: React.FC = () => {
         setShowCreateModal(false);
         setFormData({ customerName: '', customerPhone: '', creditLimit: '', notes: '' });
         loadCreditData();
-      } catch (err) {
+      } catch (err: any) {
         console.error('Failed to create account:', err);
+        setSubmitError(err?.message || 'Failed to create credit account. Check backend connectivity.');
       }
     };
 
@@ -718,6 +721,11 @@ const CreditManagement: React.FC = () => {
       <div className="fixed inset-0 bg-slate-900 bg-opacity-90 overflow-y-auto h-full w-full">
         <div className="relative top-20 mx-auto p-5 border border-slate-700 w-96 shadow-2xl rounded-3xl bg-slate-800 text-slate-100">
           <h3 className="text-lg font-medium text-white mb-4">Create New Credit Account</h3>
+          {submitError && (
+            <div className="rounded-md border border-red-500 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+              {submitError}
+            </div>
+          )}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-slate-300">Customer Name</label>

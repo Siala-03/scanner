@@ -638,7 +638,6 @@ export function App() {
                 { id: 'history', label: 'Order History' },
                 { id: 'analytics', label: 'Analytics' },
                 { id: 'staff', label: 'Staff' },
-                { id: 'performance', label: 'Performance' },
                 { id: 'expenses', label: 'Expenses' },
                 { id: 'credit', label: 'Credit' },
               ] as Array<{ id: ManagerPage; label: string }>
@@ -667,7 +666,7 @@ export function App() {
               />
             }
             {managerPage === 'menu' && <MenuManagement />}
-            {managerPage === 'staff' && <StaffManagement />}
+            {managerPage === 'staff' && <StaffManagement onShowPerformance={() => setManagerPage('performance')} />}
             {managerPage === 'analytics' && <AnalyticsPage />}
             {managerPage === 'performance' && <StaffPerformance />}
             {managerPage === 'inventory' && <InventoryManagement role="manager" />}

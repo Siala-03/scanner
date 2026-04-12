@@ -22,7 +22,11 @@ import { Badge } from '../../components/ui/Badge';
 import { SearchBar } from '../../components/ui/SearchBar';
 import { Modal } from '../../components/ui/Modal';
 import { Input } from '../../components/ui/Input';
-export function StaffManagement() {
+interface StaffManagementProps {
+  onShowPerformance?: () => void;
+}
+
+export function StaffManagement({ onShowPerformance }: StaffManagementProps) {
   const { staff: backendStaff, isLoading, refetch } = useStaff();
   const { tables } = useTables();
   const availableTables = tables.length > 0 ? [...new Set(tables)].sort((a, b) => a - b) : Array.from({ length: 20 }, (_, idx) => idx + 1);
@@ -213,15 +217,18 @@ export function StaffManagement() {
 
   const saveAssignedTables = async () => {
     if (!selectedStaffForAssign) return;
+    console.log('[saveAssignedTables] Staff ID:', selectedStaffForAssign.id, 'Tables:', assignmentSelection);
     try {
-      await updateStaffAssignments(selectedStaffForAssign.id, assignmentSelection);
+      const result = await updateStaffAssignments(selectedStaffForAssign.id, assignmentSelection);
+      console.log('[saveAssignedTables] Result:', result);
       await refetch();
-    } catch (err) {
-      console.error('Failed to assign tables', err);
-    } finally {
       setIsAssignModalOpen(false);
       setSelectedStaffForAssign(null);
       setAssignmentSelection([]);
+      alert('Tables assigned successfully!');
+    } catch (err) {
+      console.error('[saveAssignedTables] Failed to assign tables:', err);
+      alert('Failed to assign tables. Please try again.');
     }
   };
 
@@ -268,10 +275,24 @@ export function StaffManagement() {
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-gray-100">Staff Management</h1>
-            <p className="text-slate-400">
-              {backendStaff.filter((s) => s.isOnDuty).length} staff on duty
-            </p>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:gap-4">
+              <div>
+                <h1 className="text-2xl font-bold text-gray-100">Staff Management</h1>
+                <p className="text-slate-400">
+                  {backendStaff.filter((s) => s.isOnDuty).length} staff on duty
+                </p>
+              </div>
+              {onShowPerformance && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="mt-3 sm:mt-0"
+                  onClick={onShowPerformance}
+                >
+                  View Staff Performance
+                </Button>
+              )}
+            </div>
             {generatedCredentials && (
               <div className="mt-2 rounded-lg border border-emerald-400/30 bg-emerald-500/10 p-2 text-xs text-emerald-100">
                 <p className="font-semibold text-emerald-200">Credentials generated for {generatedCredentials.staffName}</p>

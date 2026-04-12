@@ -1,3 +1,4 @@
+import { apiRequest } from './http';
 import type {
   CustomerCreditAccount,
   CreditTransaction,
@@ -7,32 +8,20 @@ import type {
   CreditAlert,
 } from '../types/credit';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+const API_BASE = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace(/\/$/, '') : '';
 
 // ── Credit Accounts ────────────────────────────────────────────────────────
 
 export async function getCreditAccounts(): Promise<CustomerCreditAccount[]> {
-  const res = await fetch(`${API_BASE}/credit/accounts`, {
-    credentials: 'include',
-  });
-  if (!res.ok) throw new Error('Failed to fetch credit accounts');
-  return res.json();
+  return apiRequest<CustomerCreditAccount[]>(`${API_BASE}/api/credit/accounts`);
 }
 
 export async function getCreditAccount(accountId: string): Promise<CustomerCreditAccount> {
-  const res = await fetch(`${API_BASE}/credit/accounts/${accountId}`, {
-    credentials: 'include',
-  });
-  if (!res.ok) throw new Error('Failed to fetch credit account');
-  return res.json();
+  return apiRequest<CustomerCreditAccount>(`${API_BASE}/api/credit/accounts/${accountId}`);
 }
 
 export async function getCreditAccountByPhone(phone: string): Promise<CustomerCreditAccount | null> {
-  const res = await fetch(`${API_BASE}/credit/accounts?phone=${encodeURIComponent(phone)}`, {
-    credentials: 'include',
-  });
-  if (!res.ok) throw new Error('Failed to fetch credit account');
-  const accounts = await res.json();
+  const accounts = await apiRequest<CustomerCreditAccount[]>(`${API_BASE}/api/credit/accounts?phone=${encodeURIComponent(phone)}`);
   return accounts[0] || null;
 }
 
@@ -42,14 +31,10 @@ export async function createCreditAccount(data: {
   creditLimit: number;
   notes?: string;
 }): Promise<CustomerCreditAccount> {
-  const res = await fetch(`${API_BASE}/credit/accounts`, {
+  return apiRequest<CustomerCreditAccount>(`${API_BASE}/api/credit/accounts`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify(data),
+    json: data,
   });
-  if (!res.ok) throw new Error('Failed to create credit account');
-  return res.json();
 }
 
 export async function updateCreditAccount(
@@ -60,32 +45,22 @@ export async function updateCreditAccount(
     notes: string;
   }>
 ): Promise<CustomerCreditAccount> {
-  const res = await fetch(`${API_BASE}/credit/accounts/${accountId}`, {
+  return apiRequest<CustomerCreditAccount>(`${API_BASE}/api/credit/accounts/${accountId}`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify(data),
+    json: data,
   });
-  if (!res.ok) throw new Error('Failed to update credit account');
-  return res.json();
 }
 
 export async function deleteCreditAccount(accountId: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/credit/accounts/${accountId}`, {
+  return apiRequest<void>(`${API_BASE}/api/credit/accounts/${accountId}`, {
     method: 'DELETE',
-    credentials: 'include',
   });
-  if (!res.ok) throw new Error('Failed to delete credit account');
 }
 
 // ── Credit Transactions ────────────────────────────────────────────────────
 
 export async function getCreditTransactions(accountId: string): Promise<CreditTransaction[]> {
-  const res = await fetch(`${API_BASE}/credit/accounts/${accountId}/transactions`, {
-    credentials: 'include',
-  });
-  if (!res.ok) throw new Error('Failed to fetch credit transactions');
-  return res.json();
+  return apiRequest<CreditTransaction[]>(`${API_BASE}/api/credit/accounts/${accountId}/transactions`);
 }
 
 export async function addCreditCharge(data: {
@@ -97,14 +72,10 @@ export async function addCreditCharge(data: {
   performedBy: string;
   performedByName: string;
 }): Promise<{ transaction: CreditTransaction; account: CustomerCreditAccount }> {
-  const res = await fetch(`${API_BASE}/credit/transactions/charge`, {
+  return apiRequest<{ transaction: CreditTransaction; account: CustomerCreditAccount }>(`${API_BASE}/api/credit/transactions/charge`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify(data),
+    json: data,
   });
-  if (!res.ok) throw new Error('Failed to add credit charge');
-  return res.json();
 }
 
 export async function addCreditPayment(data: {
@@ -117,14 +88,10 @@ export async function addCreditPayment(data: {
   paidByName: string;
   notes?: string;
 }): Promise<{ transaction: CreditTransaction; payment: CreditPayment; account: CustomerCreditAccount }> {
-  const res = await fetch(`${API_BASE}/credit/transactions/payment`, {
+  return apiRequest<{ transaction: CreditTransaction; payment: CreditPayment; account: CustomerCreditAccount }>(`${API_BASE}/api/credit/transactions/payment`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify(data),
+    json: data,
   });
-  if (!res.ok) throw new Error('Failed to add credit payment');
-  return res.json();
 }
 
 export async function addCreditAdjustment(data: {
@@ -135,27 +102,19 @@ export async function addCreditAdjustment(data: {
   performedBy: string;
   performedByName: string;
 }): Promise<{ transaction: CreditTransaction; account: CustomerCreditAccount }> {
-  const res = await fetch(`${API_BASE}/credit/transactions/adjustment`, {
+  return apiRequest<{ transaction: CreditTransaction; account: CustomerCreditAccount }>(`${API_BASE}/api/credit/transactions/adjustment`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify(data),
+    json: data,
   });
-  if (!res.ok) throw new Error('Failed to add credit adjustment');
-  return res.json();
 }
 
 // ── Credit Applications ────────────────────────────────────────────────────
 
 export async function getCreditApplications(status?: string): Promise<CreditApplication[]> {
   const url = status
-    ? `${API_BASE}/credit/applications?status=${status}`
-    : `${API_BASE}/credit/applications`;
-  const res = await fetch(url, {
-    credentials: 'include',
-  });
-  if (!res.ok) throw new Error('Failed to fetch credit applications');
-  return res.json();
+    ? `${API_BASE}/api/credit/applications?status=${status}`
+    : `${API_BASE}/api/credit/applications`;
+  return apiRequest<CreditApplication[]>(url);
 }
 
 export async function submitCreditApplication(data: {
@@ -166,14 +125,10 @@ export async function submitCreditApplication(data: {
   requestedBy: string;
   requestedByName: string;
 }): Promise<CreditApplication> {
-  const res = await fetch(`${API_BASE}/credit/applications`, {
+  return apiRequest<CreditApplication>(`${API_BASE}/api/credit/applications`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify(data),
+    json: data,
   });
-  if (!res.ok) throw new Error('Failed to submit credit application');
-  return res.json();
 }
 
 export async function reviewCreditApplication(
@@ -187,38 +142,24 @@ export async function reviewCreditApplication(
     reviewedByName: string;
   }
 ): Promise<CreditApplication> {
-  const res = await fetch(`${API_BASE}/credit/applications/${applicationId}/review`, {
+  return apiRequest<CreditApplication>(`${API_BASE}/api/credit/applications/${applicationId}/review`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify(data),
+    json: data,
   });
-  if (!res.ok) throw new Error('Failed to review credit application');
-  return res.json();
 }
 
 // ── Credit Summary & Alerts ────────────────────────────────────────────────
 
 export async function getCreditSummary(): Promise<CreditSummary> {
-  const res = await fetch(`${API_BASE}/credit/summary`, {
-    credentials: 'include',
-  });
-  if (!res.ok) throw new Error('Failed to fetch credit summary');
-  return res.json();
+  return apiRequest<CreditSummary>(`${API_BASE}/api/credit/summary`);
 }
 
 export async function getCreditAlerts(): Promise<CreditAlert[]> {
-  const res = await fetch(`${API_BASE}/credit/alerts`, {
-    credentials: 'include',
-  });
-  if (!res.ok) throw new Error('Failed to fetch credit alerts');
-  return res.json();
+  return apiRequest<CreditAlert[]>(`${API_BASE}/api/credit/alerts`);
 }
 
 export async function resolveCreditAlert(alertId: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/credit/alerts/${alertId}/resolve`, {
+  await apiRequest<void>(`${API_BASE}/api/credit/alerts/${alertId}/resolve`, {
     method: 'POST',
-    credentials: 'include',
   });
-  if (!res.ok) throw new Error('Failed to resolve credit alert');
 }
