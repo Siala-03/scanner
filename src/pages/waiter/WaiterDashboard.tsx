@@ -89,10 +89,7 @@ export function WaiterDashboard({
     };
   }, [socket, joinRole]);
 
-  // Debug: Show all orders in console for troubleshooting
-  console.log('[WaiterDashboard] All orders received:', orders.length, orders.map(o => ({ id: o.id, status: o.status, tableNumber: o.tableNumber, restaurantId: o.restaurantId })));
-
-  // Filter orders - show all active orders from all sources (customer menu + waiter)
+  // Filter orders - show all active orders from all sources including customer QR menu
   const waiterOrders = useMemo(
     () =>
       orders.filter(
@@ -105,10 +102,9 @@ export function WaiterDashboard({
     [orders]
   );
 
-  // Separate customer menu orders from waiter-created orders
-  const customerMenuOrders = waiterOrders.filter(order => !order.assignedWaiterId || order.assignedWaiterId === waiter.id);
+  // All pending orders from customer QR menu and direct entry
   const newOrders = waiterOrders.filter((order) => order.status === 'pending');
-  const pendingCustomerMenuOrders = newOrders.filter((order) => !order.assignedWaiterId);
+  const pendingCustomerMenuOrders = newOrders; // Show all pending orders to waiters
   const pendingWaiterOrders = newOrders.filter((order) => order.assignedWaiterId === waiter.id);
   const kitchenOrders = waiterOrders.filter((order) => ['verified', 'preparing'].includes(order.status));
   const readyOrders = waiterOrders.filter((order) => order.status === 'ready');

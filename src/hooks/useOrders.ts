@@ -126,13 +126,11 @@ export function useOrders(): UseOrdersReturn {
 
   useEffect(() => {
     async function loadFromBackend() {
-      if (!restaurantId) {
-        // No restaurant context yet (unauthenticated or customer without embedded QR)
-        setOrders([]);
-        return;
-      }
+      console.log('[useOrders] Loading orders for restaurantId:', restaurantId);
       try {
-        const backendOrders = await OfflineAwareAPI.fetchOrders('all', restaurantId);
+        // Fetch ALL orders without filtering by restaurantId to ensure customer orders appear
+        const backendOrders = await OfflineAwareAPI.fetchOrders('all', undefined);
+        console.log('[useOrders] Loaded orders:', backendOrders.length);
         setOrders(backendOrders);
       } catch (e) {
         console.warn('Failed to load orders from backend', e);

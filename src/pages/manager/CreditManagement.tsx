@@ -699,12 +699,17 @@ const CreditManagement: React.FC = () => {
     const handleSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
       setSubmitError('');
+      const parsedLimit = parseFloat(formData.creditLimit);
+      if (!formData.customerName.trim() || !formData.customerPhone.trim() || Number.isNaN(parsedLimit) || parsedLimit < 0) {
+        setSubmitError('Please enter a valid name, phone number, and credit limit.');
+        return;
+      }
       try {
         await createAccount({
-          customerName: formData.customerName,
-          customerPhone: formData.customerPhone,
-          creditLimit: parseFloat(formData.creditLimit),
-          notes: formData.notes,
+          customerName: formData.customerName.trim(),
+          customerPhone: formData.customerPhone.trim(),
+          creditLimit: parsedLimit,
+          notes: formData.notes.trim() || undefined,
         });
         setShowCreateModal(false);
         setFormData({ customerName: '', customerPhone: '', creditLimit: '', notes: '' });

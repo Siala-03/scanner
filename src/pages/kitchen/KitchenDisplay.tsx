@@ -178,7 +178,8 @@ export function KitchenDisplay({ onLogout, restaurantId, restaurantName }: { onL
     if (!rawOrder) return;
 
     const orderRestaurantId = rawOrder.restaurantId || rawOrder.restaurant_id;
-    if (restaurantId && orderRestaurantId !== restaurantId) return;
+    // Accept orders from matching restaurant or unassigned restaurants
+    if (restaurantId && orderRestaurantId && orderRestaurantId !== restaurantId) return;
 
     const requiresKitchen = rawOrder.requiresKitchen ?? rawOrder.requires_kitchen;
     if (!requiresKitchen) return;

@@ -92,15 +92,18 @@ router.post('/accounts', authenticate, async (req: AuthenticatedRequest, res: Re
     const userId = req.staffId;
     const userName = req.headers['x-staff-name'] as string || 'Unknown';
     
-    // Validate required fields
-    if (!customerName || !customerPhone || !creditLimit) {
-      return res.status(400).json({ error: 'Customer name, phone, and credit limit are required' });
+    const trimmedName = typeof customerName === 'string' ? customerName.trim() : '';
+    const trimmedPhone = typeof customerPhone === 'string' ? customerPhone.trim() : '';
+    const creditLimitValue = Number(creditLimit);
+
+    if (!trimmedName || !trimmedPhone || Number.isNaN(creditLimitValue) || creditLimitValue < 0) {
+      return res.status(400).json({ error: 'Customer name, phone, and valid credit limit are required' });
     }
-    
+
     // Check if account already exists for this phone
     const existing = await pool.query(
       'SELECT id FROM credit_accounts WHERE customer_phone = $1',
-      [customerPhone]
+      [trimmedPhone]
     );
     
     if (existing.rows.length > 0) {
@@ -119,9 +122,9 @@ router.post('/accounts', authenticate, async (req: AuthenticatedRequest, res: Re
     `, [
       accountId,
       customerId,
-      customerName,
-      customerPhone,
-      creditLimit,
+      trimmedName,
+      trimmedPhone,
+      creditLimitValue,
       0, // Initial balance
       'active',
       now(),
