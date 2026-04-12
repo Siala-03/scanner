@@ -207,7 +207,7 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
         const rec = inventoryMap[item.id];
         const stock = rec?.stock ?? 0;
         const threshold = rec?.lowStockThreshold ?? 0;
-        const maxStock = Math.max(rec?.reorderQty ?? stock * 2 ?? 20, stock, 1);
+        const maxStock = Math.max(rec?.reorderQty ?? (stock * 2 || 20), stock, 1);
         const lastUpdatedDays = rec?.updatedAt ? Math.max(0, Math.floor((Date.now() - new Date(rec.updatedAt).getTime()) / (1000 * 60 * 60 * 24))) : null;
         return {
           item,

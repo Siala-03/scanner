@@ -24,6 +24,8 @@ import { Modal } from '../../components/ui/Modal';
 import { Input } from '../../components/ui/Input';
 export function StaffManagement() {
   const { staff: backendStaff, isLoading, refetch } = useStaff();
+  const { tables } = useTables();
+  const availableTables = tables.length > 0 ? [...new Set(tables)].sort((a, b) => a - b) : Array.from({ length: 20 }, (_, idx) => idx + 1);
   const { kpis, refetch: refetchKPIs } = useKPIs();
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -199,6 +201,14 @@ export function StaffManagement() {
     setSelectedStaffForAssign(staffMember);
     setAssignmentSelection(staffMember.assignedTables ?? []);
     setIsAssignModalOpen(true);
+  };
+
+  const toggleTableAssignment = (tableNumber: number) => {
+    setAssignmentSelection((prev) =>
+      prev.includes(tableNumber)
+        ? prev.filter((n) => n !== tableNumber)
+        : [...prev, tableNumber].sort((a, b) => a - b)
+    );
   };
 
   const saveAssignedTables = async () => {
@@ -854,6 +864,56 @@ export function StaffManagement() {
                 disabled={!addForm.name || !addForm.email || !addForm.phone || isCreatingStaff}
               >
                 Create + Generate Login
+              </Button>
+            </div>
+          </div>
+        </Modal>
+
+        {/* Assign Tables Modal */}
+        <Modal
+          isOpen={isAssignModalOpen}
+          onClose={() => setIsAssignModalOpen(false)}
+          title={`Assign Tables to ${selectedStaffForAssign?.name ?? 'Staff'}`}
+          variant="dark"
+        >
+          <div className="space-y-4">
+            <p className="text-sm text-slate-400">
+              Select one or more tables to assign to this waiter.
+            </p>
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {availableTables.map((tableNumber) => {
+                const selected = assignmentSelection.includes(tableNumber);
+                return (
+                  <button
+                    key={tableNumber}
+                    type="button"
+                    onClick={() => toggleTableAssignment(tableNumber)}
+                    className={`rounded-2xl border p-3 text-left transition-colors ${selected ? 'border-amber-400 bg-amber-500/10 text-amber-100 shadow-sm shadow-amber-500/10' : 'border-slate-700 bg-slate-800 text-slate-200 hover:border-slate-500'}`}>
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="font-medium">Table {tableNumber}</span>
+                      {selected && <span className="rounded-full bg-amber-500/20 px-2 py-1 text-amber-200 text-xs">Assigned</span>}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="rounded-xl border border-slate-700 bg-slate-950/50 p-3 text-sm text-slate-400">
+              Tip: if the table list is empty, add tables from the QR code manager or the table management screen.
+            </div>
+            <div className="flex gap-3 pt-4">
+              <Button
+                variant="secondary"
+                fullWidth
+                onClick={() => setIsAssignModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                fullWidth
+                onClick={saveAssignedTables}
+                disabled={!selectedStaffForAssign}
+              >
+                Save Assignments
               </Button>
             </div>
           </div>
