@@ -620,27 +620,23 @@ export function App() {
 
         <div className="max-w-6xl mx-auto px-4 py-6">
           <div className="flex flex-wrap items-center gap-2 mb-4">
-            {[
-              { id: 'dashboard', label: 'Dashboard' },
-              { id: 'inventory', label: 'Inventory' },
-              { id: 'menu', label: 'Manage Menu' },
-              { id: 'qrcodes', label: 'QR Codes' },
-              { id: 'history', label: 'Order History' },
-              { id: 'analytics', label: 'Analytics' },
-              { id: 'staff', label: 'Staff' },
-              { id: 'performance', label: 'Performance' },
-            {
-              id: 'expenses',
-              label: 'Expenses'
-            },
-            {
-              id: 'credit',
-              label: 'Credit'
-            },
-          ].map((item) => (
+            {(
+              [
+                { id: 'dashboard', label: 'Dashboard' },
+                { id: 'inventory', label: 'Inventory' },
+                { id: 'menu', label: 'Manage Menu' },
+                { id: 'qrcodes', label: 'QR Codes' },
+                { id: 'history', label: 'Order History' },
+                { id: 'analytics', label: 'Analytics' },
+                { id: 'staff', label: 'Staff' },
+                { id: 'performance', label: 'Performance' },
+                { id: 'expenses', label: 'Expenses' },
+                { id: 'credit', label: 'Credit' },
+              ] as Array<{ id: ManagerPage; label: string }>
+            ).map((item) => (
               <button
                 key={item.id}
-                onClick={() => setManagerPage(item.id as ManagerPage)}
+                onClick={() => setManagerPage(item.id)}
                 className={`px-3 py-2 rounded-full text-xs font-semibold transition ${managerPage === item.id ? 'bg-amber-500 text-slate-900' : 'bg-slate-700 text-slate-200 hover:bg-slate-600'}`}
               >
                 {item.label}

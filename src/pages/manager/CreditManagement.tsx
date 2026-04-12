@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useCredit } from '../../hooks/useCredit';
+import { useOrders } from '../../hooks/useOrders';
+import { fetchOrderById } from '../../api/orders';
 import type { CustomerCreditAccount } from '../../types/credit';
+import type { Order } from '../../types/orders';
 import { Staff } from '../../types';
 
 type TabType = 'accounts' | 'applications' | 'transactions' | 'reports';
@@ -26,6 +29,25 @@ const CreditManagement: React.FC = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showTransactionModal, setShowTransactionModal] = useState(false);
   const [transactionType, setTransactionType] = useState<'charge' | 'payment' | 'adjustment'>('charge');
+  const { orders, getOrderById } = useOrders();
+  const [orderLookupId, setOrderLookupId] = useState('');
+  const [orderLookupLoading, setOrderLookupLoading] = useState(false);
+  const [orderLookupError, setOrderLookupError] = useState('');
+  const [orderData, setOrderData] = useState<Order | null>(null);
+  const [customerNameInput, setCustomerNameInput] = useState('');
+  const [customerPhoneInput, setCustomerPhoneInput] = useState('');
+  const [customerIdNumber, setCustomerIdNumber] = useState('');
+  const [creditAmount, setCreditAmount] = useState('');
+  const [creditLimit, setCreditLimit] = useState('');
+  const [quickNotes, setQuickNotes] = useState('');
+  const [selectedAccountId, setSelectedAccountId] = useState('');
+
+  const handleLogout = () => {
+    localStorage.removeItem('authUser');
+    localStorage.removeItem('selectedRole');
+    localStorage.removeItem('restaurantId');
+    window.location.href = '/';
+  };
 
   const {
     accounts,
@@ -46,6 +68,14 @@ const CreditManagement: React.FC = () => {
       loadCreditData();
     }
   }, [user, loadCreditData]);
+
+  useEffect(() => {
+    if (orderData) {
+      setCustomerNameInput(orderData.customerName ?? '');
+      setCreditAmount(orderData.total?.toFixed(2) ?? '');
+      setCreditLimit(orderData.total?.toFixed(2) ?? '');
+    }
+  }, [orderData]);
 
   // Filter accounts based on search
   const filteredAccounts = accounts.filter(account =>
@@ -95,9 +125,293 @@ const CreditManagement: React.FC = () => {
     }
   };
 
+  const quickSelectedAccount = selectedAccountId
+    ? accounts.find((account) => account.id === selectedAccountId) ?? null
+    : null;
+
+  const handleLookupOrder = async () => {
+    const lookupId = orderLookupId.trim();
+    setOrderLookupError('');
+    setOrderData(null);
+
+    if (!lookupId) {
+      setOrderLookupError('Enter an order ID to search.');
+      return;
+    }
+
+    setOrderLookupLoading(true);
+    try {
+      const existingOrder = orders.find(
+        (order) => order.id === lookupId || order.orderNumber === lookupId
+      );
+
+      if (existingOrder) {
+        setOrderData(existingOrder);
+      } else {
+        const fetchedOrder = await fetchOrderById(lookupId);
+        if (!fetchedOrder) {
+          setOrderLookupError('Order not found. Please confirm the ID.');
+        } else {
+          setOrderData(fetchedOrder);
+        }
+      }
+    } catch (err) {
+      setOrderLookupError('Unable to retrieve order. Please try again.');
+    } finally {
+      setOrderLookupLoading(false);
+    }
+  };
+
+  const clearQuickCreditForm = () => {
+    setOrderLookupId('');
+    setOrderData(null);
+    setSelectedAccountId('');
+    setCustomerNameInput('');
+    setCustomerPhoneInput('');
+    setCustomerIdNumber('');
+    setCreditAmount('');
+    setCreditLimit('');
+    setQuickNotes('');
+    setOrderLookupError('');
+  };
+
+  const handleRecordCredit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!customerNameInput.trim() || !customerPhoneInput.trim() || !creditAmount.trim()) {
+      setOrderLookupError('Please complete the customer and amount fields before recording credit.');
+      return;
+    }
+
+    const amount = parseFloat(creditAmount);
+    const limit = parseFloat(creditLimit) || Math.max(amount, 1000);
+
+    if (isNaN(amount) || amount <= 0) {
+      setOrderLookupError('Please enter a valid credit amount.');
+      return;
+    }
+
+    setOrderLookupError('');
+
+    try {
+      let account = quickSelectedAccount ?? accounts.find((acc) => acc.customerPhone === customerPhoneInput.trim());
+
+      if (!account) {
+        account = await createAccount({
+          customerName: customerNameInput.trim(),
+          customerPhone: customerPhoneInput.trim(),
+          creditLimit: Math.max(limit, amount),
+          notes: quickNotes || `Credit created for order ${orderData?.orderNumber ?? ''}`,
+        });
+      }
+
+      await chargeCredit({
+        accountId: account.id,
+        customerId: account.customerId || orderData?.customerId || '',
+        amount,
+        orderId: orderData?.id,
+        description: quickNotes || `Credit for order ${orderData?.orderNumber ?? orderLookupId}`,
+        performedBy: user?.id || '',
+        performedByName: user?.name || '',
+      });
+
+      clearQuickCreditForm();
+      loadCreditData();
+      alert('Credit entry recorded successfully.');
+    } catch (err) {
+      console.error('Failed to record credit:', err);
+      setOrderLookupError('Failed to record credit. Please try again.');
+    }
+  };
+
   // Render Accounts Tab
   const renderAccountsTab = () => (
     <div className="space-y-6">
+      <div className="rounded-3xl border border-slate-700 bg-slate-900/95 shadow-lg p-6 text-slate-100">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <h2 className="text-2xl font-semibold text-white">Credit from Order</h2>
+            <p className="mt-2 text-sm text-slate-300 max-w-2xl">
+              Enter the order ID to pull order details, then complete the customer information and record the credit.
+            </p>
+          </div>
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="inline-flex items-center rounded-full bg-cyan-500 px-4 py-2 text-sm font-medium text-slate-950 hover:bg-cyan-400 transition"
+          >
+            <span>Open New Account</span>
+          </button>
+        </div>
+
+        <div className="mt-6 grid gap-4 lg:grid-cols-[1.4fr_0.6fr]">
+          <div className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
+              <label className="sr-only" htmlFor="orderLookupId">Order ID</label>
+              <input
+                id="orderLookupId"
+                type="text"
+                value={orderLookupId}
+                onChange={(e) => setOrderLookupId(e.target.value)}
+                placeholder="Order ID or number"
+                className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-slate-100 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+              />
+              <button
+                type="button"
+                onClick={handleLookupOrder}
+                disabled={orderLookupLoading}
+                className="inline-flex items-center justify-center rounded-2xl bg-cyan-500 px-5 py-3 text-sm font-semibold text-slate-950 hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {orderLookupLoading ? 'Looking up...' : 'Lookup Order'}
+              </button>
+            </div>
+
+            {orderLookupError && (
+              <div className="rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+                {orderLookupError}
+              </div>
+            )}
+
+            {orderData && (
+              <div className="rounded-3xl border border-slate-700 bg-slate-950 p-4 text-slate-100">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-sm uppercase tracking-wide text-cyan-300">Order details</p>
+                    <p className="text-lg font-semibold">{orderData.orderNumber || orderData.id}</p>
+                  </div>
+                  <div className="space-y-1 text-right text-sm text-slate-400">
+                    <p>Placed: {formatDate(String(orderData.createdAt))}</p>
+                    <p>Status: <span className="font-semibold text-white">{orderData.status}</span></p>
+                    <p>Served by: <span className="font-semibold text-white">{orderData.assignedTo || orderData.createdBy || 'Unknown'}</span></p>
+                  </div>
+                </div>
+
+                <div className="mt-4 rounded-2xl bg-slate-900 p-4 border border-slate-700">
+                  <p className="text-sm text-slate-400">Items</p>
+                  <ul className="mt-3 space-y-3">
+                    {orderData.items.map((item) => (
+                      <li key={item.id} className="flex items-center justify-between rounded-2xl bg-slate-800 p-3">
+                        <div>
+                          <p className="font-medium text-slate-100">{item.menuItemName}</p>
+                          <p className="text-sm text-slate-400">Qty: {item.quantity}</p>
+                        </div>
+                        <p className="text-sm font-semibold text-cyan-300">{formatCurrency(item.totalPrice)}</p>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="rounded-3xl border border-slate-700 bg-slate-950 p-5 text-slate-100">
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm text-slate-300">Customer name</label>
+                <input
+                  type="text"
+                  value={customerNameInput}
+                  onChange={(e) => setCustomerNameInput(e.target.value)}
+                  placeholder="Customer full name"
+                  className="mt-2 w-full rounded-2xl border border-slate-700 bg-slate-900 px-4 py-3 text-slate-100 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm text-slate-300">Phone number</label>
+                <input
+                  type="tel"
+                  value={customerPhoneInput}
+                  onChange={(e) => setCustomerPhoneInput(e.target.value)}
+                  placeholder="Enter phone number"
+                  className="mt-2 w-full rounded-2xl border border-slate-700 bg-slate-900 px-4 py-3 text-slate-100 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm text-slate-300">ID / Passport</label>
+                <input
+                  type="text"
+                  value={customerIdNumber}
+                  onChange={(e) => setCustomerIdNumber(e.target.value)}
+                  placeholder="ID or passport number"
+                  className="mt-2 w-full rounded-2xl border border-slate-700 bg-slate-900 px-4 py-3 text-slate-100 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm text-slate-300">Existing credit account</label>
+                <select
+                  value={selectedAccountId}
+                  onChange={(e) => setSelectedAccountId(e.target.value)}
+                  className="mt-2 w-full rounded-2xl border border-slate-700 bg-slate-900 px-4 py-3 text-slate-100 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                >
+                  <option value="">Use or create a new account</option>
+                  {accounts.map((account) => (
+                    <option key={account.id} value={account.id}>
+                      {account.customerName} — {account.customerPhone}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {quickSelectedAccount && (
+                <div className="rounded-2xl border border-slate-700 bg-slate-800 p-4 text-sm text-slate-300">
+                  <p className="font-medium text-white">Selected account</p>
+                  <p>{quickSelectedAccount.customerName}</p>
+                  <p>Available: {formatCurrency(quickSelectedAccount.availableCredit)}</p>
+                  <p>Current balance: {formatCurrency(quickSelectedAccount.currentBalance)}</p>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm text-slate-300">Credit limit</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={creditLimit}
+                  onChange={(e) => setCreditLimit(e.target.value)}
+                  placeholder="Set a credit limit"
+                  className="mt-2 w-full rounded-2xl border border-slate-700 bg-slate-900 px-4 py-3 text-slate-100 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm text-slate-300">Amount to credit</label>
+                <input
+                  type="number"
+                  required
+                  min="0"
+                  step="0.01"
+                  value={creditAmount}
+                  onChange={(e) => setCreditAmount(e.target.value)}
+                  placeholder="Enter amount or use order total"
+                  className="mt-2 w-full rounded-2xl border border-slate-700 bg-slate-900 px-4 py-3 text-slate-100 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm text-slate-300">Notes / description</label>
+                <textarea
+                  rows={3}
+                  value={quickNotes}
+                  onChange={(e) => setQuickNotes(e.target.value)}
+                  placeholder="e.g. credit for delayed payment"
+                  className="mt-2 w-full rounded-2xl border border-slate-700 bg-slate-900 px-4 py-3 text-slate-100 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={handleRecordCredit}
+                className="mt-3 w-full rounded-2xl bg-cyan-500 px-4 py-3 text-sm font-semibold text-slate-950 hover:bg-cyan-400 transition"
+              >
+                Record credit to account
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div className="flex justify-between items-center">
         <div className="relative flex-1 max-w-md">
           <input
@@ -105,10 +419,10 @@ const CreditManagement: React.FC = () => {
             placeholder="Search by name or phone..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full pl-10 pr-4 py-2 rounded-2xl border border-slate-700 bg-slate-950 text-slate-100 focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
           />
           <svg
-            className="w-5 h-5 absolute left-3 top-2.5 text-gray-400"
+            className="w-5 h-5 absolute left-3 top-2.5 text-slate-500"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -118,38 +432,35 @@ const CreditManagement: React.FC = () => {
         </div>
         <button
           onClick={() => setShowCreateModal(true)}
-          className="ml-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center"
+          className="ml-4 rounded-2xl bg-cyan-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-cyan-400 transition"
         >
-          <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
           New Account
         </button>
       </div>
 
-      <div className="bg-white shadow overflow-hidden sm:rounded-lg">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+      <div className="bg-slate-900/95 shadow overflow-hidden sm:rounded-3xl border border-slate-700">
+        <table className="min-w-full divide-y divide-slate-700">
+          <thead className="bg-slate-950">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phone</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Credit Limit</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Current Balance</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Available</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Customer</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Phone</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Credit Limit</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Current Balance</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Available</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Status</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Actions</th>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+          <tbody className="bg-slate-950 divide-y divide-slate-800">
             {filteredAccounts.map((account) => (
-              <tr key={account.id} className="hover:bg-gray-50">
+              <tr key={account.id} className="hover:bg-slate-900">
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm font-medium text-gray-900">{account.customerName}</div>
+                  <div className="text-sm font-medium text-slate-100">{account.customerName}</div>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{account.customerPhone}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{formatCurrency(account.creditLimit)}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{formatCurrency(account.currentBalance)}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-medium">
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-400">{account.customerPhone}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-100">{formatCurrency(account.creditLimit)}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-100">{formatCurrency(account.currentBalance)}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-emerald-300 font-medium">
                   {formatCurrency(account.availableCredit)}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
@@ -194,7 +505,7 @@ const CreditManagement: React.FC = () => {
           </tbody>
         </table>
         {filteredAccounts.length === 0 && (
-          <div className="text-center py-12 text-gray-500">
+          <div className="text-center py-12 text-slate-400">
             No credit accounts found. Create one to get started.
           </div>
         )}
@@ -212,10 +523,10 @@ const CreditManagement: React.FC = () => {
             placeholder="Search applications..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full pl-10 pr-4 py-2 rounded-2xl border border-slate-700 bg-slate-950 text-slate-100 focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
           />
           <svg
-            className="w-5 h-5 absolute left-3 top-2.5 text-gray-400"
+            className="w-5 h-5 absolute left-3 top-2.5 text-slate-500"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -225,27 +536,27 @@ const CreditManagement: React.FC = () => {
         </div>
       </div>
 
-      <div className="bg-white shadow overflow-hidden sm:rounded-lg">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+      <div className="bg-slate-900 shadow overflow-hidden sm:rounded-3xl border border-slate-700">
+        <table className="min-w-full divide-y divide-slate-800">
+          <thead className="bg-slate-950">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phone</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Requested Limit</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Requested Date</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Customer</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Phone</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Requested Limit</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Requested Date</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Status</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Actions</th>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+          <tbody className="bg-slate-950 divide-y divide-slate-800">
             {filteredApplications.map((application) => (
-              <tr key={application.id} className="hover:bg-gray-50">
+              <tr key={application.id} className="hover:bg-slate-900">
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm font-medium text-gray-900">{application.customerName}</div>
+                  <div className="text-sm font-medium text-slate-100">{application.customerName}</div>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{application.customerPhone}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{formatCurrency(application.requestedLimit)}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{formatDate(application.requestedAt)}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-400">{application.customerPhone}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-100">{formatCurrency(application.requestedLimit)}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-400">{formatDate(application.requestedAt)}</td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(application.status)}`}>
                     {application.status}
@@ -292,7 +603,7 @@ const CreditManagement: React.FC = () => {
                     </>
                   )}
                   {application.status !== 'pending' && (
-                    <span className="text-gray-500">Reviewed</span>
+                    <span className="text-slate-400">Reviewed</span>
                   )}
                 </td>
               </tr>
@@ -300,7 +611,7 @@ const CreditManagement: React.FC = () => {
           </tbody>
         </table>
         {filteredApplications.length === 0 && (
-          <div className="text-center py-12 text-gray-500">
+          <div className="text-center py-12 text-slate-400">
             No credit applications found.
           </div>
         )}
@@ -311,12 +622,12 @@ const CreditManagement: React.FC = () => {
   // Render Transactions Tab
   const renderTransactionsTab = () => (
     <div className="space-y-6">
-      <div className="bg-white shadow overflow-hidden sm:rounded-lg">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-medium text-gray-900">Recent Transactions</h3>
+      <div className="bg-slate-900 shadow overflow-hidden sm:rounded-3xl border border-slate-700">
+        <div className="px-6 py-4 border-b border-slate-800">
+          <h3 className="text-lg font-medium text-white">Recent Transactions</h3>
         </div>
         <div className="p-6">
-          <p className="text-gray-500">Transaction history will be displayed here. Select an account from the Accounts tab to view its transactions.</p>
+          <p className="text-slate-300">Transaction history will be displayed here. Select an account from the Accounts tab to view its transactions.</p>
         </div>
       </div>
     </div>
@@ -326,52 +637,52 @@ const CreditManagement: React.FC = () => {
   const renderReportsTab = () => (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-white overflow-hidden shadow rounded-lg">
+        <div className="bg-slate-900 shadow rounded-3xl border border-slate-700">
           <div className="px-4 py-5 sm:p-6">
-            <dt className="text-sm font-medium text-gray-500 truncate">Total Accounts</dt>
-            <dd className="mt-1 text-3xl font-semibold text-gray-900">{summary?.totalAccounts || 0}</dd>
+            <dt className="text-sm font-medium text-slate-400 truncate">Total Accounts</dt>
+            <dd className="mt-1 text-3xl font-semibold text-slate-100">{summary?.totalAccounts || 0}</dd>
           </div>
         </div>
-        <div className="bg-white overflow-hidden shadow rounded-lg">
+        <div className="bg-slate-900 shadow rounded-3xl border border-slate-700">
           <div className="px-4 py-5 sm:p-6">
-            <dt className="text-sm font-medium text-gray-500 truncate">Active Accounts</dt>
-            <dd className="mt-1 text-3xl font-semibold text-green-600">{summary?.activeAccounts || 0}</dd>
+            <dt className="text-sm font-medium text-slate-400 truncate">Active Accounts</dt>
+            <dd className="mt-1 text-3xl font-semibold text-emerald-300">{summary?.activeAccounts || 0}</dd>
           </div>
         </div>
-        <div className="bg-white overflow-hidden shadow rounded-lg">
+        <div className="bg-slate-900 shadow rounded-3xl border border-slate-700">
           <div className="px-4 py-5 sm:p-6">
-            <dt className="text-sm font-medium text-gray-500 truncate">Total Outstanding</dt>
-            <dd className="mt-1 text-3xl font-semibold text-red-600">{formatCurrency(summary?.totalOutstanding || 0)}</dd>
+            <dt className="text-sm font-medium text-slate-400 truncate">Total Outstanding</dt>
+            <dd className="mt-1 text-3xl font-semibold text-rose-300">{formatCurrency(summary?.totalOutstanding || 0)}</dd>
           </div>
         </div>
-        <div className="bg-white overflow-hidden shadow rounded-lg">
+        <div className="bg-slate-900 shadow rounded-3xl border border-slate-700">
           <div className="px-4 py-5 sm:p-6">
-            <dt className="text-sm font-medium text-gray-500 truncate">Accounts Overdue</dt>
-            <dd className="mt-1 text-3xl font-semibold text-yellow-600">{summary?.accountsOverLimit || 0}</dd>
+            <dt className="text-sm font-medium text-slate-400 truncate">Accounts Overdue</dt>
+            <dd className="mt-1 text-3xl font-semibold text-amber-300">{summary?.accountsOverLimit || 0}</dd>
           </div>
         </div>
       </div>
 
-      <div className="bg-white shadow overflow-hidden sm:rounded-lg">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-medium text-gray-900">Credit Summary</h3>
+      <div className="bg-slate-900 shadow rounded-3xl border border-slate-700">
+        <div className="px-6 py-4 border-b border-slate-800">
+          <h3 className="text-lg font-medium text-white">Credit Summary</h3>
         </div>
-        <div className="p-6 space-y-4">
+        <div className="p-6 space-y-4 text-slate-300">
           <div className="flex justify-between">
-            <span className="text-gray-600">Total Outstanding</span>
-            <span className="font-medium">{formatCurrency(summary?.totalOutstanding || 0)}</span>
+            <span className="text-slate-400">Total Outstanding</span>
+            <span className="font-medium text-slate-100">{formatCurrency(summary?.totalOutstanding || 0)}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-gray-600">Average Credit Utilization</span>
-            <span className="font-medium">{((summary?.averageCreditUtilization || 0) * 100).toFixed(1)}%</span>
+            <span className="text-slate-400">Average Credit Utilization</span>
+            <span className="font-medium text-slate-100">{((summary?.averageCreditUtilization || 0) * 100).toFixed(1)}%</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-gray-600">Accounts Over Limit</span>
-            <span className="font-medium text-red-600">{summary?.accountsOverLimit || 0}</span>
+            <span className="text-slate-400">Accounts Over Limit</span>
+            <span className="font-medium text-rose-300">{summary?.accountsOverLimit || 0}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-gray-600">Overdue Amount</span>
-            <span className="font-medium text-yellow-600">{formatCurrency(summary?.overdueAmount || 0)}</span>
+            <span className="text-slate-400">Overdue Amount</span>
+            <span className="font-medium text-amber-300">{formatCurrency(summary?.overdueAmount || 0)}</span>
           </div>
         </div>
       </div>
@@ -407,32 +718,32 @@ const CreditManagement: React.FC = () => {
     if (!showCreateModal) return null;
 
     return (
-      <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full">
-        <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Create New Credit Account</h3>
+      <div className="fixed inset-0 bg-slate-950 bg-opacity-80 overflow-y-auto h-full w-full">
+        <div className="relative top-20 mx-auto p-5 border border-slate-700 w-96 shadow-2xl rounded-3xl bg-slate-950 text-slate-100">
+          <h3 className="text-lg font-medium text-white mb-4">Create New Credit Account</h3>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700">Customer Name</label>
+              <label className="block text-sm font-medium text-slate-300">Customer Name</label>
               <input
                 type="text"
                 required
                 value={formData.customerName}
                 onChange={(e) => setFormData({ ...formData, customerName: e.target.value })}
-                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                className="mt-1 block w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100 focus:outline-none focus:ring-cyan-500 focus:border-cyan-500"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700">Phone Number</label>
+              <label className="block text-sm font-medium text-slate-300">Phone Number</label>
               <input
                 type="tel"
                 required
                 value={formData.customerPhone}
                 onChange={(e) => setFormData({ ...formData, customerPhone: e.target.value })}
-                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                className="mt-1 block w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100 focus:outline-none focus:ring-cyan-500 focus:border-cyan-500"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700">Credit Limit (R)</label>
+              <label className="block text-sm font-medium text-slate-300">Credit Limit (R)</label>
               <input
                 type="number"
                 required
@@ -440,23 +751,23 @@ const CreditManagement: React.FC = () => {
                 step="0.01"
                 value={formData.creditLimit}
                 onChange={(e) => setFormData({ ...formData, creditLimit: e.target.value })}
-                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                className="mt-1 block w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100 focus:outline-none focus:ring-cyan-500 focus:border-cyan-500"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700">Notes (Optional)</label>
+              <label className="block text-sm font-medium text-slate-300">Notes (Optional)</label>
               <textarea
                 value={formData.notes}
                 onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                 rows={3}
-                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                className="mt-1 block w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100 focus:outline-none focus:ring-cyan-500 focus:border-cyan-500"
               />
             </div>
             <div className="flex justify-end space-x-3">
               <button
                 type="button"
                 onClick={() => setShowCreateModal(false)}
-                className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50"
+                className="px-4 py-2 rounded-md border border-slate-700 bg-slate-950 text-sm font-medium text-slate-200 hover:bg-slate-900"
               >
                 Cancel
               </button>
@@ -531,21 +842,21 @@ const CreditManagement: React.FC = () => {
     if (!showTransactionModal || !selectedAccount) return null;
 
     return (
-      <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full">
-        <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">
+      <div className="fixed inset-0 bg-slate-950 bg-opacity-80 overflow-y-auto h-full w-full">
+        <div className="relative top-20 mx-auto p-5 border border-slate-700 w-96 shadow-2xl rounded-3xl bg-slate-950 text-slate-100">
+          <h3 className="text-lg font-medium text-white mb-4">
             {transactionType === 'charge' && 'Add Charge'}
             {transactionType === 'payment' && 'Record Payment'}
             {transactionType === 'adjustment' && 'Manual Adjustment'}
           </h3>
-          <div className="mb-4 p-3 bg-gray-50 rounded">
-            <p className="text-sm text-gray-600">Account: <strong>{selectedAccount.customerName}</strong></p>
-            <p className="text-sm text-gray-600">Current Balance: <strong>{formatCurrency(selectedAccount.currentBalance)}</strong></p>
-            <p className="text-sm text-gray-600">Available Credit: <strong>{formatCurrency(selectedAccount.availableCredit)}</strong></p>
+          <div className="mb-4 p-3 bg-slate-900 rounded-2xl border border-slate-700">
+            <p className="text-sm text-slate-300">Account: <strong className="text-white">{selectedAccount.customerName}</strong></p>
+            <p className="text-sm text-slate-300">Current Balance: <strong className="text-white">{formatCurrency(selectedAccount.currentBalance)}</strong></p>
+            <p className="text-sm text-slate-300">Available Credit: <strong className="text-white">{formatCurrency(selectedAccount.availableCredit)}</strong></p>
           </div>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700">Amount (R)</label>
+              <label className="block text-sm font-medium text-slate-300">Amount (R)</label>
               <input
                 type="number"
                 required
@@ -553,29 +864,29 @@ const CreditManagement: React.FC = () => {
                 step="0.01"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
-                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                className="mt-1 block w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100 focus:outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/40"
               />
             </div>
             {transactionType !== 'payment' && (
               <div>
-                <label className="block text-sm font-medium text-gray-700">Description</label>
+                <label className="block text-sm font-medium text-slate-300">Description</label>
                 <input
                   type="text"
                   required
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  className="mt-1 block w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100 focus:outline-none focus:ring-cyan-500 focus:border-cyan-500"
                 />
               </div>
             )}
             {transactionType === 'payment' && (
               <div>
-                <label className="block text-sm font-medium text-gray-700">Reference (Optional)</label>
+                <label className="block text-sm font-medium text-slate-300">Reference (Optional)</label>
                 <input
                   type="text"
                   value={reference}
                   onChange={(e) => setReference(e.target.value)}
-                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  className="mt-1 block w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100 focus:outline-none focus:ring-cyan-500 focus:border-cyan-500"
                 />
               </div>
             )}
@@ -583,7 +894,7 @@ const CreditManagement: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setShowTransactionModal(false)}
-                className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50"
+                className="px-4 py-2 rounded-md border border-slate-700 bg-slate-950 text-sm font-medium text-slate-200 hover:bg-slate-900"
               >
                 Cancel
               </button>
@@ -603,13 +914,21 @@ const CreditManagement: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-slate-950 text-slate-100">
       <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
-          <h1 className="text-3xl font-bold text-gray-900 mb-6">Credit Management</h1>
+          <div className="flex justify-between items-center mb-6">
+            <h1 className="text-3xl font-bold text-white">Credit Management</h1>
+            <button
+              onClick={handleLogout}
+              className="inline-flex items-center rounded-full bg-red-500 px-4 py-2 text-sm font-medium text-white hover:bg-red-400 transition"
+            >
+              <span>Logout</span>
+            </button>
+          </div>
 
           {loadError && (
-            <div className="mb-4 bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded">
+            <div className="mb-4 rounded-3xl border border-red-600/30 bg-red-500/10 px-4 py-3 text-red-200">
               {loadError}
             </div>
           )}
@@ -623,14 +942,14 @@ const CreditManagement: React.FC = () => {
           {!isLoading && (
             <>
               {/* Tabs */}
-              <div className="border-b border-gray-200 mb-6">
+              <div className="border-b border-slate-700 mb-6">
                 <nav className="-mb-px flex space-x-8">
                   <button
                     onClick={() => setActiveTab('accounts')}
                     className={`py-4 px-1 border-b-2 font-medium text-sm ${
                       activeTab === 'accounts'
-                        ? 'border-blue-500 text-blue-600'
-                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                        ? 'border-cyan-400 text-cyan-300'
+                        : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-600'
                     }`}
                   >
                     Accounts
@@ -639,8 +958,8 @@ const CreditManagement: React.FC = () => {
                     onClick={() => setActiveTab('applications')}
                     className={`py-4 px-1 border-b-2 font-medium text-sm ${
                       activeTab === 'applications'
-                        ? 'border-blue-500 text-blue-600'
-                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                        ? 'border-cyan-400 text-cyan-300'
+                        : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-600'
                     }`}
                   >
                     Applications
