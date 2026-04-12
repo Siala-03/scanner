@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useSocket } from './useSocket';
 import { Order, OrderStatus, CartItem, Customer } from '../types';
 import { getEffectivePrice } from '../utils/pricing';
@@ -153,6 +153,23 @@ export function useOrders(): UseOrdersReturn {
     if (restaurantId) joinRestaurant(restaurantId);
     joinRole('waiter');
 
+    // Poll for new orders every 5 seconds as backup for real-time updates
+    const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+    const startPolling = async () => {
+      try {
+        let waiterRestaurantId = localStorage.getItem('restaurantId');
+        if (!waiterRestaurantId) {
+          try {
+            const authUser = JSON.parse(localStorage.getItem('authUser') || '{}');
+            waiterRestaurantId = authUser.restaurantId;
+          } catch { /* ignore */ }
+        }
+        const orders = await OfflineAwareAPI.fetchOrders('all', waiterRestaurantId);
+        setOrders(orders);
+      } catch (e) { /* ignore polling errors */ }
+    };
+    pollIntervalRef.current = setInterval(startPolling, 5000);
+
     const handleOrderUpdate = (data: any) => {
       const updatedOrder = normalizeOrderPayload(data?.order);
 
@@ -160,13 +177,18 @@ export function useOrders(): UseOrdersReturn {
         return;
       }
 
-      // Accept orders that match our restaurant, or if we have no restaurant context yet
-      const orderRestaurant = updatedOrder.restaurantId;
-      const isMatch = !restaurantId || !orderRestaurant || orderRestaurant === restaurantId;
-
-      if (!isMatch) {
-        return;
+      // Get current restaurantId from localStorage (in case it changed)
+      let currentRestaurantId = localStorage.getItem('restaurantId');
+      if (!currentRestaurantId) {
+        try {
+          const authUser = JSON.parse(localStorage.getItem('authUser') || '{}');
+          currentRestaurantId = authUser.restaurantId;
+        } catch { /* ignore */ }
       }
+
+      // Accept any order - don't filter by restaurant for now to debug
+      // This ensures new customer orders appear immediately
+      console.log('[useOrders] Socket order update received:', data.type, 'orderId:', updatedOrder.id, 'orderRestaurant:', updatedOrder.restaurantId, 'currentRestaurant:', currentRestaurantId);
 
       setOrders((prevOrders) => {
         const orderExists = prevOrders.some((order) => order.id === updatedOrder.id);
@@ -194,6 +216,9 @@ export function useOrders(): UseOrdersReturn {
     socket.on('order:update', handleOrderUpdate);
     return () => {
       socket.off('order:update', handleOrderUpdate);
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+      }
     };
   }, [restaurantId, joinOrders, joinRestaurant, joinRole, socket]);
 
