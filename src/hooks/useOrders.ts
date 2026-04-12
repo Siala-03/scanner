@@ -126,9 +126,10 @@ export function useOrders(): UseOrdersReturn {
 
   useEffect(() => {
     async function loadFromBackend() {
+      console.log('[useOrders] Loading orders for restaurantId:', restaurantId);
       try {
         const backendOrders = await OfflineAwareAPI.fetchOrders('all', restaurantId);
-        console.log('[useOrders] Loaded orders from backend:', backendOrders.length);
+        console.log('[useOrders] Loaded orders from backend:', backendOrders.length, 'for restaurant:', restaurantId, 'orders:', backendOrders.map(o => ({ id: o.id, status: o.status, tableNumber: o.tableNumber, restaurantId: o.restaurantId })));
         setOrders(backendOrders);
       } catch (e) {
         console.warn('Failed to load orders from backend', e);

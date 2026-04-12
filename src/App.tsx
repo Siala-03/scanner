@@ -1,6 +1,6 @@
 import { useCallback, useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeftIcon, QrCodeIcon } from 'lucide-react';
+import { ArrowLeftIcon, QrCodeIcon, LogOutIcon } from 'lucide-react';
 import { CartItem, OrderStatus, Customer } from './types';
 import { useOrders } from './hooks/useOrders';
 import { useTables } from './hooks/useTables';
@@ -602,19 +602,28 @@ export function App() {
       <div className="min-h-screen bg-slate-900 text-slate-100">
         {/* Header */}
         <div className="sticky top-0 z-50 bg-slate-800/95 border-b border-slate-700">
-          <div className="max-w-6xl mx-auto flex items-center gap-3 px-4 py-3">
+          <div className="max-w-6xl mx-auto flex items-center justify-between gap-3 px-4 py-3">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleBack}
+                className="p-2 rounded-lg bg-slate-700/60 hover:bg-slate-600 text-slate-200"
+                aria-label="Back"
+              >
+                <ArrowLeftIcon className="w-5 h-5" />
+              </button>
+              <div>
+                <div className="text-sm text-slate-300 uppercase tracking-wider">Manager Portal</div>
+                <div className="text-lg font-semibold">Welcome, {authUser.name}</div>
+                <div className="text-sm text-slate-400 mt-1">{restaurantName || 'Restaurant'}</div>
+              </div>
+            </div>
             <button
               onClick={handleBack}
-              className="p-2 rounded-lg bg-slate-700/60 hover:bg-slate-600 text-slate-200"
-              aria-label="Back"
+              className="p-2 rounded-lg bg-slate-700/60 hover:bg-red-600 text-slate-200 hover:text-white transition-colors"
+              aria-label="Logout"
             >
-              <ArrowLeftIcon className="w-5 h-5" />
+              <LogOutIcon className="w-5 h-5" />
             </button>
-            <div>
-              <div className="text-sm text-slate-300 uppercase tracking-wider">Manager Portal</div>
-              <div className="text-lg font-semibold">Welcome, {authUser.name}</div>
-              <div className="text-sm text-slate-400 mt-1">{restaurantName || 'Restaurant'}</div>
-            </div>
           </div>
         </div>
 
@@ -648,7 +657,6 @@ export function App() {
             {managerPage === 'dashboard' &&
               <ManagerDashboard
                 onNavigate={(page) => setManagerPage(page as ManagerPage)}
-                onLogout={handleBack}
                 totalOrders={managerTotalOrders}
                 activeOrders={managerActiveOrders}
                 servedOrders={managerServedOrders}

@@ -1,13 +1,12 @@
 import React from 'react';
 import { Button } from '../../components/ui/Button';
-import { MenuIcon, LogOutIcon, QrCodeIcon } from 'lucide-react';
+import { MenuIcon, QrCodeIcon } from 'lucide-react';
 import { AIInsightsChat } from '../../components/manager/AIInsightsChat';
 import { useInventoryData } from '../../hooks/useInventory';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, Legend } from 'recharts';
 
 interface ManagerDashboardProps {
   onNavigate: (page: 'dashboard' | 'menu' | 'staff' | 'analytics' | 'performance' | 'qrcodes' | 'inventory' | 'history') => void;
-  onLogout?: () => void;
   totalOrders: number;
   activeOrders: number;
   servedOrders: number;
@@ -25,7 +24,7 @@ const statusColors: Record<string, string> = {
   served: '#22c55e'
 };
 
-export function ManagerDashboard({ onNavigate, onLogout, totalOrders, activeOrders, servedOrders, todaysRevenue, tableCount, ordersByHour, statusBreakdown }: ManagerDashboardProps) {
+export function ManagerDashboard({ onNavigate, totalOrders, activeOrders, servedOrders, todaysRevenue, tableCount, ordersByHour, statusBreakdown }: ManagerDashboardProps) {
   const { forecasts, forecastAlerts, isGeneratingForecasts, runForecasting } = useInventoryData();
 
   return (
@@ -42,9 +41,6 @@ export function ManagerDashboard({ onNavigate, onLogout, totalOrders, activeOrde
             </Button>
             <Button variant="secondary" onClick={() => onNavigate('qrcodes')}>
               <QrCodeIcon className="w-4 h-4 mr-1" /> QR Codes
-            </Button>
-            <Button variant="danger" onClick={onLogout}>
-              <LogOutIcon className="w-4 h-4 mr-1" /> Logout
             </Button>
           </div>
         </div>

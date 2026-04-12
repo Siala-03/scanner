@@ -42,13 +42,6 @@ const CreditManagement: React.FC = () => {
   const [quickNotes, setQuickNotes] = useState('');
   const [selectedAccountId, setSelectedAccountId] = useState('');
 
-  const handleLogout = () => {
-    localStorage.removeItem('authUser');
-    localStorage.removeItem('selectedRole');
-    localStorage.removeItem('restaurantId');
-    window.location.href = '/';
-  };
-
   const {
     accounts,
     applications,
@@ -228,7 +221,7 @@ const CreditManagement: React.FC = () => {
   // Render Accounts Tab
   const renderAccountsTab = () => (
     <div className="space-y-6">
-      <div className="rounded-3xl border border-slate-700 bg-slate-900/95 shadow-lg p-6 text-slate-100">
+      <div className="rounded-3xl border border-slate-700 bg-slate-800/95 shadow-lg p-6 text-slate-100">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <h2 className="text-2xl font-semibold text-white">Credit from Order</h2>
@@ -237,8 +230,9 @@ const CreditManagement: React.FC = () => {
             </p>
           </div>
           <button
+            type="button"
             onClick={() => setShowCreateModal(true)}
-            className="inline-flex items-center rounded-full bg-cyan-500 px-4 py-2 text-sm font-medium text-slate-950 hover:bg-cyan-400 transition"
+            className="inline-flex items-center rounded-full bg-amber-500 px-4 py-2 text-sm font-medium text-slate-950 hover:bg-amber-400 transition"
           >
             <span>Open New Account</span>
           </button>
@@ -254,13 +248,13 @@ const CreditManagement: React.FC = () => {
                 value={orderLookupId}
                 onChange={(e) => setOrderLookupId(e.target.value)}
                 placeholder="Order ID or number"
-                className="w-full rounded-2xl border border-slate-700 bg-slate-900 px-4 py-3 text-slate-100 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                className="w-full rounded-2xl border border-slate-700 bg-slate-700 px-4 py-3 text-slate-100 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/40"
               />
               <button
                 type="button"
                 onClick={handleLookupOrder}
                 disabled={orderLookupLoading}
-                className="inline-flex items-center justify-center rounded-2xl bg-cyan-500 px-5 py-3 text-sm font-semibold text-slate-950 hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex items-center justify-center rounded-2xl bg-amber-500 px-5 py-3 text-sm font-semibold text-slate-950 hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {orderLookupLoading ? 'Looking up...' : 'Lookup Order'}
               </button>
@@ -273,10 +267,10 @@ const CreditManagement: React.FC = () => {
             )}
 
             {orderData && (
-              <div className="rounded-3xl border border-slate-700 bg-slate-900 p-4 text-slate-100">
+              <div className="rounded-3xl border border-slate-700 bg-slate-800 p-4 text-slate-100">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <p className="text-sm uppercase tracking-wide text-cyan-300">Order details</p>
+                    <p className="text-sm uppercase tracking-wide text-amber-300">Order details</p>
                     <p className="text-lg font-semibold">{orderData.orderNumber || orderData.id}</p>
                   </div>
                   <div className="space-y-1 text-right text-sm text-slate-400">
@@ -295,7 +289,7 @@ const CreditManagement: React.FC = () => {
                           <p className="font-medium text-slate-100">{item.menuItemName}</p>
                           <p className="text-sm text-slate-400">Qty: {item.quantity}</p>
                         </div>
-                        <p className="text-sm font-semibold text-cyan-300">{formatCurrency(item.totalPrice ?? 0)}</p>
+                        <p className="text-sm font-semibold text-amber-300">{formatCurrency(item.totalPrice ?? 0)}</p>
                       </li>
                     ))}
                   </ul>
@@ -304,7 +298,7 @@ const CreditManagement: React.FC = () => {
             )}
           </div>
 
-          <div className="rounded-3xl border border-slate-700 bg-slate-900 p-5 text-slate-100">
+          <div className="rounded-3xl border border-slate-700 bg-slate-800 p-5 text-slate-100">
             <div className="space-y-4">
               <div>
                 <label className="block text-sm text-slate-300">Customer name</label>
@@ -313,7 +307,7 @@ const CreditManagement: React.FC = () => {
                   value={customerNameInput}
                   onChange={(e) => setCustomerNameInput(e.target.value)}
                   placeholder="Customer full name"
-                  className="mt-2 w-full rounded-2xl border border-slate-700 bg-slate-900 px-4 py-3 text-slate-100 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                  className="mt-2 w-full rounded-2xl border border-slate-700 bg-slate-700 px-4 py-3 text-slate-100 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/40"
                 />
               </div>
 
@@ -324,7 +318,7 @@ const CreditManagement: React.FC = () => {
                   value={customerPhoneInput}
                   onChange={(e) => setCustomerPhoneInput(e.target.value)}
                   placeholder="Enter phone number"
-                  className="mt-2 w-full rounded-2xl border border-slate-700 bg-slate-900 px-4 py-3 text-slate-100 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                  className="mt-2 w-full rounded-2xl border border-slate-700 bg-slate-700 px-4 py-3 text-slate-100 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/40"
                 />
               </div>
 
@@ -335,7 +329,7 @@ const CreditManagement: React.FC = () => {
                   value={customerIdNumber}
                   onChange={(e) => setCustomerIdNumber(e.target.value)}
                   placeholder="ID or passport number"
-                  className="mt-2 w-full rounded-2xl border border-slate-700 bg-slate-900 px-4 py-3 text-slate-100 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                  className="mt-2 w-full rounded-2xl border border-slate-700 bg-slate-700 px-4 py-3 text-slate-100 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/40"
                 />
               </div>
 
@@ -344,7 +338,7 @@ const CreditManagement: React.FC = () => {
                 <select
                   value={selectedAccountId}
                   onChange={(e) => setSelectedAccountId(e.target.value)}
-                  className="mt-2 w-full rounded-2xl border border-slate-700 bg-slate-900 px-4 py-3 text-slate-100 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                  className="mt-2 w-full rounded-2xl border border-slate-700 bg-slate-700 px-4 py-3 text-slate-100 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/40"
                 >
                   <option value="">Use or create a new account</option>
                   {accounts.map((account) => (
@@ -356,7 +350,7 @@ const CreditManagement: React.FC = () => {
               </div>
 
               {quickSelectedAccount && (
-                <div className="rounded-2xl border border-slate-700 bg-slate-800 p-4 text-sm text-slate-300">
+                <div className="rounded-2xl border border-slate-700 bg-slate-700 p-4 text-sm text-slate-300">
                   <p className="font-medium text-white">Selected account</p>
                   <p>{quickSelectedAccount.customerName}</p>
                   <p>Available: {formatCurrency(quickSelectedAccount.availableCredit)}</p>
@@ -373,7 +367,7 @@ const CreditManagement: React.FC = () => {
                   value={creditLimit}
                   onChange={(e) => setCreditLimit(e.target.value)}
                   placeholder="Set a credit limit"
-                  className="mt-2 w-full rounded-2xl border border-slate-700 bg-slate-900 px-4 py-3 text-slate-100 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                  className="mt-2 w-full rounded-2xl border border-slate-700 bg-slate-700 px-4 py-3 text-slate-100 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/40"
                 />
               </div>
 
@@ -387,7 +381,7 @@ const CreditManagement: React.FC = () => {
                   value={creditAmount}
                   onChange={(e) => setCreditAmount(e.target.value)}
                   placeholder="Enter amount or use order total"
-                  className="mt-2 w-full rounded-2xl border border-slate-700 bg-slate-900 px-4 py-3 text-slate-100 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                  className="mt-2 w-full rounded-2xl border border-slate-700 bg-slate-700 px-4 py-3 text-slate-100 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/40"
                 />
               </div>
 
@@ -398,14 +392,14 @@ const CreditManagement: React.FC = () => {
                   value={quickNotes}
                   onChange={(e) => setQuickNotes(e.target.value)}
                   placeholder="e.g. credit for delayed payment"
-                  className="mt-2 w-full rounded-2xl border border-slate-700 bg-slate-900 px-4 py-3 text-slate-100 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                  className="mt-2 w-full rounded-2xl border border-slate-700 bg-slate-700 px-4 py-3 text-slate-100 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/40"
                 />
               </div>
 
               <button
                 type="button"
                 onClick={handleRecordCredit}
-                className="mt-3 w-full rounded-2xl bg-cyan-500 px-4 py-3 text-sm font-semibold text-slate-950 hover:bg-cyan-400 transition"
+                className="mt-3 w-full rounded-2xl bg-amber-500 px-4 py-3 text-sm font-semibold text-slate-950 hover:bg-amber-400 transition"
               >
                 Record credit to account
               </button>
@@ -421,7 +415,7 @@ const CreditManagement: React.FC = () => {
             placeholder="Search by name or phone..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 rounded-2xl border border-slate-700 bg-slate-900 text-slate-100 focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+            className="w-full pl-10 pr-4 py-2 rounded-2xl border border-slate-700 bg-slate-700 text-slate-100 focus:ring-2 focus:ring-amber-500 focus:border-transparent"
           />
           <svg
             className="w-5 h-5 absolute left-3 top-2.5 text-slate-500"
@@ -433,14 +427,15 @@ const CreditManagement: React.FC = () => {
           </svg>
         </div>
         <button
+          type="button"
           onClick={() => setShowCreateModal(true)}
-          className="ml-4 rounded-2xl bg-cyan-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-cyan-400 transition"
+          className="ml-4 rounded-2xl bg-amber-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-amber-400 transition"
         >
           New Account
         </button>
       </div>
 
-      <div className="bg-slate-900 shadow overflow-hidden sm:rounded-3xl border border-slate-700">
+      <div className="bg-slate-800 shadow overflow-hidden sm:rounded-3xl border border-slate-700">
         <table className="min-w-full divide-y divide-slate-700">
           <thead className="bg-slate-800">
             <tr>
@@ -453,9 +448,9 @@ const CreditManagement: React.FC = () => {
               <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Actions</th>
             </tr>
           </thead>
-          <tbody className="bg-slate-900 divide-y divide-slate-800">
+          <tbody className="bg-slate-800 divide-y divide-slate-800">
             {filteredAccounts.map((account) => (
-              <tr key={account.id} className="hover:bg-slate-900">
+              <tr key={account.id} className="hover:bg-slate-800">
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="text-sm font-medium text-slate-100">{account.customerName}</div>
                 </td>
@@ -477,7 +472,7 @@ const CreditManagement: React.FC = () => {
                       setShowTransactionModal(true);
                       setTransactionType('charge');
                     }}
-                    className="text-blue-600 hover:text-blue-900"
+                    className="text-amber-500 hover:text-amber-800"
                   >
                     Charge
                   </button>
@@ -525,7 +520,7 @@ const CreditManagement: React.FC = () => {
             placeholder="Search applications..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 rounded-2xl border border-slate-700 bg-slate-900 text-slate-100 focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+            className="w-full pl-10 pr-4 py-2 rounded-2xl border border-slate-700 bg-slate-700 text-slate-100 focus:ring-2 focus:ring-amber-500 focus:border-transparent"
           />
           <svg
             className="w-5 h-5 absolute left-3 top-2.5 text-slate-500"
@@ -538,7 +533,7 @@ const CreditManagement: React.FC = () => {
         </div>
       </div>
 
-      <div className="bg-slate-900 shadow overflow-hidden sm:rounded-3xl border border-slate-700">
+      <div className="bg-slate-800 shadow overflow-hidden sm:rounded-3xl border border-slate-700">
         <table className="min-w-full divide-y divide-slate-800">
           <thead className="bg-slate-800">
             <tr>
@@ -550,9 +545,9 @@ const CreditManagement: React.FC = () => {
               <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Actions</th>
             </tr>
           </thead>
-          <tbody className="bg-slate-900 divide-y divide-slate-800">
+          <tbody className="bg-slate-800 divide-y divide-slate-800">
             {filteredApplications.map((application) => (
-              <tr key={application.id} className="hover:bg-slate-900">
+              <tr key={application.id} className="hover:bg-slate-800">
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="text-sm font-medium text-slate-100">{application.customerName}</div>
                 </td>
@@ -624,7 +619,7 @@ const CreditManagement: React.FC = () => {
   // Render Transactions Tab
   const renderTransactionsTab = () => (
     <div className="space-y-6">
-      <div className="bg-slate-900 shadow overflow-hidden sm:rounded-3xl border border-slate-700">
+      <div className="bg-slate-800 shadow overflow-hidden sm:rounded-3xl border border-slate-700">
         <div className="px-6 py-4 border-b border-slate-800">
           <h3 className="text-lg font-medium text-white">Recent Transactions</h3>
         </div>
@@ -639,25 +634,25 @@ const CreditManagement: React.FC = () => {
   const renderReportsTab = () => (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-slate-900 shadow rounded-3xl border border-slate-700">
+        <div className="bg-slate-800 shadow rounded-3xl border border-slate-700">
           <div className="px-4 py-5 sm:p-6">
             <dt className="text-sm font-medium text-slate-400 truncate">Total Accounts</dt>
             <dd className="mt-1 text-3xl font-semibold text-slate-100">{summary?.totalAccounts || 0}</dd>
           </div>
         </div>
-        <div className="bg-slate-900 shadow rounded-3xl border border-slate-700">
+        <div className="bg-slate-800 shadow rounded-3xl border border-slate-700">
           <div className="px-4 py-5 sm:p-6">
             <dt className="text-sm font-medium text-slate-400 truncate">Active Accounts</dt>
             <dd className="mt-1 text-3xl font-semibold text-emerald-300">{summary?.activeAccounts || 0}</dd>
           </div>
         </div>
-        <div className="bg-slate-900 shadow rounded-3xl border border-slate-700">
+        <div className="bg-slate-800 shadow rounded-3xl border border-slate-700">
           <div className="px-4 py-5 sm:p-6">
             <dt className="text-sm font-medium text-slate-400 truncate">Total Outstanding</dt>
             <dd className="mt-1 text-3xl font-semibold text-rose-300">{formatCurrency(summary?.totalOutstanding || 0)}</dd>
           </div>
         </div>
-        <div className="bg-slate-900 shadow rounded-3xl border border-slate-700">
+        <div className="bg-slate-800 shadow rounded-3xl border border-slate-700">
           <div className="px-4 py-5 sm:p-6">
             <dt className="text-sm font-medium text-slate-400 truncate">Accounts Overdue</dt>
             <dd className="mt-1 text-3xl font-semibold text-amber-300">{summary?.accountsOverLimit || 0}</dd>
@@ -665,7 +660,7 @@ const CreditManagement: React.FC = () => {
         </div>
       </div>
 
-      <div className="bg-slate-900 shadow rounded-3xl border border-slate-700">
+      <div className="bg-slate-800 shadow rounded-3xl border border-slate-700">
         <div className="px-6 py-4 border-b border-slate-800">
           <h3 className="text-lg font-medium text-white">Credit Summary</h3>
         </div>
@@ -720,8 +715,8 @@ const CreditManagement: React.FC = () => {
     if (!showCreateModal) return null;
 
     return (
-      <div className="fixed inset-0 bg-slate-900 bg-opacity-80 overflow-y-auto h-full w-full">
-        <div className="relative top-20 mx-auto p-5 border border-slate-700 w-96 shadow-2xl rounded-3xl bg-slate-900 text-slate-100">
+      <div className="fixed inset-0 bg-slate-900 bg-opacity-90 overflow-y-auto h-full w-full">
+        <div className="relative top-20 mx-auto p-5 border border-slate-700 w-96 shadow-2xl rounded-3xl bg-slate-800 text-slate-100">
           <h3 className="text-lg font-medium text-white mb-4">Create New Credit Account</h3>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
@@ -731,7 +726,7 @@ const CreditManagement: React.FC = () => {
                 required
                 value={formData.customerName}
                 onChange={(e) => setFormData({ ...formData, customerName: e.target.value })}
-                className="mt-1 block w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100 focus:outline-none focus:ring-cyan-500 focus:border-cyan-500"
+                className="mt-1 block w-full rounded-md border border-slate-700 bg-slate-700 px-3 py-2 text-slate-100 focus:outline-none focus:ring-amber-500 focus:border-amber-500"
               />
             </div>
             <div>
@@ -741,7 +736,7 @@ const CreditManagement: React.FC = () => {
                 required
                 value={formData.customerPhone}
                 onChange={(e) => setFormData({ ...formData, customerPhone: e.target.value })}
-                className="mt-1 block w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100 focus:outline-none focus:ring-cyan-500 focus:border-cyan-500"
+                className="mt-1 block w-full rounded-md border border-slate-700 bg-slate-700 px-3 py-2 text-slate-100 focus:outline-none focus:ring-amber-500 focus:border-amber-500"
               />
             </div>
             <div>
@@ -753,7 +748,7 @@ const CreditManagement: React.FC = () => {
                 step="0.01"
                 value={formData.creditLimit}
                 onChange={(e) => setFormData({ ...formData, creditLimit: e.target.value })}
-                className="mt-1 block w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100 focus:outline-none focus:ring-cyan-500 focus:border-cyan-500"
+                className="mt-1 block w-full rounded-md border border-slate-700 bg-slate-700 px-3 py-2 text-slate-100 focus:outline-none focus:ring-amber-500 focus:border-amber-500"
               />
             </div>
             <div>
@@ -762,20 +757,20 @@ const CreditManagement: React.FC = () => {
                 value={formData.notes}
                 onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                 rows={3}
-                className="mt-1 block w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100 focus:outline-none focus:ring-cyan-500 focus:border-cyan-500"
+                className="mt-1 block w-full rounded-md border border-slate-700 bg-slate-700 px-3 py-2 text-slate-100 focus:outline-none focus:ring-amber-500 focus:border-amber-500"
               />
             </div>
             <div className="flex justify-end space-x-3">
               <button
                 type="button"
                 onClick={() => setShowCreateModal(false)}
-                className="px-4 py-2 rounded-md border border-slate-700 bg-slate-900 text-sm font-medium text-slate-200 hover:bg-slate-900"
+                className="px-4 py-2 rounded-md border border-slate-700 bg-slate-700 text-sm font-medium text-slate-200 hover:bg-slate-600"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="px-4 py-2 bg-blue-600 border border-transparent rounded-md shadow-sm text-sm font-medium text-white hover:bg-blue-700"
+                className="px-4 py-2 bg-amber-600 border border-transparent rounded-md shadow-sm text-sm font-medium text-slate-950 hover:bg-amber-500"
               >
                 Create Account
               </button>
@@ -845,13 +840,13 @@ const CreditManagement: React.FC = () => {
 
     return (
       <div className="fixed inset-0 bg-slate-900 bg-opacity-80 overflow-y-auto h-full w-full">
-        <div className="relative top-20 mx-auto p-5 border border-slate-700 w-96 shadow-2xl rounded-3xl bg-slate-900 text-slate-100">
+        <div className="relative top-20 mx-auto p-5 border border-slate-700 w-96 shadow-2xl rounded-3xl bg-slate-800 text-slate-100">
           <h3 className="text-lg font-medium text-white mb-4">
             {transactionType === 'charge' && 'Add Charge'}
             {transactionType === 'payment' && 'Record Payment'}
             {transactionType === 'adjustment' && 'Manual Adjustment'}
           </h3>
-          <div className="mb-4 p-3 bg-slate-900 rounded-2xl border border-slate-700">
+          <div className="mb-4 p-3 bg-slate-800 rounded-2xl border border-slate-700">
             <p className="text-sm text-slate-300">Account: <strong className="text-white">{selectedAccount.customerName}</strong></p>
             <p className="text-sm text-slate-300">Current Balance: <strong className="text-white">{formatCurrency(selectedAccount.currentBalance)}</strong></p>
             <p className="text-sm text-slate-300">Available Credit: <strong className="text-white">{formatCurrency(selectedAccount.availableCredit)}</strong></p>
@@ -866,7 +861,7 @@ const CreditManagement: React.FC = () => {
                 step="0.01"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
-                className="mt-1 block w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100 focus:outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/40"
+                className="mt-1 block w-full rounded-md border border-slate-700 bg-slate-700 px-3 py-2 text-slate-100 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/40"
               />
             </div>
             {transactionType !== 'payment' && (
@@ -877,7 +872,7 @@ const CreditManagement: React.FC = () => {
                   required
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  className="mt-1 block w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100 focus:outline-none focus:ring-cyan-500 focus:border-cyan-500"
+                  className="mt-1 block w-full rounded-md border border-slate-700 bg-slate-700 px-3 py-2 text-slate-100 focus:outline-none focus:ring-amber-500 focus:border-amber-500"
                 />
               </div>
             )}
@@ -888,7 +883,7 @@ const CreditManagement: React.FC = () => {
                   type="text"
                   value={reference}
                   onChange={(e) => setReference(e.target.value)}
-                  className="mt-1 block w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100 focus:outline-none focus:ring-cyan-500 focus:border-cyan-500"
+                  className="mt-1 block w-full rounded-md border border-slate-700 bg-slate-700 px-3 py-2 text-slate-100 focus:outline-none focus:ring-amber-500 focus:border-amber-500"
                 />
               </div>
             )}
@@ -896,13 +891,13 @@ const CreditManagement: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setShowTransactionModal(false)}
-                className="px-4 py-2 rounded-md border border-slate-700 bg-slate-900 text-sm font-medium text-slate-200 hover:bg-slate-900"
+                className="px-4 py-2 rounded-md border border-slate-700 bg-slate-700 text-sm font-medium text-slate-200 hover:bg-slate-600"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="px-4 py-2 bg-blue-600 border border-transparent rounded-md shadow-sm text-sm font-medium text-white hover:bg-blue-700"
+                className="px-4 py-2 bg-amber-600 border border-transparent rounded-md shadow-sm text-sm font-medium text-slate-950 hover:bg-amber-500"
               >
                 {transactionType === 'charge' && 'Add Charge'}
                 {transactionType === 'payment' && 'Record Payment'}
@@ -919,14 +914,8 @@ const CreditManagement: React.FC = () => {
     <div className="min-h-screen bg-slate-900 text-slate-100">
       <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
-          <div className="flex justify-between items-center mb-6">
+          <div className="flex items-center mb-6">
             <h1 className="text-3xl font-bold text-white">Credit Management</h1>
-            <button
-              onClick={handleLogout}
-              className="inline-flex items-center rounded-full bg-red-500 px-4 py-2 text-sm font-medium text-white hover:bg-red-400 transition"
-            >
-              <span>Logout</span>
-            </button>
           </div>
 
           {loadError && (
@@ -937,7 +926,7 @@ const CreditManagement: React.FC = () => {
 
           {isLoading && !accounts.length && (
             <div className="flex justify-center items-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-500"></div>
             </div>
           )}
 
@@ -950,7 +939,7 @@ const CreditManagement: React.FC = () => {
                     onClick={() => setActiveTab('accounts')}
                     className={`py-4 px-1 border-b-2 font-medium text-sm ${
                       activeTab === 'accounts'
-                        ? 'border-cyan-400 text-cyan-300'
+                        ? 'border-amber-400 text-amber-300'
                         : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-600'
                     }`}
                   >
@@ -960,7 +949,7 @@ const CreditManagement: React.FC = () => {
                     onClick={() => setActiveTab('applications')}
                     className={`py-4 px-1 border-b-2 font-medium text-sm ${
                       activeTab === 'applications'
-                        ? 'border-cyan-400 text-cyan-300'
+                        ? 'border-amber-400 text-amber-300'
                         : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-600'
                     }`}
                   >
@@ -975,7 +964,7 @@ const CreditManagement: React.FC = () => {
                     onClick={() => setActiveTab('transactions')}
                     className={`py-4 px-1 border-b-2 font-medium text-sm ${
                       activeTab === 'transactions'
-                        ? 'border-blue-500 text-blue-600'
+                        ? 'border-amber-400 text-amber-300'
                         : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                     }`}
                   >
@@ -985,7 +974,7 @@ const CreditManagement: React.FC = () => {
                     onClick={() => setActiveTab('reports')}
                     className={`py-4 px-1 border-b-2 font-medium text-sm ${
                       activeTab === 'reports'
-                        ? 'border-blue-500 text-blue-600'
+                        ? 'border-amber-400 text-amber-300'
                         : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                     }`}
                   >
