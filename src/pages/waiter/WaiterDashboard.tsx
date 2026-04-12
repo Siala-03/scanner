@@ -299,7 +299,7 @@ export function WaiterDashboard({
                 <ClockIcon className="w-4 h-4 text-blue-400" />
                 <p className="text-sm text-slate-400">Pending</p>
               </div>
-              <p className="text-3xl font-bold text-white">{newOrders.length}</p>
+              <p className="text-3xl font-bold text-white">{allPendingOrders.length}</p>
               <p className="text-xs text-slate-500">Awaiting confirmation</p>
             </Card>
             <Card className="bg-slate-800 border border-slate-700 p-4">
@@ -417,7 +417,7 @@ export function WaiterDashboard({
 
                   {/* Quick Actions */}
                   <div className="grid gap-4 sm:grid-cols-2">
-                    {newOrders.slice(0, 4).map((order) => (
+                    {pendingCustomerMenuOrders.slice(0, 4).map((order) => (
                       <OrderCard
                         key={order.id}
                         order={order}
@@ -429,7 +429,7 @@ export function WaiterDashboard({
                     ))}
                   </div>
 
-                  {newOrders.length === 0 && (
+                  {pendingCustomerMenuOrders.length === 0 && (
                     <EmptyState
                       icon={<ClipboardListIcon className="w-8 h-8" />}
                       title="No active orders"
