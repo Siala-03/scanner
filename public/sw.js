@@ -1,14 +1,20 @@
 import { registerRoute } from 'workbox-routing';
-import { NetworkFirst, CacheFirst } from 'workbox-strategies';
+import { NetworkFirst, CacheFirst, NetworkOnly } from 'workbox-strategies';
 import { ExpirationPlugin } from 'workbox-expiration';
 import { precacheAndRoute } from 'workbox-precaching';
 
 // Precache assets
 precacheAndRoute(self.__WB_MANIFEST || []);
 
-// Cache API responses with NetworkFirst strategy
+// Do not cache inventory API responses; always fetch fresh inventory data.
 registerRoute(
-  ({ url }) => url.pathname.startsWith('/api/'),
+  ({ url }) => url.pathname.startsWith('/api/inventory'),
+  new NetworkOnly()
+);
+
+// Cache other API responses with NetworkFirst strategy for GET requests only
+registerRoute(
+  ({ url, request }) => url.pathname.startsWith('/api/') && request.method === 'GET',
   new NetworkFirst({
     cacheName: 'api-cache',
     plugins: [

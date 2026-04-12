@@ -27,6 +27,9 @@ export async function apiRequest<T>(
   const headers = new Headers(init.headers);
   headers.set('Accept', 'application/json');
   if (init.json !== undefined) headers.set('Content-Type', 'application/json');
+  if (!init.method || init.method.toUpperCase() === 'GET') {
+    headers.set('Cache-Control', 'no-cache');
+  }
 
   // Add authentication headers automatically from localStorage
   let staffId = localStorage.getItem('staffId');
@@ -57,7 +60,8 @@ export async function apiRequest<T>(
     res = await fetch(url, {
       ...init,
       headers,
-      body: init.json !== undefined ? JSON.stringify(init.json) : init.body
+      body: init.json !== undefined ? JSON.stringify(init.json) : init.body,
+      cache: init.cache ?? 'no-store'
     });
   } catch (networkError) {
     // Network error (e.g., server not reachable)

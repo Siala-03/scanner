@@ -3,7 +3,7 @@ import { useCredit } from '../../hooks/useCredit';
 import { useOrders } from '../../hooks/useOrders';
 import { fetchOrderById } from '../../api/orders';
 import type { CustomerCreditAccount } from '../../types/credit';
-import type { Order } from '../../types/orders';
+import type { Order } from '../../types';
 import { Staff } from '../../types';
 
 type TabType = 'accounts' | 'applications' | 'transactions' | 'reports';
@@ -141,8 +141,8 @@ const CreditManagement: React.FC = () => {
 
     setOrderLookupLoading(true);
     try {
-      const existingOrder = orders.find(
-        (order) => order.id === lookupId || order.orderNumber === lookupId
+      const existingOrder = getOrderById(lookupId) ?? orders.find(
+        (order) => order.orderNumber === lookupId
       );
 
       if (existingOrder) {
@@ -280,7 +280,7 @@ const CreditManagement: React.FC = () => {
                   <div className="space-y-1 text-right text-sm text-slate-400">
                     <p>Placed: {formatDate(String(orderData.createdAt))}</p>
                     <p>Status: <span className="font-semibold text-white">{orderData.status}</span></p>
-                    <p>Served by: <span className="font-semibold text-white">{orderData.assignedTo || orderData.createdBy || 'Unknown'}</span></p>
+                    <p>Served by: <span className="font-semibold text-white">{orderData.assignedWaiterId || 'Unknown'}</span></p>
                   </div>
                 </div>
 
@@ -293,7 +293,7 @@ const CreditManagement: React.FC = () => {
                           <p className="font-medium text-slate-100">{item.menuItemName}</p>
                           <p className="text-sm text-slate-400">Qty: {item.quantity}</p>
                         </div>
-                        <p className="text-sm font-semibold text-cyan-300">{formatCurrency(item.totalPrice)}</p>
+                        <p className="text-sm font-semibold text-cyan-300">{formatCurrency(item.totalPrice ?? 0)}</p>
                       </li>
                     ))}
                   </ul>
