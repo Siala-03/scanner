@@ -126,10 +126,10 @@ export function useOrders(): UseOrdersReturn {
 
   useEffect(() => {
     async function loadFromBackend() {
-      console.log('[useOrders] Loading orders for restaurantId:', restaurantId);
+      console.log('[useOrders] Loading orders (no filter)...');
       try {
-        const backendOrders = await OfflineAwareAPI.fetchOrders('all', restaurantId);
-        console.log('[useOrders] Loaded orders from backend:', backendOrders.length, 'for restaurant:', restaurantId, 'orders:', backendOrders.map(o => ({ id: o.id, status: o.status, tableNumber: o.tableNumber, restaurantId: o.restaurantId })));
+        const backendOrders = await OfflineAwareAPI.fetchOrders('all', undefined);
+        console.log('[useOrders] Loaded ALL orders from backend:', backendOrders.length, 'orders:', backendOrders.map(o => ({ id: o.id, status: o.status, tableNumber: o.tableNumber, restaurantId: o.restaurantId })));
         setOrders(backendOrders);
       } catch (e) {
         console.warn('Failed to load orders from backend', e);
@@ -241,6 +241,8 @@ export function useOrders(): UseOrdersReturn {
       delivery?: { provider: string; address: string },
       loyaltyRewardId?: string
     ): Promise<Order> => {
+      const currentRestaurantId = resolveRestaurantId();
+      console.log('[addOrder] Creating order for restaurantId:', currentRestaurantId, 'table:', tableNumber);
       ensureInventoryInitialized();
 
       const requiresKitchen = isFoodOrder(items);
@@ -261,7 +263,7 @@ export function useOrders(): UseOrdersReturn {
         tableNumber,
         customerName: customer?.name,
         customerId: customer?.id,
-        restaurantId,
+        restaurantId: currentRestaurantId,
         items: localItems,
         status: 'pending',
         subtotal,
@@ -284,7 +286,7 @@ export function useOrders(): UseOrdersReturn {
           tableNumber,
           customerName: customer?.name || 'Walk-in',
           customerId: customer?.id,
-          restaurantId,
+          restaurantId: currentRestaurantId,
           items: payloadItems,
           notes: specialInstructions,
           requiresKitchen,
