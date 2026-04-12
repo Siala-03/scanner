@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useSocket } from './useSocket';
 import { Order, OrderStatus, CartItem, Customer } from '../types';
 import { getEffectivePrice } from '../utils/pricing';
@@ -153,23 +153,6 @@ export function useOrders(): UseOrdersReturn {
     if (restaurantId) joinRestaurant(restaurantId);
     joinRole('waiter');
 
-    // Poll for new orders every 5 seconds as backup for real-time updates
-    const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
-    const startPolling = async () => {
-      try {
-        let waiterRestaurantId = localStorage.getItem('restaurantId');
-        if (!waiterRestaurantId) {
-          try {
-            const authUser = JSON.parse(localStorage.getItem('authUser') || '{}');
-            waiterRestaurantId = authUser.restaurantId;
-          } catch { /* ignore */ }
-        }
-        const orders = await OfflineAwareAPI.fetchOrders('all', waiterRestaurantId);
-        setOrders(orders);
-      } catch (e) { /* ignore polling errors */ }
-    };
-    pollIntervalRef.current = setInterval(startPolling, 5000);
-
     const handleOrderUpdate = (data: any) => {
       const updatedOrder = normalizeOrderPayload(data?.order);
 
@@ -216,9 +199,6 @@ export function useOrders(): UseOrdersReturn {
     socket.on('order:update', handleOrderUpdate);
     return () => {
       socket.off('order:update', handleOrderUpdate);
-      if (pollIntervalRef.current) {
-        clearInterval(pollIntervalRef.current);
-      }
     };
   }, [restaurantId, joinOrders, joinRestaurant, joinRole, socket]);
 

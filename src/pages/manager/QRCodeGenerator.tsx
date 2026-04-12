@@ -200,22 +200,22 @@ export function QRCodeGenerator({
                     />
                   </div>
 
-                  {/* Download Button */}
-                  <div className="flex flex-col sm:flex-row items-center gap-2 mb-3">
+                  {/* Action Buttons */}
+                  <div className="flex items-center gap-2 mb-3">
                     <button
                       onClick={() => handleDownload(tableNum)}
-                      className="flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-500 text-white hover:bg-amber-600 transition-colors"
+                      className="p-2 rounded-lg bg-amber-500 text-white hover:bg-amber-600 transition-colors"
+                      title="Download QR"
                     >
                       <DownloadIcon className="w-4 h-4" />
-                      Download
                     </button>
                     {onDeleteTable && (
                       <button
                         onClick={() => handleDeleteTable(tableNum)}
-                        className="flex items-center gap-2 px-4 py-2 rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors"
+                        className="p-2 rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors"
+                        title="Delete QR"
                       >
                         <Trash2 className="w-4 h-4" />
-                        Delete
                       </button>
                     )}
                   </div>
