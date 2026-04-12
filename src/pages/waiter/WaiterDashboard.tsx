@@ -102,13 +102,15 @@ export function WaiterDashboard({
     [orders]
   );
 
-  // All pending orders from customer QR menu and direct entry
-  const newOrders = waiterOrders.filter((order) => order.status === 'pending');
-  const pendingCustomerMenuOrders = newOrders; // Show all pending orders to waiters
-  const pendingWaiterOrders = newOrders.filter((order) => order.assignedWaiterId === waiter.id);
+  // Customer menu orders (from QR menu - no assignedWaiterId yet)
+  const allPendingOrders = waiterOrders.filter((order) => order.status === 'pending');
+  const pendingCustomerMenuOrders = allPendingOrders.filter((order) => !order.assignedWaiterId);
+  // Waiter-created orders (assigned to this waiter)
+  const pendingWaiterOrders = allPendingOrders.filter((order) => order.assignedWaiterId === waiter.id);
+  
   const kitchenOrders = waiterOrders.filter((order) => ['verified', 'preparing'].includes(order.status));
   const readyOrders = waiterOrders.filter((order) => order.status === 'ready');
-  // Filter served orders from ALL orders (not waiterOrders which already excludes 'served')
+  // Filter served orders from ALL orders
   const completedOrders = orders.filter((order) => order.status === 'served');
 
   const allWaiterCalls = useMemo(() => {
@@ -352,10 +354,16 @@ export function WaiterDashboard({
                 Overview
               </button>
               <button
+                onClick={() => setActiveTab('new')}
+                className={`px-4 py-2 rounded-full ${activeTab === 'new' ? 'bg-amber-500 text-slate-950' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+              >
+                New ({pendingCustomerMenuOrders.length})
+              </button>
+              <button
                 onClick={() => setActiveTab('pending')}
                 className={`px-4 py-2 rounded-full ${activeTab === 'pending' ? 'bg-amber-500 text-slate-950' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
               >
-                Pending ({newOrders.length})
+                Pending ({pendingWaiterOrders.length})
               </button>
               <button
                 onClick={() => setActiveTab('kitchen')}
@@ -431,27 +439,63 @@ export function WaiterDashboard({
                 </motion.div>
               )}
 
+              {activeTab === 'new' && (
+                <motion.div key="new" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -16 }} className="space-y-4">
+                  <div className="rounded-3xl border border-blue-500/20 bg-blue-500/5 p-6">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="rounded-2xl bg-blue-500/10 p-3">
+                        <QrCodeIcon className="w-6 h-6 text-blue-300" />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-semibold text-white">New Customer Orders</h3>
+                        <p className="text-sm text-slate-400">Orders from QR menu scans awaiting verification</p>
+                      </div>
+                    </div>
+                    {pendingCustomerMenuOrders.length === 0 ? (
+                      <EmptyState
+                        icon={<ClipboardListIcon className="w-8 h-8" />}
+                        title="No new orders"
+                        description="Customer orders from QR menu scans will appear here for verification."
+                      />
+                    ) : (
+                      <div className="space-y-4">
+                        {pendingCustomerMenuOrders.map((order) => (
+                          <OrderCard
+                            key={order.id}
+                            order={order}
+                            onViewDetails={setSelectedOrder}
+                            onApprove={handleApprove}
+                            onReject={handleReject}
+                            onPrintReceipt={handlePrintReceipt}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
+              )}
+
               {activeTab === 'pending' && (
                 <motion.div key="pending" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -16 }} className="space-y-4">
-                  {newOrders.length === 0 ? (
+                  {pendingWaiterOrders.length === 0 ? (
                     <EmptyState
                       icon={<ClipboardListIcon className="w-8 h-8" />}
                       title="No pending orders"
-                      description="New orders from customer QR menu scans will appear here automatically for approval."
+                      description="Direct waiter-created orders that need approval."
                     />
                   ) : (
                     <div className="space-y-6">
-                      {pendingCustomerMenuOrders.length > 0 && (
+                      {pendingWaiterOrders.length > 0 && (
                         <div className="rounded-3xl border border-slate-700 bg-slate-900/80 p-5">
                           <div className="flex items-center justify-between gap-4 mb-4">
                             <div>
-                              <h3 className="text-lg font-semibold text-white">Customer QR Orders</h3>
-                              <p className="text-sm text-slate-400">Orders placed from the guest-facing QR menu appear here first.</p>
+                              <h3 className="text-lg font-semibold text-white">Direct Orders</h3>
+                              <p className="text-sm text-slate-400">Orders created directly by waiters.</p>
                             </div>
-                            <span className="rounded-full bg-blue-500/15 text-blue-200 px-3 py-1 text-xs font-semibold">{pendingCustomerMenuOrders.length} QR orders</span>
+                            <span className="rounded-full bg-green-500/15 text-green-200 px-3 py-1 text-xs font-semibold">{pendingWaiterOrders.length} orders</span>
                           </div>
                           <div className="space-y-4">
-                            {pendingCustomerMenuOrders.map((order) => (
+                            {pendingWaiterOrders.map((order) => (
                               <OrderCard
                                 key={order.id}
                                 order={order}
