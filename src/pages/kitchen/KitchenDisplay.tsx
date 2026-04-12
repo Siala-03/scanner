@@ -225,34 +225,119 @@ export function KitchenDisplay({ onLogout, restaurantId, restaurantName }: { onL
   }, [restaurantId, joinOrders, joinRestaurant, socket, handleKitchenSocketUpdate]);
 
   const handlePrintReceipt = (order: KitchenOrder) => {
+    const now = new Date();
+    const printedAt = now.toLocaleString('en-US', {
+      year: 'numeric', month: 'short', day: 'numeric',
+      hour: '2-digit', minute: '2-digit', second: '2-digit'
+    });
+    const placedAt = new Date(order.createdAt).toLocaleString('en-US', {
+      hour: '2-digit', minute: '2-digit', second: '2-digit'
+    });
+    const waitMinutes = Math.floor((now.getTime() - new Date(order.createdAt).getTime()) / 60000);
+    const urgencyLabel = waitMinutes > 15 ? '⚠️ URGENT' : waitMinutes > 8 ? '⏰ SOON' : '✓ ON TIME';
+
     const html = `<!DOCTYPE html>
       <html>
         <head>
-          <title>Kitchen Ticket - ${order.orderNumber}</title>
+          <title>Kitchen Ticket #${order.orderNumber}</title>
           <style>
-            body { font-family: Arial, sans-serif; padding: 16px; color: #111; background: #fff; }
-            h1, h2, p { margin: 0 0 10px; }
-            .item { margin-bottom: 8px; }
-            .note { color: #555; font-size: 0.95rem; }
-            .header { margin-bottom: 16px; border-bottom: 1px solid #ddd; padding-bottom: 12px; }
+            @media print { @page { margin: 8mm; } }
+            * { box-sizing: border-box; }
+            body {
+              font-family: 'Courier New', Courier, monospace;
+              padding: 12px;
+              color: #000;
+              background: #fff;
+              max-width: 320px;
+              margin: 0 auto;
+              font-size: 13px;
+            }
+            .center { text-align: center; }
+            .bold { font-weight: bold; }
+            .divider { border: none; border-top: 1px dashed #000; margin: 8px 0; }
+            .divider-solid { border: none; border-top: 2px solid #000; margin: 8px 0; }
+            .row { display: flex; justify-content: space-between; margin: 2px 0; }
+            .restaurant { font-size: 16px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; }
+            .ticket-title { font-size: 14px; font-weight: bold; margin: 4px 0; }
+            .order-num { font-size: 22px; font-weight: bold; }
+            .table-num { font-size: 18px; }
+            .status-badge {
+              display: inline-block;
+              padding: 3px 10px;
+              border: 2px solid #000;
+              font-weight: bold;
+              font-size: 13px;
+              letter-spacing: 1px;
+              margin: 4px 0;
+            }
+            .item-row { margin: 5px 0; }
+            .item-qty { font-weight: bold; font-size: 15px; min-width: 28px; display: inline-block; }
+            .item-name { font-size: 14px; font-weight: bold; }
+            .item-note { font-size: 11px; margin-left: 28px; color: #444; font-style: italic; }
+            .special-note {
+              border: 2px solid #000;
+              padding: 6px;
+              margin: 8px 0;
+              font-weight: bold;
+              font-size: 12px;
+            }
+            .loyalty-note {
+              border: 1px dashed #000;
+              padding: 4px;
+              margin: 6px 0;
+              font-size: 11px;
+            }
+            .urgency { font-weight: bold; font-size: 12px; }
+            .footer { font-size: 10px; color: #666; margin-top: 10px; }
           </style>
         </head>
         <body>
-          <div class="header">
-            <h1>${restaurantName || 'Kitchen'}</h1>
-            <h2>Order ${order.orderNumber}</h2>
-            <p>Table ${order.tableNumber} • Status: ${order.status.toUpperCase()}</p>
+          <div class="center">
+            <div class="restaurant">${restaurantName || 'KITCHEN'}</div>
+            <div class="ticket-title">★ KITCHEN TICKET ★</div>
           </div>
-          <div>
-            ${order.items.map((item) => `<div class="item"><strong>${item.quantity}x</strong> ${item.name}${item.notes ? ` <span class="note">(${item.notes})</span>` : ''}</div>`).join('')}
+          <hr class="divider-solid" />
+
+          <div class="center">
+            <div class="order-num">Order #${order.orderNumber}</div>
+            <div class="table-num">TABLE ${order.tableNumber}</div>
+            <div class="status-badge">${order.status.toUpperCase()}</div>
           </div>
-          ${order.notes ? `<div class="note"><strong>Order Notes:</strong> ${order.notes}</div>` : ''}
-          <div style="margin-top:24px;"><small>Printed from Kitchen display</small></div>
+
+          <hr class="divider" />
+          <div class="row"><span>Placed:</span><span>${placedAt}</span></div>
+          <div class="row"><span>Wait time:</span><span>${waitMinutes} min <span class="urgency">${urgencyLabel}</span></span></div>
+          <hr class="divider" />
+
+          ${order.notes ? `<div class="special-note">⚠️ SPECIAL REQUEST: ${order.notes}</div>` : ''}
+
+          <div style="margin: 6px 0;">
+            ${order.items.map((item) => `
+              <div class="item-row">
+                <span class="item-qty">${item.quantity}x</span>
+                <span class="item-name">${item.name}</span>
+                ${item.notes ? `<div class="item-note">→ ${item.notes}</div>` : ''}
+              </div>
+            `).join('')}
+          </div>
+
+          ${order.loyaltyDiscount && order.loyaltyDiscount > 0 ? `
+            <div class="loyalty-note">🎁 LOYALTY DISCOUNT: -$${(order.loyaltyDiscount / 100).toFixed(2)}</div>
+          ` : ''}
+          ${order.loyaltyFreeItemId ? `
+            <div class="loyalty-note">🎁 FREE ITEM: ${getMenuItemName(order.loyaltyFreeItemId)}</div>
+          ` : ''}
+
+          <hr class="divider-solid" />
+          <div class="center footer">
+            <div>Printed: ${printedAt}</div>
+            <div>Kitchen Display System</div>
+          </div>
           <script>window.onload = function() { window.print(); }</script>
         </body>
       </html>`;
 
-    const printWindow = window.open('', '_blank', 'width=500,height=700');
+    const printWindow = window.open('', '_blank', 'width=400,height=700');
     if (printWindow) {
       printWindow.document.open();
       printWindow.document.write(html);

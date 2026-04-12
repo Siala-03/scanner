@@ -135,6 +135,23 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
   } = useInventoryData();
   const menuCategories = useMemo(() => Array.from(new Set(menuItems.map((m) => m.category))), [menuItems]);
   const isManager = role === 'manager';
+
+  // Calculate pendingPO stats from loaded purchase orders
+  const pendingPOCount = useMemo(() => purchaseOrders.filter(po => !['received', 'cancelled'].includes(po.status)).length, [purchaseOrders]);
+  const pendingPOValue = useMemo(() => purchaseOrders.filter(po => !['received', 'cancelled'].includes(po.status)).reduce((sum, po) => sum + (po.totalCost || 0), 0), [purchaseOrders]);
+
+  // Combined item list for PO creation: menu items + standalone inventory items
+  const allInventoryItems = useMemo(() => {
+    const menuItemSet = new Set(menuItems.map(m => m.id));
+    const nonMenuItems = inventory
+      .map(rec => normalizeInventoryRecord(rec))
+      .filter(rec => !menuItemSet.has(rec.menuItemId))
+      .map(rec => ({ id: rec.menuItemId, name: rec.menuItemId, isMenuItem: false }));
+    return [
+      ...menuItems.map(m => ({ id: m.id, name: m.name, isMenuItem: true })),
+      ...nonMenuItems,
+    ];
+  }, [menuItems, inventory]);
   const [activeTab, setActiveTab] = useState<Tab>('overview');
   const [showAddInventoryModal, setShowAddInventoryModal] = useState(false);
   const [newInventoryItemName, setNewInventoryItemName] = useState('');
@@ -529,11 +546,11 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
   const handleRecordWaste = async () => {
     if (!wasteForm.menuItemId || wasteForm.qty <= 0) return;
     const mi = menuItems.find((m) => m.id === wasteForm.menuItemId);
-    if (!mi) return;
+    const itemName = mi?.name ?? wasteForm.menuItemId;
     try {
       await apiRecordWaste({
         menu_item_id: wasteForm.menuItemId,
-        menu_item_name: mi.name,
+        menu_item_name: itemName,
         qty: wasteForm.qty,
         unit_cost: inventoryMap[wasteForm.menuItemId]?.unitCost ?? 0,
         reason: wasteForm.reason,
@@ -1085,8 +1102,8 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
               {[
                 { label: 'Total POs', value: purchaseOrders.length, color: 'text-white' },
-                { label: 'Pending', value: analytics.pendingPOCount, color: 'text-amber-400' },
-                { label: 'Pending Value', value: formatPrice(analytics.pendingPOValue), color: 'text-amber-400' },
+                { label: 'Active POs', value: pendingPOCount, color: 'text-amber-400' },
+                { label: 'Active Value', value: formatPrice(pendingPOValue), color: 'text-amber-400' },
                 { label: 'Received This Month', value: purchaseOrders.filter((p) => p.status === 'received').length, color: 'text-emerald-400' },
               ].map((kpi) => (
                 <Card key={kpi.label} className="bg-slate-800/50 border border-slate-700/50">
@@ -1141,6 +1158,14 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                           className="mt-2 px-3 py-1 rounded-lg bg-emerald-500/20 text-emerald-400 text-xs font-medium hover:bg-emerald-500/30 transition"
                         >
                           Receive Delivery
+                        </button>
+                      )}
+                      {isManager && po.status === 'sent' && (
+                        <button
+                          onClick={async (e) => { e.stopPropagation(); try { await apiUpdatePurchaseOrder(po.id, { status: 'confirmed' }); await refresh(); alert('Purchase order confirmed'); } catch (err) { alert(`Failed: ${err instanceof Error ? err.message : 'Unknown error'}`); } }}
+                          className="mt-1 px-3 py-1 rounded-lg bg-amber-500/20 text-amber-400 text-xs font-medium hover:bg-amber-500/30 transition"
+                        >
+                          Confirm PO
                         </button>
                       )}
                       {isManager && po.status === 'draft' && (
@@ -1337,6 +1362,15 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
               </div>
               <div className="flex justify-between items-center pt-3 border-t border-slate-700/30">
                 <p className="text-slate-400 text-sm">Total: {formatPrice(selectedPO.totalCost)}</p>
+                <div className="flex gap-2">
+                {isManager && selectedPO.status === 'sent' && (
+                  <button
+                    onClick={async () => { try { await apiUpdatePurchaseOrder(selectedPO.id, { status: 'confirmed' }); await refresh(); setSelectedPO(null); } catch (err) { alert(`Failed: ${err instanceof Error ? err.message : 'Unknown error'}`); } }}
+                    className="px-3 py-1 rounded-lg bg-amber-500/20 text-amber-400 text-xs font-medium hover:bg-amber-500/30 transition"
+                  >
+                    Confirm PO
+                  </button>
+                )}
                 {isManager && (selectedPO.status === 'confirmed' || selectedPO.status === 'sent' || selectedPO.status === 'partial') && (
                   <button
                     onClick={() => {
@@ -1473,9 +1507,18 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                     className="px-3 py-2 rounded-lg bg-slate-900 border border-slate-600 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
                   >
                     <option value="">Select Item</option>
-                    {menuItems.map((m) => (
-                      <option key={m.id} value={m.id}>{m.name}</option>
-                    ))}
+                    <optgroup label="Menu Items">
+                      {menuItems.map((m) => (
+                        <option key={m.id} value={m.id}>{m.name}</option>
+                      ))}
+                    </optgroup>
+                    {allInventoryItems.filter(i => !i.isMenuItem).length > 0 && (
+                      <optgroup label="Other Inventory Items">
+                        {allInventoryItems.filter(i => !i.isMenuItem).map((item) => (
+                          <option key={item.id} value={item.id}>{item.name}</option>
+                        ))}
+                      </optgroup>
+                    )}
                   </select>
                   <input
                     type="number"
@@ -1762,9 +1805,18 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                 className="px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
               >
                 <option value="">Select Item</option>
-                {menuItems.map((m) => (
-                  <option key={m.id} value={m.id}>{m.name}</option>
-                ))}
+                <optgroup label="Menu Items">
+                  {menuItems.map((m) => (
+                    <option key={m.id} value={m.id}>{m.name}</option>
+                  ))}
+                </optgroup>
+                {allInventoryItems.filter(i => !i.isMenuItem).length > 0 && (
+                  <optgroup label="Other Items">
+                    {allInventoryItems.filter(i => !i.isMenuItem).map((item) => (
+                      <option key={item.id} value={item.id}>{item.name}</option>
+                    ))}
+                  </optgroup>
+                )}
               </select>
               <input
                 type="number"

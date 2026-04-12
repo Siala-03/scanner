@@ -32,7 +32,7 @@ export function SupervisorDashboard({ onManageMenu, onLogout }: SupervisorDashbo
   const deliveryOrders = useMemo(() => {
     return orders.filter(
       (order) =>
-        order.deliveryProvider === 'VubaVuba' &&
+        order.deliveryProvider?.toLowerCase() === 'vubavuba' &&
         (deliveryStatusFilter === 'all' || order.deliveryStatus === deliveryStatusFilter)
     );
   }, [orders, deliveryStatusFilter]);

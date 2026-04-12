@@ -296,14 +296,14 @@ export default function ManagerExpenseApproval() {
             <tr key={expense.id} className="hover:bg-slate-700/50 border-t border-slate-700">
               <td className="px-3 md:px-6 py-4 text-sm md:text-base text-slate-100">{expense.description}</td>
               <td className="px-3 md:px-6 py-4 text-sm md:text-base text-slate-100">
-                {expense.category?.name || 'N/A'}
+                {expense.category?.name || categories.find(c => c.id === expense.categoryId)?.name || expense.categoryId || 'Uncategorized'}
               </td>
               <td className="px-3 md:px-6 py-4 text-sm md:text-base font-medium text-slate-100">
                 {expense.currency} {Number(expense.amount).toFixed(2)}
               </td>
               <td className="px-3 md:px-6 py-4 text-sm md:text-base text-slate-100">
                 <span className="inline-block px-2 py-1 bg-amber-900/40 text-amber-200 rounded text-xs border border-amber-700">
-                  {expense.createdByRole}
+                  {expense.createdByRole || expense.createdBy?.split('@')[0] || 'Staff'}
                 </span>
               </td>
               <td className="px-3 md:px-6 py-4 space-x-2">
@@ -599,7 +599,9 @@ export default function ManagerExpenseApproval() {
                 </div>
                 <div>
                   <p className="text-sm text-slate-400">Category</p>
-                  <p className="font-medium text-slate-100">{selectedExpense.category?.name}</p>
+                  <p className="font-medium text-slate-100">
+                    {selectedExpense.category?.name || categories.find(c => c.id === selectedExpense.categoryId)?.name || selectedExpense.categoryId || 'Uncategorized'}
+                  </p>
                 </div>
                 <div>
                   <p className="text-sm text-slate-400">Amount</p>
@@ -611,7 +613,7 @@ export default function ManagerExpenseApproval() {
                 <div>
                   <p className="text-sm text-slate-400">Created By</p>
                   <p className="font-medium text-slate-100">
-                    {selectedExpense.createdByRole}
+                    {selectedExpense.createdByRole || selectedExpense.createdBy?.split('@')[0] || 'Staff'}
                   </p>
                 </div>
               </div>

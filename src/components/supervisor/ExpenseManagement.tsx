@@ -477,10 +477,10 @@ export default function SupervisorExpenseManagement() {
           </thead>
           <tbody className="divide-y">
             {expenses.map(expense => (
-              <tr key={expense.id} className="hover:bg-gray-50">
+              <tr key={expense.id} className="hover:bg-slate-700/50 text-slate-200">
                 <td className="px-6 py-4 text-sm">{expense.description}</td>
                 <td className="px-6 py-4 text-sm">
-                  {expense.category?.name || 'N/A'}
+                  {expense.category?.name || categories.find(c => c.id === expense.categoryId)?.name || expense.categoryId || 'Uncategorized'}
                 </td>
                 <td className="px-6 py-4 text-sm font-medium">
                   {expense.currency} {Number(expense.amount).toFixed(2)}
@@ -539,7 +539,9 @@ export default function SupervisorExpenseManagement() {
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Category</p>
-                  <p className="font-medium">{selectedExpense.category?.name}</p>
+                  <p className="font-medium">
+                    {selectedExpense.category?.name || categories.find(c => c.id === selectedExpense.categoryId)?.name || selectedExpense.categoryId || 'Uncategorized'}
+                  </p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Amount</p>

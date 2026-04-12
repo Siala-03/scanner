@@ -19,6 +19,7 @@ import { StaffManagement } from './pages/manager/StaffManagement';
 import { AnalyticsPage } from './pages/manager/AnalyticsPage';
 import { QRCodeGenerator } from './pages/manager/QRCodeGenerator';
 import CreditManagement from './pages/manager/CreditManagement';
+import { LoyaltyManagement } from './pages/manager/LoyaltyManagement';
 import ExpenseApproval from './components/manager/ExpenseApproval';
 import SupervisorExpenseManagement from './components/supervisor/ExpenseManagement';
 import { InventoryManagement } from './pages/shared/InventoryManagement';
@@ -35,7 +36,7 @@ import { fetchRestaurantPublic } from './api/restaurants';
 const DEFAULT_RESTAURANT_ID = 'default_restaurant';
 
 type UserRole = 'customer' | 'waiter' | 'supervisor' | 'manager' | 'kitchen' | 'superadmin' | 'supplier' | null;
-type ManagerPage = 'dashboard' | 'menu' | 'staff' | 'analytics' | 'performance' | 'qrcodes' | 'inventory' | 'history' | 'expenses' | 'credit';
+type ManagerPage = 'dashboard' | 'menu' | 'staff' | 'analytics' | 'performance' | 'qrcodes' | 'inventory' | 'history' | 'expenses' | 'credit' | 'loyalty';
 type SupervisorPage = 'dashboard' | 'revenue' | 'staff' | 'qrcodes' | 'inventory' | 'menu' | 'history' | 'expenses';
 export function App() {
   const [selectedRole, setSelectedRole] = useState<UserRole>(null);
@@ -627,32 +628,40 @@ export function App() {
           </div>
         </div>
 
-        <div className="max-w-6xl mx-auto px-4 py-6">
-          <div className="flex flex-wrap items-center gap-2 mb-4">
-            {(
-              [
-                { id: 'dashboard', label: 'Dashboard' },
-                { id: 'inventory', label: 'Inventory' },
-                { id: 'menu', label: 'Manage Menu' },
-                { id: 'qrcodes', label: 'QR Codes' },
-                { id: 'history', label: 'Order History' },
-                { id: 'analytics', label: 'Analytics' },
-                { id: 'staff', label: 'Staff' },
-                { id: 'expenses', label: 'Expenses' },
-                { id: 'credit', label: 'Credit' },
-              ] as Array<{ id: ManagerPage; label: string }>
-            ).map((item) => (
-              <button
-                key={item.id}
-                onClick={() => setManagerPage(item.id)}
-                className={`px-3 py-2 rounded-full text-xs font-semibold transition ${managerPage === item.id ? 'bg-amber-500 text-slate-900' : 'bg-slate-700 text-slate-200 hover:bg-slate-600'}`}
-              >
-                {item.label}
-              </button>
-            ))}
-          </div>
+        <div className="flex">
+          {/* Side Menu */}
+          <aside className="w-56 min-h-[calc(100vh-73px)] bg-slate-800 border-r border-slate-700 p-4">
+            <nav className="space-y-1">
+              {(
+                [
+                  { id: 'dashboard', label: 'Dashboard' },
+                  { id: 'inventory', label: 'Inventory' },
+                  { id: 'menu', label: 'Manage Menu' },
+                  { id: 'qrcodes', label: 'QR Codes' },
+                  { id: 'history', label: 'Order History' },
+                  { id: 'analytics', label: 'Analytics' },
+                  { id: 'staff', label: 'Staff' },
+                  { id: 'expenses', label: 'Expenses' },
+                  { id: 'credit', label: 'Credit' },
+                  { id: 'loyalty', label: 'Loyalty & SMS' },
+                ] as Array<{ id: ManagerPage; label: string }>
+              ).map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => setManagerPage(item.id)}
+                  className={`w-full px-4 py-3 text-left text-sm font-medium rounded-lg transition ${
+                    managerPage === item.id
+                      ? 'bg-amber-500 text-slate-900'
+                      : 'text-slate-300 hover:bg-slate-700 hover:text-white'
+                  }`}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </nav>
+          </aside>
 
-          <main className="bg-slate-900 text-slate-100 rounded-none p-0 min-h-[70vh] min-w-0 overflow-x-auto">
+          <main className="flex-1 bg-slate-900 text-slate-100 p-6 min-h-[calc(100vh-73px)] overflow-x-auto">
             {managerPage === 'dashboard' &&
               <ManagerDashboard
                 onNavigate={(page) => setManagerPage(page as ManagerPage)}
@@ -681,6 +690,7 @@ export function App() {
             )}
             {managerPage === 'expenses' && <ExpenseApproval />}
             {managerPage === 'credit' && <CreditManagement />}
+            {managerPage === 'loyalty' && <LoyaltyManagement />}
             {managerPage === 'history' && <OrderHistoryPage onBack={() => setManagerPage('dashboard')} existingOrders={orders} />}
           </main>
         </div>

@@ -11,8 +11,10 @@ import {
   UsersIcon,
   ClockIcon,
   TrendingUpIcon,
-  BellIcon
+  BellIcon,
+  DollarSignIcon
 } from 'lucide-react';
+import { formatPrice } from '../../utils/currency';
 import { Order, Staff, CartItem } from '../../types';
 import { Card } from '../../components/ui/Card';
 import { EmptyState } from '../../components/ui/EmptyState';
@@ -110,7 +112,8 @@ export function WaiterDashboard({
   const pendingWaiterOrders = newOrders.filter((order) => order.assignedWaiterId === waiter.id);
   const kitchenOrders = waiterOrders.filter((order) => ['verified', 'preparing'].includes(order.status));
   const readyOrders = waiterOrders.filter((order) => order.status === 'ready');
-  const completedOrders = waiterOrders.filter((order) => order.status === 'served');
+  // Filter served orders from ALL orders (not waiterOrders which already excludes 'served')
+  const completedOrders = orders.filter((order) => order.status === 'served');
 
   const allWaiterCalls = useMemo(() => {
     const map = new Map<number, Date>();
@@ -129,11 +132,16 @@ export function WaiterDashboard({
     ? Math.round((waiterReviews.reduce((sum, review) => sum + review.rating, 0) / waiterReviews.length) * 10) / 10
     : null;
 
-  // Calculate customer menu order stats
+  // Calculate customer menu order stats (all orders, not just active ones)
   const customerMenuOrderCount = customerMenuOrders.length;
-  const recentCustomerOrders = customerMenuOrders.filter(order =>
+  const recentCustomerOrders = orders.filter(order =>
     new Date(order.createdAt).getTime() > Date.now() - 24 * 60 * 60 * 1000 // Last 24 hours
   ).length;
+
+  // Today's revenue from served orders
+  const todaysRevenue = orders
+    .filter(o => o.status === 'served' && new Date(o.createdAt).toDateString() === new Date().toDateString())
+    .reduce((sum, o) => sum + (o.total || 0), 0);
 
   const handleApprove = (order: Order) => {
     const nextStatus = order.requiresKitchen ? 'verified' : 'ready';
@@ -318,6 +326,14 @@ export function WaiterDashboard({
               </div>
               <p className="text-3xl font-bold text-white">{completedOrders.length}</p>
               <p className="text-xs text-slate-500">Completed today</p>
+            </Card>
+            <Card className="bg-slate-800 border border-slate-700 p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <DollarSignIcon className="w-4 h-4 text-emerald-400" />
+                <p className="text-sm text-slate-400">Revenue</p>
+              </div>
+              <p className="text-2xl font-bold text-white">{formatPrice(todaysRevenue)}</p>
+              <p className="text-xs text-slate-500">Today's served orders</p>
             </Card>
           </div>
         </div>
