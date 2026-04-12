@@ -169,7 +169,10 @@ router.get('/', async (req: Request, res: Response) => {
 // GET kitchen view - orders that need to be prepared
 router.get('/kitchen', async (req: Request, res: Response) => {
   try {
-    const restaurantId = (req.query.restaurantId as string) || 'default_restaurant';
+    const restaurantId = req.query.restaurantId as string;
+    if (!restaurantId) {
+      return res.status(400).json({ error: 'restaurantId is required' });
+    }
 
     const result = await pool.query(
       `SELECT * FROM orders

@@ -129,6 +129,7 @@ export function WaiterDashboard({
     : null;
 
   // Calculate customer menu order stats (all orders, not just active ones)
+  const customerMenuOrders = orders.filter(o => !o.assignedWaiterId || o.status === 'pending');
   const customerMenuOrderCount = customerMenuOrders.length;
   const recentCustomerOrders = orders.filter(order =>
     new Date(order.createdAt).getTime() > Date.now() - 24 * 60 * 60 * 1000 // Last 24 hours
