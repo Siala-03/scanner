@@ -126,11 +126,21 @@ export function useOrders(): UseOrdersReturn {
 
   useEffect(() => {
     async function loadFromBackend() {
-      console.log('[useOrders] Loading orders for restaurantId:', restaurantId);
+      // Get restaurantId from auth user if available, otherwise use localStorage
+      let waiterRestaurantId = restaurantId;
+      if (!waiterRestaurantId) {
+        const authUser = localStorage.getItem('authUser');
+        if (authUser) {
+          try {
+            const parsed = JSON.parse(authUser);
+            waiterRestaurantId = parsed.restaurantId;
+          } catch { /* ignore */ }
+        }
+      }
+      console.log('[useOrders] Loading orders for waiter, restaurantId:', waiterRestaurantId);
       try {
-        // Fetch ALL orders without filtering by restaurantId to ensure customer orders appear
-        const backendOrders = await OfflineAwareAPI.fetchOrders('all', undefined);
-        console.log('[useOrders] Loaded orders:', backendOrders.length);
+        const backendOrders = await OfflineAwareAPI.fetchOrders('all', waiterRestaurantId);
+        console.log('[useOrders] Loaded orders:', backendOrders.length, 'for restaurant:', waiterRestaurantId);
         setOrders(backendOrders);
       } catch (e) {
         console.warn('Failed to load orders from backend', e);
