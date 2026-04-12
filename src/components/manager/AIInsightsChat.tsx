@@ -149,7 +149,7 @@ export function AIInsightsChat({ alerts }: AIInsightsChatProps) {
         className="p-4 bg-blue-600 hover:bg-blue-500 text-white rounded-full shadow-xl shadow-blue-900/40 transition-all transform hover:scale-105 active:scale-95 flex items-center gap-2 group"
       >
         <Sparkles className={`w-6 h-6 ${isOpen ? 'rotate-12' : ''} transition-transform`} />
-        {!isOpen && <span className="font-semibold text-sm pr-1">AI Analyst</span>}
+        {!isOpen && <span className="font-semibold text-sm pr-1">Servv IQ</span>}
       </button>
     </div>
   );

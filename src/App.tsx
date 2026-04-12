@@ -598,7 +598,7 @@ export function App() {
       <div className="min-h-screen bg-slate-900 text-slate-100">
         {/* Header */}
         <div className="sticky top-0 z-50 bg-slate-800/95 border-b border-slate-700">
-          <div className="max-w-6xl mx-auto flex items-center justify-between gap-3 px-4 py-3">
+          <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 px-4 py-3">
             <div className="flex items-center gap-3">
               <button
                 onClick={handleBack}
@@ -608,9 +608,9 @@ export function App() {
                 <ArrowLeftIcon className="w-5 h-5" />
               </button>
               <div>
-                <div className="text-sm text-slate-300 uppercase tracking-wider">Manager Portal</div>
-                <div className="text-lg font-semibold">Welcome, {authUser.name}</div>
-                <div className="text-sm text-slate-400 mt-1">{restaurantName || 'Restaurant'}</div>
+                <div className="text-xs sm:text-sm text-slate-300 uppercase tracking-wider">Manager Portal</div>
+                <div className="text-base sm:text-lg font-semibold">Welcome, {authUser.name}</div>
+                <div className="text-xs sm:text-sm text-slate-400">{restaurantName || 'Restaurant'}</div>
               </div>
             </div>
             <button
@@ -623,10 +623,11 @@ export function App() {
           </div>
         </div>
 
-        <div className="flex">
-          {/* Side Menu */}
-          <aside className="w-56 min-h-[calc(100vh-73px)] bg-slate-800 border-r border-slate-700 p-4">
-            <nav className="space-y-1">
+        <div className="flex flex-col lg:flex-row">
+          {/* Side Menu - responsive: horizontal scroll on mobile/tablet, vertical on desktop */}
+          <aside className="w-full lg:w-56 lg:min-h-[calc(100vh-73px)] bg-slate-800 border-r border-slate-700 p-4">
+            {/* Mobile/Tablet: horizontal scrollable menu */}
+            <nav className="flex lg:flex-col overflow-x-auto gap-1 lg:space-y-1 pb-2 lg:pb-0">
               {(
                 [
                   { id: 'dashboard', label: 'Dashboard' },
@@ -644,7 +645,7 @@ export function App() {
                 <button
                   key={item.id}
                   onClick={() => setManagerPage(item.id)}
-                  className={`w-full px-4 py-3 text-left text-sm font-medium rounded-lg transition ${
+                  className={`whitespace-nowrap px-4 py-2 text-left text-sm font-medium rounded-lg transition flex-shrink-0 ${
                     managerPage === item.id
                       ? 'bg-amber-500 text-slate-900'
                       : 'text-slate-300 hover:bg-slate-700 hover:text-white'
@@ -656,7 +657,7 @@ export function App() {
             </nav>
           </aside>
 
-          <main className="flex-1 bg-slate-900 text-slate-100 p-6 min-h-[calc(100vh-73px)] overflow-x-auto">
+          <main className="flex-1 bg-slate-900 text-slate-100 p-4 lg:p-6 min-h-[calc(100vh-73px)] overflow-x-auto">
             {managerPage === 'dashboard' &&
               <ManagerDashboard
                 onNavigate={(page) => setManagerPage(page as ManagerPage)}
