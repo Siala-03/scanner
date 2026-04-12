@@ -126,10 +126,11 @@ export function useOrders(): UseOrdersReturn {
 
   useEffect(() => {
     async function loadFromBackend() {
-      console.log('[useOrders] Loading orders (no filter)...');
+      console.log('[useOrders] Loading orders for restaurantId:', restaurantId);
       try {
-        const backendOrders = await OfflineAwareAPI.fetchOrders('all', undefined);
-        console.log('[useOrders] Loaded ALL orders from backend:', backendOrders.length, 'orders:', backendOrders.map(o => ({ id: o.id, status: o.status, tableNumber: o.tableNumber, restaurantId: o.restaurantId })));
+        // Pass restaurantId so backend uses the correct restaurant (not default_restaurant)
+        const backendOrders = await OfflineAwareAPI.fetchOrders('all', restaurantId);
+        console.log('[useOrders] Loaded orders from backend:', backendOrders.length);
         setOrders(backendOrders);
       } catch (e) {
         console.warn('Failed to load orders from backend', e);
@@ -144,22 +145,22 @@ export function useOrders(): UseOrdersReturn {
 
     const handleOrderUpdate = (data: any) => {
       const updatedOrder = normalizeOrderPayload(data?.order);
-      console.log('[useOrders] Socket order:update received', {
-        type: data?.type,
-        orderId: updatedOrder?.id,
-        orderRestaurant: updatedOrder?.restaurantId,
-        currentRestaurant: restaurantId,
-        orderNumber: updatedOrder?.orderNumber,
-        status: updatedOrder?.status,
-        matches: updatedOrder?.restaurantId === restaurantId
-      });
 
       if (!updatedOrder) {
-        console.log('[useOrders] Skipping order update - missing order payload');
         return;
       }
-      if (updatedOrder.restaurantId !== restaurantId) {
-        console.log('[useOrders] Skipping order update - restaurantId mismatch');
+
+      // Accept orders that match our restaurant, OR orders with no restaurantId,
+      // OR orders from 'default_restaurant' (customer QR scans without embedded restaurantId)
+      const orderRestaurant = updatedOrder.restaurantId;
+      const isMatch =
+        !orderRestaurant ||
+        orderRestaurant === restaurantId ||
+        orderRestaurant === 'default_restaurant' ||
+        restaurantId === 'default_restaurant';
+
+      if (!isMatch) {
+        console.log('[useOrders] Skipping order update - restaurantId mismatch', orderRestaurant, 'vs', restaurantId);
         return;
       }
 

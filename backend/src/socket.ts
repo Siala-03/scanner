@@ -112,7 +112,7 @@ export function emitSupplierUpdate(data: {
   }
 }
 
-// Order events (for Kitchen Display System)
+// Order events (for Kitchen Display System and Waiter Dashboard)
 export function emitOrderUpdate(data: {
   type: 'create' | 'update' | 'status';
   order?: unknown;
@@ -124,12 +124,18 @@ export function emitOrderUpdate(data: {
       order: data.order ? toCamelCase(data.order) : undefined
     };
 
+    // Emit to all order listeners
     io.to('orders').emit('order:update', payload);
 
+    // Emit to restaurant-specific room
     const restaurantId = (payload.order as any)?.restaurantId || (payload.order as any)?.restaurant_id;
     if (restaurantId) {
       io.to(`restaurant:${restaurantId}`).emit('order:update', payload);
     }
+
+    // Also emit to waiter role room so waiters always get order updates
+    // regardless of which restaurant room they joined
+    io.to('role:waiter').emit('order:update', payload);
   }
 }
 

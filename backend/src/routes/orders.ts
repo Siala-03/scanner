@@ -116,7 +116,21 @@ router.get('/', async (req: Request, res: Response) => {
     const params: unknown[] = [];
     const conditions: string[] = [];
 
-    const resolvedRestaurantId = (restaurantId as string) || 'default_restaurant';
+    // Resolve restaurantId: query param > auth header lookup > default
+    let resolvedRestaurantId = restaurantId as string;
+    if (!resolvedRestaurantId) {
+      const staffId = req.headers['x-staff-id'] as string;
+      if (staffId) {
+        try {
+          const staffResult = await pool.query('SELECT restaurant_id FROM staff WHERE id = $1', [staffId]);
+          if (staffResult.rows.length > 0) {
+            resolvedRestaurantId = staffResult.rows[0].restaurant_id;
+          }
+        } catch (_e) { /* ignore */ }
+      }
+    }
+    resolvedRestaurantId = resolvedRestaurantId || 'default_restaurant';
+
     params.push(resolvedRestaurantId);
     conditions.push(`restaurant_id = $${params.length}`);
 

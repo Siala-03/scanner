@@ -213,9 +213,9 @@ export function WaiterDashboard({
   };
 
   return (
-    <div className="dark min-h-screen bg-slate-900">
+    <div className="dark min-h-screen bg-slate-900 overflow-y-auto">
       {/* Header */}
-      <div className="sticky top-0 z-20 bg-slate-900/95 backdrop-blur-sm border-b border-slate-800 px-4 py-4">
+      <div className="bg-slate-900/95 border-b border-slate-800 px-4 py-4">
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
