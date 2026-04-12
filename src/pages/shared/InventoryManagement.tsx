@@ -1363,25 +1363,26 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
               <div className="flex justify-between items-center pt-3 border-t border-slate-700/30">
                 <p className="text-slate-400 text-sm">Total: {formatPrice(selectedPO.totalCost)}</p>
                 <div className="flex gap-2">
-                {isManager && selectedPO.status === 'sent' && (
-                  <button
-                    onClick={async () => { try { await apiUpdatePurchaseOrder(selectedPO.id, { status: 'confirmed' }); await refresh(); setSelectedPO(null); } catch (err) { alert(`Failed: ${err instanceof Error ? err.message : 'Unknown error'}`); } }}
-                    className="px-3 py-1 rounded-lg bg-amber-500/20 text-amber-400 text-xs font-medium hover:bg-amber-500/30 transition"
-                  >
-                    Confirm PO
-                  </button>
-                )}
-                {isManager && (selectedPO.status === 'confirmed' || selectedPO.status === 'sent' || selectedPO.status === 'partial') && (
-                  <button
-                    onClick={() => {
-                      setReceiveModal(selectedPO);
-                      setReceiveQtys(Object.fromEntries(selectedPO.items.map((i) => [i.menuItemId, i.orderedQty - i.receivedQty])));
-                    }}
-                    className="px-3 py-1 rounded-lg bg-emerald-500/20 text-emerald-400 text-xs font-medium hover:bg-emerald-500/30 transition"
-                  >
-                    Receive Delivery
-                  </button>
-                )}
+                  {isManager && selectedPO.status === 'sent' && (
+                    <button
+                      onClick={async () => { try { await apiUpdatePurchaseOrder(selectedPO.id, { status: 'confirmed' }); await refresh(); setSelectedPO(null); } catch (err) { alert(`Failed: ${err instanceof Error ? err.message : 'Unknown error'}`); } }}
+                      className="px-3 py-1 rounded-lg bg-amber-500/20 text-amber-400 text-xs font-medium hover:bg-amber-500/30 transition"
+                    >
+                      Confirm PO
+                    </button>
+                  )}
+                  {isManager && (selectedPO.status === 'confirmed' || selectedPO.status === 'sent' || selectedPO.status === 'partial') && (
+                    <button
+                      onClick={() => {
+                        setReceiveModal(selectedPO);
+                        setReceiveQtys(Object.fromEntries(selectedPO.items.map((i) => [i.menuItemId, i.orderedQty - i.receivedQty])));
+                      }}
+                      className="px-3 py-1 rounded-lg bg-emerald-500/20 text-emerald-400 text-xs font-medium hover:bg-emerald-500/30 transition"
+                    >
+                      Receive Delivery
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           )}

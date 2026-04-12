@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(powershell -Command \"Get-ChildItem 'c:\\\\Users\\\\PC\\\\Desktop\\\\Projects\\\\scanner' | Select-Object Name\")"
+    ]
+  }
+}
