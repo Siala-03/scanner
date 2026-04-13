@@ -315,6 +315,7 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
         reorderPoint: newInventoryItemReorderPoint,
         reorderQty: newInventoryItemReorderQty,
         unitCost: newInventoryItemUnitCost,
+        unitMeasurement: newInventoryItemUnitMeasurement,
         location: newInventoryItemLocation,
       });
 

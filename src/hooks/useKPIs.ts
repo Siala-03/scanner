@@ -24,7 +24,15 @@ export function useKPIs() {
     refetch();
   }, []);
 
-  const createKPI = async (kpiData: Omit<KPI, 'id' | 'restaurantId' | 'createdBy' | 'createdAt' | 'updatedAt'>) => {
+  const createKPI = async (kpiData: {
+    staffRole: string;
+    name: string;
+    description?: string;
+    metric: string;
+    targetValue: number;
+    period: string;
+    assignedStaffIds?: string[];
+  }) => {
     try {
       const newKPI = await apiCreateKPI(kpiData);
       setKpis(prev => [newKPI, ...prev]);

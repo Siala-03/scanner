@@ -51,14 +51,21 @@ async function computeProgress(
   let currentValue = 0;
 
   if (kpi.metric === 'orders_served' || kpi.metric === 'revenue' || kpi.metric === 'tables_served') {
+    // Try assigned_waiter_id first, fall back to assigned_to (both column names exist)
     const { data: orders } = await supabaseAdmin
       .from('orders')
-      .select('total, table_number, status, assigned_waiter_id, created_at')
+      .select('total, table_number, status, assigned_waiter_id, assigned_to, created_at')
       .eq('restaurant_id', kpi.restaurant_id)
-      .eq('assigned_waiter_id', staffId)
       .eq('status', 'served')
       .gte('created_at', start.toISOString())
       .lte('created_at', end.toISOString());
+
+    // Filter by staffId against both column names
+    if (orders) {
+      orders.splice(0, orders.length, ...orders.filter(
+        (o: any) => o.assigned_waiter_id === staffId || o.assigned_to === staffId
+      ));
+    }
 
     const list = orders || [];
     if (kpi.metric === 'orders_served') {
@@ -244,6 +251,52 @@ export async function unassignKPI(staffId: string, kpiId: number): Promise<void>
     .from('kpis')
     .update({ assigned_staff_ids: ids })
     .eq('id', kpiId);
+}
+
+export async function updateKPI(
+  kpiId: number,
+  kpi: {
+    staffRole?: string;
+    name?: string;
+    description?: string;
+    metric?: string;
+    targetValue?: number;
+    period?: string;
+    assignedStaffIds?: string[];
+  }
+): Promise<KPI> {
+  const payload: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  if (kpi.staffRole !== undefined) payload.staff_role = kpi.staffRole;
+  if (kpi.name !== undefined) payload.name = kpi.name;
+  if (kpi.description !== undefined) payload.description = kpi.description;
+  if (kpi.metric !== undefined) payload.metric = kpi.metric;
+  if (kpi.targetValue !== undefined) payload.target_value = kpi.targetValue;
+  if (kpi.period !== undefined) payload.period = kpi.period;
+  if (kpi.assignedStaffIds !== undefined) payload.assigned_staff_ids = kpi.assignedStaffIds;
+
+  const { data, error } = await supabaseAdmin
+    .from('kpis')
+    .update(payload)
+    .eq('id', kpiId)
+    .select()
+    .single();
+
+  if (error) throw error;
+
+  return {
+    id: data.id,
+    restaurant_id: data.restaurant_id,
+    staff_role: data.staff_role,
+    name: data.name,
+    description: data.description,
+    metric: data.metric,
+    target_value: data.target_value,
+    period: data.period,
+    created_by: data.created_by,
+    created_at: new Date(data.created_at),
+    updated_at: new Date(data.updated_at),
+    assigned_staff_ids: data.assigned_staff_ids || [],
+  } as KPI;
 }
 
 /** Progress is computed live from orders — this is a no-op */

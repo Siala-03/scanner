@@ -14,7 +14,24 @@ import type {
 } from '../types/expenses';
 
 function getRestaurantId(): string | undefined {
-  return localStorage.getItem('restaurantId') || undefined;
+  const direct = localStorage.getItem('restaurantId');
+  if (direct && direct.trim()) return direct;
+
+  const authUserRaw = localStorage.getItem('authUser');
+  if (authUserRaw) {
+    try {
+      const authUser = JSON.parse(authUserRaw);
+      const fallbackId = authUser?.restaurantId || authUser?.restaurant_id;
+      if (typeof fallbackId === 'string' && fallbackId.trim()) {
+        localStorage.setItem('restaurantId', fallbackId);
+        return fallbackId;
+      }
+    } catch {
+      // Ignore malformed authUser payload and fall through
+    }
+  }
+
+  return undefined;
 }
 
 function getStaffId(): string {

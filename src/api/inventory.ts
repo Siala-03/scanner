@@ -3,7 +3,24 @@ import type { InventoryRecord, Supplier, PurchaseOrder, StockMovement, WasteEntr
 
 function getRestaurantId(): string | undefined {
   if (typeof window !== 'undefined') {
-    return localStorage.getItem('restaurantId') || undefined;
+    const direct = localStorage.getItem('restaurantId');
+    if (direct && direct.trim()) return direct;
+
+    const authUserRaw = localStorage.getItem('authUser');
+    if (authUserRaw) {
+      try {
+        const authUser = JSON.parse(authUserRaw);
+        const fallbackId = authUser?.restaurantId || authUser?.restaurant_id;
+        if (typeof fallbackId === 'string' && fallbackId.trim()) {
+          localStorage.setItem('restaurantId', fallbackId);
+          return fallbackId;
+        }
+      } catch {
+        // Ignore malformed authUser payload and return undefined below
+      }
+    }
+
+    return undefined;
   }
   return undefined;
 }
@@ -181,6 +198,8 @@ export async function updateInventoryRecord(
   if (record.reorder_qty         !== undefined) updateFields.reorder_qty         = record.reorder_qty;
   if (record.unitCost            !== undefined) updateFields.unit_cost           = record.unitCost;
   if (record.unit_cost           !== undefined) updateFields.unit_cost           = record.unit_cost;
+  if (record.unitMeasurement    !== undefined) updateFields.unit_measurement   = record.unitMeasurement;
+  if (record.unit_measurement !== undefined) updateFields.unit_measurement = record.unit_measurement;
   if (record.supplierId          !== undefined) updateFields.supplier_id         = record.supplierId;
   if (record.supplier_id         !== undefined) updateFields.supplier_id         = record.supplier_id;
   if (record.location            !== undefined) updateFields.location            = record.location;

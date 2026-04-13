@@ -9,6 +9,7 @@ export interface InventoryRecord {
   reorderPoint: number;
   reorderQty: number;
   unitCost: number; // cost per unit in RWF
+  unitMeasurement?: string; // e.g. "kg", "L", "boxes", "units"
   supplierId?: string;
   location?: string; // e.g. "Bar Fridge", "Dry Store"
   updatedAt: string; // ISO

@@ -14,7 +14,7 @@ import { useTables } from '../../hooks/useTables';
 import { signUpStaff } from '../../api/auth';
 import { updateStaffAssignments, updateStaffStatus, updateStaffRole, deleteStaff } from '../../api/staff';
 import { useKPIs } from '../../hooks/useKPIs';
-import { createKPI, deleteKPI, assignKPI, unassignKPI } from '../../api/kpis';
+import { createKPI, updateKPI, deleteKPI, assignKPI, unassignKPI } from '../../api/kpis';
 import { fetchOrdersByDateRange } from '../../api/orders';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -1144,12 +1144,21 @@ export function StaffManagement({ onShowPerformance }: StaffManagementProps) {
                     return;
                   }
                   try {
-                    // Update KPI logic would go here
-                    // For now, just close the modal
+                    await updateKPI(editingKPI.id, {
+                      staffRole: kpiForm.staffRole,
+                      name: kpiForm.name,
+                      description: kpiForm.description,
+                      metric: kpiForm.metric,
+                      targetValue: kpiForm.targetValue,
+                      period: kpiForm.period,
+                      assignedStaffIds: kpiForm.assignedStaffIds,
+                    });
                     setIsEditKPIOpen(false);
+                    setEditingKPI(null);
                     refetchKPIs();
-                  } catch (error) {
+                  } catch (error: any) {
                     console.error('Failed to update KPI:', error);
+                    alert(error?.message || 'Failed to update KPI');
                   }
                 }}
                 disabled={!kpiForm.selectedStaffId || !kpiForm.name || kpiForm.targetValue <= 0}>
