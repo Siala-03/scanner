@@ -46,8 +46,6 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
     email: '',
     phone: '',
     address: '',
-    city: '',
-    country: '',
     managerName: '',
     managerEmail: '',
     managerPhone: '',
@@ -63,10 +61,7 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
     setIsLoading(true);
     try {
       const data = await fetchRestaurants();
-      setRestaurants(data.map(r => ({
-        ...r,
-        managerCount: 0
-      })));
+      setRestaurants(data);
     } catch (error) {
       console.error('Failed to load restaurants:', error);
     } finally {
@@ -143,8 +138,6 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
           email:   formData.email,
           phone:   formData.phone,
           address: formData.address,
-          city:    formData.city,
-          country: formData.country,
         });
       } else {
         // 1. Create the restaurant
@@ -153,8 +146,6 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
           email:   formData.email,
           phone:   formData.phone,
           address: formData.address,
-          city:    formData.city,
-          country: formData.country,
         });
 
         // 2. Create the manager staff account linked to this restaurant
@@ -188,15 +179,13 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
 
   const handleEdit = (restaurant: Restaurant) => {
     setFormData({
-      name:    restaurant.name,
-      email:   restaurant.email,
-      phone:   restaurant.phone,
-      address: restaurant.address,
-      city:    restaurant.city    || restaurant.settings?.city    || '',
-      country: restaurant.country || restaurant.settings?.country || '',
-      managerName: '',
-      managerEmail: '',
-      managerPhone: '',
+      name:            restaurant.name,
+      email:           restaurant.email,
+      phone:           restaurant.phone,
+      address:         restaurant.address,
+      managerName:     '',
+      managerEmail:    '',
+      managerPhone:    '',
       managerUsername: '',
       managerPassword: '',
     });
@@ -217,17 +206,15 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
 
   const resetForm = () => {
     setFormData({
-      name: '',
-      email: '',
-      phone: '',
-      address: '',
-      city: '',
-      country: '',
-      managerName: '',
-      managerEmail: '',
-      managerPhone: '',
+      name:            '',
+      email:           '',
+      phone:           '',
+      address:         '',
+      managerName:     '',
+      managerEmail:    '',
+      managerPhone:    '',
       managerUsername: '',
-      managerPassword: ''
+      managerPassword: '',
     });
     setEditingId(null);
   };
@@ -325,8 +312,7 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
                     <th className="px-4 py-3 text-left text-sm font-semibold">Name</th>
                     <th className="px-4 py-3 text-left text-sm font-semibold">Email</th>
                     <th className="px-4 py-3 text-left text-sm font-semibold">Phone</th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold">City</th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold">Managers</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold">Address</th>
                     <th className="px-4 py-3 text-left text-sm font-semibold">Actions</th>
                   </tr>
                 </thead>
@@ -335,12 +321,10 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
                     <tr key={restaurant.id} className="border-b border-slate-700 hover:bg-slate-700/30">
                       <td className="px-4 py-3">
                         <div className="font-medium">{restaurant.name}</div>
-                        <div className="text-sm text-slate-400">{restaurant.address}</div>
                       </td>
                       <td className="px-4 py-3 text-sm">{restaurant.email}</td>
                       <td className="px-4 py-3 text-sm">{restaurant.phone}</td>
-                      <td className="px-4 py-3 text-sm">{restaurant.city}</td>
-                      <td className="px-4 py-3 text-center font-medium">{restaurant.managerCount}</td>
+                      <td className="px-4 py-3 text-sm text-slate-400">{restaurant.address}</td>
                       <td className="px-4 py-3">
                         <div className="flex gap-2">
                           <button
@@ -563,24 +547,6 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
               placeholder="123 Main Street"
               required
             />
-
-            <div className="grid grid-cols-2 gap-3">
-              <Input
-                label="City"
-                value={formData.city}
-                onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                placeholder="New York"
-                required
-              />
-
-              <Input
-                label="Country"
-                value={formData.country}
-                onChange={(e) => setFormData({ ...formData, country: e.target.value })}
-                placeholder="USA"
-                required
-              />
-            </div>
 
             {!editingId && (
               <div className="border-t border-slate-600 pt-4 mt-6">
