@@ -132,7 +132,7 @@ export async function signUpStaff(input: {
 
   const staffId = `staff-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-  const { data: raw, error: staffError } = await supabase
+  const { data: raw, error: staffError } = await supabaseAdmin
     .from('staff')
     .insert({
       id:              staffId,
@@ -157,17 +157,17 @@ export async function signUpStaff(input: {
     );
   }
 
-  const { error: credError } = await supabase
+  const { error: credError } = await supabaseAdmin
     .from('staff_credentials')
     .insert({
       staff_id:      staffId,
       username:      input.username,
-      password_hash: input.password, // stored as-is; update to hashing when ready
+      password_hash: input.password,
       restaurant_id: restaurantId ?? null,
     });
 
   if (credError) {
-    await supabase.from('staff').delete().eq('id', staffId);
+    await supabaseAdmin.from('staff').delete().eq('id', staffId);
     throw new Error(
       credError.message.includes('duplicate')
         ? 'Username already taken'
@@ -201,8 +201,8 @@ export async function updateStaffDuty(staffId: string, isOnDuty: boolean): Promi
 }
 
 export async function deleteStaff(staffId: string): Promise<void> {
-  await supabase.from('staff_credentials').delete().eq('staff_id', staffId);
-  const { error } = await supabase.from('staff').delete().eq('id', staffId);
+  await supabaseAdmin.from('staff_credentials').delete().eq('staff_id', staffId);
+  const { error } = await supabaseAdmin.from('staff').delete().eq('id', staffId);
   if (error) throw error;
 }
 
