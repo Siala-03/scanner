@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabase';
+import { supabase, supabaseAdmin } from '../lib/supabase';
 import type { Staff, StaffRole, StaffPerformance } from '../types';
 
 // Map Supabase snake_case row → app camelCase Staff
@@ -143,6 +143,7 @@ export async function signUpStaff(input: {
       is_on_duty:      true,
       assigned_tables: [],
       performance:     {},
+      hire_date:       new Date().toISOString(),
       restaurant_id:   restaurantId ?? null,
     })
     .select()

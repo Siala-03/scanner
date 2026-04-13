@@ -39,6 +39,7 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
   const [passwordSuccess, setPasswordSuccess] = useState('');
   const [isPasswordLoading, setIsPasswordLoading] = useState(false);
   const [formError, setFormError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -133,6 +134,7 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
   const handleCreateOrUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError('');
+    setIsSubmitting(true);
     try {
       if (editingId) {
         await updateRestaurant(editingId, {
@@ -171,7 +173,13 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
       setShowCreateModal(false);
     } catch (error) {
       console.error('Failed to save restaurant:', error);
-      setFormError(error instanceof Error ? error.message : 'Failed to save. Please try again.');
+      const msg =
+        error instanceof Error
+          ? error.message
+          : (error as any)?.message || JSON.stringify(error) || 'Failed to save. Please try again.';
+      setFormError(msg);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -623,6 +631,8 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
                 type="submit"
                 variant="primary"
                 className="flex-1"
+                isLoading={isSubmitting}
+                disabled={isSubmitting}
               >
                 {editingId ? 'Update' : 'Create'} Restaurant
               </Button>
@@ -635,6 +645,7 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
                   resetForm();
                 }}
                 className="flex-1"
+                disabled={isSubmitting}
               >
                 Cancel
               </Button>

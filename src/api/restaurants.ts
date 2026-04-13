@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabase';
+import { supabase, supabaseAdmin } from '../lib/supabase';
 
 export interface Restaurant {
   id: string;
@@ -42,8 +42,8 @@ export async function fetchRestaurant(restaurantId: string): Promise<Restaurant>
 
 export async function createRestaurant(restaurant: Partial<Restaurant>): Promise<Restaurant> {
   const id = `restaurant-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  
-  const { data, error } = await supabase
+
+  const { data, error } = await supabaseAdmin
     .from('restaurants')
     .insert({
       id,
@@ -66,7 +66,7 @@ export async function createRestaurant(restaurant: Partial<Restaurant>): Promise
 }
 
 export async function updateRestaurant(id: string, restaurant: Partial<Restaurant>): Promise<Restaurant> {
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from('restaurants')
     .update({
       name: restaurant.name,
@@ -86,7 +86,7 @@ export async function updateRestaurant(id: string, restaurant: Partial<Restauran
 }
 
 export async function deleteRestaurant(id: string): Promise<void> {
-  const { error } = await supabase
+  const { error } = await supabaseAdmin
     .from('restaurants')
     .delete()
     .eq('id', id);
