@@ -3,16 +3,40 @@ import type { Customer, LoyaltyTransaction, Reward, RewardRedemption, LoyaltySum
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
+function resolveRestaurantId(): string | undefined {
+  const direct = localStorage.getItem('restaurantId');
+  if (direct && direct.trim()) return direct;
+
+  const authUserRaw = localStorage.getItem('authUser');
+  if (authUserRaw) {
+    try {
+      const authUser = JSON.parse(authUserRaw);
+      const fallbackId = authUser?.restaurantId || authUser?.restaurant_id;
+      if (typeof fallbackId === 'string' && fallbackId.trim()) {
+        localStorage.setItem('restaurantId', fallbackId);
+        return fallbackId;
+      }
+    } catch {
+      return undefined;
+    }
+  }
+
+  return undefined;
+}
+
 // Customer management
 export async function createOrFindCustomer(customerData: {
   phone?: string;
   email?: string;
   name?: string;
-  restaurantId: string;
+  restaurantId?: string;
 }): Promise<Customer> {
+  const restaurantId = customerData.restaurantId || resolveRestaurantId();
+  if (!restaurantId) throw new Error('No restaurant selected');
+
   return apiRequest<Customer>(`${API_BASE}/loyalty/customers`, {
     method: 'POST',
-    json: customerData,
+    json: { ...customerData, restaurantId },
   });
 }
 
@@ -38,8 +62,11 @@ export async function awardPoints(data: {
 }
 
 // Rewards management
-export async function getRewards(restaurantId: string): Promise<Reward[]> {
-  return apiRequest<Reward[]>(`${API_BASE}/loyalty/rewards?restaurantId=${encodeURIComponent(restaurantId)}`);
+export async function getRewards(restaurantId?: string): Promise<Reward[]> {
+  const resolvedRestaurantId = restaurantId || resolveRestaurantId();
+  if (!resolvedRestaurantId) throw new Error('No restaurant selected');
+
+  return apiRequest<Reward[]>(`${API_BASE}/loyalty/rewards?restaurantId=${encodeURIComponent(resolvedRestaurantId)}`);
 }
 
 export async function createReward(rewardData: {

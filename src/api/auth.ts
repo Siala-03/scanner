@@ -26,6 +26,27 @@ function normalizeStaff(raw: Record<string, any>): Staff {
   };
 }
 
+function getRestaurantId(): string | undefined {
+  const direct = localStorage.getItem('restaurantId');
+  if (direct && direct.trim()) return direct;
+
+  const authUserRaw = localStorage.getItem('authUser');
+  if (authUserRaw) {
+    try {
+      const authUser = JSON.parse(authUserRaw);
+      const fallbackId = authUser?.restaurantId || authUser?.restaurant_id;
+      if (typeof fallbackId === 'string' && fallbackId.trim()) {
+        localStorage.setItem('restaurantId', fallbackId);
+        return fallbackId;
+      }
+    } catch {
+      return undefined;
+    }
+  }
+
+  return undefined;
+}
+
 export async function loginStaff(
   username: string,
   password: string,
@@ -79,7 +100,7 @@ export async function loginStaff(
 }
 
 export async function fetchAllStaff(): Promise<Staff[]> {
-  const restaurantId = localStorage.getItem('restaurantId') || undefined;
+  const restaurantId = getRestaurantId();
   const role         = localStorage.getItem('staffRole');
 
   let query = supabase.from('staff').select('*').order('name');
@@ -103,7 +124,7 @@ export async function fetchStaffById(id: string): Promise<Staff> {
 }
 
 export async function fetchWaiters(): Promise<Staff[]> {
-  const restaurantId = localStorage.getItem('restaurantId') || undefined;
+  const restaurantId = getRestaurantId();
   const { data, error } = await supabase
     .from('staff')
     .select('*')
@@ -123,7 +144,7 @@ export async function signUpStaff(input: {
   password: string;
   restaurantId?: string;
 }): Promise<Staff> {
-  const restaurantId = input.restaurantId || localStorage.getItem('restaurantId') || undefined;
+  const restaurantId = input.restaurantId || getRestaurantId();
   const currentRole  = localStorage.getItem('staffRole');
 
   if (input.role === 'superadmin' && currentRole !== 'superadmin') {

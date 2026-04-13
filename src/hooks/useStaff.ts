@@ -3,6 +3,27 @@ import type { Staff } from '../types';
 import { fetchStaff, fetchStaffOnDuty, fetchWaiters, fetchStaffById } from '../api/staff';
 import { supabaseAdmin as supabase } from '../lib/supabase';
 
+function resolveRestaurantId(): string | undefined {
+  const direct = localStorage.getItem('restaurantId');
+  if (direct && direct.trim()) return direct;
+
+  const authUserRaw = localStorage.getItem('authUser');
+  if (authUserRaw) {
+    try {
+      const authUser = JSON.parse(authUserRaw);
+      const fallbackId = authUser?.restaurantId || authUser?.restaurant_id;
+      if (typeof fallbackId === 'string' && fallbackId.trim()) {
+        localStorage.setItem('restaurantId', fallbackId);
+        return fallbackId;
+      }
+    } catch {
+      return undefined;
+    }
+  }
+
+  return undefined;
+}
+
 export function useStaff() {
   const [staff, setStaff] = useState<Staff[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -26,7 +47,7 @@ export function useStaff() {
   useEffect(() => {
     loadStaff();
 
-    const restaurantId = localStorage.getItem('restaurantId');
+    const restaurantId = resolveRestaurantId();
     if (restaurantId) {
       if (channelRef.current) supabase.removeChannel(channelRef.current);
       channelRef.current = supabase

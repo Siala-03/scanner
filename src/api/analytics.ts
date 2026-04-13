@@ -1,7 +1,26 @@
 import { supabaseAdmin } from '../lib/supabase';
 
 function getRestaurantId(): string | null {
-  return typeof window !== 'undefined' ? localStorage.getItem('restaurantId') : null;
+  if (typeof window === 'undefined') return null;
+
+  const direct = localStorage.getItem('restaurantId');
+  if (direct && direct.trim()) return direct;
+
+  const authUserRaw = localStorage.getItem('authUser');
+  if (authUserRaw) {
+    try {
+      const authUser = JSON.parse(authUserRaw);
+      const fallbackId = authUser?.restaurantId || authUser?.restaurant_id;
+      if (typeof fallbackId === 'string' && fallbackId.trim()) {
+        localStorage.setItem('restaurantId', fallbackId);
+        return fallbackId;
+      }
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
 }
 
 export interface RevenueData {

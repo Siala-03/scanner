@@ -3,7 +3,6 @@ import { supabaseAdmin } from '../lib/supabase';
 import { Order, OrderStatus, CartItem, Customer } from '../types';
 import { getEffectivePrice } from '../utils/pricing';
 import { decrementInventoryForOrder, ensureInventoryInitialized } from '../utils/inventoryStorage';
-import { OfflineAwareAPI } from '../api/offlineAware';
 import { createOrder as apiCreateOrder, updateOrderStatus as apiUpdateOrderStatus } from '../api/orders';
 
 const normalizeOrderPayload = (rawOrder: any): Order | undefined => {
@@ -74,6 +73,27 @@ const normalizeOrderPayload = (rawOrder: any): Order | undefined => {
     items: items.map(normalizeItem),
   } as Order;
 };
+
+function resolveRestaurantId(): string | undefined {
+  const direct = localStorage.getItem('restaurantId');
+  if (direct && direct.trim()) return direct;
+
+  const authUserRaw = localStorage.getItem('authUser');
+  if (authUserRaw) {
+    try {
+      const authUser = JSON.parse(authUserRaw);
+      const fallbackId = authUser?.restaurantId || authUser?.restaurant_id;
+      if (typeof fallbackId === 'string' && fallbackId.trim()) {
+        localStorage.setItem('restaurantId', fallbackId);
+        return fallbackId;
+      }
+    } catch {
+      return undefined;
+    }
+  }
+
+  return undefined;
+}
 
 interface UseOrdersReturn {
   orders: Order[];
@@ -220,7 +240,7 @@ export function useOrders(): UseOrdersReturn {
       delivery?: { provider: string; address: string },
       loyaltyRewardId?: string
     ): Promise<Order> => {
-      const currentRestaurantId = localStorage.getItem('restaurantId') || undefined;
+      const currentRestaurantId = resolveRestaurantId();
       if (!currentRestaurantId) {
         throw new Error('Cannot place order: restaurant context is missing. Please scan the restaurant QR code.');
       }
@@ -291,7 +311,7 @@ export function useOrders(): UseOrdersReturn {
   const updateOrderStatus = useCallback(
     async (orderId: string, status: OrderStatus, opts?: { assignedWaiterId?: string }) => {
       try {
-        await apiUpdateOrderStatus(orderId, { status, assignedTo: opts?.assignedWaiterId });
+        await apiUpdateOrderStatus(orderId, { status: status as any, assignedTo: opts?.assignedWaiterId });
       } catch (e) {
         console.warn('Failed to update order status:', e);
       }
