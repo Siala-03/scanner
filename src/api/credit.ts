@@ -65,7 +65,11 @@ function normalizeApplication(raw: any): CreditApplication {
 
 export async function getCreditAccounts(): Promise<CustomerCreditAccount[]> {
   const restaurantId = getRestaurantId();
-  if (!restaurantId) return [];
+  console.log('getCreditAccounts - restaurantId:', restaurantId);
+  if (!restaurantId) {
+    console.warn('getCreditAccounts: No restaurantId in localStorage');
+    return [];
+  }
 
   const { data, error } = await supabase
     .from('credit_accounts')
@@ -73,7 +77,11 @@ export async function getCreditAccounts(): Promise<CustomerCreditAccount[]> {
     .eq('restaurant_id', restaurantId)
     .order('customer_name');
 
-  if (error) { console.error('getCreditAccounts error:', error); return []; }
+  if (error) { 
+    console.error('getCreditAccounts error:', error); 
+    return []; 
+  }
+  console.log('getCreditAccounts - fetched:', data?.length, 'accounts');
   return (data || []).map(normalizeCreditAccount);
 }
 
@@ -406,16 +414,24 @@ export async function reviewCreditApplication(
 
 export async function getCreditSummary(): Promise<CreditSummary> {
   const restaurantId = getRestaurantId();
-  if (!restaurantId) return { totalAccounts: 0, totalBalance: 0, totalCreditLimit: 0, activeAccounts: 0 };
+  console.log('getCreditSummary - restaurantId:', restaurantId);
+  if (!restaurantId) {
+    console.warn('getCreditSummary: No restaurantId in localStorage');
+    return { totalAccounts: 0, totalBalance: 0, totalCreditLimit: 0, activeAccounts: 0 };
+  }
 
   const { data, error } = await supabase
     .from('credit_accounts')
     .select('credit_limit, current_balance, status')
     .eq('restaurant_id', restaurantId);
 
-  if (error) { console.error('getCreditSummary error:', error); return { totalAccounts: 0, totalBalance: 0, totalCreditLimit: 0, activeAccounts: 0 }; }
+  if (error) { 
+    console.error('getCreditSummary error:', error); 
+    return { totalAccounts: 0, totalBalance: 0, totalCreditLimit: 0, activeAccounts: 0 }; 
+  }
 
   const accounts = data || [];
+  console.log('getCreditSummary - fetched:', accounts.length, 'accounts');
   return {
     totalAccounts: accounts.length,
     totalBalance: accounts.reduce((sum, a) => sum + (a.current_balance || 0), 0),

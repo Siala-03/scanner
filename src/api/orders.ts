@@ -147,6 +147,7 @@ export async function updateOrderStatus(
 
   if (statusUpdate.assignedTo !== undefined) {
     updates.assigned_to = statusUpdate.assignedTo;
+    updates.assigned_waiter_id = statusUpdate.assignedTo;
   }
 
   if (statusUpdate.status === 'served' || statusUpdate.status === 'completed') {

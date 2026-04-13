@@ -69,7 +69,7 @@ const normalizeOrderPayload = (rawOrder: any): Order | undefined => {
     loyaltyRewardId: rawOrder.loyaltyRewardId ?? rawOrder.loyalty_reward_id,
     loyaltyDiscount: rawOrder.loyaltyDiscount ?? rawOrder.loyalty_discount,
     loyaltyFreeItemId: rawOrder.loyaltyFreeItemId ?? rawOrder.loyalty_free_item_id,
-    assignedWaiterId: rawOrder.assignedWaiterId ?? rawOrder.assigned_waiter_id,
+    assignedWaiterId: rawOrder.assignedWaiterId ?? rawOrder.assigned_waiter_id ?? rawOrder.assigned_to,
     items: items.map(normalizeItem),
   } as Order;
 };
