@@ -1,47 +1,23 @@
 import { KPI, KPIWithProgress } from '../types';
-import { apiRequest } from './http';
 
-const API_BASE = '/api';
+// KPI management is not yet backed by Supabase — return safe empty values
+// so supervisor dashboard doesn't crash while the feature is pending.
 
 export async function getKPIs(): Promise<KPI[]> {
-  return apiRequest<KPI[]>(`${API_BASE}/kpis`);
+  return [];
 }
 
-export async function createKPI(kpi: { staffRole: string; name: string; description?: string; metric: string; targetValue: number; period: string; assignedStaffIds?: string[] }): Promise<KPI> {
-  return apiRequest<KPI>(`${API_BASE}/kpis`, {
-    method: 'POST',
-    json: kpi,
-  });
+export async function createKPI(kpi: Omit<KPI, 'id' | 'restaurantId' | 'createdBy' | 'createdAt' | 'updatedAt'>): Promise<KPI> {
+  throw new Error('KPI management not yet implemented');
 }
 
 export async function getStaffKPIs(): Promise<KPIWithProgress[]> {
-  return apiRequest<KPIWithProgress[]>(`${API_BASE}/kpis/staff`);
+  return [];
 }
 
-export async function assignKPI(staffId: string, kpiId: number): Promise<void> {
-  await apiRequest<void>(`${API_BASE}/kpis/assign`, {
-    method: 'POST',
-    json: { staffId, kpiId },
-  });
-}
-
-export async function unassignKPI(staffId: string, kpiId: number): Promise<void> {
-  await apiRequest<void>(`${API_BASE}/kpis/unassign`, {
-    method: 'DELETE',
-    json: { staffId, kpiId },
-  });
-}
-
-export async function updateKPIProgress(kpiId: number, currentValue: number): Promise<void> {
-  await apiRequest<void>(`${API_BASE}/kpis/progress/${kpiId}`, {
-    method: 'PUT',
-    json: { currentValue },
-  });
-}
-
-export async function deleteKPI(kpiId: number): Promise<{ success: boolean }> {
-  await apiRequest<void>(`${API_BASE}/kpis/${kpiId}`, {
-    method: 'DELETE',
-  });
+export async function assignKPI(_staffId: string, _kpiId: number): Promise<void> {}
+export async function unassignKPI(_staffId: string, _kpiId: number): Promise<void> {}
+export async function updateKPIProgress(_kpiId: number, _currentValue: number): Promise<void> {}
+export async function deleteKPI(_kpiId: number): Promise<{ success: boolean }> {
   return { success: true };
 }

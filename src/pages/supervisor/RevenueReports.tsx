@@ -67,7 +67,7 @@ export function RevenueReports() {
 
   // Filter orders by date range
   const filteredOrders = orders.filter(order => {
-    const orderDate = new Date(order.createdAt);
+    const orderDate = new Date((order as any).created_at || order.createdAt);
     const now = new Date();
     
     if (statusFilter !== 'all' && order.status !== statusFilter) return false;
@@ -90,21 +90,7 @@ export function RevenueReports() {
     downloadCsv(filename, csv);
   };
 
-  const filteredByRange = orders.filter((order) => {
-    const orderDate = new Date(order.createdAt);
-    const now = new Date();
-    if (statusFilter !== 'all' && order.status !== statusFilter) return false;
-    if (dateRange === 'today') {
-      return orderDate.toDateString() === now.toDateString();
-    }
-    if (dateRange === 'week') {
-      return orderDate >= new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    }
-    if (dateRange === 'month') {
-      return orderDate >= new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-    }
-    return true;
-  });
+  const filteredByRange = filteredOrders;
 
   const totalRevenue = filteredByRange.reduce((sum, order) => sum + order.total, 0);
   const totalOrders = filteredByRange.length;
@@ -122,17 +108,20 @@ export function RevenueReports() {
   const itemMap = new Map<string, { revenue: number; orderCount: number }>();
   const tableMap = new Map<number, { totalRevenue: number; totalOrders: number }>();
   filteredByRange.forEach((order) => {
-    order.items?.forEach((item) => {
-      const category = item.menuItemName || item.menuItemId || 'Unknown';
+    order.items?.forEach((item: any) => {
+      const name = item.menuItemName || item.menu_item_name || item.menuItemId || item.menu_item_id || 'Unknown';
+      const itemRevenue = item.totalPrice || item.total_price || (item.unitPrice || item.unit_price || 0) * (item.quantity || 1);
+      const category = name;
+
       const current = categoryMap.get(category) || { revenue: 0, orders: 0 };
-      current.revenue += item.totalPrice || item.unitPrice * item.quantity || 0;
+      current.revenue += itemRevenue;
       current.orders += 1;
       categoryMap.set(category, current);
 
-      const itemCurrent = itemMap.get(item.menuItemName || item.menuItemId || 'Unknown') || { revenue: 0, orderCount: 0 };
-      itemCurrent.revenue += item.totalPrice || item.unitPrice * item.quantity || 0;
+      const itemCurrent = itemMap.get(name) || { revenue: 0, orderCount: 0 };
+      itemCurrent.revenue += itemRevenue;
       itemCurrent.orderCount += item.quantity || 1;
-      itemMap.set(item.menuItemName || item.menuItemId || 'Unknown', itemCurrent);
+      itemMap.set(name, itemCurrent);
     });
 
     if (order.tableNumber != null) {
@@ -173,7 +162,7 @@ export function RevenueReports() {
   const revenueInRange = filteredByRange.reduce((sum, order) => sum + order.total, 0);
   const revenuePrevious = orders
     .filter((order) => {
-      const createdAt = new Date(order.createdAt);
+      const createdAt = new Date((order as any).created_at || order.createdAt);
       return createdAt >= previousStart && createdAt < rangeStart;
     })
     .reduce((sum, order) => sum + order.total, 0);
@@ -182,7 +171,7 @@ export function RevenueReports() {
   const formattedChange = revenuePrevious > 0 ? `${revenueChange >= 0 ? '+' : ''}${revenueChange.toFixed(1)}% vs last period` : 'No prior period data';
 
   const ordersPrevious = orders.filter((order) => {
-    const createdAt = new Date(order.createdAt);
+    const createdAt = new Date((order as any).created_at || order.createdAt);
     return createdAt >= previousStart && createdAt < rangeStart;
   }).length;
   const orderChange = ordersPrevious > 0 ? ((filteredByRange.length - ordersPrevious) / ordersPrevious) * 100 : 0;
@@ -386,7 +375,7 @@ export function RevenueReports() {
                       }} />
 
                       <span className="text-sm text-slate-300 flex-1">
-                        {cat.name}
+                        {cat.category}
                       </span>
                       <span className="text-sm font-medium text-gray-100">
                         {cat.percentage}%
@@ -582,10 +571,10 @@ export function RevenueReports() {
                             {formatPrice(order.total)}
                           </td>
                           <td className="px-4 py-3 text-sm text-slate-400">
-                            {new Date(order.createdAt).toLocaleDateString()}
+                            {new Date((order as any).created_at || order.createdAt).toLocaleDateString()}
                           </td>
                           <td className="px-4 py-3 text-sm text-slate-400">
-                            {new Date(order.createdAt).toLocaleTimeString()}
+                            {new Date((order as any).created_at || order.createdAt).toLocaleTimeString()}
                           </td>
                         </motion.tr>
                       ))

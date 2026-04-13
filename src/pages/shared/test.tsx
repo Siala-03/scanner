@@ -67,6 +67,7 @@ import {
   recordWaste,
   computeInventoryAnalytics,
 } from '../../utils/inventoryStorage';
+import { createSupplier as createSupplierApi, fetchSuppliers as fetchSuppliersApi, updateSupplier as updateSupplierApi } from '../../api/inventory';
 
 interface InventoryManagementProps {
   role: 'manager' | 'supervisor';
@@ -211,7 +212,16 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
     return poFilter === 'all' ? all : all.filter((p) => p.status === poFilter);
   }, [tick, poFilter]);
 
-  const suppliers = useMemo(() => loadSuppliers(), [tick]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [suppliersLoading, setSuppliersLoading] = useState(true);
+
+  useEffect(() => {
+    setSuppliersLoading(true);
+    fetchSuppliersApi().then((data) => {
+      setSuppliers(data || []);
+      setSuppliersLoading(false);
+    }).catch(() => setSuppliersLoading(false));
+  }, [tick]);
 
   const handleCreatePO = () => {
     if (!newPO.supplierId || newPOItems.length === 0) return;
@@ -261,29 +271,33 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
   const [supplierForm, setSupplierForm] = useState<Partial<Supplier>>({});
 
-  const handleSaveSupplier = () => {
+  const handleSaveSupplier = async () => {
     if (!supplierForm.name) return;
-    if (editingSupplier) {
-      updateSupplier(editingSupplier.id, supplierForm as Partial<Supplier>);
-    } else {
-      addSupplier({
-        name: supplierForm.name ?? '',
-        contactPerson: supplierForm.contactPerson ?? '',
-        email: supplierForm.email ?? '',
-        phone: supplierForm.phone ?? '',
-        address: supplierForm.address ?? '',
-        categories: supplierForm.categories ?? [],
-        leadTimeDays: supplierForm.leadTimeDays ?? 3,
-        paymentTerms: supplierForm.paymentTerms ?? 'Net 30',
-        rating: supplierForm.rating ?? 3,
-        isActive: supplierForm.isActive ?? true,
-        notes: supplierForm.notes,
-      });
+    try {
+      if (editingSupplier) {
+        await updateSupplierApi(editingSupplier.id, supplierForm as Partial<Supplier>);
+      } else {
+        await createSupplierApi({
+          name: supplierForm.name ?? '',
+          contactPerson: supplierForm.contactPerson ?? '',
+          email: supplierForm.email ?? '',
+          phone: supplierForm.phone ?? '',
+          address: supplierForm.address ?? '',
+          categories: supplierForm.categories ?? [],
+          leadTimeDays: supplierForm.leadTimeDays ?? 3,
+          paymentTerms: supplierForm.paymentTerms ?? 'Net 30',
+          rating: supplierForm.rating ?? 3,
+          isActive: supplierForm.isActive ?? true,
+          notes: supplierForm.notes,
+        });
+      }
+      setShowSupplierModal(false);
+      setEditingSupplier(null);
+      setSupplierForm({});
+      refresh();
+    } catch (err) {
+      console.error('Failed to save supplier:', err);
     }
-    setShowSupplierModal(false);
-    setEditingSupplier(null);
-    setSupplierForm({});
-    refresh();
   };
 
   // ── Movements state ─────────────────────────────────────────────────────
@@ -801,7 +815,10 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                         Edit
                       </button>
                       <button
-                        onClick={() => { updateSupplier(sup.id, { isActive: !sup.isActive }); refresh(); }}
+                        onClick={async () => { 
+                          await updateSupplierApi(sup.id, { isActive: !sup.isActive }); 
+                          refresh(); 
+                        }}
                         className={`px-3 py-1 rounded-lg text-xs font-medium transition ${
                           sup.isActive ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30' : 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30'
                         }`}
@@ -812,7 +829,10 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                   )}
                 </Card>
               ))}
-              {suppliers.length === 0 && (
+              {suppliersLoading && (
+                <div className="py-16 text-center text-slate-500">Loading suppliers...</div>
+              )}
+              {!suppliersLoading && suppliers.length === 0 && (
                 <div className="py-16 text-center text-slate-500">No suppliers found.</div>
               )}
             </div>

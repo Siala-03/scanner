@@ -29,20 +29,20 @@ export function OrderHistoryPage({ onBack, existingOrders }: OrderHistoryPagePro
   const [error, setError] = useState<string | null>(null);
   const [usingLocalData, setUsingLocalData] = useState(false);
 
-  // Convert orders to the right format
+  // Normalize orders from Supabase snake_case to camelCase
   const convertOrders = (orders: any[]): Order[] => {
     return orders.map(order => ({
       ...order,
       id: order.id,
-      orderNumber: order.orderNumber || order.id.slice(0, 8),
-      tableNumber: order.tableNumber || order.table_number,
+      orderNumber: order.orderNumber || order.order_number || order.id.slice(0, 8),
+      tableNumber: order.tableNumber ?? order.table_number,
       customerName: order.customerName || order.customer_name,
       status: order.status,
       items: order.items || [],
-      total: (order.total || 0) / 100, // Convert cents to dollars if needed
-      subtotal: (order.subtotal || 0) / 100,
+      total: order.total || 0,
+      subtotal: order.subtotal || 0,
       createdAt: order.createdAt ? new Date(order.createdAt) : new Date(order.created_at),
-      updatedAt: order.updatedAt ? new Date(order.updatedAt) : new Date(order.updated_at),
+      updatedAt: order.updatedAt ? new Date(order.updatedAt) : new Date(order.updated_at || order.created_at),
     }));
   };
 
@@ -110,14 +110,15 @@ export function OrderHistoryPage({ onBack, existingOrders }: OrderHistoryPagePro
   };
 
   const handlePrintReceipt = async (order: Order) => {
-    // Configuration for the receipt (in production, this would come from restaurant settings)
+    const savedUser = (() => { try { return JSON.parse(localStorage.getItem('authUser') || '{}'); } catch { return {}; } })();
+    const restaurantName = localStorage.getItem('restaurantName') || savedUser?.restaurantName || 'Restaurant';
     const receiptOptions: Parameters<typeof orderToReceiptData>[1] = {
-      restaurantName: 'Servv IQ',
-      restaurantAddress: '123 Main Street, City',
-      restaurantPhone: '(555) 123-4567',
-      restaurantEmail: 'info@servv.com',
-      taxRate: 18, // 18% tax (configurable by manager)
-      serverName: 'Supervisor',
+      restaurantName,
+      restaurantAddress: '',
+      restaurantPhone: '',
+      restaurantEmail: '',
+      taxRate: 0,
+      serverName: savedUser?.name || 'Supervisor',
       orderType: order.deliveryAddress ? 'delivery' as const : 'dine-in' as const,
       paymentMethod: 'Cash',
       paymentStatus: 'paid' as const,

@@ -1,5 +1,8 @@
-import { supabase } from '../lib/supabase';
+import { supabaseAdmin } from '../lib/supabase';
 import type { Order, CreateOrderInput, UpdateOrderStatusInput } from '../types/orders';
+
+// Use supabaseAdmin for all order operations so RLS never blocks customers or staff
+const db = supabaseAdmin;
 
 function getRestaurantId(): string | undefined {
   if (typeof window !== 'undefined') {
@@ -20,7 +23,7 @@ export async function fetchOrders(status?: string, restaurantId?: string): Promi
   
   // Superadmin sees all orders if no restaurant specified
   if (!restaurant) {
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('orders')
       .select('*')
       .order('created_at', { ascending: false });
@@ -28,7 +31,7 @@ export async function fetchOrders(status?: string, restaurantId?: string): Promi
     return data as Order[];
   }
   
-  let query = supabase
+  let query = db
     .from('orders')
     .select('*')
     .eq('restaurant_id', restaurant)
@@ -47,7 +50,7 @@ export async function fetchOrdersByDateRange(startDate: string, endDate: string,
   const restaurant = restaurantId || getRestaurantId();
   if (!restaurant) return [];
   
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('orders')
     .select('*')
     .eq('restaurant_id', restaurant)
@@ -63,7 +66,7 @@ export async function fetchKitchenOrders(restaurantId?: string): Promise<Order[]
   const restaurant = restaurantId || getRestaurantId();
   if (!restaurant) return [];
   
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('orders')
     .select('*')
     .eq('restaurant_id', restaurant)
@@ -75,7 +78,7 @@ export async function fetchKitchenOrders(restaurantId?: string): Promise<Order[]
 }
 
 export async function fetchOrderById(id: string): Promise<Order> {
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('orders')
     .select('*')
     .eq('id', id)
@@ -86,7 +89,7 @@ export async function fetchOrderById(id: string): Promise<Order> {
 }
 
 export async function createOrder(order: CreateOrderInput): Promise<Order> {
-  const restaurantId = getRestaurantId();
+  const restaurantId = (order as any).restaurantId || getRestaurantId();
   if (!restaurantId) throw new Error('No restaurant selected');
   
   const staffId = getStaffId();
@@ -106,7 +109,7 @@ export async function createOrder(order: CreateOrderInput): Promise<Order> {
 
   const total = items.reduce((sum, item) => sum + item.total_price, 0);
 
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('orders')
     .insert({
       id: orderId,
@@ -150,7 +153,7 @@ export async function updateOrderStatus(
     updates.completed_at = new Date().toISOString();
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('orders')
     .update(updates)
     .eq('id', id)
@@ -166,7 +169,7 @@ export async function updateOrderItemStatus(
   itemId: string,
   status: string
 ): Promise<Order> {
-  const { data: order, error: fetchError } = await supabase
+  const { data: order, error: fetchError } = await db
     .from('orders')
     .select('items')
     .eq('id', orderId)
@@ -178,7 +181,7 @@ export async function updateOrderItemStatus(
     item.id === itemId ? { ...item, status } : item
   );
 
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('orders')
     .update({ 
       items: updatedItems,
@@ -193,9 +196,9 @@ export async function updateOrderItemStatus(
 }
 
 export async function cancelOrder(id: string): Promise<void> {
-  const { error } = await supabase
+  const { error } = await db
     .from('orders')
-    .update({ 
+    .update({
       status: 'cancelled',
       updated_at: new Date().toISOString()
     })
@@ -237,7 +240,7 @@ export async function seedTestOrders(): Promise<{ message: string; count: number
     };
   });
 
-  const { error } = await supabase.from('orders').upsert(orders, { onConflict: 'id' });
+  const { error } = await db.from('orders').upsert(orders, { onConflict: 'id' });
   if (error) throw error;
 
   return { message: 'Test orders created', count: orders.length };

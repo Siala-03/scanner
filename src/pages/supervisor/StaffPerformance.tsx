@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   BarChart,
   Bar,
@@ -10,12 +10,36 @@ import {
 'recharts';
 import { StarIcon, TrophyIcon, ClockIcon, DollarSignIcon } from 'lucide-react';
 import { useWaiters } from '../../hooks/useStaff';
+import { useOrdersContext } from '../../contexts/OrdersContext';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { ProgressBar } from '../../components/ui/ProgressBar';
 import { formatPrice } from '../../utils/currency';
+
 export function StaffPerformance() {
   const { waiters, isLoading } = useWaiters();
+  const { orders } = useOrdersContext();
+
+  // Compute real performance from actual orders
+  const performanceMap = useMemo(() => {
+    const map = new Map<string, { ordersServed: number; totalRevenue: number }>();
+    orders.forEach(order => {
+      if (!order.assignedWaiterId) return;
+      const cur = map.get(order.assignedWaiterId) || { ordersServed: 0, totalRevenue: 0 };
+      if (order.status === 'served') {
+        cur.ordersServed += 1;
+        cur.totalRevenue += order.total || 0;
+      }
+      map.set(order.assignedWaiterId, cur);
+    });
+    return map;
+  }, [orders]);
+
+  const maxOrders = useMemo(() => {
+    let max = 1;
+    performanceMap.forEach(p => { if (p.ordersServed > max) max = p.ordersServed; });
+    return max;
+  }, [performanceMap]);
 
   if (isLoading) {
     return (
@@ -25,14 +49,21 @@ export function StaffPerformance() {
     );
   }
 
-  const sortedByRating = [...waiters].sort(
-    (a, b) => b.performance.rating - a.performance.rating
+  const getPerf = (id: string) => performanceMap.get(id) || { ordersServed: 0, totalRevenue: 0 };
+
+  const sortedByOrders = [...waiters].sort(
+    (a, b) => getPerf(b.id).ordersServed - getPerf(a.id).ordersServed
   );
+
+  const sortedByRating = [...waiters].sort(
+    (a, b) => (b.performance?.rating || 0) - (a.performance?.rating || 0)
+  );
+
   const chartData = waiters.map((w) => ({
     name: w.name.split(' ')[0],
-    orders: w.performance.ordersServed,
-    revenue: w.performance.totalRevenue,
-    rating: w.performance.rating
+    orders: getPerf(w.id).ordersServed,
+    revenue: getPerf(w.id).totalRevenue,
+    rating: w.performance?.rating || 0,
   }));
   return (
     <div className="dark min-h-screen bg-slate-900 p-4 md:p-6">
@@ -50,48 +81,35 @@ export function StaffPerformance() {
             <h3 className="text-lg font-semibold text-gray-100">Leaderboard</h3>
           </div>
           <div className="space-y-3">
-            {sortedByRating.map((waiter, index) =>
-            <div
-              key={waiter.id}
-              className={`flex items-center gap-4 p-3 rounded-lg ${index === 0 ? 'bg-amber-500/10 border border-amber-500/30' : 'bg-slate-700/30'}`}>
-
+            {sortedByOrders.map((waiter, index) => {
+              const perf = getPerf(waiter.id);
+              return (
                 <div
-                className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${index === 0 ? 'bg-amber-500 text-white' : index === 1 ? 'bg-slate-400 text-white' : index === 2 ? 'bg-orange-700 text-white' : 'bg-slate-600 text-slate-300'}`}>
-
-                  {index + 1}
-                </div>
-                <div className="w-10 h-10 rounded-full bg-slate-600 flex items-center justify-center text-white font-medium">
-                  {waiter.name.
-                split(' ').
-                map((n) => n[0]).
-                join('')}
-                </div>
-                <div className="flex-1">
-                  <p className="font-medium text-gray-100">{waiter.name}</p>
-                  <div className="flex items-center gap-1">
-                    {Array.from({
-                    length: 5
-                  }).map((_, i) =>
-                  <StarIcon
-                    key={i}
-                    className={`w-3 h-3 ${i < Math.floor(waiter.performance.rating) ? 'text-amber-400 fill-amber-400' : 'text-slate-600'}`} />
-
-                  )}
-                    <span className="text-sm text-slate-400 ml-1">
-                      {waiter.performance.rating}
-                    </span>
+                  key={waiter.id}
+                  className={`flex items-center gap-4 p-3 rounded-lg ${index === 0 ? 'bg-amber-500/10 border border-amber-500/30' : 'bg-slate-700/30'}`}
+                >
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${index === 0 ? 'bg-amber-500 text-white' : index === 1 ? 'bg-slate-400 text-white' : index === 2 ? 'bg-orange-700 text-white' : 'bg-slate-600 text-slate-300'}`}>
+                    {index + 1}
+                  </div>
+                  <div className="w-10 h-10 rounded-full bg-slate-600 flex items-center justify-center text-white font-medium">
+                    {waiter.name.split(' ').map((n: string) => n[0]).join('')}
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-medium text-gray-100">{waiter.name}</p>
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: 5 }).map((_, i) => (
+                        <StarIcon key={i} className={`w-3 h-3 ${i < Math.floor(waiter.performance?.rating || 0) ? 'text-amber-400 fill-amber-400' : 'text-slate-600'}`} />
+                      ))}
+                      <span className="text-sm text-slate-400 ml-1">{waiter.performance?.rating || 0}</span>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-semibold text-amber-400">{formatPrice(perf.totalRevenue)}</p>
+                    <p className="text-sm text-slate-400">{perf.ordersServed} orders served</p>
                   </div>
                 </div>
-                <div className="text-right">
-                  <p className="font-semibold text-amber-400">
-                    {formatPrice(waiter.performance.totalRevenue)}
-                  </p>
-                  <p className="text-sm text-slate-400">
-                    {waiter.performance.ordersServed} orders
-                  </p>
-                </div>
-              </div>
-            )}
+              );
+            })}
           </div>
         </Card>
 
@@ -170,80 +188,66 @@ export function StaffPerformance() {
           Individual Performance
         </h3>
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {waiters.map((waiter) =>
-          <Card key={waiter.id} className="bg-slate-800">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-12 h-12 rounded-full bg-slate-600 flex items-center justify-center text-white font-medium text-lg">
-                  {waiter.name.
-                split(' ').
-                map((n) => n[0]).
-                join('')}
-                </div>
-                <div>
-                  <p className="font-semibold text-gray-100">{waiter.name}</p>
-                  <Badge
-                  variant={waiter.isOnDuty ? 'ready' : 'served'}
-                  size="sm">
-
-                    {waiter.isOnDuty ? 'On Duty' : 'Off Duty'}
-                  </Badge>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-slate-400">
-                    <StarIcon className="w-4 h-4" />
-                    <span className="text-sm">Rating</span>
+          {waiters.map((waiter) => {
+            const perf = getPerf(waiter.id);
+            return (
+              <Card key={waiter.id} className="bg-slate-800">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-12 h-12 rounded-full bg-slate-600 flex items-center justify-center text-white font-medium text-lg">
+                    {waiter.name.split(' ').map((n: string) => n[0]).join('')}
                   </div>
-                  <div className="flex items-center gap-1">
-                    {Array.from({
-                    length: 5
-                  }).map((_, i) =>
-                  <StarIcon
-                    key={i}
-                    className={`w-4 h-4 ${i < Math.floor(waiter.performance.rating) ? 'text-amber-400 fill-amber-400' : 'text-slate-600'}`} />
-
-                  )}
+                  <div>
+                    <p className="font-semibold text-gray-100">{waiter.name}</p>
+                    <Badge variant={waiter.isOnDuty ? 'verified' : 'default'} size="sm">
+                      {waiter.isOnDuty ? 'On Duty' : 'Off Duty'}
+                    </Badge>
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-slate-400">
-                    <ClockIcon className="w-4 h-4" />
-                    <span className="text-sm">Avg Service Time</span>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-slate-400">
+                      <StarIcon className="w-4 h-4" />
+                      <span className="text-sm">Rating</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: 5 }).map((_, i) => (
+                        <StarIcon key={i} className={`w-4 h-4 ${i < Math.floor(waiter.performance?.rating || 0) ? 'text-amber-400 fill-amber-400' : 'text-slate-600'}`} />
+                      ))}
+                    </div>
                   </div>
-                  <span className="text-gray-100 font-medium">
-                    {waiter.performance.avgServiceTime} min
-                  </span>
-                </div>
 
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-slate-400">
-                    <DollarSignIcon className="w-4 h-4" />
-                    <span className="text-sm">Total Revenue</span>
-                  </div>
-                  <span className="text-amber-400 font-medium">
-                    {formatPrice(waiter.performance.totalRevenue)}
-                  </span>
-                </div>
-
-                <div className="pt-2 border-t border-slate-700">
-                  <div className="flex justify-between text-sm mb-1">
-                    <span className="text-slate-400">Orders Served</span>
-                    <span className="text-gray-100">
-                      {waiter.performance.ordersServed}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-slate-400">
+                      <ClockIcon className="w-4 h-4" />
+                      <span className="text-sm">Avg Service Time</span>
+                    </div>
+                    <span className="text-gray-100 font-medium">
+                      {waiter.performance?.avgServiceTime ?? '—'} min
                     </span>
                   </div>
-                  <ProgressBar
-                  value={waiter.performance.ordersServed}
-                  max={1000}
-                  size="sm" />
 
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-slate-400">
+                      <DollarSignIcon className="w-4 h-4" />
+                      <span className="text-sm">Revenue (served)</span>
+                    </div>
+                    <span className="text-amber-400 font-medium">
+                      {formatPrice(perf.totalRevenue)}
+                    </span>
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-700">
+                    <div className="flex justify-between text-sm mb-1">
+                      <span className="text-slate-400">Orders Served</span>
+                      <span className="text-gray-100">{perf.ordersServed}</span>
+                    </div>
+                    <ProgressBar value={perf.ordersServed} max={Math.max(maxOrders, 1)} size="sm" />
+                  </div>
                 </div>
-              </div>
-            </Card>
-          )}
+              </Card>
+            );
+          })}
         </div>
       </div>
     </div>);

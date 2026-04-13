@@ -270,6 +270,7 @@ export async function adjustStock(
 export async function fetchSuppliers(): Promise<Supplier[]> {
   const restaurantId = getRestaurantId();
   if (!restaurantId) return [];
+  console.log('Fetching suppliers for restaurant:', restaurantId);
 
   const { data, error } = await supabase
     .from('suppliers')
@@ -278,25 +279,29 @@ export async function fetchSuppliers(): Promise<Supplier[]> {
     .order('name');
 
   if (error) { console.error('fetchSuppliers error:', error); return []; }
+  console.log('Suppliers fetched:', data);
   return (data || []).map(normalizeSupplier);
 }
 
 export async function createSupplier(supplier: Partial<Supplier>): Promise<Supplier> {
   const restaurantId = getRestaurantId();
+  if (!restaurantId) throw new Error('No restaurant selected');
+  
   const id = `sup-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  console.log('Creating supplier:', supplier, 'restaurant:', restaurantId);
 
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await supabase
     .from('suppliers')
     .insert({
       id,
       name:           supplier.name,
-      contact_person: supplier.contactPerson  ?? '',
+      contact_person: supplier.contactPerson  ?? supplier.contact_person ?? '',
       email:          supplier.email          ?? '',
       phone:          supplier.phone          ?? '',
       address:        supplier.address        ?? '',
       categories:     supplier.categories     ?? [],
-      lead_time_days: supplier.leadTimeDays   ?? 7,
-      payment_terms:  supplier.paymentTerms   ?? 'Net 30',
+      lead_time_days: supplier.leadTimeDays   ?? supplier.lead_time_days ?? 7,
+      payment_terms:  supplier.paymentTerms   ?? supplier.payment_terms ?? 'Net 30',
       rating:         supplier.rating         ?? 3,
       is_active:      supplier.isActive       !== false,
       notes:          supplier.notes          ?? '',
@@ -305,7 +310,11 @@ export async function createSupplier(supplier: Partial<Supplier>): Promise<Suppl
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) {
+    console.error('createSupplier error:', error);
+    throw error;
+  }
+  console.log('Supplier created:', data);
   return normalizeSupplier(data);
 }
 

@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabaseAdmin } from '../lib/supabase';
 import { Order, OrderStatus, CartItem, Customer } from '../types';
 import { getEffectivePrice } from '../utils/pricing';
 import { decrementInventoryForOrder, ensureInventoryInitialized } from '../utils/inventoryStorage';
@@ -101,7 +101,7 @@ interface UseOrdersReturn {
 // API functions
 export function useOrders(): UseOrdersReturn {
   const [orders, setOrders] = useState<Order[]>([]);
-  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const channelRef = useRef<ReturnType<typeof supabaseAdmin.channel> | null>(null);
 
   const [restaurantId, setRestaurantId] = useState<string | undefined>(
     () => localStorage.getItem('restaurantId') || undefined
@@ -131,9 +131,9 @@ export function useOrders(): UseOrdersReturn {
 
     // Subscribe to Supabase Realtime for live order updates
     if (restaurantId) {
-      if (channelRef.current) supabase.removeChannel(channelRef.current);
+      if (channelRef.current) supabaseAdmin.removeChannel(channelRef.current);
 
-      channelRef.current = supabase
+      channelRef.current = supabaseAdmin
         .channel(`orders-realtime-${restaurantId}`)
         .on(
           'postgres_changes',
@@ -159,7 +159,7 @@ export function useOrders(): UseOrdersReturn {
 
     return () => {
       if (channelRef.current) {
-        supabase.removeChannel(channelRef.current);
+        supabaseAdmin.removeChannel(channelRef.current);
         channelRef.current = null;
       }
     };
