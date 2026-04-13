@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabase';
+import { supabase, supabaseAdmin } from '../lib/supabase';
 
 function getRestaurantId(): string | undefined {
   if (typeof window !== 'undefined') {
@@ -68,6 +68,24 @@ export async function deleteTable(id: string): Promise<void> {
 }
 
 export async function callWaiter(tableNumber: number): Promise<{ success: boolean; message?: string }> {
-  console.log(`Waiter called for table ${tableNumber}`);
+  const restaurantId = getRestaurantId();
+  if (!restaurantId) return { success: false, message: 'No restaurant context' };
+
+  const channelName = `waiter-calls-${restaurantId}`;
+  const channel = supabaseAdmin.channel(channelName);
+
+  await new Promise<void>((resolve) => {
+    channel.subscribe((status) => {
+      if (status === 'SUBSCRIBED') resolve();
+    });
+  });
+
+  await channel.send({
+    type: 'broadcast',
+    event: 'waiter:call',
+    payload: { tableNumber, timestamp: new Date().toISOString(), restaurantId },
+  });
+
+  supabaseAdmin.removeChannel(channel);
   return { success: true, message: 'Waiter has been notified' };
 }

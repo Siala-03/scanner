@@ -29,7 +29,7 @@ import { buildReceiptHtml, orderToReceiptData } from '../../utils/receipt';
 import { printReceiptNetwork } from '../../api/printer';
 import { ReceiptShareModal } from '../../components/ui/ReceiptShareModal';
 import { useOfflineStatus } from '../../hooks/useOfflineStatus';
-import { useSocket } from '../../hooks/useSocket';
+import { supabaseAdmin } from '../../lib/supabase';
 
 // ─── Kitchen detection ────────────────────────────────────────────────────────
 const DRINK_CATEGORIES = new Set([
@@ -446,19 +446,27 @@ export function WaiterDashboard({
   const [showShareModal, setShowShareModal] = useState(false);
   const [selectedOrderForShare, setSelectedOrderForShare] = useState<Order | null>(null);
 
-  const { socket, joinRole } = useSocket();
   const { kpis } = useStaffKPIs();
   const { isOnline, pendingOperations } = useOfflineStatus();
 
-  // ── Socket: waiter call events ──
+  // ── Supabase Realtime: waiter call broadcast ──
   useEffect(() => {
-    joinRole('waiter');
-    const handleWaiterCall = (data: { tableNumber: number; timestamp: Date }) => {
-      setSocketCalls((prev) => [...prev, { ...data, timestamp: new Date(data.timestamp) }]);
-    };
-    socket.on('waiter:call', handleWaiterCall);
-    return () => { socket.off('waiter:call', handleWaiterCall); };
-  }, [socket, joinRole]);
+    const restaurantId = localStorage.getItem('restaurantId');
+    if (!restaurantId) return;
+
+    const channel = supabaseAdmin
+      .channel(`waiter-calls-${restaurantId}`)
+      .on('broadcast', { event: 'waiter:call' }, (payload) => {
+        const data = payload.payload as { tableNumber: number; timestamp: string };
+        setSocketCalls((prev) => [
+          ...prev,
+          { tableNumber: data.tableNumber, timestamp: new Date(data.timestamp) },
+        ]);
+      })
+      .subscribe();
+
+    return () => { supabaseAdmin.removeChannel(channel); };
+  }, []);
 
   // ── Order buckets ──
   const incomingOrders = useMemo(

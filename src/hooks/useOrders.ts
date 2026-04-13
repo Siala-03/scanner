@@ -4,6 +4,7 @@ import { Order, OrderStatus, CartItem, Customer } from '../types';
 import { getEffectivePrice } from '../utils/pricing';
 import { decrementInventoryForOrder, ensureInventoryInitialized } from '../utils/inventoryStorage';
 import { OfflineAwareAPI } from '../api/offlineAware';
+import { createOrder as apiCreateOrder, updateOrderStatus as apiUpdateOrderStatus } from '../api/orders';
 
 const normalizeOrderPayload = (rawOrder: any): Order | undefined => {
   if (!rawOrder) return undefined;
@@ -119,7 +120,8 @@ export function useOrders(): UseOrdersReturn {
   const loadOrders = useCallback(async (restId?: string) => {
     const id = restId || restaurantId;
     try {
-      const fetched = await OfflineAwareAPI.fetchOrders('all', id);
+      const { fetchOrders } = await import('../api/orders');
+      const fetched = await fetchOrders('all', id);
       setOrders(fetched.map((o: any) => normalizeOrderPayload(o)).filter(Boolean) as Order[]);
     } catch {
       setOrders([]);
@@ -261,7 +263,8 @@ export function useOrders(): UseOrdersReturn {
 
       let savedOrder: Order = localOrder;
       try {
-        const createdOrder = await OfflineAwareAPI.createOrder({
+        // Bypass OfflineAwareAPI — call Supabase directly so orders always reach the server
+        const createdOrder = await apiCreateOrder({
           tableNumber,
           customerName: customer?.name || 'Walk-in',
           customerId: customer?.id,
@@ -271,8 +274,8 @@ export function useOrders(): UseOrdersReturn {
           requiresKitchen,
           deliveryProvider: delivery?.provider,
           deliveryAddress: delivery?.address,
-          loyaltyRewardId
-        });
+          loyaltyRewardId,
+        } as any);
 
         savedOrder = normalizeOrderPayload(createdOrder) ?? localOrder;
         setOrders((prev) => prev.map((order) => (order.id === localOrderId ? savedOrder : order)));
@@ -288,7 +291,7 @@ export function useOrders(): UseOrdersReturn {
   const updateOrderStatus = useCallback(
     async (orderId: string, status: OrderStatus, opts?: { assignedWaiterId?: string }) => {
       try {
-        await OfflineAwareAPI.updateOrderStatus(orderId, { status, assignedTo: opts?.assignedWaiterId });
+        await apiUpdateOrderStatus(orderId, { status, assignedTo: opts?.assignedWaiterId });
       } catch (e) {
         console.warn('Failed to update order status:', e);
       }
