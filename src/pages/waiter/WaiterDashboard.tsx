@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ClipboardListIcon,
@@ -539,10 +539,34 @@ export function WaiterDashboard({
   const [socketCalls, setSocketCalls] = useState<{ tableNumber: number; timestamp: Date }[]>([]);
   const [showShareModal, setShowShareModal] = useState(false);
   const [selectedOrderForShare, setSelectedOrderForShare] = useState<Order | null>(null);
+  // Track order IDs we've already seen so we can detect truly new ones
+  const knownOrderIdsRef = useRef<Set<string>>(new Set());
 
   const { kpis } = useStaffKPIs();
 
-  // ── Supabase Realtime: waiter call broadcast ──
+  // ── Derive waiter-call notifications from new pending orders (polling-safe) ──
+  useEffect(() => {
+    const now = Date.now();
+    orders
+      .filter((o) => o.status === 'pending')
+      .forEach((order) => {
+        if (knownOrderIdsRef.current.has(order.id)) return;
+        // Only notify for orders placed in the last 90 seconds so the initial
+        // load of old pending orders doesn't spam the waiter with stale alerts.
+        const ageMs = now - new Date(order.createdAt).getTime();
+        if (ageMs < 90_000) {
+          setSocketCalls((prev) => {
+            const alreadyHas = prev.some((c) => c.tableNumber === order.tableNumber);
+            if (alreadyHas) return prev;
+            return [...prev, { tableNumber: order.tableNumber, timestamp: new Date(order.createdAt) }];
+          });
+        }
+      });
+    // Mark every order ID as seen regardless of status/age
+    orders.forEach((o) => knownOrderIdsRef.current.add(o.id));
+  }, [orders]);
+
+  // ── Supabase Realtime broadcast: "Call Waiter" button (explicit, no order) ──
   useEffect(() => {
     const restaurantId = localStorage.getItem('restaurantId');
     if (!restaurantId) return;
@@ -551,10 +575,11 @@ export function WaiterDashboard({
       .channel(`waiter-calls-${restaurantId}`)
       .on('broadcast', { event: 'waiter:call' }, (payload) => {
         const data = payload.payload as { tableNumber: number; timestamp: string };
-        setSocketCalls((prev) => [
-          ...prev,
-          { tableNumber: data.tableNumber, timestamp: new Date(data.timestamp) },
-        ]);
+        setSocketCalls((prev) => {
+          const alreadyHas = prev.some((c) => c.tableNumber === data.tableNumber);
+          if (alreadyHas) return prev;
+          return [...prev, { tableNumber: data.tableNumber, timestamp: new Date(data.timestamp) }];
+        });
       })
       .subscribe();
 

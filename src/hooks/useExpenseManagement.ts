@@ -45,7 +45,7 @@ export function useExpenseManagement() {
       const result = await fetchExpenses(filters);
       setState(prev => ({
         ...prev,
-        expenses: result.data,
+        expenses: Array.isArray(result) ? result : [],
         loading: false,
       }));
     } catch (err) {

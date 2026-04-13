@@ -47,7 +47,7 @@ export default function ManagerExpenseApproval() {
   const [newNote, setNewNote] = useState('');
   const [rejectionReason, setRejectionReason] = useState('');
   const [approvalNotes, setApprovalNotes] = useState('');
-  const [summary, setSummary] = useState<any>(null);
+  const [summary, setSummary] = useState<any[]>([]);
   const [tab, setTab] = useState<'pending' | 'approved' | 'rejected' | 'create'>('pending');
   const [formData, setFormData] = useState<ExpenseFormData>({
     categoryId: '',
@@ -75,6 +75,20 @@ export default function ManagerExpenseApproval() {
     return [];
   };
 
+  const normalizeSummary = (input: any): any[] => {
+    if (Array.isArray(input)) return input;
+    if (Array.isArray(input?.data)) return input.data;
+    if (input && typeof input === 'object') {
+      return [
+        { approval_status: 'pending', count: input.pending || 0, total_amount: 0 },
+        { approval_status: 'approved', count: input.approved || 0, total_amount: 0 },
+        { approval_status: 'rejected', count: input.rejected || 0, total_amount: 0 },
+        { approval_status: 'total', count: input.total || 0, total_amount: 0 },
+      ];
+    }
+    return [];
+  };
+
   const loadData = async () => {
     try {
       setLoading(true);
@@ -89,8 +103,8 @@ export default function ManagerExpenseApproval() {
       setPendingExpenses(unwrapData<ExpenseWithDetails>(pending as any));
       setApprovedExpenses(unwrapData<ExpenseWithDetails>(approved as any));
       setRejectedExpenses(unwrapData<ExpenseWithDetails>(rejected as any));
-      setCategories(cats);
-      setSummary(sum);
+      setCategories(unwrapData<ExpenseCategory>(cats as any));
+      setSummary(normalizeSummary(sum));
       setError(null);
     } catch (err) {
       setError('Failed to load data');
@@ -245,7 +259,7 @@ export default function ManagerExpenseApproval() {
       await createExpenseNote(expenseId, 'comment', newNote);
       const notes = await getExpenseNotes(expenseId);
       if (selectedExpense?.id === expenseId) {
-        setSelectedExpense({ ...selectedExpense, notes_: notes });
+        setSelectedExpense({ ...selectedExpense, notes_: unwrapData<any>(notes as any) });
       }
       setNewNote('');
       setError(null);
@@ -264,7 +278,11 @@ export default function ManagerExpenseApproval() {
         getExpenseNotes(expense.id),
         getExpenseAuditLog(expense.id),
       ]);
-      setSelectedExpense({ ...expense, notes_: notes, auditLog });
+      setSelectedExpense({
+        ...expense,
+        notes_: unwrapData<any>(notes as any),
+        auditLog: unwrapData<any>(auditLog as any),
+      });
       setShowDetails(true);
       setError(null);
     } catch (err) {
@@ -358,7 +376,7 @@ export default function ManagerExpenseApproval() {
         )}
 
         {/* Summary Cards */}
-        {summary && (
+        {summary.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {summary.map((item: any) => (
             <div key={item.approval_status} className="bg-slate-800 rounded-lg shadow p-4 border border-slate-700">

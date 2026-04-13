@@ -523,7 +523,31 @@ export async function getApprovalSummary(): Promise<any> {
 
 // Backward-compatible API used by ExpenseApproval component
 export async function getExpenseApprovalSummary(): Promise<any> {
-  return getApprovalSummary();
+  const summary = await getApprovalSummary();
+  const normalized = summary || {};
+
+  return [
+    {
+      approval_status: 'pending',
+      count: normalized.pending || 0,
+      total_amount: 0,
+    },
+    {
+      approval_status: 'approved',
+      count: normalized.approved || 0,
+      total_amount: 0,
+    },
+    {
+      approval_status: 'rejected',
+      count: normalized.rejected || 0,
+      total_amount: 0,
+    },
+    {
+      approval_status: 'total',
+      count: normalized.total || 0,
+      total_amount: 0,
+    },
+  ];
 }
 
 // ============================================

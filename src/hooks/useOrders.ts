@@ -149,7 +149,10 @@ export function useOrders(): UseOrdersReturn {
   useEffect(() => {
     loadOrders();
 
-    // Subscribe to Supabase Realtime for live order updates
+    // Poll every 8 seconds as a reliable fallback (works even if Realtime is not enabled)
+    const pollInterval = setInterval(() => loadOrders(), 8000);
+
+    // Also subscribe to Supabase Realtime for instant updates when it IS configured
     if (restaurantId) {
       if (channelRef.current) supabaseAdmin.removeChannel(channelRef.current);
 
@@ -178,6 +181,7 @@ export function useOrders(): UseOrdersReturn {
     }
 
     return () => {
+      clearInterval(pollInterval);
       if (channelRef.current) {
         supabaseAdmin.removeChannel(channelRef.current);
         channelRef.current = null;

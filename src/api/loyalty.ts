@@ -1,4 +1,4 @@
-import { apiRequest } from './http';
+import { apiRequest, ApiError } from './http';
 import type { Customer, LoyaltyTransaction, Reward, RewardRedemption, LoyaltySummary } from '../types';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
@@ -41,7 +41,22 @@ export async function createOrFindCustomer(customerData: {
 }
 
 export async function getCustomers(): Promise<Customer[]> {
-  return apiRequest<Customer[]>(`${API_BASE}/loyalty/customers`);
+  try {
+    const response = await apiRequest<Customer[] | { data?: Customer[]; customers?: Customer[] }>(`${API_BASE}/loyalty/customers`);
+    if (Array.isArray(response)) return response;
+    if (Array.isArray(response?.data)) return response.data;
+    if (Array.isArray(response?.customers)) return response.customers;
+    return [];
+  } catch (error) {
+    if (
+      error instanceof ApiError &&
+      (error.status === 400 || error.status === 404 || /restaurantId is required/i.test(error.message))
+    ) {
+      return [];
+    }
+
+    throw error;
+  }
 }
 
 export async function getCustomerDetails(customerId: string): Promise<LoyaltySummary> {
