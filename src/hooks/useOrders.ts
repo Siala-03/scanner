@@ -218,6 +218,10 @@ export function useOrders(): UseOrdersReturn {
 
   const isFoodOrder = (items: CartItem[]) =>
     items.some((item) => {
+      // Explicit flag takes priority if set
+      if (item.menuItem.requiresKitchen === true) return true;
+      if (item.menuItem.requiresKitchen === false) return false;
+      // Fall back to category-based detection
       const category = String(item.menuItem.category ?? '').toLowerCase();
       return category === '' || !drinkCategories.has(category);
     });

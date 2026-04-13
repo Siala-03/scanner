@@ -1,4 +1,3 @@
-import React from 'react';
 import { motion } from 'framer-motion';
 import { ClockIcon, MapPinIcon, UtensilsIcon, WineIcon, SmartphoneIcon } from 'lucide-react';
 import { Order } from '../../types';
@@ -22,33 +21,24 @@ export function OrderCard({
   onApprove,
   onReject,
   onMarkReady,
-  onMarkServed
+  onMarkServed,
+  onPrintReceipt,
 }: OrderCardProps) {
   const minutesAgo = Math.floor(
-    (Date.now() - order.createdAt.getTime()) / 60000
+    (Date.now() - new Date(order.createdAt).getTime()) / 60000
   );
 
-  // Determine if this is a customer menu order (from QR scan) or waiter-created
   const isCustomerMenuOrder = !order.assignedWaiterId || order.status === 'pending';
 
   return (
     <motion.div
       layout
-      initial={{
-        opacity: 0,
-        y: 20
-      }}
-      animate={{
-        opacity: 1,
-        y: 0
-      }}
-      exit={{
-        opacity: 0,
-        x: -100
-      }}
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, x: -100 }}
       className="bg-slate-800 rounded-xl p-4 cursor-pointer hover:bg-slate-750 transition-colors border border-slate-700"
-      onClick={() => onViewDetails(order)}>
-
+      onClick={() => onViewDetails(order)}
+    >
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 rounded-xl bg-amber-500/20 flex items-center justify-center">
@@ -56,9 +46,7 @@ export function OrderCard({
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-lg font-bold text-white">
-                Table {order.tableNumber}
-              </span>
+              <span className="text-lg font-bold text-white">Table {order.tableNumber}</span>
               {isCustomerMenuOrder && (
                 <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 text-xs font-medium">
                   <SmartphoneIcon className="w-3 h-3" />
@@ -66,34 +54,32 @@ export function OrderCard({
                 </div>
               )}
               {order.requiresKitchen ? (
-                <UtensilsIcon
-                  className="w-4 h-4 text-orange-400"
-                  title="Requires kitchen" />
+                <span title="Requires kitchen">
+                  <UtensilsIcon className="w-4 h-4 text-orange-400" />
+                </span>
               ) : (
-                <WineIcon
-                  className="w-4 h-4 text-purple-400"
-                  title="Bar only" />
+                <span title="Bar only">
+                  <WineIcon className="w-4 h-4 text-purple-400" />
+                </span>
               )}
             </div>
-            <p className="text-sm text-slate-400">{order.id}</p>
+            <p className="text-sm text-slate-400">{order.orderNumber ?? order.id}</p>
           </div>
         </div>
         <StatusBadge status={order.status} />
       </div>
 
       <div className="space-y-1 mb-3">
-        {order.items.slice(0, 3).map((item, index) =>
+        {order.items.slice(0, 3).map((item, index) => (
           <div key={index} className="flex justify-between text-sm">
             <span className="text-slate-300">
               {item.quantity}x {item.menuItem?.name ?? item.menuItemName ?? 'Unknown item'}
             </span>
           </div>
+        ))}
+        {order.items.length > 3 && (
+          <p className="text-sm text-slate-500">+{order.items.length - 3} more items</p>
         )}
-        {order.items.length > 3 &&
-          <p className="text-sm text-slate-500">
-            +{order.items.length - 3} more items
-          </p>
-        }
       </div>
 
       <div className="flex items-center justify-between pt-3 border-t border-slate-700">
@@ -102,58 +88,37 @@ export function OrderCard({
             <ClockIcon className="w-4 h-4" />
             <span className="text-sm">{minutesAgo}m ago</span>
           </div>
-          <span className="text-lg font-bold text-amber-400">
-            {formatPrice(order.total)}
-          </span>
+          <span className="text-lg font-bold text-amber-400">{formatPrice(order.total)}</span>
         </div>
 
         <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
-          {order.status === 'pending' && onApprove && onReject &&
-          <>
-              <Button
-              variant="danger"
-              size="sm"
-              onClick={() => onReject(order.id)}>
-
+          {order.status === 'pending' && onApprove && onReject && (
+            <>
+              <Button variant="danger" size="sm" onClick={() => onReject(order.id)}>
                 Reject
               </Button>
-              <Button
-              variant="primary"
-              size="sm"
-              onClick={() => onApprove(order)}>
-
+              <Button variant="primary" size="sm" onClick={() => onApprove(order)}>
                 Approve
               </Button>
             </>
-          }
-          {order.status === 'preparing' && onMarkReady &&
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={() => onMarkReady(order.id)}>
-
+          )}
+          {(order.status === 'verified' || order.status === 'preparing') && onMarkReady && (
+            <Button variant="primary" size="sm" onClick={() => onMarkReady(order.id)}>
               Mark Ready
             </Button>
-          }
-          {order.status === 'ready' && onMarkServed &&
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={() => onMarkServed(order.id)}>
-
+          )}
+          {order.status === 'ready' && onMarkServed && (
+            <Button variant="primary" size="sm" onClick={() => onMarkServed(order.id)}>
               Mark Served
             </Button>
-          }
+          )}
           {order.status === 'served' && onPrintReceipt && (
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => onPrintReceipt(order)}>
+            <Button variant="secondary" size="sm" onClick={() => onPrintReceipt(order)}>
               Print Receipt
             </Button>
           )}
         </div>
       </div>
-    </motion.div>);
-
+    </motion.div>
+  );
 }

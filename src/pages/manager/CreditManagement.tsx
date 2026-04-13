@@ -633,29 +633,29 @@ const CreditManagement: React.FC = () => {
   // Render Reports Tab
   const renderReportsTab = () => (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-slate-800 shadow rounded-3xl border border-slate-700">
-          <div className="px-4 py-5 sm:p-6">
-            <dt className="text-sm font-medium text-slate-400 truncate">Total Accounts</dt>
-            <dd className="mt-1 text-3xl font-semibold text-slate-100">{summary?.totalAccounts || 0}</dd>
+      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+        <div className="bg-slate-800 shadow rounded-2xl sm:rounded-3xl border border-slate-700">
+          <div className="px-3 py-4 sm:px-4 sm:py-5">
+            <dt className="text-xs sm:text-sm font-medium text-slate-400 truncate">Total Accounts</dt>
+            <dd className="mt-1 text-2xl sm:text-3xl font-semibold text-slate-100">{summary?.totalAccounts || 0}</dd>
           </div>
         </div>
-        <div className="bg-slate-800 shadow rounded-3xl border border-slate-700">
-          <div className="px-4 py-5 sm:p-6">
-            <dt className="text-sm font-medium text-slate-400 truncate">Active Accounts</dt>
-            <dd className="mt-1 text-3xl font-semibold text-emerald-300">{summary?.activeAccounts || 0}</dd>
+        <div className="bg-slate-800 shadow rounded-2xl sm:rounded-3xl border border-slate-700">
+          <div className="px-3 py-4 sm:px-4 sm:py-5">
+            <dt className="text-xs sm:text-sm font-medium text-slate-400 truncate">Active Accounts</dt>
+            <dd className="mt-1 text-2xl sm:text-3xl font-semibold text-emerald-300">{summary?.activeAccounts || 0}</dd>
           </div>
         </div>
-        <div className="bg-slate-800 shadow rounded-3xl border border-slate-700">
-          <div className="px-4 py-5 sm:p-6">
-            <dt className="text-sm font-medium text-slate-400 truncate">Total Outstanding</dt>
-            <dd className="mt-1 text-3xl font-semibold text-rose-300">{formatCurrency(summary?.totalOutstanding || 0)}</dd>
+        <div className="bg-slate-800 shadow rounded-2xl sm:rounded-3xl border border-slate-700">
+          <div className="px-3 py-4 sm:px-4 sm:py-5">
+            <dt className="text-xs sm:text-sm font-medium text-slate-400 truncate">Total Outstanding</dt>
+            <dd className="mt-1 text-2xl sm:text-3xl font-semibold text-rose-300">{formatCurrency(summary?.totalOutstanding || 0)}</dd>
           </div>
         </div>
-        <div className="bg-slate-800 shadow rounded-3xl border border-slate-700">
-          <div className="px-4 py-5 sm:p-6">
-            <dt className="text-sm font-medium text-slate-400 truncate">Accounts Overdue</dt>
-            <dd className="mt-1 text-3xl font-semibold text-amber-300">{summary?.accountsOverLimit || 0}</dd>
+        <div className="bg-slate-800 shadow rounded-2xl sm:rounded-3xl border border-slate-700">
+          <div className="px-3 py-4 sm:px-4 sm:py-5">
+            <dt className="text-xs sm:text-sm font-medium text-slate-400 truncate">Accounts Overdue</dt>
+            <dd className="mt-1 text-2xl sm:text-3xl font-semibold text-amber-300">{summary?.accountsOverLimit || 0}</dd>
           </div>
         </div>
       </div>
@@ -723,8 +723,8 @@ const CreditManagement: React.FC = () => {
     if (!showCreateModal) return null;
 
     return (
-      <div className="fixed inset-0 bg-slate-900 bg-opacity-90 overflow-y-auto h-full w-full">
-        <div className="relative top-20 mx-auto p-5 border border-slate-700 w-96 shadow-2xl rounded-3xl bg-slate-800 text-slate-100">
+      <div className="fixed inset-0 bg-slate-900 bg-opacity-90 overflow-y-auto h-full w-full z-50">
+        <div className="relative top-10 sm:top-20 mx-auto p-4 sm:p-5 border border-slate-700 w-full sm:w-96 shadow-2xl rounded-2xl sm:rounded-3xl bg-slate-800 text-slate-100">
           <h3 className="text-lg font-medium text-white mb-4">Create New Credit Account</h3>
           {submitError && (
             <div className="rounded-md border border-red-500 bg-red-500/10 px-3 py-2 text-sm text-red-200">
@@ -852,8 +852,8 @@ const CreditManagement: React.FC = () => {
     if (!showTransactionModal || !selectedAccount) return null;
 
     return (
-      <div className="fixed inset-0 bg-slate-900 bg-opacity-80 overflow-y-auto h-full w-full">
-        <div className="relative top-20 mx-auto p-5 border border-slate-700 w-96 shadow-2xl rounded-3xl bg-slate-800 text-slate-100">
+      <div className="fixed inset-0 bg-slate-900 bg-opacity-80 overflow-y-auto h-full w-full z-50">
+        <div className="relative top-10 sm:top-20 mx-auto p-4 sm:p-5 border border-slate-700 w-full sm:w-96 shadow-2xl rounded-2xl sm:rounded-3xl bg-slate-800 text-slate-100">
           <h3 className="text-lg font-medium text-white mb-4">
             {transactionType === 'charge' && 'Add Charge'}
             {transactionType === 'payment' && 'Record Payment'}
@@ -925,10 +925,15 @@ const CreditManagement: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100">
-      <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div className="px-4 py-6 sm:px-0">
-          <div className="flex items-center mb-6">
-            <h1 className="text-3xl font-bold text-white">Credit Management</h1>
+      <div className="max-w-7xl mx-auto p-4 md:py-6 sm:px-6 lg:px-8">
+        <div className="px-0 py-4 sm:py-0">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+            <h1 className="text-2xl md:text-3xl font-bold text-white">Credit Management</h1>
+            <div className="flex flex-wrap gap-2 sm:gap-4">
+              <Button variant="ghost" size="sm" onClick={() => loadCreditData()}>
+                <RefreshCwIcon className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+              </Button>
+            </div>
           </div>
 
           {loadError && (
@@ -946,8 +951,8 @@ const CreditManagement: React.FC = () => {
           {!isLoading && (
             <>
               {/* Tabs */}
-              <div className="border-b border-slate-700 mb-6">
-                <nav className="-mb-px flex space-x-8">
+              <div className="border-b border-slate-700 mb-6 overflow-x-auto">
+                <nav className="-mb-px flex space-x-4 sm:space-x-8 whitespace-nowrap">
                   <button
                     onClick={() => setActiveTab('accounts')}
                     className={`py-4 px-1 border-b-2 font-medium text-sm ${

@@ -62,9 +62,9 @@ export function AIInsightsChat({ alerts }: AIInsightsChatProps) {
   };
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end">
+    <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50 flex flex-col items-end">
       {isOpen && (
-        <div className="mb-4 w-80 sm:w-96 h-[500px] bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom-4">
+        <div className="mb-3 sm:mb-4 w-[85vw] sm:w-80 md:w-96 h-[60vh] sm:h-[500px] bg-slate-900 border border-slate-700 rounded-xl sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom-4">
           {/* Header */}
           <div className="p-4 border-b border-slate-700 bg-slate-800/50 flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -146,10 +146,10 @@ export function AIInsightsChat({ alerts }: AIInsightsChatProps) {
 
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="p-4 bg-blue-600 hover:bg-blue-500 text-white rounded-full shadow-xl shadow-blue-900/40 transition-all transform hover:scale-105 active:scale-95 flex items-center gap-2 group"
+        className="p-3 sm:p-4 bg-blue-600 hover:bg-blue-500 text-white rounded-full shadow-xl shadow-blue-900/40 transition-all transform hover:scale-105 active:scale-95 flex items-center gap-2 group"
       >
-        <Sparkles className={`w-6 h-6 ${isOpen ? 'rotate-12' : ''} transition-transform`} />
-        {!isOpen && <span className="font-semibold text-sm pr-1">Servv IQ</span>}
+        <Sparkles className={`w-5 h-5 sm:w-6 sm:h-6 ${isOpen ? 'rotate-12' : ''} transition-transform`} />
+        {!isOpen && <span className="font-semibold text-xs sm:text-sm pr-1">Servv IQ</span>}
       </button>
     </div>
   );

@@ -270,14 +270,14 @@ export function StaffManagement({ onShowPerformance }: StaffManagementProps) {
   }
 
   return (
-    <div className="dark min-h-screen bg-slate-900 p-4 md:p-6">
+    <div className="dark min-h-screen bg-slate-900 p-3 md:p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
           <div>
             <div className="flex flex-col sm:flex-row sm:items-center sm:gap-4">
               <div>
-                <h1 className="text-2xl font-bold text-gray-100">Staff Management</h1>
+                <h1 className="text-xl md:text-2xl font-bold text-gray-100">Staff Management</h1>
                 <p className="text-slate-400">
                   {backendStaff.filter((s) => s.isOnDuty).length} staff on duty
                 </p>
@@ -322,19 +322,19 @@ export function StaffManagement({ onShowPerformance }: StaffManagementProps) {
               </div>
             )}
           </div>
-          <Button variant="primary" onClick={() => setIsAddStaffOpen(true)}>
-            <PlusIcon className="w-5 h-5" />
-            Add Staff
+          <Button variant="primary" size="sm" onClick={() => setIsAddStaffOpen(true)}>
+            <PlusIcon className="w-4 h-4" />
+            <span className="hidden sm:inline">Add Staff</span>
           </Button>
         </div>
 
         {/* Filters */}
-        <div className="flex flex-col md:flex-row gap-4 mb-6">
+        <div className="flex flex-col sm:flex-row gap-3 mb-6">
           <SearchBar
             value={searchQuery}
             onChange={setSearchQuery}
             placeholder="Search staff..."
-            className="md:w-80" />
+            className="sm:w-80" />
 
           <div className="flex-1">
             <div className="flex flex-wrap gap-2">
@@ -373,7 +373,7 @@ export function StaffManagement({ onShowPerformance }: StaffManagementProps) {
         </div>
 
         {/* Staff Grid */}
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <AnimatePresence>
             {filteredStaff.map((member) =>
             <motion.div
@@ -597,11 +597,11 @@ export function StaffManagement({ onShowPerformance }: StaffManagementProps) {
                           <table className="w-full">
                             <thead>
                               <tr className="text-xs text-slate-400 text-left">
-                                <th className="px-4 py-2 font-medium">Name</th>
-                                <th className="px-4 py-2 font-medium">Metric</th>
-                                <th className="px-4 py-2 font-medium">Period</th>
-                                <th className="px-4 py-2 font-medium min-w-[180px]">Progress</th>
-                                <th className="px-4 py-2 font-medium text-right">Actions</th>
+                                <th className="px-3 py-2 font-medium">Name</th>
+                                <th className="px-3 py-2 font-medium">Metric</th>
+                                <th className="px-3 py-2 font-medium hidden sm:table-cell">Period</th>
+                                <th className="px-3 py-2 font-medium min-w-[140px]">Progress</th>
+                                <th className="px-3 py-2 font-medium text-right">Actions</th>
                               </tr>
                             </thead>
                             <tbody>
@@ -612,19 +612,19 @@ export function StaffManagement({ onShowPerformance }: StaffManagementProps) {
                                 const barColor = pct >= 100 ? 'bg-emerald-500' : pct >= 60 ? 'bg-amber-500' : 'bg-red-500';
                                 return (
                                 <tr key={kpi.id} className="border-t border-slate-700/50 hover:bg-slate-700/30">
-                                  <td className="px-4 py-3">
+                                  <td className="px-3 py-3">
                                     <p className="text-sm font-medium text-white">{kpi.name}</p>
                                     {kpi.description && (
                                       <p className="text-xs text-slate-400 mt-0.5">{kpi.description}</p>
                                     )}
                                   </td>
-                                  <td className="px-4 py-3">
+                                  <td className="px-3 py-3">
                                     <Badge variant="secondary" size="sm">{kpi.metric.replace(/_/g, ' ')}</Badge>
                                   </td>
-                                  <td className="px-4 py-3">
+                                  <td className="px-3 py-3 hidden sm:table-cell">
                                     <Badge variant="primary" size="sm">{kpi.period}</Badge>
                                   </td>
-                                  <td className="px-4 py-3">
+                                  <td className="px-3 py-3">
                                     <div className="flex items-center gap-2">
                                       <div className="flex-1 h-2 bg-slate-700 rounded-full overflow-hidden">
                                         <div
@@ -638,7 +638,7 @@ export function StaffManagement({ onShowPerformance }: StaffManagementProps) {
                                     </div>
                                     <p className="text-[10px] text-slate-500 mt-1">{pct}% of target</p>
                                   </td>
-                                  <td className="px-4 py-3">
+                                  <td className="px-3 py-3">
                                     <div className="flex gap-1 justify-end">
                                       <Button
                                         variant="secondary"

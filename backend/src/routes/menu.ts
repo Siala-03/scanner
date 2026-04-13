@@ -61,8 +61,8 @@ menuRouter.post('/', authenticate, async (req: AuthenticatedRequest, res: Respon
       console.log(`Inserting ${items.length} new menu items for restaurant ${restaurantId}`);
       for (const item of items) {
         await client.query(
-          `INSERT INTO menu_items (id, name, description, price, category, emoji, prep_time, is_available, is_popular, restaurant_id)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+          `INSERT INTO menu_items (id, name, description, price, category, emoji, prep_time, is_available, is_popular, restaurant_id, requires_kitchen)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
           [
             item.id,
             item.name,
@@ -73,7 +73,8 @@ menuRouter.post('/', authenticate, async (req: AuthenticatedRequest, res: Respon
             item.prepTime || 15,
             item.isAvailable !== false,  // Default to true if not specified
             item.isPopular || false,
-            restaurantId
+            restaurantId,
+            item.requiresKitchen ?? null,  // null = let frontend use category fallback
           ]
         );
       }

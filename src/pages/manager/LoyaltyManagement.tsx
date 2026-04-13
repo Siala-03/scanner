@@ -133,11 +133,11 @@ export function LoyaltyManagement() {
     <div className="dark min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
       {/* Header */}
       <div className="border-b border-slate-700/50 bg-slate-900/80 backdrop-blur sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 md:px-6 py-4">
-          <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div className="max-w-7xl mx-auto px-3 md:px-6 py-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
-              <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-                <GiftIcon className="w-6 h-6 text-amber-400" />
+              <h1 className="text-xl md:text-2xl font-bold text-white flex items-center gap-2">
+                <GiftIcon className="w-5 h-5 md:w-6 h-6 text-amber-400" />
                 Loyalty Program Management
               </h1>
               <p className="text-slate-400 text-sm mt-0.5">View, manage and export customer loyalty data for SMS marketing</p>
@@ -153,7 +153,7 @@ export function LoyaltyManagement() {
                 disabled={filteredCustomers.length === 0}
               >
                 <MessageSquareIcon className="w-4 h-4" />
-                Export Phone Numbers ({exportTarget.length})
+                <span className="hidden sm:inline">Export Phone Numbers ({exportTarget.length})</span>
               </Button>
               <Button
                 variant="primary"
@@ -162,7 +162,7 @@ export function LoyaltyManagement() {
                 disabled={filteredCustomers.length === 0}
               >
                 <DownloadIcon className="w-4 h-4" />
-                Export CSV ({exportTarget.length})
+                <span className="hidden sm:inline">Export CSV ({exportTarget.length})</span>
               </Button>
             </div>
           </div>
@@ -309,10 +309,10 @@ export function LoyaltyManagement() {
         {!loading && (
           <Card className="bg-slate-800/50 border border-slate-700/50" padding="none">
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full min-w-[600px]">
                 <thead className="bg-slate-700/40 border-b border-slate-700/50">
                   <tr>
-                    <th className="px-4 py-3 text-left w-10">
+                    <th className="px-3 py-3 text-left w-10">
                       <input
                         type="checkbox"
                         checked={selectedCustomers.size === filteredCustomers.length && filteredCustomers.length > 0}
@@ -320,12 +320,12 @@ export function LoyaltyManagement() {
                         className="rounded border-slate-500 bg-slate-800 accent-amber-500"
                       />
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Customer</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Phone</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Email</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Points</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Joined</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">SMS Ready</th>
+                    <th className="px-3 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Customer</th>
+                    <th className="px-3 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider hidden sm:table-cell">Phone</th>
+                    <th className="px-3 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider hidden md:table-cell">Email</th>
+                    <th className="px-3 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Points</th>
+                    <th className="px-3 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider hidden lg:table-cell">Joined</th>
+                    <th className="px-3 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">SMS</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-700/30">
@@ -334,7 +334,7 @@ export function LoyaltyManagement() {
                       key={customer.id}
                       className={`transition-colors hover:bg-slate-700/20 ${selectedCustomers.has(customer.id) ? 'bg-amber-500/5' : ''}`}
                     >
-                      <td className="px-4 py-3">
+                      <td className="px-3 py-3">
                         <input
                           type="checkbox"
                           checked={selectedCustomers.has(customer.id)}
@@ -342,7 +342,7 @@ export function LoyaltyManagement() {
                           className="rounded border-slate-500 bg-slate-800 accent-amber-500"
                         />
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-3 py-3">
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-500/30 to-amber-600/30 flex items-center justify-center text-amber-300 font-semibold text-sm">
                             {(customer.name || 'C')[0].toUpperCase()}
@@ -353,7 +353,7 @@ export function LoyaltyManagement() {
                           </div>
                         </div>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-3 py-3 hidden sm:table-cell">
                         {customer.phone ? (
                           <div className="flex items-center gap-1.5">
                             <PhoneIcon className="w-3 h-3 text-green-400" />
@@ -363,7 +363,7 @@ export function LoyaltyManagement() {
                           <span className="text-xs text-slate-600">—</span>
                         )}
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-3 py-3 hidden md:table-cell">
                         {customer.email ? (
                           <div className="flex items-center gap-1.5">
                             <MailIcon className="w-3 h-3 text-blue-400" />
@@ -373,13 +373,13 @@ export function LoyaltyManagement() {
                           <span className="text-xs text-slate-600">—</span>
                         )}
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-3 py-3">
                         <div className="flex items-center gap-1">
                           <StarIcon className="w-3 h-3 text-amber-400" />
                           <span className="text-sm font-semibold text-amber-300">{(customer.totalPoints || 0).toLocaleString()}</span>
                         </div>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-3 py-3 hidden lg:table-cell">
                         <div className="flex items-center gap-1.5">
                           <CalendarIcon className="w-3 h-3 text-slate-500" />
                           <span className="text-xs text-slate-400">
@@ -387,7 +387,7 @@ export function LoyaltyManagement() {
                           </span>
                         </div>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-3 py-3">
                         {customer.phone ? (
                           <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-green-500/15 text-green-300 border border-green-500/20">
                             Ready

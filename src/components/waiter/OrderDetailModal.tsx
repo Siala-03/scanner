@@ -29,11 +29,12 @@ export function OrderDetailModal({
   onApprove,
   onReject,
   onMarkReady,
-  onMarkServed
+  onMarkServed,
+  onPrintReceipt,
 }: OrderDetailModalProps) {
   if (!order) return null;
   const minutesAgo = Math.floor(
-    (Date.now() - order.createdAt.getTime()) / 60000
+    (Date.now() - new Date(order.createdAt).getTime()) / 60000
   );
   return (
     <Modal
@@ -155,12 +156,10 @@ export function OrderDetailModal({
 
         {/* Timestamps */}
         <div className="text-sm text-slate-400 space-y-1">
-          <p>Created: {order.createdAt.toLocaleString()}</p>
-          {order.verifiedAt &&
-          <p>Verified: {order.verifiedAt.toLocaleString()}</p>
-          }
-          {order.readyAt && <p>Ready: {order.readyAt.toLocaleString()}</p>}
-          {order.servedAt && <p>Served: {order.servedAt.toLocaleString()}</p>}
+          <p>Created: {new Date(order.createdAt).toLocaleString()}</p>
+          {order.verifiedAt && <p>Verified: {new Date(order.verifiedAt).toLocaleString()}</p>}
+          {order.readyAt && <p>Ready: {new Date(order.readyAt).toLocaleString()}</p>}
+          {order.servedAt && <p>Served: {new Date(order.servedAt).toLocaleString()}</p>}
         </div>
 
         {/* Actions */}

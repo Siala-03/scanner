@@ -318,12 +318,12 @@ export function AnalyticsPage() {
   };
 
   return (
-    <div className="dark min-h-screen bg-slate-900 p-4 md:p-6">
+    <div className="dark min-h-screen bg-slate-900 p-3 md:p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-gray-100">Analytics</h1>
+            <h1 className="text-xl md:text-2xl font-bold text-gray-100">Analytics</h1>
             <p className="text-slate-400">
               Deep dive into your business metrics
             </p>
@@ -341,25 +341,25 @@ export function AnalyticsPage() {
         </div>
 
         {/* Date Window + Comparison Mode */}
-        <div className="flex items-center justify-between mb-6 gap-4">
+        <div className="flex flex-wrap items-center justify-between mb-6 gap-4">
           <div className="flex items-center gap-2">
             {['7d', '30d', '90d', '1y'].map((window) => (
               <button
                 key={window}
-                className={`px-3 py-1 rounded ${dateWindow === window ? 'bg-emerald-500 text-white' : 'bg-slate-700 text-slate-200'}`}
+                className={`px-3 py-1 rounded text-sm ${dateWindow === window ? 'bg-emerald-500 text-white' : 'bg-slate-700 text-slate-200'}`}
                 onClick={() => setDateWindow(window as '7d' | '30d' | '90d' | '1y')}>
                 {window}
               </button>
             ))}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button
-              className={`px-3 py-1 rounded ${comparisonMode === 'previousMonth' ? 'bg-sky-500 text-white' : 'bg-slate-700 text-slate-200'}`}
+              className={`px-3 py-1 rounded text-sm ${comparisonMode === 'previousMonth' ? 'bg-sky-500 text-white' : 'bg-slate-700 text-slate-200'}`}
               onClick={() => setComparisonMode('previousMonth')}>
               Prev Month
             </button>
             <button
-              className={`px-3 py-1 rounded ${comparisonMode === 'lastYear' ? 'bg-sky-500 text-white' : 'bg-slate-700 text-slate-200'}`}
+              className={`px-3 py-1 rounded text-sm ${comparisonMode === 'lastYear' ? 'bg-sky-500 text-white' : 'bg-slate-700 text-slate-200'}`}
               onClick={() => setComparisonMode('lastYear')}>
               Last Year
             </button>
@@ -367,17 +367,17 @@ export function AnalyticsPage() {
         </div>
 
         {/* KPI targets */}
-        <div className="grid md:grid-cols-3 gap-4 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
           <Card className="bg-slate-800 p-4">
             <p className="text-xs text-slate-400">Revenue Target</p>
-            <div className="flex items-center gap-2">
-              <p className="text-2xl font-bold text-gray-100">{formatPrice(currentRevenue)} / {formatPrice(kpiTargets.revenue)}</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-xl md:text-2xl font-bold text-gray-100">{formatPrice(currentRevenue)} / {formatPrice(kpiTargets.revenue)}</p>
               <input
                 type="number"
                 min={0}
                 value={kpiTargets.revenue}
                 onChange={(e) => setKpiTargets((prev) => ({ ...prev, revenue: Number(e.target.value) }))}
-                className="w-24 bg-slate-700 text-white px-2 py-1 rounded text-xs"
+                className="w-20 md:w-24 bg-slate-700 text-white px-2 py-1 rounded text-xs"
               />
             </div>
             <div className="h-2 bg-slate-700 rounded mt-2 overflow-hidden">
@@ -386,14 +386,14 @@ export function AnalyticsPage() {
           </Card>
           <Card className="bg-slate-800 p-4">
             <p className="text-xs text-slate-400">Orders Target</p>
-            <div className="flex items-center gap-2">
-              <p className="text-2xl font-bold text-gray-100">{currentOrders.toLocaleString()} / {kpiTargets.orders}</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-xl md:text-2xl font-bold text-gray-100">{currentOrders.toLocaleString()} / {kpiTargets.orders}</p>
               <input
                 type="number"
                 min={0}
                 value={kpiTargets.orders}
                 onChange={(e) => setKpiTargets((prev) => ({ ...prev, orders: Number(e.target.value) }))}
-                className="w-20 bg-slate-700 text-white px-2 py-1 rounded text-xs"
+                className="w-16 md:w-20 bg-slate-700 text-white px-2 py-1 rounded text-xs"
               />
             </div>
             <div className="h-2 bg-slate-700 rounded mt-2 overflow-hidden">
@@ -402,15 +402,15 @@ export function AnalyticsPage() {
           </Card>
           <Card className="bg-slate-800 p-4">
             <p className="text-xs text-slate-400">Avg Order Value Target</p>
-            <div className="flex items-center gap-2">
-              <p className="text-2xl font-bold text-gray-100">{formatPrice(monthlyComparison.currentMonth.avgOrderValue)} / {formatPrice(kpiTargets.avgOrderValue)}</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-xl md:text-2xl font-bold text-gray-100">{formatPrice(monthlyComparison.currentMonth.avgOrderValue)} / {formatPrice(kpiTargets.avgOrderValue)}</p>
               <input
                 type="number"
                 min={0}
                 step={0.1}
                 value={kpiTargets.avgOrderValue}
                 onChange={(e) => setKpiTargets((prev) => ({ ...prev, avgOrderValue: Number(e.target.value) }))}
-                className="w-20 bg-slate-700 text-white px-2 py-1 rounded text-xs"
+                className="w-16 md:w-20 bg-slate-700 text-white px-2 py-1 rounded text-xs"
               />
             </div>
             <div className="h-2 bg-slate-700 rounded mt-2 overflow-hidden">
@@ -425,7 +425,7 @@ export function AnalyticsPage() {
         </div>
 
         {/* Month Comparison */}
-        <div className="grid md:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           <Card className="bg-slate-800">
             <p className="text-sm text-slate-400 mb-1">
               {timeRange === 'today'
@@ -485,7 +485,7 @@ export function AnalyticsPage() {
         </div>
 
         {/* BI improved analytics: predictions and recommendations */}
-        <div className="grid lg:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <Card className="bg-slate-800 p-4">
             <p className="text-xs text-slate-400 mb-1">Avg Daily Revenue</p>
             <p className="text-2xl font-bold text-gray-100">{formatPrice(avgDailyRevenue)}</p>
@@ -505,7 +505,7 @@ export function AnalyticsPage() {
         </div>
 
         {/* Additional BI improvements */}
-        <div className="grid lg:grid-cols-3 gap-4 mb-6">
+        <div className="grid sm:grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
           <Card className="bg-slate-800 p-4">
             <h3 className="text-sm font-semibold text-gray-100 mb-2">Sales Funnel</h3>
             <ul className="space-y-1 text-sm text-slate-300">
@@ -564,7 +564,7 @@ export function AnalyticsPage() {
           </Card>
         </div>
 
-        <div className="grid lg:grid-cols-2 gap-6 mb-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
           {/* Revenue Trend */}
           <Card className="bg-slate-800">
             <h3 className="text-lg font-semibold text-gray-100 mb-4">

@@ -261,25 +261,26 @@ export function MenuManagement() {
     }
   };
   return (
-    <div className="dark min-h-screen bg-slate-900 p-4 md:p-6">
+    <div className="dark min-h-screen bg-slate-900 p-3 md:p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-gray-100">Menu Management</h1>
+            <h1 className="text-xl md:text-2xl font-bold text-gray-100">Menu Management</h1>
             <p className="text-slate-400">
               {menuItemsState.length} items total
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {/* Import Button */}
             <Button 
               variant="secondary" 
+              size="sm"
               onClick={handleImportClick}
               isLoading={isImporting}
             >
-              <UploadIcon className="w-5 h-5" />
-              Import
+              <UploadIcon className="w-4 h-4" />
+              <span className="hidden sm:inline">Import</span>
             </Button>
             {/* Hidden file input */}
             <input
@@ -293,11 +294,12 @@ export function MenuManagement() {
             <div className="relative export-dropdown">
               <Button 
                 variant="secondary" 
+                size="sm"
                 onClick={() => setIsExportMenuOpen(!isExportMenuOpen)}
                 ref={exportButtonRef}
               >
-                <DownloadIcon className="w-5 h-5" />
-                Export
+                <DownloadIcon className="w-4 h-4" />
+                <span className="hidden sm:inline">Export</span>
               </Button>
               {isExportMenuOpen && (
                 <div className="absolute right-0 mt-2 w-48 bg-slate-800 rounded-md shadow-lg border border-slate-700 z-50">
@@ -318,20 +320,20 @@ export function MenuManagement() {
                 </div>
               )}
             </div>
-            <Button variant="primary" onClick={handleAddItem} isLoading={isSaving}>
-              <PlusIcon className="w-5 h-5" />
-              Add Item
+            <Button variant="primary" size="sm" onClick={handleAddItem} isLoading={isSaving}>
+              <PlusIcon className="w-4 h-4" />
+              <span className="hidden sm:inline">Add Item</span>
             </Button>
           </div>
         </div>
 
         {/* Filters */}
-        <div className="flex flex-col md:flex-row gap-4 mb-6">
+        <div className="flex flex-col sm:flex-row gap-3 mb-6">
           <SearchBar
             value={searchQuery}
             onChange={setSearchQuery}
             placeholder="Search menu items..."
-            className="md:w-80" />
+            className="sm:w-80" />
 
           <div className="flex-1 overflow-x-auto">
             <Tabs
@@ -344,7 +346,7 @@ export function MenuManagement() {
         </div>
 
         {/* Menu Items Grid */}
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <AnimatePresence mode="popLayout">
             {filteredItems.map((item, index) =>
             <motion.div

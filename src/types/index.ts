@@ -13,6 +13,7 @@ export interface MenuItem {
   prepTime: number; // in minutes
   isAvailable: boolean;
   isPopular: boolean;
+  requiresKitchen?: boolean; // true = food (goes to kitchen), false = bar only — hidden from customer menu
 }
 
 export type MenuCategory =

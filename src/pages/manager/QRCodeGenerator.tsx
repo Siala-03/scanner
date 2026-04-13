@@ -146,35 +146,35 @@ export function QRCodeGenerator({
   };
 
   return (
-    <div className="dark bg-slate-900 p-4 md:p-6">
+    <div className="dark bg-slate-900 p-3 md:p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row items-center justify-between mb-8">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 md:mb-8">
           <div>
-            <h1 className="text-2xl font-bold text-gray-100">{qrTitle}</h1>
-            <p className="text-slate-400">
+            <h1 className="text-xl md:text-2xl font-bold text-gray-100">{qrTitle}</h1>
+            <p className="text-slate-400 text-sm">
               Generate QR codes for customers to scan and place orders from their tables.
             </p>
           </div>
-          <div className="flex gap-3 mt-4 sm:mt-0">
-            <Button variant="secondary" onClick={handlePrint}>
+          <div className="flex gap-2 sm:gap-3">
+            <Button variant="secondary" size="sm" onClick={handlePrint}>
               <PrinterIcon className="w-4 h-4" />
-              Print All
+              <span className="hidden sm:inline">Print All</span>
             </Button>
-            <Button variant="primary" onClick={handleAddTable} disabled={isAddingTable}>
+            <Button variant="primary" size="sm" onClick={handleAddTable} disabled={isAddingTable}>
               <PlusIcon className="w-4 h-4" />
-              {isAddingTable ? 'Adding...' : 'Add Table'}
+              <span className="hidden sm:inline">{isAddingTable ? 'Adding...' : 'Add Table'}</span>
             </Button>
           </div>
         </div>
 
         {/* QR Grid */}
         {validTables.length === 0 ? (
-          <p className="text-center text-slate-300 py-20">
+          <p className="text-center text-slate-300 py-12 md:py-20">
             No tables created yet. Use the "Add Table" button above to generate a new table number and QR code.
           </p>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
             {validTables.map((tableNum) => {
               const qrLink = restaurantId
                 ? `${resolvedBaseUrl}/r/${encodeURIComponent(restaurantId)}/t/${tableNum}`
@@ -182,26 +182,26 @@ export function QRCodeGenerator({
               return (
                 <div
                   key={tableNum}
-                  className="bg-white p-6 rounded-xl border border-slate-200 flex flex-col items-center justify-center text-center shadow-md hover:shadow-lg transition-shadow"
+                  className="bg-white p-3 sm:p-6 rounded-xl border border-slate-200 flex flex-col items-center justify-center text-center shadow-md hover:shadow-lg transition-shadow"
                 >
-                  <h2 className="text-2xl font-bold text-slate-900 mb-2">
+                  <h2 className="text-lg sm:text-2xl font-bold text-slate-900 mb-2">
                     Table {tableNum}
                   </h2>
                   {restaurantName && (
-                    <p className="text-sm text-slate-500 mb-4">{restaurantName}</p>
+                    <p className="text-xs sm:text-sm text-slate-500 mb-2 sm:mb-4">{restaurantName}</p>
                   )}
 
                   {/* QR Code */}
-                  <div id={`qr-container-${tableNum}`} className="mb-4 p-2 bg-white rounded">
+                  <div id={`qr-container-${tableNum}`} className="mb-3 sm:mb-4 p-1 sm:p-2 bg-white rounded">
                     <QRCode
                       value={qrLink}
-                      size={160}
+                      size={140}
                       level="H"
                     />
                   </div>
 
                   {/* Action Buttons */}
-                  <div className="flex items-center gap-2 mb-3">
+                  <div className="flex items-center gap-2 mb-2 sm:mb-3">
                     <button
                       onClick={() => handleDownload(tableNum)}
                       className="p-2 rounded-lg bg-amber-500 text-white hover:bg-amber-600 transition-colors"
@@ -220,10 +220,10 @@ export function QRCodeGenerator({
                     )}
                   </div>
 
-                  <p className="text-sm text-slate-500 font-medium">
-                    Customers scan to order
+                  <p className="text-xs sm:text-sm text-slate-500 font-medium">
+                    Scan to order
                   </p>
-                  <p className="text-xs text-slate-400 mt-1 break-all font-mono">
+                  <p className="text-[10px] sm:text-xs text-slate-400 mt-1 break-all font-mono hidden sm:block">
                     {qrLink}
                   </p>
                 </div>

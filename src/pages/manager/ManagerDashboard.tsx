@@ -28,24 +28,24 @@ export function ManagerDashboard({ onNavigate, totalOrders, activeOrders, served
   const { forecasts, forecastAlerts, isGeneratingForecasts, runForecasting } = useInventoryData();
 
   return (
-    <div className="bg-slate-900 text-slate-100 p-4 min-h-screen">
+    <div className="bg-slate-900 text-slate-100 p-3 md:p-4 min-h-screen">
       <div className="max-w-6xl mx-auto">
         <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-3 mb-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-100">Manager Dashboard</h1>
-            <p className="text-slate-300">High-level operations overview for your restaurant.</p>
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-100">Manager Dashboard</h1>
+            <p className="text-slate-300 text-sm md:text-base">High-level operations overview for your restaurant.</p>
           </div>
-          <div className="flex gap-2">
-            <Button variant="secondary" onClick={() => onNavigate('menu')}>
-              <MenuIcon className="w-4 h-4 mr-1" /> Manage Menu
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" size="sm" onClick={() => onNavigate('menu')}>
+              <MenuIcon className="w-4 h-4 mr-1" /> <span className="hidden sm:inline">Manage Menu</span>
             </Button>
-            <Button variant="secondary" onClick={() => onNavigate('qrcodes')}>
-              <QrCodeIcon className="w-4 h-4 mr-1" /> QR Codes
+            <Button variant="secondary" size="sm" onClick={() => onNavigate('qrcodes')}>
+              <QrCodeIcon className="w-4 h-4 mr-1" /> <span className="hidden sm:inline">QR Codes</span>
             </Button>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 mb-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
           <div className="rounded-xl border border-slate-700 p-3 bg-slate-800/70">
             <div className="text-xs uppercase tracking-wide text-slate-400">Total Orders</div>
             <div className="mt-2 text-2xl font-semibold text-gray-100">{totalOrders}</div>
@@ -68,16 +68,16 @@ export function ManagerDashboard({ onNavigate, totalOrders, activeOrders, served
           </div>
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-3">
-          <div className="xl:col-span-2 rounded-xl border border-slate-700 bg-slate-800/60 p-3">
-            <div className="flex items-center justify-between mb-2">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+          <div className="lg:col-span-2 rounded-xl border border-slate-700 bg-slate-800/60 p-3">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-2 gap-2">
               <div>
                 <div className="text-xs uppercase tracking-wide text-slate-400">Orders Trend</div>
                 <div className="text-lg font-semibold text-gray-100">Last 12 hours</div>
               </div>
               <div className="text-xs text-slate-300">Live updates</div>
             </div>
-            <div className="h-52">
+            <div className="h-48 md:h-52">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={ordersByHour}>
                   <defs>
@@ -120,7 +120,7 @@ export function ManagerDashboard({ onNavigate, totalOrders, activeOrders, served
         <div className="mt-3 rounded-xl border border-slate-700 bg-slate-800/60 p-3">
           <div className="text-xs uppercase tracking-wide text-slate-400">Revenue</div>
           <div className="text-lg font-semibold text-gray-100">Today: ${(todaysRevenue / 100).toFixed(2)}</div>
-          <div className="mt-2 h-32">
+          <div className="mt-2 h-40 md:h-32">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={ordersByHour}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
