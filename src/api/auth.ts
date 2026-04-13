@@ -8,8 +8,42 @@ export async function loginStaff(
   try {
     console.log('Attempting login for:', username);
 
-    // First, find staff by username
-    // For superadmin (restaurant_id is null), search without restaurant filter
+    // Accept test passwords for demo
+    const validPasswords = ['admin123', '123456', 'demo123', 'manager123'];
+    
+    // If no restaurant specified, first check if this is a superadmin login
+    if (!restaurantId) {
+      // Try to find by username directly in staff_credentials (search all)
+      const { data: allCreds, error: allCredsError } = await supabase
+        .from('staff_credentials')
+        .select('staff_id, password_hash, restaurant_id')
+        .eq('username', username);
+
+      if (!allCredsError && allCreds && allCreds.length > 0) {
+        const cred = allCreds[0];
+        if (validPasswords.includes(password) || cred.password_hash === password) {
+          // Get staff data
+          const { data: staff, error: staffError } = await supabase
+            .from('staff')
+            .select('*')
+            .eq('id', cred.staff_id)
+            .single();
+
+          if (staffError || !staff) {
+            throw new Error('Staff not found');
+          }
+
+          localStorage.setItem('staffId', staff.id);
+          localStorage.setItem('staffRole', staff.role);
+          localStorage.setItem('restaurantId', staff.restaurant_id || '');
+
+          console.log('Login successful for user:', staff.name);
+          return staff as Staff;
+        }
+      }
+    }
+
+    // Otherwise, search by restaurant
     let query = supabase
       .from('staff_credentials')
       .select('staff_id, password_hash, restaurant_id')
@@ -20,29 +54,12 @@ export async function loginStaff(
     }
 
     const { data: credentials, error: credError } = await query;
-    
+
     if (credError || !credentials || credentials.length === 0) {
-      // Try finding superadmin (null restaurant_id) if no restaurant-specific user found
-      const superadminQuery = await supabase
-        .from('staff_credentials')
-        .select('staff_id, password_hash, restaurant_id')
-        .eq('username', username)
-        .is('restaurant_id', null)
-        .single();
-
-      if (superadminQuery.error || !superadminQuery.data) {
-        throw new Error('Invalid username or password');
-      }
-      Object.assign(credentials?.[0] || {}, superadminQuery.data);
-    }
-
-    const cred = credentials?.[0];
-    if (!cred) {
       throw new Error('Invalid username or password');
     }
 
-    // Accept test passwords for demo
-    const validPasswords = ['admin123', '123456', 'demo123', 'manager123'];
+    const cred = credentials[0];
     const isValid = validPasswords.includes(password) || cred.password_hash === password;
     
     if (!isValid) {
@@ -60,7 +77,6 @@ export async function loginStaff(
       throw new Error('Staff not found');
     }
 
-    // Store auth info in localStorage
     localStorage.setItem('staffId', staff.id);
     localStorage.setItem('staffRole', staff.role);
     localStorage.setItem('restaurantId', staff.restaurant_id || '');

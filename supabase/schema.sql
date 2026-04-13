@@ -26,6 +26,7 @@ ON CONFLICT (id) DO NOTHING;
 
 -- 2. STAFF (tied to a specific restaurant)
 -- role: superadmin (Servv team), manager, supervisor, waiter, kitchen
+-- restaurant_id can be NULL for superadmin
 CREATE TABLE IF NOT EXISTS staff (
   id text PRIMARY KEY,
   name text NOT NULL,
@@ -36,18 +37,15 @@ CREATE TABLE IF NOT EXISTS staff (
   assigned_tables integer[] NOT NULL DEFAULT '{}',
   performance jsonb NOT NULL DEFAULT '{}',
   hire_date timestamptz NOT NULL DEFAULT now(),
-  restaurant_id text REFERENCES restaurants(id) -- NULL for superadmin
+  restaurant_id text REFERENCES restaurants(id)
 );
--- For restaurants, email unique per restaurant; for superadmin, can be global
-CREATE INDEX IF NOT EXISTS idx_staff_restaurant ON staff(restaurant_id) WHERE restaurant_id IS NOT NULL;
 
--- Staff credentials (username/password for login)
+-- Staff credentials - use staff_id as primary key, allow NULL restaurant_id
 CREATE TABLE IF NOT EXISTS staff_credentials (
-  staff_id text NOT NULL REFERENCES staff(id) ON DELETE CASCADE,
-  username text NOT NULL,
+  staff_id text NOT NULL PRIMARY KEY REFERENCES staff(id) ON DELETE CASCADE,
+  username text NOT NULL UNIQUE,
   password_hash text NOT null,
-  restaurant_id text REFERENCES restaurants(id), -- NULL for superadmin
-  PRIMARY KEY (restaurant_id, username)
+  restaurant_id text REFERENCES restaurants(id)
 );
 
 -- 3. MENU ITEMS
