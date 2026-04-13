@@ -290,7 +290,7 @@ export async function createSupplier(supplier: Partial<Supplier>): Promise<Suppl
   const id = `sup-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   console.log('Creating supplier:', supplier, 'restaurant:', restaurantId);
 
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from('suppliers')
     .insert({
       id,

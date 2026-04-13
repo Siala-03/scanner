@@ -1,23 +1,260 @@
-import { KPI, KPIWithProgress } from '../types';
+import { supabaseAdmin } from '../lib/supabase';
+import { KPI, KPIWithProgress, StaffKPIProgress } from '../types';
 
-// KPI management is not yet backed by Supabase — return safe empty values
-// so supervisor dashboard doesn't crash while the feature is pending.
-
-export async function getKPIs(): Promise<KPI[]> {
-  return [];
+function getRestaurantId(): string | null {
+  return typeof window !== 'undefined' ? localStorage.getItem('restaurantId') : null;
 }
 
-export async function createKPI(kpi: Omit<KPI, 'id' | 'restaurantId' | 'createdBy' | 'createdAt' | 'updatedAt'>): Promise<KPI> {
-  throw new Error('KPI management not yet implemented');
+function getCurrentStaff(): { id: string; role: string } | null {
+  try {
+    const raw = localStorage.getItem('authUser');
+    if (!raw) return null;
+    const u = JSON.parse(raw);
+    if (!u?.id || !u?.role) return null;
+    return { id: u.id, role: u.role };
+  } catch {
+    return null;
+  }
+}
+
+function getPeriodBounds(period: string): { start: Date; end: Date } {
+  const now = new Date();
+  const start = new Date(now);
+  const end = new Date(now);
+
+  if (period === 'daily') {
+    start.setHours(0, 0, 0, 0);
+    end.setHours(23, 59, 59, 999);
+  } else if (period === 'weekly') {
+    const day = start.getDay(); // 0=Sun
+    start.setDate(start.getDate() - day);
+    start.setHours(0, 0, 0, 0);
+    end.setDate(start.getDate() + 6);
+    end.setHours(23, 59, 59, 999);
+  } else {
+    // monthly
+    start.setDate(1);
+    start.setHours(0, 0, 0, 0);
+    end.setMonth(end.getMonth() + 1, 0);
+    end.setHours(23, 59, 59, 999);
+  }
+  return { start, end };
+}
+
+/** Compute current metric value from real orders for a given staff + KPI */
+async function computeProgress(
+  kpi: KPI,
+  staffId: string
+): Promise<StaffKPIProgress> {
+  const { start, end } = getPeriodBounds(kpi.period);
+
+  let currentValue = 0;
+
+  if (kpi.metric === 'orders_served' || kpi.metric === 'revenue' || kpi.metric === 'tables_served') {
+    const { data: orders } = await supabaseAdmin
+      .from('orders')
+      .select('total, table_number, status, assigned_waiter_id, created_at')
+      .eq('restaurant_id', kpi.restaurant_id)
+      .eq('assigned_waiter_id', staffId)
+      .eq('status', 'served')
+      .gte('created_at', start.toISOString())
+      .lte('created_at', end.toISOString());
+
+    const list = orders || [];
+    if (kpi.metric === 'orders_served') {
+      currentValue = list.length;
+    } else if (kpi.metric === 'revenue') {
+      currentValue = list.reduce((sum: number, o: any) => sum + (o.total || 0), 0);
+    } else if (kpi.metric === 'tables_served') {
+      currentValue = new Set(list.map((o: any) => o.table_number)).size;
+    }
+  }
+  // 'prep_time' and 'rating' require additional tables — leave at 0 for now
+
+  return {
+    id: 0,
+    staffId,
+    kpiId: kpi.id,
+    currentValue,
+    periodStart: start,
+    periodEnd: end,
+    achieved: currentValue >= kpi.target_value,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+}
+
+export async function getKPIs(): Promise<KPI[]> {
+  const restaurantId = getRestaurantId();
+  if (!restaurantId) return [];
+
+  const { data, error } = await supabaseAdmin
+    .from('kpis')
+    .select('*')
+    .eq('restaurant_id', restaurantId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.warn('getKPIs error:', error.message);
+    return [];
+  }
+
+  return (data || []).map((row: any) => ({
+    id: row.id,
+    restaurant_id: row.restaurant_id,
+    staff_role: row.staff_role,
+    name: row.name,
+    description: row.description,
+    metric: row.metric,
+    target_value: row.target_value,
+    period: row.period,
+    created_by: row.created_by,
+    created_at: new Date(row.created_at),
+    updated_at: new Date(row.updated_at),
+    assigned_staff_ids: row.assigned_staff_ids || [],
+  })) as KPI[];
+}
+
+export async function createKPI(kpi: {
+  staffRole: string;
+  name: string;
+  description?: string;
+  metric: string;
+  targetValue: number;
+  period: string;
+  assignedStaffIds?: string[];
+}): Promise<KPI> {
+  const restaurantId = getRestaurantId();
+  if (!restaurantId) throw new Error('No restaurant selected');
+  const staff = getCurrentStaff();
+
+  const { data, error } = await supabaseAdmin
+    .from('kpis')
+    .insert({
+      restaurant_id: restaurantId,
+      staff_role: kpi.staffRole,
+      name: kpi.name,
+      description: kpi.description || null,
+      metric: kpi.metric,
+      target_value: kpi.targetValue,
+      period: kpi.period,
+      created_by: staff?.id || null,
+      assigned_staff_ids: kpi.assignedStaffIds || [],
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+
+  return {
+    id: data.id,
+    restaurant_id: data.restaurant_id,
+    staff_role: data.staff_role,
+    name: data.name,
+    description: data.description,
+    metric: data.metric,
+    target_value: data.target_value,
+    period: data.period,
+    created_by: data.created_by,
+    created_at: new Date(data.created_at),
+    updated_at: new Date(data.updated_at),
+    assigned_staff_ids: data.assigned_staff_ids || [],
+  } as KPI;
 }
 
 export async function getStaffKPIs(): Promise<KPIWithProgress[]> {
-  return [];
+  const restaurantId = getRestaurantId();
+  const staff = getCurrentStaff();
+  if (!restaurantId || !staff) return [];
+
+  // Fetch KPIs where this staff's role matches OR they are in assigned_staff_ids
+  const { data, error } = await supabaseAdmin
+    .from('kpis')
+    .select('*')
+    .eq('restaurant_id', restaurantId);
+
+  if (error) {
+    console.warn('getStaffKPIs error:', error.message);
+    return [];
+  }
+
+  const all = (data || []) as any[];
+  // Filter to KPIs relevant to this staff member
+  const relevant = all.filter((row) => {
+    if (row.staff_role === staff.role) return true;
+    const ids: string[] = row.assigned_staff_ids || [];
+    return ids.includes(staff.id);
+  });
+
+  if (relevant.length === 0) return [];
+
+  // Compute live progress for each KPI
+  const results = await Promise.all(
+    relevant.map(async (row): Promise<KPIWithProgress> => {
+      const kpi: KPI = {
+        id: row.id,
+        restaurant_id: row.restaurant_id,
+        staff_role: row.staff_role,
+        name: row.name,
+        description: row.description,
+        metric: row.metric,
+        target_value: row.target_value,
+        period: row.period,
+        created_by: row.created_by,
+        created_at: new Date(row.created_at),
+        updated_at: new Date(row.updated_at),
+        assigned_staff_ids: row.assigned_staff_ids || [],
+      };
+      const progress = await computeProgress(kpi, staff.id);
+      return { ...kpi, progress };
+    })
+  );
+
+  return results;
 }
 
-export async function assignKPI(_staffId: string, _kpiId: number): Promise<void> {}
-export async function unassignKPI(_staffId: string, _kpiId: number): Promise<void> {}
+export async function assignKPI(staffId: string, kpiId: number): Promise<void> {
+  const { data: existing } = await supabaseAdmin
+    .from('kpis')
+    .select('assigned_staff_ids')
+    .eq('id', kpiId)
+    .single();
+
+  if (!existing) return;
+  const ids: string[] = existing.assigned_staff_ids || [];
+  if (!ids.includes(staffId)) ids.push(staffId);
+
+  await supabaseAdmin
+    .from('kpis')
+    .update({ assigned_staff_ids: ids })
+    .eq('id', kpiId);
+}
+
+export async function unassignKPI(staffId: string, kpiId: number): Promise<void> {
+  const { data: existing } = await supabaseAdmin
+    .from('kpis')
+    .select('assigned_staff_ids')
+    .eq('id', kpiId)
+    .single();
+
+  if (!existing) return;
+  const ids: string[] = (existing.assigned_staff_ids || []).filter((id: string) => id !== staffId);
+
+  await supabaseAdmin
+    .from('kpis')
+    .update({ assigned_staff_ids: ids })
+    .eq('id', kpiId);
+}
+
+/** Progress is computed live from orders — this is a no-op */
 export async function updateKPIProgress(_kpiId: number, _currentValue: number): Promise<void> {}
-export async function deleteKPI(_kpiId: number): Promise<{ success: boolean }> {
+
+export async function deleteKPI(kpiId: number): Promise<{ success: boolean }> {
+  const { error } = await supabaseAdmin
+    .from('kpis')
+    .delete()
+    .eq('id', kpiId);
+
+  if (error) throw error;
   return { success: true };
 }

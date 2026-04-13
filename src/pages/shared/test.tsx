@@ -274,6 +274,12 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
   const handleSaveSupplier = async () => {
     if (!supplierForm.name) return;
     try {
+      const restaurantId = localStorage.getItem('restaurantId');
+      console.log('Saving supplier, restaurantId:', restaurantId);
+      if (!restaurantId) {
+        alert('No restaurant selected. Please log in again.');
+        return;
+      }
       if (editingSupplier) {
         await updateSupplierApi(editingSupplier.id, supplierForm as Partial<Supplier>);
       } else {
@@ -297,6 +303,7 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
       refresh();
     } catch (err) {
       console.error('Failed to save supplier:', err);
+      alert(`Failed to save supplier: ${err instanceof Error ? err.message : 'Unknown error'}`);
     }
   };
 
