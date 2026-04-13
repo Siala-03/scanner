@@ -1,4 +1,5 @@
-import { supabase, type InventoryRecord as SupabaseInventoryRecord, type Supplier as SupabaseSupplier } from '../lib/supabase';
+import { supabase, supabaseAdmin } from '../lib/supabase';
+import type { InventoryRecord, Supplier, PurchaseOrder, StockMovement, WasteEntry, InventoryAnalytics } from '../types/inventory';
 
 function getRestaurantId(): string | undefined {
   if (typeof window !== 'undefined') {
@@ -7,23 +8,121 @@ function getRestaurantId(): string | undefined {
   return undefined;
 }
 
+function getStaffId(): string {
+  return localStorage.getItem('staffId') || 'system';
+}
+
+// ── Normalizers ──────────────────────────────────────────────────────────────
+
+function normalizeInventoryRecord(raw: any): InventoryRecord {
+  return {
+    menuItemId:        raw.menu_item_id   ?? raw.menuItemId   ?? '',
+    stock:             raw.stock           ?? 0,
+    lowStockThreshold: raw.low_stock_threshold ?? raw.lowStockThreshold ?? 5,
+    reorderPoint:      raw.reorder_point   ?? raw.reorderPoint ?? 10,
+    reorderQty:        raw.reorder_qty     ?? raw.reorderQty   ?? 20,
+    unitCost:          raw.unit_cost       ?? raw.unitCost     ?? 0,
+    supplierId:        raw.supplier_id     ?? raw.supplierId   ?? undefined,
+    location:          raw.location        ?? '',
+    updatedAt:         raw.updated_at      ?? raw.updatedAt    ?? new Date().toISOString(),
+  };
+}
+
+function normalizeSupplier(raw: any): Supplier {
+  return {
+    id:            raw.id,
+    name:          raw.name           ?? '',
+    contactPerson: raw.contact_person ?? raw.contactPerson ?? '',
+    email:         raw.email          ?? '',
+    phone:         raw.phone          ?? '',
+    address:       raw.address        ?? '',
+    categories:    raw.categories     ?? [],
+    leadTimeDays:  raw.lead_time_days ?? raw.leadTimeDays ?? 7,
+    paymentTerms:  raw.payment_terms  ?? raw.paymentTerms ?? 'Net 30',
+    rating:        raw.rating         ?? 3,
+    isActive:      raw.is_active      ?? raw.isActive     ?? true,
+    notes:         raw.notes          ?? '',
+    createdAt:     raw.created_at     ?? raw.createdAt    ?? new Date().toISOString(),
+  };
+}
+
+function normalizePurchaseOrder(raw: any): PurchaseOrder {
+  const items = Array.isArray(raw.items) ? raw.items.map((i: any) => ({
+    menuItemId:   i.menu_item_id   ?? i.menuItemId   ?? '',
+    menuItemName: i.menu_item_name ?? i.menuItemName ?? '',
+    orderedQty:   i.ordered_qty    ?? i.orderedQty   ?? 0,
+    receivedQty:  i.received_qty   ?? i.receivedQty  ?? 0,
+    unitCost:     i.unit_cost      ?? i.unitCost     ?? 0,
+    totalCost:    i.total_cost     ?? i.totalCost    ?? 0,
+  })) : [];
+
+  return {
+    id:               raw.id,
+    supplierId:       raw.supplier_id       ?? raw.supplierId       ?? '',
+    supplierName:     raw.supplier_name     ?? raw.supplierName     ?? '',
+    status:           raw.status            ?? 'draft',
+    items,
+    totalCost:        raw.total_cost        ?? raw.totalCost        ?? 0,
+    expectedDelivery: raw.expected_delivery ?? raw.expectedDelivery ?? null,
+    createdAt:        raw.created_at        ?? raw.createdAt        ?? new Date().toISOString(),
+    updatedAt:        raw.updated_at        ?? raw.updatedAt        ?? new Date().toISOString(),
+    receivedAt:       raw.received_at       ?? raw.receivedAt       ?? null,
+    createdBy:        raw.created_by        ?? raw.createdBy        ?? '',
+    notes:            raw.notes             ?? null,
+  };
+}
+
+function normalizeMovement(raw: any): StockMovement {
+  return {
+    id:           raw.id,
+    menuItemId:   raw.menu_item_id   ?? raw.menuItemId   ?? '',
+    menuItemName: raw.menu_item_name ?? raw.menuItemName ?? '',
+    type:         raw.type           ?? 'adjustment',
+    qty:          raw.qty            ?? 0,
+    stockBefore:  raw.stock_before   ?? raw.stockBefore  ?? 0,
+    balanceAfter: raw.balance_after  ?? raw.balanceAfter ?? 0,
+    unitCost:     raw.unit_cost      ?? raw.unitCost,
+    totalValue:   raw.total_value    ?? raw.totalValue,
+    reference:    raw.reference      ?? null,
+    performedBy:  raw.performed_by   ?? raw.performedBy  ?? '',
+    notes:        raw.notes          ?? null,
+    timestamp:    raw.timestamp      ?? raw.created_at   ?? new Date().toISOString(),
+  };
+}
+
+function normalizeWasteEntry(raw: any): WasteEntry {
+  return {
+    id:           raw.id,
+    menuItemId:   raw.menu_item_id   ?? raw.menuItemId   ?? '',
+    menuItemName: raw.menu_item_name ?? raw.menuItemName ?? '',
+    qty:          raw.qty            ?? 0,
+    unitCost:     raw.unit_cost      ?? raw.unitCost     ?? 0,
+    totalCost:    raw.total_cost     ?? raw.totalCost    ?? 0,
+    reason:       raw.reason         ?? 'other',
+    reportedBy:   raw.reported_by    ?? raw.reportedBy   ?? '',
+    recordedBy:   raw.recorded_by    ?? raw.recordedBy   ?? '',
+    notes:        raw.notes          ?? null,
+    timestamp:    raw.timestamp      ?? raw.created_at   ?? new Date().toISOString(),
+  };
+}
+
 // ── Inventory Records ────────────────────────────────────────────────────────
 
-export async function fetchInventory(): Promise<SupabaseInventoryRecord[]> {
+export async function fetchInventory(): Promise<InventoryRecord[]> {
   const restaurantId = getRestaurantId();
   if (!restaurantId) return [];
-  
+
   const { data, error } = await supabase
     .from('inventory_records')
     .select('*')
     .eq('restaurant_id', restaurantId)
     .order('menu_item_id');
 
-  if (error) return [];
-  return data as SupabaseInventoryRecord[];
+  if (error) { console.error('fetchInventory error:', error); return []; }
+  return (data || []).map(normalizeInventoryRecord);
 }
 
-export async function fetchInventoryById(menuItemId: string): Promise<SupabaseInventoryRecord> {
+export async function fetchInventoryById(menuItemId: string): Promise<InventoryRecord> {
   const { data, error } = await supabase
     .from('inventory_records')
     .select('*')
@@ -31,56 +130,95 @@ export async function fetchInventoryById(menuItemId: string): Promise<SupabaseIn
     .single();
 
   if (error) throw error;
-  return data as SupabaseInventoryRecord;
+  return normalizeInventoryRecord(data);
 }
 
-export async function createInventoryRecord(record: Partial<SupabaseInventoryRecord>): Promise<SupabaseInventoryRecord> {
+export async function createInventoryRecord(record: Partial<InventoryRecord>): Promise<InventoryRecord> {
   const restaurantId = getRestaurantId();
   const id = `inv-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  
-  const { data, error } = await supabase
+
+  const { data, error } = await supabaseAdmin
     .from('inventory_records')
     .insert({
       id,
-      menu_item_id: record.menu_item_id,
-      stock: record.stock || 0,
-      low_stock_threshold: record.low_stock_threshold || 5,
-      reorder_point: record.reorder_point || 10,
-      reorder_qty: record.reorder_qty || 20,
-      unit_cost: record.unit_cost || 0,
-      supplier_id: record.supplier_id || null,
-      location: record.location || '',
-      restaurant_id: restaurantId
+      menu_item_id:        record.menuItemId,
+      stock:               record.stock               ?? 0,
+      low_stock_threshold: record.lowStockThreshold   ?? 5,
+      reorder_point:       record.reorderPoint        ?? 10,
+      reorder_qty:         record.reorderQty          ?? 20,
+      unit_cost:           record.unitCost            ?? 0,
+      supplier_id:         record.supplierId          ?? null,
+      location:            record.location            ?? '',
+      restaurant_id:       restaurantId,
     })
     .select()
     .single();
 
   if (error) throw error;
-  return data as SupabaseInventoryRecord;
+  return normalizeInventoryRecord(data);
 }
 
 export async function updateInventoryRecord(
   menuItemId: string,
-  record: Partial<SupabaseInventoryRecord>
-): Promise<SupabaseInventoryRecord> {
-  const { data, error } = await supabase
+  record: Partial<InventoryRecord> & Record<string, any>
+): Promise<InventoryRecord> {
+  const restaurantId = getRestaurantId();
+
+  // Accept both camelCase (from UI) and snake_case (from direct callers)
+  const payload: Record<string, any> = {
+    menu_item_id:  menuItemId,
+    restaurant_id: restaurantId,
+    updated_at:    new Date().toISOString(),
+  };
+
+  if (record.stock               !== undefined) payload.stock               = record.stock;
+  if (record.lowStockThreshold   !== undefined) payload.low_stock_threshold = record.lowStockThreshold;
+  if (record.low_stock_threshold !== undefined) payload.low_stock_threshold = record.low_stock_threshold;
+  if (record.reorderPoint        !== undefined) payload.reorder_point       = record.reorderPoint;
+  if (record.reorder_point       !== undefined) payload.reorder_point       = record.reorder_point;
+  if (record.reorderQty          !== undefined) payload.reorder_qty         = record.reorderQty;
+  if (record.reorder_qty         !== undefined) payload.reorder_qty         = record.reorder_qty;
+  if (record.unitCost            !== undefined) payload.unit_cost           = record.unitCost;
+  if (record.unit_cost           !== undefined) payload.unit_cost           = record.unit_cost;
+  if (record.supplierId          !== undefined) payload.supplier_id         = record.supplierId;
+  if (record.supplier_id         !== undefined) payload.supplier_id         = record.supplier_id;
+  if (record.location            !== undefined) payload.location            = record.location;
+
+  const { data, error } = await supabaseAdmin
     .from('inventory_records')
-    .upsert({
-      menu_item_id: menuItemId,
-      stock: record.stock,
-      low_stock_threshold: record.low_stock_threshold,
-      reorder_point: record.reorder_point,
-      reorder_qty: record.reorder_qty,
-      unit_cost: record.unit_cost,
-      supplier_id: record.supplier_id,
-      location: record.location,
-      updated_at: new Date().toISOString()
-    }, { onConflict: 'menu_item_id,restaurant_id' })
+    .upsert(payload, { onConflict: 'menu_item_id,restaurant_id' })
     .select()
     .single();
 
   if (error) throw error;
-  return data as SupabaseInventoryRecord;
+  return normalizeInventoryRecord(data);
+}
+
+export async function deleteInventoryRecord(menuItemId: string): Promise<void> {
+  const restaurantId = getRestaurantId();
+  const { error } = await supabaseAdmin
+    .from('inventory_records')
+    .delete()
+    .eq('menu_item_id', menuItemId)
+    .eq('restaurant_id', restaurantId);
+
+  if (error) throw error;
+}
+
+export async function fetchLowStockItems(): Promise<InventoryRecord[]> {
+  const restaurantId = getRestaurantId();
+  if (!restaurantId) return [];
+
+  // Fetch all and filter client-side (supabase.raw() not supported in JS client)
+  const { data, error } = await supabase
+    .from('inventory_records')
+    .select('*')
+    .eq('restaurant_id', restaurantId)
+    .order('stock', { ascending: true });
+
+  if (error) { console.error('fetchLowStockItems error:', error); return []; }
+  const records = (data || []).map(normalizeInventoryRecord);
+  return records.filter(r => r.stock <= r.lowStockThreshold);
 }
 
 export async function adjustStock(
@@ -88,259 +226,200 @@ export async function adjustStock(
   adjustment: number,
   reason: string,
   performedBy: string
-): Promise<SupabaseInventoryRecord> {
-  // Get current stock
-  const { data: current, error: fetchError } = await supabase
+): Promise<InventoryRecord> {
+  const restaurantId = getRestaurantId();
+
+  const { data: current } = await supabase
     .from('inventory_records')
     .select('stock')
     .eq('menu_item_id', menuItemId)
+    .eq('restaurant_id', restaurantId)
     .single();
 
-  if (fetchError) throw fetchError;
+  const oldStock = current?.stock ?? 0;
+  const newStock = Math.max(0, oldStock + adjustment);
 
-  const newStock = (current?.stock || 0) + adjustment;
-  
-  // Update stock
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from('inventory_records')
-    .update({
-      stock: Math.max(0, newStock),
-      updated_at: new Date().toISOString()
-    })
+    .update({ stock: newStock, updated_at: new Date().toISOString() })
     .eq('menu_item_id', menuItemId)
+    .eq('restaurant_id', restaurantId)
     .select()
     .single();
 
   if (error) throw error;
 
-  // Record movement
-  await supabase.from('stock_movements').insert({
-    id: `mov-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-    menu_item_id: menuItemId,
+  await supabaseAdmin.from('stock_movements').insert({
+    id:            `mov-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    menu_item_id:  menuItemId,
     menu_item_name: menuItemId,
-    type: adjustment > 0 ? 'purchase' : 'adjustment',
-    qty: Math.abs(adjustment),
-    stock_before: current?.stock || 0,
-    balance_after: Math.max(0, newStock),
-    performed_by: performedBy,
-    notes: reason,
-    restaurant_id: getRestaurantId()
-  });
+    type:          adjustment > 0 ? 'purchase' : 'adjustment',
+    qty:           Math.abs(adjustment),
+    stock_before:  oldStock,
+    balance_after: newStock,
+    performed_by:  performedBy,
+    notes:         reason,
+    restaurant_id: restaurantId,
+  }).then(() => {}).catch(console.warn);
 
-  return data as SupabaseInventoryRecord;
-}
-
-export async function deleteInventoryRecord(menuItemId: string): Promise<void> {
-  const { error } = await supabase
-    .from('inventory_records')
-    .delete()
-    .eq('menu_item_id', menuItemId);
-
-  if (error) throw error;
-}
-
-export async function fetchLowStockItems(): Promise<SupabaseInventoryRecord[]> {
-  const restaurantId = getRestaurantId();
-  const { data, error } = await supabase
-    .from('inventory_records')
-    .select('*')
-    .eq('restaurant_id', restaurantId)
-    .lte('stock', supabase.raw('low_stock_threshold'))
-    .order('stock', { ascending: true });
-
-  if (error) {
-    console.error('Error fetching low stock items:', error);
-    return [];
-  }
-  return data as SupabaseInventoryRecord[];
-}
-
-// ── Locations ────────────────────────────────────────────────────────────────
-
-export async function fetchLocations(): Promise<Array<{
-  id: string;
-  name: string;
-  type: string;
-  is_active: boolean;
-  low_stock_items: number;
-  total_items: number;
-}>> {
-  const restaurantId = getRestaurantId();
-  const { data, error } = await supabase
-    .from('locations')
-    .select('*')
-    .eq('restaurant_id', restaurantId)
-    .order('name');
-
-  if (error) return [];
-  return data;
+  return normalizeInventoryRecord(data);
 }
 
 // ── Suppliers ─────────────────────────────────────────────────────────────────
 
-export async function fetchSuppliers(): Promise<SupabaseSupplier[]> {
+export async function fetchSuppliers(): Promise<Supplier[]> {
   const restaurantId = getRestaurantId();
+  if (!restaurantId) return [];
+
   const { data, error } = await supabase
     .from('suppliers')
     .select('*')
     .eq('restaurant_id', restaurantId)
     .order('name');
 
-  if (error) return [];
-  return data as SupabaseSupplier[];
+  if (error) { console.error('fetchSuppliers error:', error); return []; }
+  return (data || []).map(normalizeSupplier);
 }
 
-export async function fetchSupplierById(id: string): Promise<SupabaseSupplier> {
-  const { data, error } = await supabase
-    .from('suppliers')
-    .select('*')
-    .eq('id', id)
-    .single();
-
-  if (error) throw error;
-  return data as SupabaseSupplier;
-}
-
-export async function createSupplier(supplier: Partial<SupabaseSupplier>): Promise<SupabaseSupplier> {
+export async function createSupplier(supplier: Partial<Supplier>): Promise<Supplier> {
   const restaurantId = getRestaurantId();
   const id = `sup-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  
-  const { data, error } = await supabase
+
+  const { data, error } = await supabaseAdmin
     .from('suppliers')
     .insert({
       id,
-      name: supplier.name,
-      contact_person: supplier.contact_person || '',
-      email: supplier.email || '',
-      phone: supplier.phone || '',
-      address: supplier.address || '',
-      categories: supplier.categories || [],
-      lead_time_days: supplier.lead_time_days || 7,
-      payment_terms: supplier.payment_terms || 'Net 30',
-      rating: supplier.rating || 3,
-      is_active: supplier.is_active !== false,
-      notes: supplier.notes || '',
-      restaurant_id: restaurantId
+      name:           supplier.name,
+      contact_person: supplier.contactPerson  ?? '',
+      email:          supplier.email          ?? '',
+      phone:          supplier.phone          ?? '',
+      address:        supplier.address        ?? '',
+      categories:     supplier.categories     ?? [],
+      lead_time_days: supplier.leadTimeDays   ?? 7,
+      payment_terms:  supplier.paymentTerms   ?? 'Net 30',
+      rating:         supplier.rating         ?? 3,
+      is_active:      supplier.isActive       !== false,
+      notes:          supplier.notes          ?? '',
+      restaurant_id:  restaurantId,
     })
     .select()
     .single();
 
   if (error) throw error;
-  return data as SupabaseSupplier;
+  return normalizeSupplier(data);
 }
 
-export async function updateSupplier(id: string, supplier: Partial<SupabaseSupplier>): Promise<SupabaseSupplier> {
-  const { data, error } = await supabase
+export async function updateSupplier(id: string, supplier: Partial<Supplier>): Promise<Supplier> {
+  const { data, error } = await supabaseAdmin
     .from('suppliers')
     .update({
-      name: supplier.name,
-      contact_person: supplier.contact_person,
-      email: supplier.email,
-      phone: supplier.phone,
-      address: supplier.address,
-      categories: supplier.categories,
-      lead_time_days: supplier.lead_time_days,
-      payment_terms: supplier.payment_terms,
-      rating: supplier.rating,
-      is_active: supplier.is_active,
-      notes: supplier.notes,
-      updated_at: new Date().toISOString()
+      name:           supplier.name,
+      contact_person: supplier.contactPerson,
+      email:          supplier.email,
+      phone:          supplier.phone,
+      address:        supplier.address,
+      categories:     supplier.categories,
+      lead_time_days: supplier.leadTimeDays,
+      payment_terms:  supplier.paymentTerms,
+      rating:         supplier.rating,
+      is_active:      supplier.isActive,
+      notes:          supplier.notes,
+      updated_at:     new Date().toISOString(),
     })
     .eq('id', id)
     .select()
     .single();
 
   if (error) throw error;
-  return data as SupabaseSupplier;
+  return normalizeSupplier(data);
 }
 
 export async function deleteSupplier(id: string): Promise<void> {
-  const { error } = await supabase
-    .from('suppliers')
-    .delete()
-    .eq('id', id);
-
+  const { error } = await supabaseAdmin.from('suppliers').delete().eq('id', id);
   if (error) throw error;
 }
 
-// ── Purchase Orders ─────────────────────────────────────────────────────────
-
-interface PurchaseOrder {
-  id: string;
-  supplier_id: string;
-  supplier_name: string;
-  status: string;
-  items: any[];
-  total_cost: number;
-  expected_delivery: string | null;
-  received_at: string | null;
-  notes: string | null;
-  created_by: string;
-  created_at: string;
-  updated_at: string;
-}
+// ── Purchase Orders ──────────────────────────────────────────────────────────
 
 export async function fetchPurchaseOrders(status?: string): Promise<PurchaseOrder[]> {
   const restaurantId = getRestaurantId();
+  if (!restaurantId) return [];
+
   let query = supabase
     .from('purchase_orders')
     .select('*')
     .eq('restaurant_id', restaurantId)
     .order('created_at', { ascending: false });
 
-  if (status && status !== 'all') {
-    query = query.eq('status', status);
-  }
+  if (status && status !== 'all') query = query.eq('status', status);
 
   const { data, error } = await query;
-  if (error) return [];
-  return data;
+  if (error) { console.error('fetchPurchaseOrders error:', error); return []; }
+  return (data || []).map(normalizePurchaseOrder);
 }
 
 export async function createPurchaseOrder(po: Partial<PurchaseOrder>): Promise<PurchaseOrder> {
   const restaurantId = getRestaurantId();
   const id = `po-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  
-  const { data, error } = await supabase
+
+  const dbItems = (po.items || []).map(i => ({
+    menu_item_id:   i.menuItemId,
+    menu_item_name: i.menuItemName,
+    ordered_qty:    i.orderedQty,
+    received_qty:   i.receivedQty ?? 0,
+    unit_cost:      i.unitCost,
+    total_cost:     i.totalCost,
+  }));
+
+  const { data, error } = await supabaseAdmin
     .from('purchase_orders')
     .insert({
       id,
-      supplier_id: po.supplier_id,
-      supplier_name: po.supplier_name,
-      status: 'draft',
-      items: po.items || [],
-      total_cost: po.total_cost || 0,
-      expected_delivery: po.expected_delivery || null,
-      notes: po.notes || null,
-      created_by: po.created_by || 'system',
-      restaurant_id: restaurantId
+      supplier_id:       po.supplierId,
+      supplier_name:     po.supplierName,
+      status:            'draft',
+      items:             dbItems,
+      total_cost:        po.totalCost      ?? 0,
+      expected_delivery: po.expectedDelivery ?? null,
+      notes:             po.notes           ?? null,
+      created_by:        po.createdBy       || getStaffId(),
+      restaurant_id:     restaurantId,
     })
     .select()
     .single();
 
   if (error) throw error;
-  return data;
+  return normalizePurchaseOrder(data);
 }
 
 export async function updatePurchaseOrder(id: string, po: Partial<PurchaseOrder>): Promise<PurchaseOrder> {
-  const { data, error } = await supabase
+  const dbItems = po.items ? po.items.map(i => ({
+    menu_item_id:   i.menuItemId,
+    menu_item_name: i.menuItemName,
+    ordered_qty:    i.orderedQty,
+    received_qty:   i.receivedQty ?? 0,
+    unit_cost:      i.unitCost,
+    total_cost:     i.totalCost,
+  })) : undefined;
+
+  const update: Record<string, any> = { updated_at: new Date().toISOString() };
+  if (po.status            !== undefined) update.status            = po.status;
+  if (po.supplierId        !== undefined) update.supplier_id       = po.supplierId;
+  if (po.supplierName      !== undefined) update.supplier_name     = po.supplierName;
+  if (dbItems              !== undefined) update.items             = dbItems;
+  if (po.totalCost         !== undefined) update.total_cost        = po.totalCost;
+  if (po.expectedDelivery  !== undefined) update.expected_delivery = po.expectedDelivery;
+  if (po.notes             !== undefined) update.notes             = po.notes;
+
+  const { data, error } = await supabaseAdmin
     .from('purchase_orders')
-    .update({
-      supplier_id: po.supplier_id,
-      supplier_name: po.supplier_name,
-      status: po.status,
-      items: po.items,
-      total_cost: po.total_cost,
-      expected_delivery: po.expected_delivery,
-      notes: po.notes,
-      updated_at: new Date().toISOString()
-    })
+    .update(update)
     .eq('id', id)
     .select()
     .single();
 
   if (error) throw error;
-  return data;
+  return normalizePurchaseOrder(data);
 }
 
 export async function receivePurchaseOrder(
@@ -348,90 +427,68 @@ export async function receivePurchaseOrder(
   receivedItems: { menu_item_id: string; received_qty: number }[],
   receivedBy: string
 ): Promise<PurchaseOrder> {
-  // Get the PO
-  const { data: po, error: poError } = await supabase
-    .from('purchase_orders')
-    .select('*')
-    .eq('id', id)
-    .single();
+  const restaurantId = getRestaurantId();
 
-  if (poError) throw poError;
-
-  // Update inventory for received items
+  // Update inventory stock for each received item
   for (const item of receivedItems) {
+    if (!item.received_qty || item.received_qty <= 0) continue;
+
     const { data: inv } = await supabase
       .from('inventory_records')
       .select('stock')
       .eq('menu_item_id', item.menu_item_id)
+      .eq('restaurant_id', restaurantId)
       .single();
 
-    const newStock = (inv?.stock || 0) + item.received_qty;
-    
-    await supabase
+    const oldStock = inv?.stock ?? 0;
+    const newStock = oldStock + item.received_qty;
+
+    await supabaseAdmin
       .from('inventory_records')
       .upsert({
-        menu_item_id: item.menu_item_id,
-        stock: newStock,
-        updated_at: new Date().toISOString()
+        menu_item_id:  item.menu_item_id,
+        stock:         newStock,
+        restaurant_id: restaurantId,
+        updated_at:    new Date().toISOString(),
       }, { onConflict: 'menu_item_id,restaurant_id' });
 
-    // Record movement
-    await supabase.from('stock_movements').insert({
-      id: `mov-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      menu_item_id: item.menu_item_id,
+    // Record the movement
+    await supabaseAdmin.from('stock_movements').insert({
+      id:            `mov-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      menu_item_id:  item.menu_item_id,
       menu_item_name: item.menu_item_id,
-      type: 'purchase',
-      qty: item.received_qty,
-      stock_before: inv?.stock || 0,
+      type:          'purchase',
+      qty:           item.received_qty,
+      stock_before:  oldStock,
       balance_after: newStock,
-      performed_by: receivedBy,
-      reference: `PO: ${id}`,
-      restaurant_id: getRestaurantId()
-    });
+      performed_by:  receivedBy,
+      reference:     `PO:${id}`,
+      restaurant_id: restaurantId,
+    }).then(() => {}).catch(console.warn);
   }
 
-  // Update PO status
-  const { data, error } = await supabase
+  // Mark PO as received
+  const { data, error } = await supabaseAdmin
     .from('purchase_orders')
     .update({
-      status: 'received',
+      status:      'received',
       received_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
+      updated_at:  new Date().toISOString(),
     })
     .eq('id', id)
     .select()
     .single();
 
   if (error) throw error;
-  return data;
+  return normalizePurchaseOrder(data);
 }
 
 export async function deletePurchaseOrder(id: string): Promise<void> {
-  const { error } = await supabase
-    .from('purchase_orders')
-    .delete()
-    .eq('id', id);
-
+  const { error } = await supabaseAdmin.from('purchase_orders').delete().eq('id', id);
   if (error) throw error;
 }
 
-// ── Stock Movements ─────────────────────────────────────────────────────────
-
-interface StockMovement {
-  id: string;
-  menu_item_id: string;
-  menu_item_name: string;
-  type: string;
-  qty: number;
-  stock_before: number;
-  balance_after: number;
-  unit_cost: number | null;
-  total_value: number | null;
-  reference: string | null;
-  performed_by: string;
-  notes: string | null;
-  timestamp: string;
-}
+// ── Stock Movements ──────────────────────────────────────────────────────────
 
 export async function fetchMovements(filters?: {
   menu_item_id?: string;
@@ -441,76 +498,26 @@ export async function fetchMovements(filters?: {
   limit?: number;
 }): Promise<StockMovement[]> {
   const restaurantId = getRestaurantId();
+  if (!restaurantId) return [];
+
   let query = supabase
     .from('stock_movements')
     .select('*')
     .eq('restaurant_id', restaurantId)
     .order('timestamp', { ascending: false });
 
-  if (filters?.menu_item_id) {
-    query = query.eq('menu_item_id', filters.menu_item_id);
-  }
-  if (filters?.type) {
-    query = query.eq('type', filters.type);
-  }
-  if (filters?.from_date) {
-    query = query.gte('timestamp', filters.from_date);
-  }
-  if (filters?.to_date) {
-    query = query.lte('timestamp', filters.to_date);
-  }
-  if (filters?.limit) {
-    query = query.limit(filters.limit);
-  }
+  if (filters?.menu_item_id) query = query.eq('menu_item_id', filters.menu_item_id);
+  if (filters?.type)         query = query.eq('type', filters.type);
+  if (filters?.from_date)    query = query.gte('timestamp', filters.from_date);
+  if (filters?.to_date)      query = query.lte('timestamp', filters.to_date);
+  if (filters?.limit)        query = query.limit(filters.limit);
 
   const { data, error } = await query;
-  if (error) return [];
-  return data;
+  if (error) { console.error('fetchMovements error:', error); return []; }
+  return (data || []).map(normalizeMovement);
 }
 
-export async function createMovement(movement: Partial<StockMovement>): Promise<StockMovement> {
-  const restaurantId = getRestaurantId();
-  const id = `mov-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  
-  const { data, error } = await supabase
-    .from('stock_movements')
-    .insert({
-      id,
-      menu_item_id: movement.menu_item_id,
-      menu_item_name: movement.menu_item_name,
-      type: movement.type,
-      qty: movement.qty,
-      stock_before: movement.stock_before,
-      balance_after: movement.balance_after,
-      unit_cost: movement.unit_cost,
-      total_value: movement.total_value,
-      reference: movement.reference,
-      performed_by: movement.performed_by,
-      notes: movement.notes,
-      restaurant_id: restaurantId
-    })
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data;
-}
-
-// ── Waste Entries ───────────────────────────────────────────────────────────
-
-interface WasteEntry {
-  id: string;
-  menu_item_id: string;
-  menu_item_name: string;
-  qty: number;
-  unit_cost: number;
-  total_cost: number;
-  reason: string;
-  reported_by: string;
-  recorded_by: string;
-  notes: string | null;
-  timestamp: string;
-}
+// ── Waste Entries ────────────────────────────────────────────────────────────
 
 export async function fetchWasteEntries(filters?: {
   menu_item_id?: string;
@@ -520,31 +527,23 @@ export async function fetchWasteEntries(filters?: {
   limit?: number;
 }): Promise<WasteEntry[]> {
   const restaurantId = getRestaurantId();
+  if (!restaurantId) return [];
+
   let query = supabase
     .from('waste_entries')
     .select('*')
     .eq('restaurant_id', restaurantId)
     .order('timestamp', { ascending: false });
 
-  if (filters?.menu_item_id) {
-    query = query.eq('menu_item_id', filters.menu_item_id);
-  }
-  if (filters?.reason) {
-    query = query.eq('reason', filters.reason);
-  }
-  if (filters?.from_date) {
-    query = query.gte('timestamp', filters.from_date);
-  }
-  if (filters?.to_date) {
-    query = query.lte('timestamp', filters.to_date);
-  }
-  if (filters?.limit) {
-    query = query.limit(filters.limit);
-  }
+  if (filters?.menu_item_id) query = query.eq('menu_item_id', filters.menu_item_id);
+  if (filters?.reason)       query = query.eq('reason', filters.reason);
+  if (filters?.from_date)    query = query.gte('timestamp', filters.from_date);
+  if (filters?.to_date)      query = query.lte('timestamp', filters.to_date);
+  if (filters?.limit)        query = query.limit(filters.limit);
 
   const { data, error } = await query;
-  if (error) return [];
-  return data;
+  if (error) { console.error('fetchWasteEntries error:', error); return []; }
+  return (data || []).map(normalizeWasteEntry);
 }
 
 export async function recordWaste(waste: {
@@ -560,117 +559,81 @@ export async function recordWaste(waste: {
   const restaurantId = getRestaurantId();
   const id = `waste-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-  // Deduct from inventory
   const { data: inv } = await supabase
     .from('inventory_records')
     .select('stock')
     .eq('menu_item_id', waste.menu_item_id)
+    .eq('restaurant_id', restaurantId)
     .single();
 
-  const newStock = Math.max(0, (inv?.stock || 0) - waste.qty);
-  
-  await supabase
-    .from('inventory_records')
-    .upsert({
-      menu_item_id: waste.menu_item_id,
-      stock: newStock,
-      updated_at: new Date().toISOString()
-    }, { onConflict: 'menu_item_id,restaurant_id' });
+  const oldStock = inv?.stock ?? 0;
+  const newStock = Math.max(0, oldStock - waste.qty);
 
-  // Create waste entry
-  const { data, error } = await supabase
+  await supabaseAdmin
+    .from('inventory_records')
+    .update({ stock: newStock, updated_at: new Date().toISOString() })
+    .eq('menu_item_id', waste.menu_item_id)
+    .eq('restaurant_id', restaurantId);
+
+  const { data, error } = await supabaseAdmin
     .from('waste_entries')
     .insert({
       id,
-      menu_item_id: waste.menu_item_id,
+      menu_item_id:   waste.menu_item_id,
       menu_item_name: waste.menu_item_name,
-      qty: waste.qty,
-      unit_cost: waste.unit_cost,
-      total_cost: waste.qty * waste.unit_cost,
-      reason: waste.reason,
-      reported_by: waste.reported_by,
-      recorded_by: waste.recorded_by,
-      notes: waste.notes || null,
-      restaurant_id: restaurantId
+      qty:            waste.qty,
+      unit_cost:      waste.unit_cost,
+      total_cost:     waste.qty * waste.unit_cost,
+      reason:         waste.reason,
+      reported_by:    waste.reported_by,
+      recorded_by:    waste.recorded_by,
+      notes:          waste.notes ?? null,
+      restaurant_id:  restaurantId,
     })
     .select()
     .single();
 
   if (error) throw error;
-  return data;
+  return normalizeWasteEntry(data);
 }
 
 // ── Analytics ────────────────────────────────────────────────────────────────
 
-interface InventoryAnalytics {
-  totalStockValue: number;
-  lowStockCount: number;
-  outOfStockCount: number;
-  pendingPOCount: number;
-  pendingPOValue: number;
-  wasteCostLast30d: number;
-  avgTurnoverDays: number;
-  belowReorderCount: number;
-  topWasteReason: string | null;
-  wasteByReason: { reason: string; qty: number; cost: number }[];
-  topWasteItems: { menuItemId: string; menuItemName: string; qty: number; cost: number }[];
-  stockTurnoverRate: number;
-  categoryBreakdown: { category: string; value: number }[];
-}
-
 export async function computeInventoryAnalytics(): Promise<InventoryAnalytics> {
-  const restaurantId = getRestaurantId();
-  
-  const [inventory, lowStock, movements, waste, pos] = await Promise.all([
+  const [inventory, movements, waste, pos] = await Promise.all([
     fetchInventory(),
-    fetchLowStockItems(),
     fetchMovements({ limit: 200 }),
     fetchWasteEntries({ limit: 200 }),
-    fetchPurchaseOrders()
+    fetchPurchaseOrders(),
   ]);
 
-  const totalStockValue = inventory.reduce(
-    (sum, item) => sum + (item.stock || 0) * (item.unit_cost || 0),
-    0
-  );
+  const totalStockValue   = inventory.reduce((s, r) => s + r.stock * r.unitCost, 0);
+  const outOfStockCount   = inventory.filter(r => r.stock === 0).length;
+  const lowStockCount     = inventory.filter(r => r.stock > 0 && r.stock <= r.lowStockThreshold).length;
+  const belowReorderCount = inventory.filter(r => r.stock <= r.reorderPoint).length;
 
-  const outOfStockCount = inventory.filter((item) => item.stock === 0).length;
-  const belowReorderCount = inventory.filter(
-    (item) => (item.stock || 0) <= (item.reorder_point || 0)
-  ).length;
-
-  const pendingPO = pos.filter(p => !['received', 'cancelled'].includes(p.status));
+  const pendingPO      = pos.filter(p => !['received', 'cancelled'].includes(p.status));
   const pendingPOCount = pendingPO.length;
-  const pendingPOValue = pendingPO.reduce((sum, po) => sum + (po.total_cost || 0), 0);
+  const pendingPOValue = pendingPO.reduce((s, p) => s + p.totalCost, 0);
 
-  // Calculate waste in last 30 days
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-  const recentWaste = waste.filter(w => new Date(w.timestamp) >= thirtyDaysAgo);
-  const wasteCostLast30d = recentWaste.reduce((sum, w) => sum + (w.total_cost || 0), 0);
+  const thirtyDaysAgo  = new Date(Date.now() - 30 * 86400000).toISOString();
+  const recentWaste    = waste.filter(w => w.timestamp >= thirtyDaysAgo);
+  const wasteCostLast30d = recentWaste.reduce((s, w) => s + w.totalCost, 0);
 
-  // Group waste by reason
   const wasteByReasonMap = new Map<string, { qty: number; cost: number }>();
   recentWaste.forEach(w => {
-    const existing = wasteByReasonMap.get(w.reason) || { qty: 0, cost: 0 };
-    existing.qty += w.qty;
-    existing.cost += w.total_cost || 0;
-    wasteByReasonMap.set(w.reason, existing);
+    const e = wasteByReasonMap.get(w.reason) || { qty: 0, cost: 0 };
+    e.qty += w.qty; e.cost += w.totalCost;
+    wasteByReasonMap.set(w.reason, e);
   });
-  const wasteByReason = Array.from(wasteByReasonMap.entries()).map(([reason, data]) => ({
-    reason,
-    qty: data.qty,
-    cost: data.cost
-  }));
-
-  // Top waste reason
-  const topWasteReason = wasteByReason.length > 0 
-    ? wasteByReason.sort((a, b) => b.cost - a.cost)[0].reason 
+  const wasteByReason = Array.from(wasteByReasonMap.entries()).map(([reason, d]) => ({ reason, ...d }));
+  const topWasteReason = wasteByReason.length > 0
+    ? wasteByReason.sort((a, b) => b.cost - a.cost)[0].reason
     : null;
 
   return {
     totalStockValue,
-    lowStockCount: lowStock.length,
+    lowStockCount,
     outOfStockCount,
     pendingPOCount,
     pendingPOValue,
@@ -685,27 +648,9 @@ export async function computeInventoryAnalytics(): Promise<InventoryAnalytics> {
   };
 }
 
-// ── Forecasting (simplified - would need more complex implementation) ────────
+// ── Locations / Forecasting (stubs — tables may not exist yet) ───────────────
 
-interface InventoryForecast {
-  menu_item_id: string;
-  menu_item_name: string;
-  current_stock: number;
-  avg_daily_sales: number;
-  days_until_stockout: number;
-  suggested_reorder_qty: number;
-  alert_status: string;
-}
-
-export async function fetchForecasts(): Promise<InventoryForecast[]> {
-  // Simplified - would need sales history to calculate
-  return [];
-}
-
-export async function generateForecasts(): Promise<{ success: boolean; count: number; forecasts: InventoryForecast[] }> {
-  return { success: true, count: 0, forecasts: [] };
-}
-
-export async function fetchForecastAlerts(): Promise<InventoryForecast[]> {
-  return [];
-}
+export async function fetchLocations() { return []; }
+export async function fetchForecasts() { return []; }
+export async function generateForecasts() { return { success: true, count: 0, forecasts: [] }; }
+export async function fetchForecastAlerts() { return []; }

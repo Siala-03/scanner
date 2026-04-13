@@ -207,7 +207,7 @@ export function useOrders(): UseOrdersReturn {
       delivery?: { provider: string; address: string },
       loyaltyRewardId?: string
     ): Promise<Order> => {
-      const currentRestaurantId = resolveRestaurantId();
+      const currentRestaurantId = localStorage.getItem('restaurantId') || undefined;
       if (!currentRestaurantId) {
         throw new Error('Cannot place order: restaurant context is missing. Please scan the restaurant QR code.');
       }

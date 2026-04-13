@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useSocket } from './useSocket';
+import { supabase } from '../lib/supabase';
 import {
   fetchInventory,
   fetchLowStockItems,
@@ -10,12 +10,10 @@ import {
   computeInventoryAnalytics,
   fetchLocations,
   fetchForecasts,
-  generateForecasts,
   fetchForecastAlerts,
 } from '../api/inventory';
 import type {
   InventoryRecord,
-  InventoryLocation,
   Supplier,
   PurchaseOrder,
   StockMovement,
@@ -24,51 +22,42 @@ import type {
   InventoryForecast,
 } from '../types/inventory';
 
+// InventoryLocation might not be in the types yet — use a safe fallback
+type InventoryLocation = any;
+
 export function useInventoryData() {
-  const { joinInventory, socket } = useSocket();
-  const [inventory, setInventory] = useState<InventoryRecord[]>([]);
-  const inventoryRef = useRef<InventoryRecord[]>([]);
-  const [lowStockItems, setLowStockItems] = useState<InventoryRecord[]>([]);
+  const [inventory, setInventory]           = useState<InventoryRecord[]>([]);
+  const [lowStockItems, setLowStockItems]   = useState<InventoryRecord[]>([]);
+  const [suppliers, setSuppliers]           = useState<Supplier[]>([]);
+  const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
+  const [movements, setMovements]           = useState<StockMovement[]>([]);
+  const [waste, setWaste]                   = useState<WasteEntry[]>([]);
+  const [locations, setLocations]           = useState<InventoryLocation[]>([]);
+  const [analytics, setAnalytics]           = useState<InventoryAnalytics>({
+    totalStockValue: 0, lowStockCount: 0, outOfStockCount: 0,
+    pendingPOCount: 0, pendingPOValue: 0, wasteCostLast30d: 0,
+    avgTurnoverDays: 0, belowReorderCount: 0, topWasteReason: null,
+    wasteByReason: [], topWasteItems: [], stockTurnoverRate: 0, categoryBreakdown: [],
+  });
+  const [isLoading, setIsLoading]           = useState(true);
+  const [loadError, setLoadError]           = useState<string | null>(null);
+  const [alerts, setAlerts]                 = useState<string[]>([]);
+  const [forecasts, setForecasts]           = useState<InventoryForecast[]>([]);
+  const [forecastAlerts, setForecastAlerts] = useState<InventoryForecast[]>([]);
+  const [isGeneratingForecasts, setIsGeneratingForecasts] = useState(false);
+
+  const inventoryRef  = useRef<InventoryRecord[]>([]);
+  const channelRef    = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   const upsertInventoryRecords = useCallback((records: InventoryRecord[]) => {
-    setInventory((prev) => {
-      const map = new Map<string, InventoryRecord>(prev.map((rec) => [rec.menuItemId, rec]));
-      records.forEach((rec) => {
-        if (rec.menuItemId) {
-          map.set(rec.menuItemId, rec);
-        }
-      });
+    setInventory(prev => {
+      const map = new Map(prev.map(r => [r.menuItemId, r]));
+      records.forEach(r => { if (r.menuItemId) map.set(r.menuItemId, r); });
       const next = Array.from(map.values());
       inventoryRef.current = next;
       return next;
     });
   }, []);
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
-  const [movements, setMovements] = useState<StockMovement[]>([]);
-  const [waste, setWaste] = useState<WasteEntry[]>([]);
-  const [locations, setLocations] = useState<InventoryLocation[]>([]);
-  const [analytics, setAnalytics] = useState<InventoryAnalytics>({
-    totalStockValue: 0,
-    lowStockCount: 0,
-    outOfStockCount: 0,
-    pendingPOCount: 0,
-    pendingPOValue: 0,
-    wasteCostLast30d: 0,
-    avgTurnoverDays: 0,
-    belowReorderCount: 0,
-    topWasteReason: null,
-    wasteByReason: [],
-    topWasteItems: [],
-    stockTurnoverRate: 0,
-    categoryBreakdown: [],
-  });
-  const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [alerts, setAlerts] = useState<string[]>([]);
-  const [forecasts, setForecasts] = useState<InventoryForecast[]>([]);
-  const [forecastAlerts, setForecastAlerts] = useState<InventoryForecast[]>([]);
-  const [isGeneratingForecasts, setIsGeneratingForecasts] = useState(false);
 
   const loadAll = useCallback(async () => {
     setIsLoading(true);
@@ -87,79 +76,37 @@ export function useInventoryData() {
       fetchForecastAlerts(),
     ]);
 
-    const [invResult, lowResult, supResult, poResult, movResult, wasteResult, analyticsResult, locResult, fcResult, fcAlertsResult] = results;
+    const [invR, lowR, supR, poR, movR, wasteR, analyticsR, locR, fcR, fcAlertsR] = results;
 
-    if (invResult.status === 'fulfilled') {
-      setInventory(invResult.value);
-      inventoryRef.current = invResult.value;
-      // Clear error if we successfully loaded data
-      if (invResult.value.length > 0) {
-        setLoadError(null);
+    if (invR.status === 'fulfilled') {
+      setInventory(invR.value);
+      inventoryRef.current = invR.value;
+
+      // Check for low-stock alerts
+      const critical = invR.value.filter(r => r.stock === 0 || r.stock <= r.lowStockThreshold);
+      if (critical.length > 0) {
+        const msgs = critical.slice(0, 3).map(r =>
+          r.stock === 0
+            ? `${r.menuItemId} is out of stock`
+            : `${r.menuItemId} is low (${r.stock} left)`
+        );
+        setAlerts(msgs);
       }
     } else {
-      const message = invResult.reason instanceof Error ? invResult.reason.message : String(invResult.reason);
-      console.error('Critical inventory load failed:', message);
-      // Only set error if we don't have existing data
       if (inventoryRef.current.length === 0) {
-        setLoadError(message || 'Failed to load inventory items.');
+        setLoadError('Failed to load inventory');
       }
     }
 
-    if (lowResult.status === 'fulfilled') {
-      setLowStockItems(lowResult.value);
-    } else {
-      console.warn('Low stock fetch failed:', lowResult.reason);
-    }
-
-    if (supResult.status === 'fulfilled') {
-      setSuppliers(supResult.value);
-    } else {
-      console.warn('Suppliers fetch failed:', supResult.reason);
-    }
-
-    if (poResult.status === 'fulfilled') {
-      setPurchaseOrders(poResult.value);
-    } else {
-      console.warn('Purchase orders fetch failed:', poResult.reason);
-    }
-
-    if (movResult.status === 'fulfilled') {
-      setMovements(movResult.value);
-    } else {
-      console.warn('Stock movements fetch failed:', movResult.reason);
-    }
-
-    if (wasteResult.status === 'fulfilled') {
-      setWaste(wasteResult.value);
-    } else {
-      console.warn('Waste entries fetch failed:', wasteResult.reason);
-    }
-
-    if (analyticsResult.status === 'fulfilled') {
-      setAnalytics(analyticsResult.value);
-    } else {
-      console.warn('Inventory analytics fetch failed:', analyticsResult.reason);
-    }
-
-    if (locResult.status === 'fulfilled') {
-      setLocations(locResult.value);
-    } else {
-      console.warn('Locations fetch failed:', locResult.reason);
-    }
-
-    if (fcResult.status === 'fulfilled') {
-      setForecasts(fcResult.value);
-    } else {
-      setForecasts([]);
-      console.warn('Forecasts fetch failed:', fcResult.reason);
-    }
-
-    if (fcAlertsResult.status === 'fulfilled') {
-      setForecastAlerts(fcAlertsResult.value);
-    } else {
-      setForecastAlerts([]);
-      console.warn('Forecast alerts fetch failed:', fcAlertsResult.reason);
-    }
+    if (lowR.status === 'fulfilled')      setLowStockItems(lowR.value);
+    if (supR.status === 'fulfilled')      setSuppliers(supR.value);
+    if (poR.status === 'fulfilled')       setPurchaseOrders(poR.value);
+    if (movR.status === 'fulfilled')      setMovements(movR.value);
+    if (wasteR.status === 'fulfilled')    setWaste(wasteR.value);
+    if (analyticsR.status === 'fulfilled') setAnalytics(analyticsR.value);
+    if (locR.status === 'fulfilled')      setLocations(locR.value);
+    if (fcR.status === 'fulfilled')       setForecasts(fcR.value);
+    if (fcAlertsR.status === 'fulfilled') setForecastAlerts(fcAlertsR.value);
 
     setIsLoading(false);
   }, []);
@@ -167,11 +114,13 @@ export function useInventoryData() {
   const runForecasting = useCallback(async () => {
     setIsGeneratingForecasts(true);
     try {
+      const { generateForecasts } = await import('../api/inventory');
       const result = await generateForecasts();
       if (result.success) {
         setForecasts(result.forecasts);
-        const critical = result.forecasts.filter(f => f.alertStatus === 'critical' || f.alertStatus === 'warning');
-        setForecastAlerts(critical);
+        setForecastAlerts(result.forecasts.filter((f: any) =>
+          f.alertStatus === 'critical' || f.alertStatus === 'warning'
+        ));
       }
       return result;
     } catch (err) {
@@ -183,26 +132,32 @@ export function useInventoryData() {
   }, []);
 
   useEffect(() => {
-    joinInventory();
     loadAll();
 
-    const handleInventoryUpdate = () => loadAll();
-    const handleInventoryAlert = (data: { type: string; menuItemName: string; stock: number; threshold: number }) => {
-      const message = data.type === 'out-of-stock'
-        ? `${data.menuItemName} is out of stock.`
-        : `${data.menuItemName} is low on stock (${data.stock} <= ${data.threshold}).`;
-      setAlerts((prev) => [message, ...prev].slice(0, 5));
-      loadAll();
-    };
+    const restaurantId = localStorage.getItem('restaurantId');
+    if (restaurantId) {
+      if (channelRef.current) supabase.removeChannel(channelRef.current);
 
-    socket.on('inventory:update', handleInventoryUpdate);
-    socket.on('inventory:alert', handleInventoryAlert);
+      channelRef.current = supabase
+        .channel(`inventory-realtime-${restaurantId}`)
+        .on('postgres_changes', {
+          event: '*', schema: 'public', table: 'inventory_records',
+          filter: `restaurant_id=eq.${restaurantId}`,
+        }, () => loadAll())
+        .on('postgres_changes', {
+          event: '*', schema: 'public', table: 'purchase_orders',
+          filter: `restaurant_id=eq.${restaurantId}`,
+        }, () => loadAll())
+        .subscribe();
+    }
 
     return () => {
-      socket.off('inventory:update', handleInventoryUpdate);
-      socket.off('inventory:alert', handleInventoryAlert);
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
     };
-  }, [joinInventory, loadAll, socket]);
+  }, [loadAll]);
 
   return {
     inventory,
@@ -222,5 +177,8 @@ export function useInventoryData() {
     loadError,
     refresh: loadAll,
     upsertInventoryRecords,
+    // Legacy compat
+    joinInventory: () => {},
+    socket: { on: () => {}, off: () => {} },
   };
 }

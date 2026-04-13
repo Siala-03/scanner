@@ -2,7 +2,7 @@ import { useCallback, useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowLeftIcon, QrCodeIcon, LogOutIcon } from 'lucide-react';
 import { CartItem, OrderStatus, Customer } from './types';
-import { useOrders } from './hooks/useOrders';
+import { OrdersProvider, useOrdersContext } from './contexts/OrdersContext';
 import { useTables } from './hooks/useTables';
 import { callWaiter } from './api/tables';
 import { logoutStaff } from './api/auth';
@@ -105,7 +105,7 @@ export function App() {
       timestamp: Date;
     }[]>(
     []);
-  const { orders, addOrder, updateOrderStatus } = useOrders();
+  const { orders, addOrder, updateOrderStatus } = useOrdersContext();
 
   // Initialize offline sync manager
   useEffect(() => {

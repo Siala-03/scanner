@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useCredit } from '../../hooks/useCredit';
-import { useOrders } from '../../hooks/useOrders';
+import { useOrdersContext } from '../../contexts/OrdersContext';
 import { fetchOrderById } from '../../api/orders';
 import type { CustomerCreditAccount } from '../../types/credit';
 import type { Order } from '../../types';
@@ -29,7 +29,7 @@ const CreditManagement: React.FC = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showTransactionModal, setShowTransactionModal] = useState(false);
   const [transactionType, setTransactionType] = useState<'charge' | 'payment' | 'adjustment'>('charge');
-  const { orders, getOrderById } = useOrders();
+  const { orders, getOrderById } = useOrdersContext();
   const [orderLookupId, setOrderLookupId] = useState('');
   const [orderLookupLoading, setOrderLookupLoading] = useState(false);
   const [orderLookupError, setOrderLookupError] = useState('');

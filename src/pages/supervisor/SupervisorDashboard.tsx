@@ -5,7 +5,7 @@ import { useMenu } from '../../hooks/useMenu';
 import { useStaff, useStaffOnDuty } from '../../hooks/useStaff';
 import { useTodayKPIs } from '../../hooks/useAnalytics';
 import { useStaffKPIs } from '../../hooks/useKPIs';
-import { useOrders } from '../../hooks/useOrders';
+import { useOrdersContext } from '../../contexts/OrdersContext';
 import { KPICard } from '../../components/supervisor/KPICard';
 import { TrendingUpIcon } from 'lucide-react';
 
@@ -20,7 +20,7 @@ export function SupervisorDashboard({ onManageMenu, onLogout }: SupervisorDashbo
   const { staff: onDutyStaff, isLoading: onDutyLoading } = useStaffOnDuty();
   const { data: kpis, isLoading: kpiLoading } = useTodayKPIs();
   const { kpis: staffKPIs } = useStaffKPIs();
-  const { orders } = useOrders();
+  const { orders } = useOrdersContext();
 
   const [deliveryStatusFilter, setDeliveryStatusFilter] = useState<string>('all');
 
