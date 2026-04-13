@@ -103,7 +103,18 @@ export function useOrders(): UseOrdersReturn {
   const [orders, setOrders] = useState<Order[]>([]);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
-  const restaurantId = localStorage.getItem('restaurantId') || undefined;
+  const [restaurantId, setRestaurantId] = useState<string | undefined>(
+    () => localStorage.getItem('restaurantId') || undefined
+  );
+
+  // Keep restaurantId in sync whenever the app sets/changes it
+  useEffect(() => {
+    const handleChange = () => {
+      setRestaurantId(localStorage.getItem('restaurantId') || undefined);
+    };
+    window.addEventListener('restaurantIdChanged', handleChange);
+    return () => window.removeEventListener('restaurantIdChanged', handleChange);
+  }, []);
 
   const loadOrders = useCallback(async (restId?: string) => {
     const id = restId || restaurantId;
