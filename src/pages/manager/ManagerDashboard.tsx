@@ -1,8 +1,9 @@
-import React from 'react';
+import { useMemo } from 'react';
 import { Button } from '../../components/ui/Button';
 import { MenuIcon, QrCodeIcon } from 'lucide-react';
 import { AIInsightsChat } from '../../components/manager/AIInsightsChat';
 import { useInventoryData } from '../../hooks/useInventory';
+import { formatPrice } from '../../utils/currency';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, Legend } from 'recharts';
 
 interface ManagerDashboardProps {
@@ -25,7 +26,11 @@ const statusColors: Record<string, string> = {
 };
 
 export function ManagerDashboard({ onNavigate, totalOrders, activeOrders, servedOrders, todaysRevenue, tableCount, ordersByHour, statusBreakdown }: ManagerDashboardProps) {
-  const { forecasts, forecastAlerts, isGeneratingForecasts, runForecasting, analytics, inventory, refresh } = useInventoryData();
+  const { forecasts, forecastAlerts, isGeneratingForecasts, runForecasting, analytics, inventory } = useInventoryData();
+  const trackedInventoryCount = useMemo(
+    () => new Set(inventory.map((item) => item.menuItemId).filter(Boolean)).size,
+    [inventory]
+  );
 
   return (
     <div className="bg-slate-900 text-slate-100 p-3 md:p-4 min-h-screen">
@@ -75,7 +80,7 @@ export function ManagerDashboard({ onNavigate, totalOrders, activeOrders, served
             className="rounded-xl border border-slate-700 p-3 bg-slate-800/70 hover:bg-slate-800 transition text-left"
           >
             <div className="text-xs uppercase tracking-wide text-slate-400">Inventory Items</div>
-            <div className="mt-2 text-2xl font-semibold text-gray-100">{inventory.length}</div>
+            <div className="mt-2 text-2xl font-semibold text-gray-100">{trackedInventoryCount}</div>
             <div className="text-xs text-slate-300 mt-1">Tracked items</div>
           </button>
           <button 
@@ -99,7 +104,7 @@ export function ManagerDashboard({ onNavigate, totalOrders, activeOrders, served
             className="rounded-xl border border-emerald-500/30 p-3 bg-emerald-500/5 hover:bg-emerald-500/10 transition text-left"
           >
             <div className="text-xs uppercase tracking-wide text-emerald-400">Stock Value</div>
-            <div className="mt-2 text-2xl font-semibold text-emerald-400">${(analytics.totalStockValue / 100).toFixed(0)}</div>
+            <div className="mt-2 text-2xl font-semibold text-emerald-400">{formatPrice(analytics.totalStockValue)}</div>
             <div className="text-xs text-slate-300 mt-1">Total value</div>
           </button>
         </div>
@@ -155,7 +160,7 @@ export function ManagerDashboard({ onNavigate, totalOrders, activeOrders, served
 
         <div className="mt-3 rounded-xl border border-slate-700 bg-slate-800/60 p-3">
           <div className="text-xs uppercase tracking-wide text-slate-400">Revenue</div>
-          <div className="text-lg font-semibold text-gray-100">Today: ${(todaysRevenue / 100).toFixed(2)}</div>
+          <div className="text-lg font-semibold text-gray-100">Today: {formatPrice(todaysRevenue)}</div>
           <div className="mt-2 h-40 md:h-32">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={ordersByHour}>

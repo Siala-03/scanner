@@ -27,7 +27,6 @@ import { useStaffKPIs } from '../../hooks/useKPIs';
 import { buildReceiptHtml, orderToReceiptData } from '../../utils/receipt';
 import { printReceiptNetwork } from '../../api/printer';
 import { ReceiptShareModal } from '../../components/ui/ReceiptShareModal';
-import { useOfflineStatus } from '../../hooks/useOfflineStatus';
 import { supabaseAdmin } from '../../lib/supabase';
 
 // ─── Kitchen detection ────────────────────────────────────────────────────────
@@ -542,7 +541,6 @@ export function WaiterDashboard({
   const [selectedOrderForShare, setSelectedOrderForShare] = useState<Order | null>(null);
 
   const { kpis } = useStaffKPIs();
-  const { isOnline, pendingOperations } = useOfflineStatus();
 
   // ── Supabase Realtime: waiter call broadcast ──
   useEffect(() => {
@@ -719,13 +717,8 @@ export function WaiterDashboard({
 
           {/* Connection status */}
           <div className="flex flex-wrap items-center gap-2">
-            <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-400' : 'bg-red-500'}`} />
-            <span className={`text-xs ${isOnline ? 'text-emerald-400' : 'text-red-400'}`}>
-              {isOnline ? 'Live — receiving customer orders' : 'Offline mode'}
-            </span>
-            {pendingOperations > 0 && (
-              <span className="text-xs text-amber-400 ml-2">{pendingOperations} pending sync</span>
-            )}
+            <span className="w-2 h-2 rounded-full bg-emerald-400" />
+            <span className="text-xs text-emerald-400">Live — receiving customer orders</span>
           </div>
 
           {/* Stats strip */}
@@ -1064,15 +1057,11 @@ export function WaiterDashboard({
             <div className="rounded-2xl border border-slate-700 bg-slate-800/80 p-4">
               <p className="text-xs uppercase tracking-widest text-slate-500 mb-3">Customer Menu</p>
               <div className="flex items-center gap-2 mb-2">
-                <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-400' : 'bg-red-500'}`} />
-                <span className={`text-sm font-medium ${isOnline ? 'text-emerald-300' : 'text-red-400'}`}>
-                  {isOnline ? 'Live sync active' : 'Offline'}
-                </span>
+                <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                <span className="text-sm font-medium text-emerald-300">Live sync active</span>
               </div>
               <p className="text-xs text-slate-500">
-                {isOnline
-                  ? 'Orders from QR code scans appear in "Incoming" instantly.'
-                  : 'Reconnect to receive real-time orders from customer QR menu.'}
+                Orders from QR code scans appear in "Incoming" instantly.
               </p>
               {incomingOrders.length > 0 && (
                 <div className="mt-3 rounded-xl bg-amber-500/10 border border-amber-500/20 px-3 py-2 flex items-center gap-2">

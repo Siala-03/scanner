@@ -25,7 +25,7 @@ export interface ReceiptConfig {
     pointsPerUnit: number; // Points earned per unit amount
     unitAmount: number; // Amount threshold for earning points (in RWF)
     threshold: number; // Minimum order amount to start earning points (in RWF)
-    exchangeRate: number; // USD to RWF exchange rate for points calculation
+    exchangeRate: number; // Used only when historical totals are stored in USD
   };
 
   // Receipt Display Settings
@@ -57,7 +57,7 @@ export const defaultReceiptConfig: ReceiptConfig = {
   
   // Financial Settings
   taxRate: 18, // 18% tax
-  currency: 'USD',
+  currency: 'RWF',
 
   // Loyalty Program Settings
   loyaltyProgram: {
@@ -132,13 +132,14 @@ export function resetReceiptConfig(): void {
 /**
  * Calculate loyalty points for an order
  */
-export function calculateLoyaltyPoints(orderTotalUSD: number, config: ReceiptConfig = defaultReceiptConfig): number {
+export function calculateLoyaltyPoints(orderTotalAmount: number, config: ReceiptConfig = defaultReceiptConfig): number {
   if (!config.loyaltyProgram.enabled) {
     return 0;
   }
 
-  // Convert USD to RWF
-  const orderTotalRWF = orderTotalUSD * config.loyaltyProgram.exchangeRate;
+  const orderTotalRWF = config.currency === 'USD'
+    ? orderTotalAmount * config.loyaltyProgram.exchangeRate
+    : orderTotalAmount;
   
   // Check if order is above threshold
   if (orderTotalRWF <= config.loyaltyProgram.threshold) {
@@ -159,7 +160,7 @@ export function formatReceiptCurrency(amount: number, config: ReceiptConfig = de
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: config.currency,
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
+    minimumFractionDigits: config.currency === 'RWF' ? 0 : 2,
+    maximumFractionDigits: config.currency === 'RWF' ? 0 : 2
   }).format(amount);
 }

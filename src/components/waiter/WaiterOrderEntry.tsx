@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import {
   SearchIcon,
   PlusIcon,
@@ -10,7 +10,8 @@ import {
   TrashIcon,
   UtensilsIcon,
   ClockIcon,
-  CheckIcon
+  CheckIcon,
+  SparklesIcon
 } from 'lucide-react';
 import { MenuItem, OrderItem, CartItem } from '../../types/index';
 import { Modal } from '../ui/Modal';
@@ -184,7 +185,7 @@ export function WaiterOrderEntry({
       {cart.map((item) => (
         <div
           key={item.tempId}
-          className="rounded-2xl border border-gray-200 bg-white p-3 shadow-sm"
+          className="rounded-2xl border border-gray-200 bg-white p-3 shadow-sm shadow-amber-100/40"
         >
           <div className="flex items-start justify-between gap-2">
             <div className="flex-1 min-w-0">
@@ -279,7 +280,7 @@ export function WaiterOrderEntry({
       />
 
       {/* Main Content */}
-      <div className="relative flex max-h-[100dvh] w-full max-w-6xl flex-col overflow-hidden bg-white shadow-2xl md:max-h-[92vh] md:rounded-3xl">
+      <div className="relative flex max-h-[100dvh] w-full max-w-6xl flex-col overflow-hidden bg-[linear-gradient(180deg,#ffffff_0%,#fffaf2_100%)] shadow-2xl md:max-h-[92vh] md:rounded-3xl">
         {/* Header */}
         <div className="sticky top-0 z-10 border-b border-gray-200 bg-white/95 p-4 backdrop-blur">
           <div className="mb-3 flex items-start justify-between gap-3">
@@ -297,6 +298,14 @@ export function WaiterOrderEntry({
                 <p className="text-sm text-gray-500">
                   {cartItemCount} item{cartItemCount !== 1 ? 's' : ''} • {formatPrice(cartTotal)}
                 </p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <Badge variant="primary" size="sm" className="bg-amber-100 text-amber-700">
+                    Floor order
+                  </Badge>
+                  <Badge variant="secondary" size="sm">
+                    Live menu sync
+                  </Badge>
+                </div>
               </div>
             </div>
             {cart.length > 0 && (
@@ -333,13 +342,22 @@ export function WaiterOrderEntry({
                 onClick={() => setActiveCategory(category)}
                 className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
                   activeCategory === category
-                    ? 'bg-amber-500 text-white'
+                    ? 'bg-amber-500 text-white shadow-[0_12px_30px_-18px_rgba(245,158,11,0.9)]'
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}
               >
                 {categoryNames[category] || category}
               </button>
             ))}
+          </div>
+          <div className="mt-1 flex items-center justify-between gap-3 text-xs text-gray-500">
+            <span>
+              Showing {filteredItems.length} item{filteredItems.length !== 1 ? 's' : ''}
+            </span>
+            <span className="inline-flex items-center gap-1 text-amber-600">
+              <SparklesIcon className="h-3.5 w-3.5" />
+              Quick add enabled
+            </span>
           </div>
         </div>
 
@@ -365,7 +383,8 @@ export function WaiterOrderEntry({
                       layout
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className="flex items-center gap-3 rounded-2xl border border-gray-200 bg-gray-50 p-3 text-left transition-colors hover:bg-gray-100"
+                      whileHover={{ y: -2 }}
+                      className="flex items-center gap-3 rounded-3xl border border-gray-200 bg-white/90 p-3 text-left shadow-sm shadow-amber-100/40 transition-colors hover:border-amber-300/60 hover:bg-amber-50/80"
                       onClick={() => {
                         setShowItemDetail(item);
                         setItemQuantity(1);
@@ -373,6 +392,16 @@ export function WaiterOrderEntry({
                     >
                       <span className="text-3xl">{item.emoji}</span>
                       <div className="flex-1 min-w-0">
+                        <div className="mb-1 flex flex-wrap items-center gap-2">
+                          <Badge variant="secondary" size="sm" className="bg-slate-100 text-slate-600">
+                            {item.category}
+                          </Badge>
+                          {item.prepTime && (
+                            <Badge variant="primary" size="sm" className="bg-amber-100 text-amber-700">
+                              {item.prepTime}m prep
+                            </Badge>
+                          )}
+                        </div>
                         <h3 className="font-semibold text-gray-900 truncate">
                           {item.name}
                         </h3>
@@ -383,15 +412,12 @@ export function WaiterOrderEntry({
                           <span className="text-amber-600 font-semibold">
                             {formatPrice(item.price)}
                           </span>
-                          {item.prepTime && (
-                            <span className="text-xs text-gray-400 flex items-center gap-1">
-                              <ClockIcon className="w-3 h-3" />
-                              {item.prepTime}m
-                            </span>
-                          )}
                         </div>
                       </div>
-                      <PlusIcon className="w-5 h-5 text-amber-500 flex-shrink-0" />
+                      <div className="flex flex-shrink-0 items-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-amber-700">
+                        <PlusIcon className="w-4 h-4" />
+                        <span className="hidden text-xs font-semibold sm:inline">Add</span>
+                      </div>
                     </motion.button>
                   ))}
                 </div>
@@ -401,11 +427,15 @@ export function WaiterOrderEntry({
             {/* Cart Sidebar (Desktop) / Bottom Sheet (Mobile) */}
             {cart.length > 0 && (
               <div className="hidden border-l border-gray-200 bg-gray-50 lg:flex lg:flex-col">
-                <div className="p-4 border-b border-gray-200">
-                  <h3 className="font-semibold text-gray-900 flex items-center gap-2">
-                    <ShoppingCartIcon className="w-5 h-5" />
-                    Order Items
-                  </h3>
+                <div className="border-b border-gray-200 p-4">
+                  <div className="mb-1 flex items-center justify-between gap-3">
+                    <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                      <ShoppingCartIcon className="w-5 h-5" />
+                      Order Items
+                    </h3>
+                    <Badge variant="count" size="sm">{cartItemCount}</Badge>
+                  </div>
+                  <p className="text-xs text-gray-500">Review the basket before sending it to the kitchen or bar.</p>
                 </div>
                 {renderCartItems()}
                 {renderCartFooter('Submit Order')}
@@ -416,7 +446,7 @@ export function WaiterOrderEntry({
 
         {/* Mobile Cart Summary */}
         {cart.length > 0 && (
-          <div className="border-t border-gray-200 bg-white p-4 lg:hidden">
+          <div className="border-t border-gray-200 bg-white/95 p-4 shadow-[0_-14px_30px_-24px_rgba(15,23,42,0.35)] lg:hidden">
             <div className="flex items-center justify-between mb-3">
               <span className="text-gray-600">Total ({cartItemCount} items)</span>
               <span className="text-xl font-bold text-gray-900">
@@ -429,7 +459,7 @@ export function WaiterOrderEntry({
                 onClick={() => setShowMobileCart(true)}
                 className="flex-1"
               >
-                View Cart
+                View Cart ({cartItemCount})
               </Button>
               <Button
                 variant="primary"
@@ -451,7 +481,7 @@ export function WaiterOrderEntry({
             initial={{ y: '100%' }}
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
-            className="relative flex max-h-[78vh] w-full flex-col rounded-t-3xl bg-gray-50"
+            className="relative flex max-h-[78vh] w-full flex-col rounded-t-3xl bg-[linear-gradient(180deg,#f9fafb_0%,#fff7ed_100%)]"
           >
             <div className="flex items-center justify-between border-b border-gray-200 bg-white px-4 py-3">
               <div>
@@ -485,6 +515,12 @@ export function WaiterOrderEntry({
             <div className="flex justify-between items-start mb-5">
               <div className="flex-1">
                 <span className="text-6xl mb-4 block">{showItemDetail.emoji}</span>
+                <div className="mb-3 flex flex-wrap gap-2">
+                  <Badge variant="secondary" size="sm">{showItemDetail.category}</Badge>
+                  <Badge variant="primary" size="sm" className="bg-amber-100 text-amber-700">
+                    {showItemDetail.prepTime}m prep
+                  </Badge>
+                </div>
                 <h3 className="text-2xl font-bold text-gray-900">
                   {showItemDetail.name}
                 </h3>

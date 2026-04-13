@@ -1,4 +1,9 @@
 import { ReceiptData } from '../utils/receipt';
+import { formatPrice } from '../utils/currency';
+
+function formatReceiptAmount(amount: number): string {
+  return formatPrice(Math.round(amount || 0));
+}
 
 /**
  * Send receipt via WhatsApp
@@ -146,8 +151,7 @@ function formatReceiptAsText(receipt: ReceiptData, customMessage?: string): stri
   // Items
   lines.push('*Items:*');
   receipt.items.forEach(item => {
-    const itemTotal = item.totalPrice.toFixed(2);
-    lines.push(`${item.quantity}x ${item.name} - $${itemTotal}`);
+    lines.push(`${item.quantity}x ${item.name} - ${formatReceiptAmount(item.totalPrice)}`);
     if (item.specialInstructions) {
       lines.push(`   Note: ${item.specialInstructions}`);
     }
@@ -156,11 +160,11 @@ function formatReceiptAsText(receipt: ReceiptData, customMessage?: string): stri
   
   // Totals
   lines.push('*Summary:*');
-  lines.push(`Subtotal: $${receipt.subtotal.toFixed(2)}`);
+  lines.push(`Subtotal: ${formatReceiptAmount(receipt.subtotal)}`);
   if (receipt.taxRate > 0) {
-    lines.push(`Tax (${receipt.taxRate}%): $${receipt.taxAmount.toFixed(2)}`);
+    lines.push(`Tax (${receipt.taxRate}%): ${formatReceiptAmount(receipt.taxAmount)}`);
   }
-  lines.push(`*Total: $${receipt.total.toFixed(2)}*`);
+  lines.push(`*Total: ${formatReceiptAmount(receipt.total)}*`);
   lines.push('');
   
   // Payment
@@ -196,14 +200,14 @@ function formatReceiptAsHTML(receipt: ReceiptData, customMessage?: string): stri
   const itemsRows = receipt.items.map(item => `
     <tr>
       <td style="padding: 4px 8px; text-align: left;">${item.quantity}x ${item.name}</td>
-      <td style="padding: 4px 8px; text-align: right;">$${item.totalPrice.toFixed(2)}</td>
+      <td style="padding: 4px 8px; text-align: right;">${formatReceiptAmount(item.totalPrice)}</td>
     </tr>
   `).join('');
   
   const taxRow = receipt.taxRate > 0 ? `
     <tr>
       <td style="padding: 4px 8px; text-align: left;">Tax (${receipt.taxRate}%)</td>
-      <td style="padding: 4px 8px; text-align: right;">$${receipt.taxAmount.toFixed(2)}</td>
+      <td style="padding: 4px 8px; text-align: right;">${formatReceiptAmount(receipt.taxAmount)}</td>
     </tr>
   ` : '';
   
@@ -256,12 +260,12 @@ function formatReceiptAsHTML(receipt: ReceiptData, customMessage?: string): stri
   <table style="width: 100%;">
     <tr>
       <td style="padding: 4px 0;">Subtotal:</td>
-      <td style="padding: 4px 0; text-align: right;">$${receipt.subtotal.toFixed(2)}</td>
+      <td style="padding: 4px 0; text-align: right;">${formatReceiptAmount(receipt.subtotal)}</td>
     </tr>
     ${taxRow}
     <tr style="font-weight: bold; font-size: 1.1em;">
       <td style="padding: 8px 0 4px;">TOTAL:</td>
-      <td style="padding: 8px 0 4px; text-align: right;">$${receipt.total.toFixed(2)}</td>
+      <td style="padding: 8px 0 4px; text-align: right;">${formatReceiptAmount(receipt.total)}</td>
     </tr>
   </table>
   
@@ -298,15 +302,15 @@ function formatReceiptAsSMS(receipt: ReceiptData, customMessage?: string): strin
   
   // Items (abbreviated)
   receipt.items.forEach(item => {
-    lines.push(`${item.quantity}x ${item.name} $${item.totalPrice.toFixed(2)}`);
+    lines.push(`${item.quantity}x ${item.name} ${formatReceiptAmount(item.totalPrice)}`);
   });
   lines.push('');
   
-  lines.push(`Subtotal: $${receipt.subtotal.toFixed(2)}`);
+  lines.push(`Subtotal: ${formatReceiptAmount(receipt.subtotal)}`);
   if (receipt.taxRate > 0) {
-    lines.push(`Tax: $${receipt.taxAmount.toFixed(2)}`);
+    lines.push(`Tax: ${formatReceiptAmount(receipt.taxAmount)}`);
   }
-  lines.push(`TOTAL: $${receipt.total.toFixed(2)}`);
+  lines.push(`TOTAL: ${formatReceiptAmount(receipt.total)}`);
   lines.push('');
   
   if (receipt.loyaltyPoints && receipt.loyaltyPoints.pointsEarned > 0) {

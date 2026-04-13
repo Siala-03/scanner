@@ -137,7 +137,6 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
     isGeneratingForecasts,
     runForecasting,
     isLoading,
-    loadError,
     refresh,
     upsertInventoryRecords,
     locations,
@@ -728,7 +727,7 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
             {/* KPI row */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
               {[
-                { label: 'Total Items', value: menuItems.length, icon: <PackageIcon className="w-5 h-5 text-blue-400" />, color: 'text-blue-400' },
+                { label: 'Total Items', value: allInventoryItems.length, icon: <PackageIcon className="w-5 h-5 text-blue-400" />, color: 'text-blue-400' },
                 { label: 'Total Stock Value', value: formatPrice(analytics.totalStockValue), icon: <TrendingUpIcon className="w-5 h-5 text-emerald-400" />, color: 'text-emerald-400' },
                 { label: 'Low Stock', value: analytics.lowStockCount, icon: <AlertTriangleIcon className="w-5 h-5 text-amber-400" />, color: 'text-amber-400' },
                 { label: 'Out of Stock', value: analytics.outOfStockCount, icon: <XCircleIcon className="w-5 h-5 text-red-400" />, color: 'text-red-400' },

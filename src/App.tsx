@@ -6,7 +6,6 @@ import { OrdersProvider, useOrdersContext } from './contexts/OrdersContext';
 import { useTables } from './hooks/useTables';
 import { callWaiter } from './api/tables';
 import { logoutStaff } from './api/auth';
-import { offlineSync } from './utils/offlineSync';
 import { CustomerApp } from './pages/customer/CustomerApp';
 import { WaiterDashboard } from './pages/waiter/WaiterDashboard';
 import { SupervisorDashboard } from './pages/supervisor/SupervisorDashboard';
@@ -107,12 +106,6 @@ export function App() {
     []);
   const { orders, addOrder, updateOrderStatus } = useOrdersContext();
 
-  // Initialize offline sync manager
-  useEffect(() => {
-    // The singleton will initialize itself when first accessed
-    offlineSync;
-  }, []);
-  
   const handleCallWaiter = useCallback((tableNum: number) => {
     // Add to local state first for immediate UI feedback
     setWaiterCalls((prev) => [

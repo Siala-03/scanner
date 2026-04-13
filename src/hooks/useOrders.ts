@@ -2,7 +2,6 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { supabaseAdmin } from '../lib/supabase';
 import { Order, OrderStatus, CartItem, Customer } from '../types';
 import { getEffectivePrice } from '../utils/pricing';
-import { decrementInventoryForOrder, ensureInventoryInitialized } from '../utils/inventoryStorage';
 import { createOrder as apiCreateOrder, updateOrderStatus as apiUpdateOrderStatus, fetchOrders as apiFetchOrders } from '../api/orders';
 
 const normalizeOrderPayload = (rawOrder: any): Order | undefined => {
@@ -243,15 +242,9 @@ export function useOrders(): UseOrdersReturn {
       if (!currentRestaurantId) {
         throw new Error('Cannot place order: restaurant context is missing. Please scan the restaurant QR code.');
       }
-      ensureInventoryInitialized();
-
       const requiresKitchen = isFoodOrder(items);
       const payloadItems = items.map(buildOrderItemPayload);
       const localItems = items.map(buildLocalOrderItem);
-
-      decrementInventoryForOrder(
-        localItems.map((i) => ({ menuItemId: i.menuItemId, quantity: i.quantity }))
-      );
 
       const subtotal = localItems.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
       const total = subtotal;
@@ -282,7 +275,6 @@ export function useOrders(): UseOrdersReturn {
 
       let savedOrder: Order = localOrder;
       try {
-        // Bypass OfflineAwareAPI — call Supabase directly so orders always reach the server
         const createdOrder = await apiCreateOrder({
           tableNumber,
           customerName: customer?.name || 'Walk-in',

@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS restaurants (
   phone text,
   email text,
   timezone text NOT NULL DEFAULT 'UTC',
-  currency text NOT NULL DEFAULT 'USD',
+  currency text NOT NULL DEFAULT 'RWF',
   is_active boolean NOT NULL DEFAULT true,
   subscription_status text NOT NULL DEFAULT 'trial' CHECK (subscription_status IN ('trial', 'active', 'suspended', 'cancelled')),
   created_at timestamptz NOT NULL DEFAULT now(),
