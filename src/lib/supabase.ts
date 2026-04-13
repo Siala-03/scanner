@@ -9,9 +9,11 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // Admin client — uses service role key, bypasses RLS entirely.
 // Only used for superadmin write operations (create/update/delete restaurants and staff).
-export const supabaseAdmin = supabaseServiceKey
+const isValidServiceKey = supabaseServiceKey && !supabaseServiceKey.startsWith('your_');
+export const supabaseAdmin = isValidServiceKey
   ? createClient(supabaseUrl, supabaseServiceKey)
-  : supabase; // fallback to anon if key not set
+  : supabase; // fallback to anon if key not configured
+export const isAdminConfigured = !!isValidServiceKey;
 
 export interface Staff {
   id: string;
