@@ -478,6 +478,12 @@ export async function getPendingApprovals(): Promise<Expense[]> {
   return (data || []).map(normalizeExpense);
 }
 
+// Backward-compatible API used by ExpenseApproval component
+export async function getExpensesPendingApproval(): Promise<{ data: Expense[] }> {
+  const data = await getPendingApprovals();
+  return { data };
+}
+
 export async function getApprovalSummary(): Promise<any> {
   const restaurantId = getRestaurantId();
   if (!restaurantId) return { pending: 0, approved: 0, rejected: 0, total: 0 };
@@ -498,6 +504,11 @@ export async function getApprovalSummary(): Promise<any> {
   };
 }
 
+// Backward-compatible API used by ExpenseApproval component
+export async function getExpenseApprovalSummary(): Promise<any> {
+  return getApprovalSummary();
+}
+
 // ============================================
 // PLACEHOLDERS (not implemented)
 // ============================================
@@ -512,6 +523,11 @@ export async function getExpenseReceipt(_expenseId: string): Promise<any> {
 
 export async function addExpenseNote(_expenseId: string, _content: string): Promise<any> {
   return { success: true };
+}
+
+// Backward-compatible API used by ExpenseApproval component
+export async function createExpenseNote(expenseId: string, _noteType: string, content: string): Promise<any> {
+  return addExpenseNote(expenseId, content);
 }
 
 export async function getExpenseNotes(_expenseId: string): Promise<any[]> {

@@ -69,6 +69,12 @@ export default function ManagerExpenseApproval() {
     loadData();
   }, []);
 
+  const unwrapData = <T,>(input: T[] | { data?: T[] } | null | undefined): T[] => {
+    if (Array.isArray(input)) return input;
+    if (input && Array.isArray((input as any).data)) return (input as any).data;
+    return [];
+  };
+
   const loadData = async () => {
     try {
       setLoading(true);
@@ -80,9 +86,9 @@ export default function ManagerExpenseApproval() {
         getExpenseApprovalSummary(),
       ]);
 
-      setPendingExpenses(pending.data);
-      setApprovedExpenses(approved.data);
-      setRejectedExpenses(rejected.data);
+      setPendingExpenses(unwrapData<ExpenseWithDetails>(pending as any));
+      setApprovedExpenses(unwrapData<ExpenseWithDetails>(approved as any));
+      setRejectedExpenses(unwrapData<ExpenseWithDetails>(rejected as any));
       setCategories(cats);
       setSummary(sum);
       setError(null);
