@@ -45,9 +45,9 @@ export async function fetchOrders(status?: string, restaurantId?: string): Promi
       .select('*')
       .order('created_at', { ascending: false });
     if (error) return [];
-    return data as Order[];
+    return (data ?? []) as Order[];
   }
-  
+
   let query = db
     .from('orders')
     .select('*')
@@ -60,13 +60,13 @@ export async function fetchOrders(status?: string, restaurantId?: string): Promi
 
   const { data, error } = await query;
   if (error) return [];
-  return data as Order[];
+  return (data ?? []) as Order[];
 }
 
 export async function fetchOrdersByDateRange(startDate: string, endDate: string, restaurantId?: string): Promise<Order[]> {
   const restaurant = restaurantId || getRestaurantId();
   if (!restaurant) return [];
-  
+
   const { data, error } = await db
     .from('orders')
     .select('*')
@@ -76,13 +76,13 @@ export async function fetchOrdersByDateRange(startDate: string, endDate: string,
     .order('created_at', { ascending: false });
 
   if (error) return [];
-  return data as Order[];
+  return (data ?? []) as Order[];
 }
 
 export async function fetchKitchenOrders(restaurantId?: string): Promise<Order[]> {
   const restaurant = restaurantId || getRestaurantId();
   if (!restaurant) return [];
-  
+
   const { data, error } = await db
     .from('orders')
     .select('*')
@@ -91,7 +91,7 @@ export async function fetchKitchenOrders(restaurantId?: string): Promise<Order[]
     .order('created_at', { ascending: true });
 
   if (error) return [];
-  return data as Order[];
+  return (data ?? []) as Order[];
 }
 
 export async function fetchOrderById(id: string): Promise<Order> {

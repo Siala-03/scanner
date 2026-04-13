@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   SearchIcon,
@@ -51,9 +51,10 @@ export function WaiterOrderEntry({
   const [showItemDetail, setShowItemDetail] = useState<MenuItem | null>(null);
   const [itemQuantity, setItemQuantity] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showMobileCart, setShowMobileCart] = useState(false);
 
   // Load existing order items into cart if editing
-  useMemo(() => {
+  useEffect(() => {
     if (existingOrder && isOpen && cart.length === 0) {
       const existingCart = existingOrder.items.map((item, index) => ({
         ...item,
@@ -63,7 +64,7 @@ export function WaiterOrderEntry({
       }));
       setCart(existingCart);
     }
-  }, [existingOrder, isOpen]);
+  }, [existingOrder, isOpen, cart.length]);
 
   // Get unique categories from menu
   const categories = useMemo(() => {
@@ -178,6 +179,95 @@ export function WaiterOrderEntry({
     'snacks': '🥨 Snacks'
   };
 
+  const renderCartItems = () => (
+    <div className="flex-1 overflow-y-auto p-4 space-y-3">
+      {cart.map((item) => (
+        <div
+          key={item.tempId}
+          className="rounded-2xl border border-gray-200 bg-white p-3 shadow-sm"
+        >
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex-1 min-w-0">
+              <h4 className="font-medium text-gray-900 text-sm">
+                {item.menuItemName}
+              </h4>
+              <p className="text-xs text-gray-500">
+                {formatPrice(item.unitPrice || 0)} each
+              </p>
+            </div>
+            <button
+              onClick={() => removeFromCart(item.tempId)}
+              className="p-1 text-gray-400 hover:text-red-500 transition-colors"
+            >
+              <TrashIcon className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="mt-3 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => updateCartItemQuantity(item.tempId, -1)}
+                className="p-1.5 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
+              >
+                <MinusIcon className="w-4 h-4" />
+              </button>
+              <span className="w-8 text-center font-semibold text-gray-900">
+                {item.quantity}
+              </span>
+              <button
+                onClick={() => updateCartItemQuantity(item.tempId, 1)}
+                className="p-1.5 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
+              >
+                <PlusIcon className="w-4 h-4" />
+              </button>
+            </div>
+            <span className="font-semibold text-amber-600">
+              {formatPrice(item.totalPrice || 0)}
+            </span>
+          </div>
+
+          {item.notes && (
+            <p className="mt-2 text-xs italic text-gray-500">
+              Note: {item.notes}
+            </p>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+
+  const renderCartFooter = (buttonLabel: string) => (
+    <>
+      <div className="border-t border-gray-200 p-4">
+        <textarea
+          placeholder="Order notes (optional)..."
+          value={orderNotes}
+          onChange={(e) => setOrderNotes(e.target.value)}
+          className="w-full resize-none rounded-xl border border-gray-200 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+          rows={2}
+        />
+      </div>
+
+      <div className="border-t border-gray-200 bg-white p-4">
+        <div className="mb-3 flex items-center justify-between">
+          <span className="text-gray-600">Total</span>
+          <span className="text-xl font-bold text-gray-900">
+            {formatPrice(cartTotal)}
+          </span>
+        </div>
+        <Button
+          variant="primary"
+          size="lg"
+          onClick={handleSubmit}
+          isLoading={isSubmitting}
+          className="w-full"
+        >
+          {buttonLabel}
+        </Button>
+      </div>
+    </>
+  );
+
   if (!isOpen) return null;
 
   return (
@@ -189,10 +279,10 @@ export function WaiterOrderEntry({
       />
 
       {/* Main Content */}
-      <div className="relative w-full max-w-4xl max-h-[90vh] bg-white md:rounded-2xl shadow-2xl flex flex-col">
+      <div className="relative flex max-h-[100dvh] w-full max-w-6xl flex-col overflow-hidden bg-white shadow-2xl md:max-h-[92vh] md:rounded-3xl">
         {/* Header */}
-        <div className="sticky top-0 z-10 bg-white border-b border-gray-200 p-4">
-          <div className="flex items-center justify-between mb-3">
+        <div className="sticky top-0 z-10 border-b border-gray-200 bg-white/95 p-4 backdrop-blur">
+          <div className="mb-3 flex items-start justify-between gap-3">
             <div className="flex items-center gap-3">
               <button
                 onClick={onClose}
@@ -201,7 +291,7 @@ export function WaiterOrderEntry({
                 <ChevronLeftIcon className="w-6 h-6 text-gray-600" />
               </button>
               <div>
-                <h2 className="text-xl font-bold text-gray-900">
+                <h2 className="text-lg font-bold text-gray-900 sm:text-xl">
                   Take Order - Table {tableNumber}
                 </h2>
                 <p className="text-sm text-gray-500">
@@ -215,7 +305,7 @@ export function WaiterOrderEntry({
                 size="sm"
                 onClick={handleSubmit}
                 isLoading={isSubmitting}
-                className="flex items-center gap-2"
+                className="hidden items-center gap-2 lg:flex"
               >
                 <CheckIcon className="w-4 h-4" />
                 Submit Order
@@ -236,7 +326,7 @@ export function WaiterOrderEntry({
           </div>
 
           {/* Categories */}
-          <div className="flex gap-2 mt-3 overflow-x-auto pb-2 -mx-4 px-4">
+          <div className="-mx-4 mt-3 flex gap-2 overflow-x-auto px-4 pb-2">
             {categories.map((category) => (
               <button
                 key={category}
@@ -255,7 +345,7 @@ export function WaiterOrderEntry({
 
         {/* Content */}
         <div className="flex-1 overflow-hidden">
-          <div className="flex h-full">
+          <div className="grid h-full lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_360px]">
             {/* Menu Items List */}
             <div className="flex-1 overflow-y-auto p-4">
               {isLoading ? (
@@ -268,14 +358,14 @@ export function WaiterOrderEntry({
                   <p>No menu items found</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 2xl:grid-cols-3">
                   {filteredItems.map((item) => (
                     <motion.button
                       key={item.id}
                       layout
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors text-left"
+                      className="flex items-center gap-3 rounded-2xl border border-gray-200 bg-gray-50 p-3 text-left transition-colors hover:bg-gray-100"
                       onClick={() => {
                         setShowItemDetail(item);
                         setItemQuantity(1);
@@ -310,98 +400,15 @@ export function WaiterOrderEntry({
 
             {/* Cart Sidebar (Desktop) / Bottom Sheet (Mobile) */}
             {cart.length > 0 && (
-              <div className="w-80 border-l border-gray-200 bg-gray-50 flex flex-col hidden md:flex">
+              <div className="hidden border-l border-gray-200 bg-gray-50 lg:flex lg:flex-col">
                 <div className="p-4 border-b border-gray-200">
                   <h3 className="font-semibold text-gray-900 flex items-center gap-2">
                     <ShoppingCartIcon className="w-5 h-5" />
                     Order Items
                   </h3>
                 </div>
-
-                <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                  {cart.map((item) => (
-                    <div
-                      key={item.tempId}
-                      className="bg-white rounded-lg p-3 shadow-sm"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1 min-w-0">
-                          <h4 className="font-medium text-gray-900 text-sm">
-                            {item.menuItemName}
-                          </h4>
-                          <p className="text-xs text-gray-500">
-                            {formatPrice(item.unitPrice || 0)} each
-                          </p>
-                        </div>
-                        <button
-                          onClick={() => removeFromCart(item.tempId)}
-                          className="p-1 text-gray-400 hover:text-red-500 transition-colors"
-                        >
-                          <TrashIcon className="w-4 h-4" />
-                        </button>
-                      </div>
-
-                      <div className="flex items-center justify-between mt-2">
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => updateCartItemQuantity(item.tempId, -1)}
-                            className="p-1 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
-                          >
-                            <MinusIcon className="w-4 h-4" />
-                          </button>
-                          <span className="w-8 text-center font-semibold text-gray-900">
-                            {item.quantity}
-                          </span>
-                          <button
-                            onClick={() => updateCartItemQuantity(item.tempId, 1)}
-                            className="p-1 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
-                          >
-                            <PlusIcon className="w-4 h-4" />
-                          </button>
-                        </div>
-                        <span className="font-semibold text-amber-600">
-                          {formatPrice(item.totalPrice || 0)}
-                        </span>
-                      </div>
-
-                      {item.notes && (
-                        <p className="text-xs text-gray-500 mt-2 italic">
-                          Note: {item.notes}
-                        </p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-
-                {/* Notes */}
-                <div className="p-4 border-t border-gray-200">
-                  <textarea
-                    placeholder="Order notes (optional)..."
-                    value={orderNotes}
-                    onChange={(e) => setOrderNotes(e.target.value)}
-                    className="w-full p-2 text-sm border border-gray-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-amber-500"
-                    rows={2}
-                  />
-                </div>
-
-                {/* Total */}
-                <div className="p-4 bg-white border-t border-gray-200">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-gray-600">Total</span>
-                    <span className="text-xl font-bold text-gray-900">
-                      {formatPrice(cartTotal)}
-                    </span>
-                  </div>
-                  <Button
-                    variant="primary"
-                    size="lg"
-                    onClick={handleSubmit}
-                    isLoading={isSubmitting}
-                    className="w-full"
-                  >
-                    Submit Order
-                  </Button>
-                </div>
+                {renderCartItems()}
+                {renderCartFooter('Submit Order')}
               </div>
             )}
           </div>
@@ -409,7 +416,7 @@ export function WaiterOrderEntry({
 
         {/* Mobile Cart Summary */}
         {cart.length > 0 && (
-          <div className="md:hidden border-t border-gray-200 p-4 bg-white">
+          <div className="border-t border-gray-200 bg-white p-4 lg:hidden">
             <div className="flex items-center justify-between mb-3">
               <span className="text-gray-600">Total ({cartItemCount} items)</span>
               <span className="text-xl font-bold text-gray-900">
@@ -419,7 +426,7 @@ export function WaiterOrderEntry({
             <div className="flex gap-2">
               <Button
                 variant="secondary"
-                onClick={() => {/* Show full cart modal */}}
+                onClick={() => setShowMobileCart(true)}
                 className="flex-1"
               >
                 View Cart
@@ -436,6 +443,33 @@ export function WaiterOrderEntry({
           </div>
         )}
       </div>
+
+      {cart.length > 0 && showMobileCart && (
+        <div className="absolute inset-0 z-20 flex items-end lg:hidden">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setShowMobileCart(false)} />
+          <motion.div
+            initial={{ y: '100%' }}
+            animate={{ y: 0 }}
+            exit={{ y: '100%' }}
+            className="relative flex max-h-[78vh] w-full flex-col rounded-t-3xl bg-gray-50"
+          >
+            <div className="flex items-center justify-between border-b border-gray-200 bg-white px-4 py-3">
+              <div>
+                <h3 className="font-semibold text-gray-900">Cart Summary</h3>
+                <p className="text-sm text-gray-500">{cartItemCount} item{cartItemCount !== 1 ? 's' : ''}</p>
+              </div>
+              <button
+                onClick={() => setShowMobileCart(false)}
+                className="rounded-full p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+              >
+                <XIcon className="h-5 w-5" />
+              </button>
+            </div>
+            {renderCartItems()}
+            {renderCartFooter('Submit Order')}
+          </motion.div>
+        </div>
+      )}
 
       {/* Item Detail Modal */}
       <Modal

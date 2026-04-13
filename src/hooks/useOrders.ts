@@ -3,7 +3,7 @@ import { supabaseAdmin } from '../lib/supabase';
 import { Order, OrderStatus, CartItem, Customer } from '../types';
 import { getEffectivePrice } from '../utils/pricing';
 import { decrementInventoryForOrder, ensureInventoryInitialized } from '../utils/inventoryStorage';
-import { createOrder as apiCreateOrder, updateOrderStatus as apiUpdateOrderStatus } from '../api/orders';
+import { createOrder as apiCreateOrder, updateOrderStatus as apiUpdateOrderStatus, fetchOrders as apiFetchOrders } from '../api/orders';
 
 const normalizeOrderPayload = (rawOrder: any): Order | undefined => {
   if (!rawOrder) return undefined;
@@ -140,9 +140,8 @@ export function useOrders(): UseOrdersReturn {
   const loadOrders = useCallback(async (restId?: string) => {
     const id = restId || restaurantId;
     try {
-      const { fetchOrders } = await import('../api/orders');
-      const fetched = await fetchOrders('all', id);
-      setOrders(fetched.map((o: any) => normalizeOrderPayload(o)).filter(Boolean) as Order[]);
+      const fetched = await apiFetchOrders('all', id);
+      setOrders((fetched ?? []).map((o: any) => normalizeOrderPayload(o)).filter(Boolean) as Order[]);
     } catch {
       setOrders([]);
     }

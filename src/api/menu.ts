@@ -42,7 +42,7 @@ export async function fetchMenu(): Promise<MenuItem[]> {
     console.error('Error fetching menu:', error);
     return [];
   }
-  return data as MenuItem[];
+  return (data ?? []) as MenuItem[];
 }
 
 export async function fetchMenuByCategory(category: string): Promise<MenuItem[]> {
@@ -58,7 +58,7 @@ export async function fetchMenuByCategory(category: string): Promise<MenuItem[]>
     .order('name');
 
   if (error) return [];
-  return data as MenuItem[];
+  return (data ?? []) as MenuItem[];
 }
 
 export async function createMenuItem(item: Partial<MenuItem>): Promise<MenuItem> {
@@ -174,5 +174,5 @@ export async function fetchCategories(): Promise<string[]> {
     .eq('restaurant_id', restaurantId);
 
   if (error) return [];
-  return [...new Set(data.map(item => item.category))].sort();
+  return [...new Set((data ?? []).map(item => item.category))].sort();
 }
