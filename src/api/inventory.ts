@@ -165,28 +165,52 @@ export async function updateInventoryRecord(
   const restaurantId = getRestaurantId();
 
   // Accept both camelCase (from UI) and snake_case (from direct callers)
-  const payload: Record<string, any> = {
-    menu_item_id:  menuItemId,
-    restaurant_id: restaurantId,
-    updated_at:    new Date().toISOString(),
+  const updateFields: Record<string, any> = {
+    updated_at: new Date().toISOString(),
   };
 
-  if (record.stock               !== undefined) payload.stock               = record.stock;
-  if (record.lowStockThreshold   !== undefined) payload.low_stock_threshold = record.lowStockThreshold;
-  if (record.low_stock_threshold !== undefined) payload.low_stock_threshold = record.low_stock_threshold;
-  if (record.reorderPoint        !== undefined) payload.reorder_point       = record.reorderPoint;
-  if (record.reorder_point       !== undefined) payload.reorder_point       = record.reorder_point;
-  if (record.reorderQty          !== undefined) payload.reorder_qty         = record.reorderQty;
-  if (record.reorder_qty         !== undefined) payload.reorder_qty         = record.reorder_qty;
-  if (record.unitCost            !== undefined) payload.unit_cost           = record.unitCost;
-  if (record.unit_cost           !== undefined) payload.unit_cost           = record.unit_cost;
-  if (record.supplierId          !== undefined) payload.supplier_id         = record.supplierId;
-  if (record.supplier_id         !== undefined) payload.supplier_id         = record.supplier_id;
-  if (record.location            !== undefined) payload.location            = record.location;
+  if (record.stock               !== undefined) updateFields.stock               = record.stock;
+  if (record.lowStockThreshold   !== undefined) updateFields.low_stock_threshold = record.lowStockThreshold;
+  if (record.low_stock_threshold !== undefined) updateFields.low_stock_threshold = record.low_stock_threshold;
+  if (record.reorderPoint        !== undefined) updateFields.reorder_point       = record.reorderPoint;
+  if (record.reorder_point       !== undefined) updateFields.reorder_point       = record.reorder_point;
+  if (record.reorderQty          !== undefined) updateFields.reorder_qty         = record.reorderQty;
+  if (record.reorder_qty         !== undefined) updateFields.reorder_qty         = record.reorder_qty;
+  if (record.unitCost            !== undefined) updateFields.unit_cost           = record.unitCost;
+  if (record.unit_cost           !== undefined) updateFields.unit_cost           = record.unit_cost;
+  if (record.supplierId          !== undefined) updateFields.supplier_id         = record.supplierId;
+  if (record.supplier_id         !== undefined) updateFields.supplier_id         = record.supplier_id;
+  if (record.location            !== undefined) updateFields.location            = record.location;
 
+  // Try UPDATE first (existing record)
+  const { data: updated, error: updateError } = await supabaseAdmin
+    .from('inventory_records')
+    .update(updateFields)
+    .eq('menu_item_id', menuItemId)
+    .eq('restaurant_id', restaurantId)
+    .select();
+
+  if (!updateError && updated && updated.length > 0) {
+    return normalizeInventoryRecord(updated[0]);
+  }
+
+  // No existing row — INSERT with a generated id
+  const id = `inv-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   const { data, error } = await supabaseAdmin
     .from('inventory_records')
-    .upsert(payload, { onConflict: 'menu_item_id,restaurant_id' })
+    .insert({
+      id,
+      menu_item_id:        menuItemId,
+      restaurant_id:       restaurantId,
+      stock:               record.stock               ?? 0,
+      low_stock_threshold: record.lowStockThreshold   ?? record.low_stock_threshold ?? 5,
+      reorder_point:       record.reorderPoint        ?? record.reorder_point       ?? 10,
+      reorder_qty:         record.reorderQty          ?? record.reorder_qty         ?? 20,
+      unit_cost:           record.unitCost            ?? record.unit_cost           ?? 0,
+      supplier_id:         record.supplierId          ?? record.supplier_id         ?? null,
+      location:            record.location            ?? '',
+      updated_at:          new Date().toISOString(),
+    })
     .select()
     .single();
 
@@ -447,19 +471,34 @@ export async function receivePurchaseOrder(
       .select('stock')
       .eq('menu_item_id', item.menu_item_id)
       .eq('restaurant_id', restaurantId)
-      .single();
+      .maybeSingle();
 
     const oldStock = inv?.stock ?? 0;
     const newStock = oldStock + item.received_qty;
 
-    await supabaseAdmin
-      .from('inventory_records')
-      .upsert({
-        menu_item_id:  item.menu_item_id,
-        stock:         newStock,
-        restaurant_id: restaurantId,
-        updated_at:    new Date().toISOString(),
-      }, { onConflict: 'menu_item_id,restaurant_id' });
+    if (inv) {
+      // Existing record — update stock in place
+      await supabaseAdmin
+        .from('inventory_records')
+        .update({ stock: newStock, updated_at: new Date().toISOString() })
+        .eq('menu_item_id', item.menu_item_id)
+        .eq('restaurant_id', restaurantId);
+    } else {
+      // No record yet — insert with generated id
+      await supabaseAdmin
+        .from('inventory_records')
+        .insert({
+          id:                  `inv-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          menu_item_id:        item.menu_item_id,
+          stock:               newStock,
+          restaurant_id:       restaurantId,
+          low_stock_threshold: 5,
+          reorder_point:       10,
+          reorder_qty:         20,
+          unit_cost:           0,
+          updated_at:          new Date().toISOString(),
+        });
+    }
 
     // Record the movement
     await supabaseAdmin.from('stock_movements').insert({

@@ -250,6 +250,7 @@ export interface ExpenseFormData {
   taxAmount?: number;
   taxRate?: number;
   isTaxDeductible: boolean;
+  approvalStatus?: ApprovalStatus;
   createdByRole?: UserRole;
 }
 
