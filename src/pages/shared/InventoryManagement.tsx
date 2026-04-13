@@ -110,6 +110,15 @@ function normalizeInventoryRecord(rec: any): InventoryRecord {
   };
 }
 
+function getErrorMessage(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  if (err && typeof err === 'object' && 'message' in err) {
+    const message = (err as any).message;
+    if (typeof message === 'string' && message.trim()) return message;
+  }
+  return 'Unknown error';
+}
+
 // ── Main Component ───────────────────────────────────────────────────────────
 
 export function InventoryManagement({ role }: InventoryManagementProps) {
@@ -162,6 +171,7 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
   const [newInventoryItemReorderPoint, setNewInventoryItemReorderPoint] = useState(10);
   const [newInventoryItemReorderQty, setNewInventoryItemReorderQty] = useState(20);
   const [newInventoryItemUnitCost, setNewInventoryItemUnitCost] = useState(0);
+  const [newInventoryItemUnitMeasurement, setNewInventoryItemUnitMeasurement] = useState('units');
 
   const inventoryMap = useMemo(() => {
     const map: Record<string, InventoryRecord> = {};
@@ -327,7 +337,7 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
       alert('Inventory item added successfully');
     } catch (err) {
       console.error('Failed to add inventory item:', err);
-      alert(`Failed to add inventory item: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      alert(`Failed to add inventory item: ${getErrorMessage(err)}`);
     }
   };
 
@@ -395,7 +405,7 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
       setEditValues({});
     } catch (err) {
       console.error('Failed to update inventory record:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      const errorMessage = getErrorMessage(err);
       alert(`Failed to update inventory item: ${errorMessage}`);
       // Don't clear edit state on error so user can retry
     }
@@ -410,7 +420,7 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
       alert('Inventory item deleted successfully');
     } catch (err) {
       console.error('Failed to delete inventory record', err);
-      alert(`Failed to delete inventory item: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      alert(`Failed to delete inventory item: ${getErrorMessage(err)}`);
     }
   };
 
@@ -1614,7 +1624,7 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                 />
               </label>
               <label className="block text-sm text-slate-300">
-                Unit cost
+                Unit cost (RWF)
                 <input
                   type="number"
                   placeholder="Unit cost"
@@ -1624,6 +1634,28 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                   step="0.01"
                   className="mt-1 w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
                 />
+              </label>
+              <label className="block text-sm text-slate-300">
+                Unit measurement
+                <select
+                  value={newInventoryItemUnitMeasurement}
+                  onChange={(e) => setNewInventoryItemUnitMeasurement(e.target.value)}
+                  className="mt-1 w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                >
+                  <option value="units">Units</option>
+                  <option value="kg">Kilograms (kg)</option>
+                  <option value="g">Grams (g)</option>
+                  <option value="L">Liters (L)</option>
+                  <option value="ml">Milliliters (ml)</option>
+                  <option value="m">Meters (m)</option>
+                  <option value="cm">Centimeters (cm)</option>
+                  <option value="boxes">Boxes</option>
+                  <option value="cases">Cases</option>
+                  <option value="packs">Packs</option>
+                  <option value="bags">Bags</option>
+                  <option value="bottles">Bottles</option>
+                  <option value="cans">Cans</option>
+                </select>
               </label>
             </div>
 

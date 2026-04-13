@@ -163,6 +163,9 @@ export async function updateInventoryRecord(
   record: Partial<InventoryRecord> & Record<string, any>
 ): Promise<InventoryRecord> {
   const restaurantId = getRestaurantId();
+  if (!restaurantId) {
+    throw new Error('No restaurant selected. Please sign in again or reselect your restaurant.');
+  }
 
   // Accept both camelCase (from UI) and snake_case (from direct callers)
   const updateFields: Record<string, any> = {
@@ -190,6 +193,10 @@ export async function updateInventoryRecord(
     .eq('restaurant_id', restaurantId)
     .select();
 
+  if (updateError) {
+    throw new Error(`Failed to update inventory record: ${updateError.message}`);
+  }
+
   if (!updateError && updated && updated.length > 0) {
     return normalizeInventoryRecord(updated[0]);
   }
@@ -214,7 +221,9 @@ export async function updateInventoryRecord(
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) {
+    throw new Error(`Failed to insert inventory record: ${error.message}`);
+  }
   return normalizeInventoryRecord(data);
 }
 
