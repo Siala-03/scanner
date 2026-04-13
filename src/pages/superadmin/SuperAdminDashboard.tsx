@@ -4,7 +4,7 @@ import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Modal } from '../../components/ui/Modal';
 import { Input } from '../../components/ui/Input';
-import { changePassword } from '../../api/auth';
+import { changePassword, signUpStaff } from '../../api/auth';
 import { fetchRestaurants, createRestaurant, updateRestaurant, deleteRestaurant, type Restaurant } from '../../api/restaurants';
 import { fetchTablesForRestaurant, deleteTable } from '../../api/tables';
 
@@ -38,6 +38,7 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
   const [passwordError, setPasswordError] = useState('');
   const [passwordSuccess, setPasswordSuccess] = useState('');
   const [isPasswordLoading, setIsPasswordLoading] = useState(false);
+  const [formError, setFormError] = useState('');
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -131,6 +132,7 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
 
   const handleCreateOrUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
+    setFormError('');
     try {
       if (editingId) {
         await updateRestaurant(editingId, {
@@ -142,14 +144,25 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
           country: formData.country
         });
       } else {
-        await createRestaurant({
+        // 1. Create the restaurant
+        const newRestaurant = await createRestaurant({
           name: formData.name,
           email: formData.email,
           phone: formData.phone,
           address: formData.address,
           city: formData.city,
           country: formData.country,
-          managerName: formData.managerName
+        });
+
+        // 2. Create the manager staff account linked to this restaurant
+        await signUpStaff({
+          name: formData.managerName,
+          email: formData.managerEmail,
+          phone: formData.managerPhone,
+          role: 'manager',
+          username: formData.managerUsername,
+          password: formData.managerPassword,
+          restaurantId: newRestaurant.id,
         });
       }
 
@@ -158,6 +171,7 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
       setShowCreateModal(false);
     } catch (error) {
       console.error('Failed to save restaurant:', error);
+      setFormError(error instanceof Error ? error.message : 'Failed to save. Please try again.');
     }
   };
 
@@ -168,8 +182,14 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
       phone: restaurant.phone,
       address: restaurant.address,
       city: restaurant.city,
-      country: restaurant.country
+      country: restaurant.country,
+      managerName: '',
+      managerEmail: '',
+      managerPhone: '',
+      managerUsername: '',
+      managerPassword: '',
     });
+    setFormError('');
     setEditingId(restaurant.id);
     setShowCreateModal(true);
   };
@@ -220,9 +240,10 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
             >
               <Lock className="w-4 h-4 mr-2" /> Change Password
             </Button>
-            <Button 
+            <Button
               onClick={() => {
                 resetForm();
+                setFormError('');
                 setShowCreateModal(true);
               }}
             >
@@ -486,6 +507,7 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
           isOpen={showCreateModal}
           onClose={() => {
             setShowCreateModal(false);
+            setFormError('');
             resetForm();
           }}
           title={editingId ? 'Edit Restaurant' : 'Add New Restaurant'}
@@ -542,51 +564,59 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
               />
             </div>
 
-            <div className="border-t border-slate-600 pt-4 mt-6">
-              <h3 className="text-lg font-semibold text-slate-200 mb-3">Manager Account</h3>
-              
-              <Input
-                label="Manager Name"
-                value={formData.managerName}
-                onChange={(e) => setFormData({ ...formData, managerName: e.target.value })}
-                placeholder="John Doe"
-                required
-              />
+            {!editingId && (
+              <div className="border-t border-slate-600 pt-4 mt-6">
+                <h3 className="text-lg font-semibold text-slate-200 mb-3">Manager Account</h3>
 
-              <Input
-                label="Manager Email"
-                type="email"
-                value={formData.managerEmail}
-                onChange={(e) => setFormData({ ...formData, managerEmail: e.target.value })}
-                placeholder="manager@restaurant.com"
-                required
-              />
+                <Input
+                  label="Manager Name"
+                  value={formData.managerName}
+                  onChange={(e) => setFormData({ ...formData, managerName: e.target.value })}
+                  placeholder="John Doe"
+                  required
+                />
 
-              <Input
-                label="Manager Phone"
-                value={formData.managerPhone}
-                onChange={(e) => setFormData({ ...formData, managerPhone: e.target.value })}
-                placeholder="+1 (555) 123-4567"
-                required
-              />
+                <Input
+                  label="Manager Email"
+                  type="email"
+                  value={formData.managerEmail}
+                  onChange={(e) => setFormData({ ...formData, managerEmail: e.target.value })}
+                  placeholder="manager@restaurant.com"
+                  required
+                />
 
-              <Input
-                label="Manager Username"
-                value={formData.managerUsername}
-                onChange={(e) => setFormData({ ...formData, managerUsername: e.target.value })}
-                placeholder="manager_username"
-                required
-              />
+                <Input
+                  label="Manager Phone"
+                  value={formData.managerPhone}
+                  onChange={(e) => setFormData({ ...formData, managerPhone: e.target.value })}
+                  placeholder="+1 (555) 123-4567"
+                  required
+                />
 
-              <Input
-                label="Manager Password"
-                type="password"
-                value={formData.managerPassword}
-                onChange={(e) => setFormData({ ...formData, managerPassword: e.target.value })}
-                placeholder="Secure password"
-                required
-              />
-            </div>
+                <Input
+                  label="Manager Username"
+                  value={formData.managerUsername}
+                  onChange={(e) => setFormData({ ...formData, managerUsername: e.target.value })}
+                  placeholder="manager_username"
+                  required
+                />
+
+                <Input
+                  label="Manager Password"
+                  type="password"
+                  value={formData.managerPassword}
+                  onChange={(e) => setFormData({ ...formData, managerPassword: e.target.value })}
+                  placeholder="Secure password"
+                  required
+                />
+              </div>
+            )}
+
+            {formError && (
+              <p className="text-red-400 text-sm bg-red-400/10 border border-red-400/30 rounded-lg px-3 py-2">
+                {formError}
+              </p>
+            )}
 
             <div className="flex gap-3 pt-4">
               <Button
@@ -601,6 +631,7 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
                 variant="secondary"
                 onClick={() => {
                   setShowCreateModal(false);
+                  setFormError('');
                   resetForm();
                 }}
                 className="flex-1"
