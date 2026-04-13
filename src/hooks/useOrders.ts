@@ -1,5 +1,5 @@
-import { useState, useCallback, useEffect } from 'react';
-import { useSocket } from './useSocket';
+import { useState, useCallback, useEffect, useRef } from 'react';
+import { supabase } from '../lib/supabase';
 import { Order, OrderStatus, CartItem, Customer } from '../types';
 import { getEffectivePrice } from '../utils/pricing';
 import { decrementInventoryForOrder, ensureInventoryInitialized } from '../utils/inventoryStorage';
@@ -101,106 +101,58 @@ interface UseOrdersReturn {
 // API functions
 export function useOrders(): UseOrdersReturn {
   const [orders, setOrders] = useState<Order[]>([]);
-  const { socket, joinOrders, joinRestaurant, joinRole } = useSocket();
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
-  const resolveRestaurantId = () => {
-    const storedRestaurantId = localStorage.getItem('restaurantId');
-    if (storedRestaurantId) return storedRestaurantId;
+  const restaurantId = localStorage.getItem('restaurantId') || undefined;
 
-    const storedAuthUser = localStorage.getItem('authUser');
-    if (storedAuthUser) {
-      try {
-        const parsed = JSON.parse(storedAuthUser);
-        if (parsed?.restaurantId) {
-          return parsed.restaurantId;
-        }
-      } catch {
-        // ignore invalid JSON
-      }
+  const loadOrders = useCallback(async (restId?: string) => {
+    const id = restId || restaurantId;
+    try {
+      const fetched = await OfflineAwareAPI.fetchOrders('all', id);
+      setOrders(fetched.map((o: any) => normalizeOrderPayload(o)).filter(Boolean) as Order[]);
+    } catch {
+      setOrders([]);
     }
-
-    return null;
-  };
-
-  const restaurantId = resolveRestaurantId() ?? undefined;
+  }, [restaurantId]);
 
   useEffect(() => {
-    async function loadFromBackend() {
-      // Get restaurantId from auth user if available, otherwise use localStorage
-      let waiterRestaurantId = restaurantId;
-      if (!waiterRestaurantId) {
-        const authUser = localStorage.getItem('authUser');
-        if (authUser) {
-          try {
-            const parsed = JSON.parse(authUser);
-            waiterRestaurantId = parsed.restaurantId;
-          } catch { /* ignore */ }
-        }
-      }
-      console.log('[useOrders] Loading orders for waiter, restaurantId:', waiterRestaurantId);
-      try {
-        const backendOrders = await OfflineAwareAPI.fetchOrders('all', waiterRestaurantId);
-        console.log('[useOrders] Loaded orders:', backendOrders.length, 'for restaurant:', waiterRestaurantId);
-        setOrders(backendOrders);
-      } catch (e) {
-        console.warn('Failed to load orders from backend', e);
-        setOrders([]);
-      }
+    loadOrders();
+
+    // Subscribe to Supabase Realtime for live order updates
+    if (restaurantId) {
+      if (channelRef.current) supabase.removeChannel(channelRef.current);
+
+      channelRef.current = supabase
+        .channel(`orders-realtime-${restaurantId}`)
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'orders', filter: `restaurant_id=eq.${restaurantId}` },
+          (payload) => {
+            const raw = payload.new || payload.old;
+            if (!raw) { loadOrders(); return; }
+            const updated = normalizeOrderPayload(raw);
+            if (!updated) return;
+
+            setOrders((prev) => {
+              const exists = prev.some((o) => o.id === updated.id);
+              if (payload.eventType === 'DELETE') {
+                return prev.filter((o) => o.id !== updated.id);
+              }
+              if (!exists) return [updated, ...prev];
+              return prev.map((o) => (o.id === updated.id ? updated : o));
+            });
+          }
+        )
+        .subscribe();
     }
 
-    loadFromBackend();
-    joinOrders();
-    if (restaurantId) joinRestaurant(restaurantId);
-    joinRole('waiter');
-
-    const handleOrderUpdate = (data: any) => {
-      const updatedOrder = normalizeOrderPayload(data?.order);
-
-      if (!updatedOrder) {
-        return;
-      }
-
-      // Get current restaurantId from localStorage (in case it changed)
-      let currentRestaurantId = localStorage.getItem('restaurantId');
-      if (!currentRestaurantId) {
-        try {
-          const authUser = JSON.parse(localStorage.getItem('authUser') || '{}');
-          currentRestaurantId = authUser.restaurantId;
-        } catch { /* ignore */ }
-      }
-
-      // Accept any order - don't filter by restaurant for now to debug
-      // This ensures new customer orders appear immediately
-      console.log('[useOrders] Socket order update received:', data.type, 'orderId:', updatedOrder.id, 'orderRestaurant:', updatedOrder.restaurantId, 'currentRestaurant:', currentRestaurantId);
-
-      setOrders((prevOrders) => {
-        const orderExists = prevOrders.some((order) => order.id === updatedOrder.id);
-
-        if (data.type === 'create') {
-          if (orderExists) {
-            return prevOrders.map((order) => (order.id === updatedOrder.id ? updatedOrder : order));
-          }
-          console.log('[useOrders] Creating new order:', updatedOrder.id);
-          return [updatedOrder, ...prevOrders];
-        }
-
-        if (data.type === 'update' || data.type === 'status') {
-          console.log('[useOrders] Updating order:', updatedOrder.id);
-          if (!orderExists) {
-            return [updatedOrder, ...prevOrders];
-          }
-          return prevOrders.map((order) => (order.id === updatedOrder.id ? updatedOrder : order));
-        }
-
-        return prevOrders;
-      });
-    };
-
-    socket.on('order:update', handleOrderUpdate);
     return () => {
-      socket.off('order:update', handleOrderUpdate);
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
     };
-  }, [restaurantId, joinOrders, joinRestaurant, joinRole, socket]);
+  }, [restaurantId, loadOrders]);
 
   const drinkCategories = new Set([
     'beers',

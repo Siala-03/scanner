@@ -1,7 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { MenuItem } from '../types';
 import { fetchMenu, uploadMenu } from '../api/menu';
-import { getSocket } from '../hooks/useSocket';
+import { supabase } from '../lib/supabase';
 import { menuItems as defaultMenuItems } from '../data/menuData';
 import { loadCustomMenu } from '../utils/menuImportExport';
 
@@ -12,7 +12,6 @@ function getRestaurantIdFromUrl(): string | null {
   if (restaurantTableMatch) {
     return decodeURIComponent(restaurantTableMatch[1]);
   }
-
   const query = new URLSearchParams(window.location.search);
   return query.get('restaurantId');
 }
@@ -35,21 +34,20 @@ const MenuContext = createContext<MenuContextValue | null>(null);
 
 export function useMenuContext() {
   const ctx = useContext(MenuContext);
-  if (!ctx) {
-    throw new Error('useMenuContext must be used inside <MenuProvider>');
-  }
+  if (!ctx) throw new Error('useMenuContext must be used inside <MenuProvider>');
   return ctx;
 }
 
 export function MenuProvider({ children }: { children: React.ReactNode }) {
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading]   = useState(true);
+  const [error, setError]           = useState<string | null>(null);
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   const loadFallbackMenu = useCallback(() => {
-    const storedMenu = loadCustomMenu();
-    if (storedMenu && storedMenu.length > 0) {
-      setMenuItems(storedMenu);
+    const stored = loadCustomMenu();
+    if (stored && stored.length > 0) {
+      setMenuItems(stored);
       setError(null);
       return true;
     }
@@ -61,16 +59,13 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
     try {
       const menu = await fetchMenu();
       if (menu.length > 0) {
-        setMenuItems(menu);
+        setMenuItems(menu as unknown as MenuItem[]);
       } else if (!loadFallbackMenu()) {
         setMenuItems(defaultMenuItems);
       }
       setError(null);
     } catch (err) {
-      console.error('Failed to refresh menu:', err);
-      if (!loadFallbackMenu()) {
-        setMenuItems(defaultMenuItems);
-      }
+      if (!loadFallbackMenu()) setMenuItems(defaultMenuItems);
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setIsLoading(false);
@@ -80,7 +75,7 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
   const saveMenu = useCallback(async (items: MenuItem[]) => {
     setIsLoading(true);
     try {
-      await uploadMenu(items);
+      await uploadMenu(items as any);
       await refresh();
     } finally {
       setIsLoading(false);
@@ -94,79 +89,57 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let isMounted = true;
-    const restaurantIdRef = { current: getRestaurantId() };
 
+    // Initial load
     const load = async () => {
       setIsLoading(true);
       try {
         const items = await fetchMenu();
         if (!isMounted) return;
-
         if (items.length > 0) {
-          setMenuItems(items);
+          setMenuItems(items as unknown as MenuItem[]);
         } else if (!loadFallbackMenu()) {
           setMenuItems(defaultMenuItems);
         }
         setError(null);
-      } catch (err) {
-        console.error('Failed to load menu from API:', err);
-        // Log API URL for debugging
-        const apiUrl = import.meta.env.VITE_API_URL || '(using relative path)';
-        console.warn('API URL being used:', apiUrl);
+      } catch {
         if (!isMounted) return;
-        if (!loadFallbackMenu()) {
-          setMenuItems(defaultMenuItems);
-        }
-        setError(err instanceof Error ? err.message : 'Unable to load menu');
+        if (!loadFallbackMenu()) setMenuItems(defaultMenuItems);
+        setError(null); // don't show error — we have a fallback
       } finally {
-        if (!isMounted) return;
-        setIsLoading(false);
-      }
-    };
-
-    const checkRestaurantId = async () => {
-      const currentId = getRestaurantId();
-      if (currentId !== restaurantIdRef.current) {
-        restaurantIdRef.current = currentId;
-        await refresh();
+        if (isMounted) setIsLoading(false);
       }
     };
 
     load();
 
-    const socket = getSocket();
-    const handleMenuUpdate = () => {
-      refresh();
-    };
-    const handleStorageEvent = (event: StorageEvent) => {
-      if (event.key === 'restaurantId') {
-        checkRestaurantId();
-      }
-    };
-
-    try {
-      if (!socket.connected) {
-        socket.connect();
-      }
-      socket.emit('join:menu');
-      socket.on('menu:update', handleMenuUpdate);
-      socket.on('menu:changed', handleMenuUpdate);
-      window.addEventListener('restaurantIdChanged', checkRestaurantId);
-      window.addEventListener('storage', handleStorageEvent);
-      window.addEventListener('popstate', checkRestaurantId);
-    } catch (err) {
-      console.warn('Socket connect failed:', err);
+    // Supabase Realtime: refresh menu when items change in DB
+    const restaurantId = getRestaurantId();
+    if (restaurantId) {
+      if (channelRef.current) supabase.removeChannel(channelRef.current);
+      channelRef.current = supabase
+        .channel(`menu-realtime-${restaurantId}`)
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'menu_items', filter: `restaurant_id=eq.${restaurantId}` },
+          () => { if (isMounted) refresh(); }
+        )
+        .subscribe();
     }
+
+    // Re-load when restaurant changes (e.g. QR scan)
+    const handleRestaurantChange = () => { if (isMounted) refresh(); };
+    window.addEventListener('restaurantIdChanged', handleRestaurantChange);
 
     return () => {
       isMounted = false;
-      socket.off('menu:update', handleMenuUpdate);
-      socket.off('menu:changed', handleMenuUpdate);
-      window.removeEventListener('restaurantIdChanged', checkRestaurantId);
-      window.removeEventListener('storage', handleStorageEvent);
-      window.removeEventListener('popstate', checkRestaurantId);
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
+      window.removeEventListener('restaurantIdChanged', handleRestaurantChange);
     };
-  }, [refresh]);
+  }, [refresh, loadFallbackMenu]);
 
   const value = useMemo(
     () => ({ menuItems, categories, isLoading, error, refresh, saveMenu }),

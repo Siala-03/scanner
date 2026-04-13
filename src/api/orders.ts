@@ -121,6 +121,7 @@ export async function createOrder(order: CreateOrderInput): Promise<Order> {
       tax: 0,
       total,
       notes: order.notes || null,
+      requires_kitchen: order.requiresKitchen ?? false,
       created_by: staffId,
       payment_status: 'unpaid',
       restaurant_id: restaurantId

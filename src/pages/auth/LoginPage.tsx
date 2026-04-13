@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { LockIcon, UserIcon, ArrowLeftIcon, EyeIcon, EyeOffIcon, WifiIcon, WifiOffIcon } from 'lucide-react';
 import { Staff } from '../../types';
 import { loginStaff } from '../../api/auth';
-import { ApiError } from '../../api/http';
+import { supabase } from '../../lib/supabase';
 import { Button } from '../../components/ui/Button';
 
 interface LoginPageProps {
@@ -18,23 +18,18 @@ export function LoginPage({ onLogin, onBack }: LoginPageProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [serverStatus, setServerStatus] = useState<'checking' | 'online' | 'offline'>('checking');
 
-  // Check server connection on mount
+  // Check Supabase connectivity on mount
   useEffect(() => {
     const checkServerStatus = async () => {
       try {
-        const response = await fetch('/health');
-        if (response.ok) {
-          setServerStatus('online');
-        } else {
-          setServerStatus('offline');
-        }
+        const { error } = await supabase.from('restaurants').select('id').limit(1);
+        setServerStatus(error ? 'offline' : 'online');
       } catch {
         setServerStatus('offline');
       }
     };
 
     checkServerStatus();
-    // Check every 30 seconds
     const interval = setInterval(checkServerStatus, 30000);
     return () => clearInterval(interval);
   }, []);
@@ -48,42 +43,10 @@ export function LoginPage({ onLogin, onBack }: LoginPageProps) {
 
     try {
       const user = await loginStaff(username, password);
-      console.log('Login response:', user);
-
-      // Persist staff authentication state and tenant for authenticated requests
-      localStorage.setItem('staffId', user.id);
-      localStorage.removeItem('token');
-      if (user.restaurantId) {
-        localStorage.setItem('restaurantId', user.restaurantId);
-      }
-
-      console.log('Login successful, redirecting...');
       onLogin(user);
     } catch (err) {
-      console.error('Login error:', err);
-      let errorMessage = 'Login failed. Please try again.';
-
-      if (err instanceof ApiError) {
-        switch (err.status) {
-          case 0:
-            errorMessage = 'Cannot connect to server. Please check your internet connection and try again.';
-            break;
-          case 401:
-            errorMessage = 'Invalid username or password. Please check your credentials.';
-            break;
-          case 403:
-            errorMessage = 'Access denied. Please contact your administrator.';
-            break;
-          case 500:
-            errorMessage = 'Server error. Please try again later.';
-            break;
-          default:
-            errorMessage = err.message || 'Login failed. Please try again.';
-        }
-      } else if (err instanceof Error) {
-        errorMessage = err.message;
-      }
-
+      const errorMessage =
+        err instanceof Error ? err.message : 'Login failed. Please try again.';
       setError(errorMessage);
     } finally {
       setIsLoading(false);

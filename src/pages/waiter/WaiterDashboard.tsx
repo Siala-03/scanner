@@ -850,7 +850,7 @@ export function WaiterDashboard({
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-slate-400">Avg Service Time</span>
-                  <span className="font-semibold text-white">{waiter.performance.avgServiceTime} min</span>
+                  <span className="font-semibold text-white">{waiter.performance?.avgServiceTime ?? 15} min</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-slate-400">Rating</span>
