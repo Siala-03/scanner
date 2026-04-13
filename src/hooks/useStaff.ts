@@ -1,62 +1,55 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import type { Staff } from '../types';
 import { fetchStaff, fetchStaffOnDuty, fetchWaiters, fetchStaffById } from '../api/staff';
-import { getSocket } from './useSocket';
+import { supabase } from '../lib/supabase';
 
-// Hook to get staff from backend with real-time sync
 export function useStaff() {
   const [staff, setStaff] = useState<Staff[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
-  // Fetch staff from backend
   const loadStaff = useCallback(async () => {
     try {
       setIsLoading(true);
-      const backendStaff = await fetchStaff();
-      setStaff(backendStaff);
+      const data = await fetchStaff();
+      setStaff(data);
       setError(null);
     } catch (err) {
-      console.warn('Failed to fetch staff from backend:', err);
+      console.warn('Failed to fetch staff:', err);
       setError('Failed to load staff data');
     } finally {
       setIsLoading(false);
     }
   }, []);
 
-  // Listen for staff updates via WebSocket
   useEffect(() => {
     loadStaff();
 
-    try {
-      const socket = getSocket();
-
-      const handleStaffUpdate = () => {
-        console.log('Staff update received, reloading...');
-        loadStaff();
-      };
-
-      socket.on('staff:update', handleStaffUpdate);
-      socket.on('staff:changed', handleStaffUpdate);
-
-      return () => {
-        socket.off('staff:update', handleStaffUpdate);
-        socket.off('staff:changed', handleStaffUpdate);
-      };
-    } catch (err) {
-      console.warn('Socket not available for staff:', err);
+    const restaurantId = localStorage.getItem('restaurantId');
+    if (restaurantId) {
+      if (channelRef.current) supabase.removeChannel(channelRef.current);
+      channelRef.current = supabase
+        .channel(`staff-realtime-${restaurantId}`)
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'staff', filter: `restaurant_id=eq.${restaurantId}` },
+          () => loadStaff()
+        )
+        .subscribe();
     }
+
+    return () => {
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
+    };
   }, [loadStaff]);
 
-  return {
-    staff,
-    isLoading,
-    error,
-    refetch: loadStaff
-  };
+  return { staff, isLoading, error, refetch: loadStaff };
 }
 
-// Hook to get staff on duty
 export function useStaffOnDuty() {
   const [staff, setStaff] = useState<Staff[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -73,18 +66,11 @@ export function useStaffOnDuty() {
     }
   }, []);
 
-  useEffect(() => {
-    loadStaff();
-  }, [loadStaff]);
+  useEffect(() => { loadStaff(); }, [loadStaff]);
 
-  return {
-    staff,
-    isLoading,
-    refetch: loadStaff
-  };
+  return { staff, isLoading, refetch: loadStaff };
 }
 
-// Hook to get waiters
 export function useWaiters() {
   const [waiters, setWaiters] = useState<Staff[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -101,33 +87,21 @@ export function useWaiters() {
     }
   }, []);
 
-  useEffect(() => {
-    loadWaiters();
-  }, [loadWaiters]);
+  useEffect(() => { loadWaiters(); }, [loadWaiters]);
 
-  return {
-    waiters,
-    isLoading,
-    refetch: loadWaiters
-  };
+  return { waiters, isLoading, refetch: loadWaiters };
 }
 
-// Hook to get staff by ID
 export function useStaffById(id: string | undefined) {
   const [staffMember, setStaffMember] = useState<Staff | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const loadStaff = useCallback(async () => {
-    if (!id) {
-      setStaffMember(null);
-      setIsLoading(false);
-      return;
-    }
-
+    if (!id) { setStaffMember(null); setIsLoading(false); return; }
     try {
       setIsLoading(true);
-      const staff = await fetchStaffById(id);
-      setStaffMember(staff);
+      const data = await fetchStaffById(id);
+      setStaffMember(data);
     } catch (err) {
       console.warn('Failed to fetch staff member:', err);
       setStaffMember(null);
@@ -136,12 +110,7 @@ export function useStaffById(id: string | undefined) {
     }
   }, [id]);
 
-  useEffect(() => {
-    loadStaff();
-  }, [loadStaff]);
+  useEffect(() => { loadStaff(); }, [loadStaff]);
 
-  return {
-    staff: staffMember,
-    isLoading
-  };
+  return { staff: staffMember, isLoading };
 }

@@ -1,59 +1,122 @@
-import { apiRequest } from './http';
-import type { Staff } from '../types';
+import { supabase, supabaseAdmin } from '../lib/supabase';
+import type { Staff, StaffRole, StaffPerformance } from '../types';
 
-const API_BASE = '/api/auth/staff';
+function getRestaurantId(): string | undefined {
+  return localStorage.getItem('restaurantId') || undefined;
+}
 
-// Fetch all staff
+function normalizeStaff(raw: any): Staff {
+  const perf: Record<string, any> = raw.performance || {};
+  const performance: StaffPerformance = {
+    ordersServed:   perf.ordersServed   ?? perf.orders_served   ?? 0,
+    avgServiceTime: perf.avgServiceTime ?? perf.avg_service_time ?? 15,
+    rating:         perf.rating         ?? 4.5,
+    totalRevenue:   perf.totalRevenue   ?? perf.total_revenue   ?? 0,
+    shiftsThisWeek: perf.shiftsThisWeek ?? perf.shifts_this_week ?? 0,
+  };
+
+  return {
+    id:             raw.id,
+    name:           raw.name,
+    role:           raw.role as StaffRole,
+    email:          raw.email   || '',
+    phone:          raw.phone   || '',
+    restaurantId:   raw.restaurant_id || raw.restaurantId || undefined,
+    isOnDuty:       raw.is_on_duty    ?? raw.isOnDuty    ?? true,
+    assignedTables: raw.assigned_tables ?? raw.assignedTables ?? [],
+    hireDate:       raw.hire_date ? new Date(raw.hire_date) : new Date(),
+    performance,
+  };
+}
+
 export async function fetchStaff(): Promise<Staff[]> {
-  const data = await apiRequest<{ staff: Staff[] }>(`${API_BASE}`);
-  return data.staff;
+  const restaurantId = getRestaurantId();
+  const role = localStorage.getItem('staffRole');
+
+  let query = supabase.from('staff').select('*').order('name');
+  if (role !== 'superadmin' && restaurantId) {
+    query = query.eq('restaurant_id', restaurantId);
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data || []).map(normalizeStaff);
 }
 
-// Fetch staff by ID
 export async function fetchStaffById(id: string): Promise<Staff> {
-  const data = await apiRequest<{ staff: Staff }>(`${API_BASE}/${id}`);
-  return data.staff;
+  const { data, error } = await supabase
+    .from('staff')
+    .select('*')
+    .eq('id', id)
+    .single();
+  if (error) throw error;
+  return normalizeStaff(data);
 }
 
-// Get staff on duty
 export async function fetchStaffOnDuty(): Promise<Staff[]> {
-  const data = await apiRequest<{ staff: Staff[] }>(`${API_BASE}/on-duty`);
-  return data.staff;
+  const restaurantId = getRestaurantId();
+  if (!restaurantId) return [];
+
+  const { data, error } = await supabase
+    .from('staff')
+    .select('*')
+    .eq('restaurant_id', restaurantId)
+    .eq('is_on_duty', true)
+    .order('name');
+  if (error) throw error;
+  return (data || []).map(normalizeStaff);
 }
 
-// Get waiters only
 export async function fetchWaiters(): Promise<Staff[]> {
-  const data = await apiRequest<{ staff: Staff[] }>(`${API_BASE}/waiters`);
-  return data.staff;
+  const restaurantId = getRestaurantId();
+  if (!restaurantId) return [];
+
+  const { data, error } = await supabase
+    .from('staff')
+    .select('*')
+    .eq('restaurant_id', restaurantId)
+    .eq('role', 'waiter')
+    .order('name');
+  if (error) throw error;
+  return (data || []).map(normalizeStaff);
 }
 
-// Update staff status
 export async function updateStaffStatus(id: string, isOnDuty: boolean): Promise<Staff> {
-  return apiRequest<Staff>(`${API_BASE}/${id}/status`, {
-    method: 'PUT',
-    json: { isOnDuty }
-  });
+  const { data, error } = await supabaseAdmin
+    .from('staff')
+    .update({ is_on_duty: isOnDuty })
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw error;
+  return normalizeStaff(data);
 }
 
-// Update staff assignments
 export async function updateStaffAssignments(id: string, assignedTables: number[]): Promise<Staff> {
-  return apiRequest<Staff>(`${API_BASE}/${id}/assignments`, {
-    method: 'PUT',
-    json: { assignedTables }
-  });
+  const { data, error } = await supabaseAdmin
+    .from('staff')
+    .update({ assigned_tables: assignedTables })
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw error;
+  return normalizeStaff(data);
 }
 
-// Update staff role
 export async function updateStaffRole(id: string, role: StaffRole): Promise<Staff> {
-  return apiRequest<Staff>(`${API_BASE}/${id}/role`, {
-    method: 'PUT',
-    json: { role }
-  });
+  const { data, error } = await supabaseAdmin
+    .from('staff')
+    .update({ role })
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw error;
+  return normalizeStaff(data);
 }
 
-// Delete staff
 export async function deleteStaff(id: string): Promise<{ success: boolean }> {
-  return apiRequest<{ success: boolean }>(`${API_BASE}/${id}`, {
-    method: 'DELETE'
-  });
+  await supabaseAdmin.from('staff_credentials').delete().eq('staff_id', id);
+  const { error } = await supabaseAdmin.from('staff').delete().eq('id', id);
+  if (error) throw error;
+  return { success: true };
 }
