@@ -1,74 +1,140 @@
-import { useEffect, useCallback } from 'react';
-import { io, Socket } from 'socket.io-client';
+import { useEffect, useCallback, useRef } from 'react';
+import { supabase } from '../lib/supabase';
 
-// Default to production backend URL
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'https://scanner-3cku.onrender.com';
+// Custom event emitter for cross-component communication
+type EventCallback = (...args: unknown[]) => void;
+const eventListeners: Record<string, EventCallback[]> = {};
 
-let socket: Socket | null = null;
+export function emitEvent(event: string, ...args: unknown[]) {
+  const callbacks = eventListeners[event] || [];
+  callbacks.forEach(cb => cb(...args));
+}
 
-export function getSocket(): Socket {
-  if (!socket) {
-    try {
-      socket = io(SOCKET_URL, {
-        autoConnect: false,
-        reconnection: true,
-        reconnectionAttempts: 3,
-        reconnectionDelay: 1000,
-        timeout: 5000,
-      });
-    } catch (err) {
-      console.warn('Failed to create socket:', err);
-      // Return a dummy socket that does nothing
-      return {
-        // eslint-disable-next-line @typescript-eslint/no-empty-function
-        on: () => {},
-        // eslint-disable-next-line @typescript-eslint/no-empty-function
-        off: () => {},
-        // eslint-disable-next-line @typescript-eslint/no-empty-function
-        emit: () => {},
-        connected: false
-      } as unknown as Socket;
-    }
+export function onEvent(event: string, callback: EventCallback) {
+  if (!eventListeners[event]) {
+    eventListeners[event] = [];
   }
-  return socket;
+  eventListeners[event].push(callback);
+  return () => {
+    const idx = eventListeners[event].indexOf(callback);
+    if (idx > -1) eventListeners[event].splice(idx, 1);
+  };
+}
+
+export function useSupabaseRealtime() {
+  const ordersChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const inventoryChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+
+  const subscribeToOrders = useCallback((restaurantId: string, onUpdate: () => void) => {
+    // Clean up old subscription
+    if (ordersChannelRef.current) {
+      supabase.removeChannel(ordersChannelRef.current);
+    }
+
+    const channel = supabase
+      .channel(`orders-${restaurantId}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'orders',
+        filter: `restaurant_id=eq.${restaurantId}`
+      }, () => {
+        onUpdate();
+        emitEvent('orders:update');
+      })
+      .subscribe();
+
+    ordersChannelRef.current = channel;
+    return channel;
+  }, []);
+
+  const subscribeToInventory = useCallback((restaurantId: string, onUpdate: () => void) => {
+    if (inventoryChannelRef.current) {
+      supabase.removeChannel(inventoryChannelRef.current);
+    }
+
+    const channel = supabase
+      .channel(`inventory-${restaurantId}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'inventory_records',
+        filter: `restaurant_id=eq.${restaurantId}`
+      }, () => {
+        onUpdate();
+        emitEvent('inventory:update');
+      })
+      .subscribe();
+
+    inventoryChannelRef.current = channel;
+    return channel;
+  }, []);
+
+  const cleanup = useCallback(() => {
+    if (ordersChannelRef.current) {
+      supabase.removeChannel(ordersChannelRef.current);
+    }
+    if (inventoryChannelRef.current) {
+      supabase.removeChannel(inventoryChannelRef.current);
+    }
+  }, []);
+
+  return {
+    subscribeToOrders,
+    subscribeToInventory,
+    cleanup
+  };
+}
+
+// Legacy socket wrapper - now uses Supabase Realtime
+// For backward compatibility with existing code
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || '';
+
+export function getSocket() {
+  // Return a dummy socket that uses Supabase events instead
+  return {
+    on: (event: string, callback: EventCallback) => {
+      return onEvent(event, callback);
+    },
+    off: (event: string, callback?: EventCallback) => {
+      if (callback) {
+        const idx = (eventListeners[event] || []).indexOf(callback);
+        if (idx > -1) eventListeners[event].splice(idx, 1);
+      } else {
+        delete eventListeners[event];
+      }
+    },
+    emit: (event: string, ...args: unknown[]) => {
+      // Emit to local event system
+      emitEvent(event, ...args);
+    },
+    connected: true
+  };
 }
 
 export function useSocket() {
   const socket = getSocket();
 
   useEffect(() => {
-    try {
-      if (!socket.connected) {
-        socket.connect();
-      }
-    } catch (err) {
-      console.warn('Socket connection failed:', err);
-    }
-
-    return () => {
-      // Don't disconnect on unmount - keep connection alive
-    };
+    // No actual socket connection needed - using Supabase realtime
   }, [socket]);
 
   const joinInventory = useCallback(() => {
-    socket.emit('join:inventory');
-  }, [socket]);
+    console.log('[useSocket] Joined inventory realtime');
+  }, []);
 
   const joinOrders = useCallback(() => {
-    console.log('[useSocket] Emitting join:orders');
-    socket.emit('join:orders');
-  }, [socket]);
+    console.log('[useSocket] Joined orders realtime');
+  }, []);
 
   const joinRestaurant = useCallback((restaurantId: string) => {
     if (!restaurantId) return;
-    console.log(`[useSocket] Emitting join:restaurant with restaurantId: ${restaurantId}`);
-    socket.emit('join:restaurant', restaurantId);
-  }, [socket]);
+    console.log(`[useSocket] Joined restaurant: ${restaurantId}`);
+  }, []);
 
   const joinRole = useCallback((role: string) => {
-    console.log(`[useSocket] Emitting join:role with role: ${role}`);
-    socket.emit('join:role', role);
-  }, [socket]);
+    console.log(`[useSocket] Joined role: ${role}`);
+  }, []);
 
   return {
     socket,

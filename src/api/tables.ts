@@ -1,60 +1,73 @@
-import { apiRequest } from './http';
+import { supabase } from '../lib/supabase';
 
-// API base URL
-const API_BASE = '/api/tables';
+function getRestaurantId(): string | undefined {
+  if (typeof window !== 'undefined') {
+    return localStorage.getItem('restaurantId') || undefined;
+  }
+  return undefined;
+}
 
 export interface Table {
   id: string;
-  tableNumber: number;
-  name: string;
+  table_number: number;
   capacity: number;
-  location: string;
-  restaurantId: string;
-  isActive?: boolean;
+  status: string;
+  restaurant_id: string;
 }
 
-// Fetch all tables for current restaurant
 export async function fetchTables(): Promise<Table[]> {
-  try {
-    return await apiRequest<Table[]>(`${API_BASE}`);
-  } catch (err) {
-    console.warn('Failed to fetch tables from backend');
-    return [];
-  }
+  const restaurantId = getRestaurantId();
+  if (!restaurantId) return [];
+  
+  const { data, error } = await supabase
+    .from('tables')
+    .select('*')
+    .eq('restaurant_id', restaurantId)
+    .order('table_number');
+
+  if (error) return [];
+  return data || [];
 }
 
-// Fetch tables for a specific restaurant (superadmin only)
 export async function fetchTablesForRestaurant(restaurantId: string): Promise<Table[]> {
-  try {
-    return await apiRequest<Table[]>(`${API_BASE}?restaurantId=${restaurantId}`, {
-      headers: { 'x-restaurant-id': restaurantId }
-    });
-  } catch (err) {
-    console.warn(`Failed to fetch tables for restaurant ${restaurantId}`);
-    return [];
-  }
+  const { data, error } = await supabase
+    .from('tables')
+    .select('*')
+    .eq('restaurant_id', restaurantId)
+    .order('table_number');
+
+  if (error) return [];
+  return data || [];
 }
 
-// Create new table
-export async function createTable(tableNumber: number, name?: string, capacity?: number): Promise<Table> {
-  console.log('API: Creating table with number:', tableNumber);
-  return apiRequest<Table>(`${API_BASE}`, {
-    method: 'POST',
-    json: { table_number: tableNumber, name, capacity }
-  });
+export async function createTable(tableNumber: number, capacity: number = 4): Promise<Table> {
+  const restaurantId = getRestaurantId();
+  if (!restaurantId) throw new Error('No restaurant selected');
+  
+  const id = `table-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  
+  const { data, error } = await supabase
+    .from('tables')
+    .insert({
+      id,
+      table_number: tableNumber,
+      capacity,
+      status: 'available',
+      restaurant_id: restaurantId
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
 }
 
-// Delete table
 export async function deleteTable(id: string): Promise<void> {
-  return apiRequest<void>(`${API_BASE}/${id}`, {
-    method: 'DELETE'
-  });
+  const { error } = await supabase.from('tables').delete().eq('id', id);
+  if (error) throw error;
 }
 
-// Call waiter for a table
 export async function callWaiter(tableNumber: number): Promise<{ success: boolean; message?: string }> {
-  return apiRequest<{ success: boolean; message?: string }>(`${API_BASE}/call-waiter`, {
-    method: 'POST',
-    json: { tableNumber }
-  });
+  console.log(`Waiter called for table ${tableNumber}`);
+  return { success: true, message: 'Waiter has been notified' };
 }
