@@ -4,21 +4,9 @@ import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Modal } from '../../components/ui/Modal';
 import { Input } from '../../components/ui/Input';
-import { apiRequest } from '../../api/http';
 import { changePassword } from '../../api/auth';
+import { fetchRestaurants, createRestaurant, updateRestaurant, deleteRestaurant, type Restaurant } from '../../api/restaurants';
 import { fetchTablesForRestaurant, deleteTable } from '../../api/tables';
-
-interface Restaurant {
-  id: string;
-  name: string;
-  email: string;
-  phone: string;
-  address: string;
-  city: string;
-  country: string;
-  managerCount: number;
-  createdAt: string;
-}
 
 interface Table {
   id: string;
@@ -71,8 +59,11 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
   const loadRestaurants = async () => {
     setIsLoading(true);
     try {
-      const data = await apiRequest<Restaurant[]>('/api/restaurants');
-      setRestaurants(data);
+      const data = await fetchRestaurants();
+      setRestaurants(data.map(r => ({
+        ...r,
+        managerCount: 0
+      })));
     } catch (error) {
       console.error('Failed to load restaurants:', error);
     } finally {
@@ -141,24 +132,26 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
   const handleCreateOrUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const url = editingId ? `/api/restaurants/${editingId}` : '/api/restaurants';
-      const method = editingId ? 'PUT' : 'POST';
-
-      const body = editingId
-        ? {
-            name: formData.name,
-            email: formData.email,
-            phone: formData.phone,
-            address: formData.address,
-            city: formData.city,
-            country: formData.country
-          }
-        : formData;
-
-      await apiRequest(url, {
-        method,
-        json: body
-      });
+      if (editingId) {
+        await updateRestaurant(editingId, {
+          name: formData.name,
+          email: formData.email,
+          phone: formData.phone,
+          address: formData.address,
+          city: formData.city,
+          country: formData.country
+        });
+      } else {
+        await createRestaurant({
+          name: formData.name,
+          email: formData.email,
+          phone: formData.phone,
+          address: formData.address,
+          city: formData.city,
+          country: formData.country,
+          managerName: formData.managerName
+        });
+      }
 
       await loadRestaurants();
       resetForm();
@@ -184,9 +177,7 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this restaurant?')) return;
     try {
-      await apiRequest(`/api/restaurants/${id}`, {
-        method: 'DELETE'
-      });
+      await deleteRestaurant(id);
       await loadRestaurants();
     } catch (error) {
       console.error('Failed to delete restaurant:', error);
