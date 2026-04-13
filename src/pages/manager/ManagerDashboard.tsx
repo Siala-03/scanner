@@ -25,7 +25,7 @@ const statusColors: Record<string, string> = {
 };
 
 export function ManagerDashboard({ onNavigate, totalOrders, activeOrders, servedOrders, todaysRevenue, tableCount, ordersByHour, statusBreakdown }: ManagerDashboardProps) {
-  const { forecasts, forecastAlerts, isGeneratingForecasts, runForecasting } = useInventoryData();
+  const { forecasts, forecastAlerts, isGeneratingForecasts, runForecasting, analytics, inventory, refresh } = useInventoryData();
 
   return (
     <div className="bg-slate-900 text-slate-100 p-3 md:p-4 min-h-screen">
@@ -39,8 +39,8 @@ export function ManagerDashboard({ onNavigate, totalOrders, activeOrders, served
             <Button variant="secondary" size="sm" onClick={() => onNavigate('menu')}>
               <MenuIcon className="w-4 h-4 mr-1" /> <span className="hidden sm:inline">Manage Menu</span>
             </Button>
-            <Button variant="secondary" size="sm" onClick={() => onNavigate('qrcodes')}>
-              <QrCodeIcon className="w-4 h-4 mr-1" /> <span className="hidden sm:inline">QR Codes</span>
+            <Button variant="secondary" size="sm" onClick={() => onNavigate('inventory')}>
+              <QrCodeIcon className="w-4 h-4 mr-1" /> <span className="hidden sm:inline">Inventory</span>
             </Button>
           </div>
         </div>
@@ -66,6 +66,42 @@ export function ManagerDashboard({ onNavigate, totalOrders, activeOrders, served
             <div className="mt-2 text-2xl font-semibold text-gray-100">{tableCount}</div>
             <div className="text-xs text-slate-300 mt-1">Configured tables</div>
           </div>
+        </div>
+
+        {/* Inventory KPIs */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+          <button 
+            onClick={() => onNavigate('inventory')}
+            className="rounded-xl border border-slate-700 p-3 bg-slate-800/70 hover:bg-slate-800 transition text-left"
+          >
+            <div className="text-xs uppercase tracking-wide text-slate-400">Inventory Items</div>
+            <div className="mt-2 text-2xl font-semibold text-gray-100">{inventory.length}</div>
+            <div className="text-xs text-slate-300 mt-1">Tracked items</div>
+          </button>
+          <button 
+            onClick={() => onNavigate('inventory')}
+            className="rounded-xl border border-amber-500/30 p-3 bg-amber-500/5 hover:bg-amber-500/10 transition text-left"
+          >
+            <div className="text-xs uppercase tracking-wide text-amber-400">Low Stock</div>
+            <div className="mt-2 text-2xl font-semibold text-amber-400">{analytics.lowStockCount}</div>
+            <div className="text-xs text-slate-300 mt-1">Need attention</div>
+          </button>
+          <button 
+            onClick={() => onNavigate('inventory')}
+            className="rounded-xl border border-red-500/30 p-3 bg-red-500/5 hover:bg-red-500/10 transition text-left"
+          >
+            <div className="text-xs uppercase tracking-wide text-red-400">Out of Stock</div>
+            <div className="mt-2 text-2xl font-semibold text-red-400">{analytics.outOfStockCount}</div>
+            <div className="text-xs text-slate-300 mt-1">Immediate action</div>
+          </button>
+          <button 
+            onClick={() => onNavigate('inventory')}
+            className="rounded-xl border border-emerald-500/30 p-3 bg-emerald-500/5 hover:bg-emerald-500/10 transition text-left"
+          >
+            <div className="text-xs uppercase tracking-wide text-emerald-400">Stock Value</div>
+            <div className="mt-2 text-2xl font-semibold text-emerald-400">${(analytics.totalStockValue / 100).toFixed(0)}</div>
+            <div className="text-xs text-slate-300 mt-1">Total value</div>
+          </button>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">

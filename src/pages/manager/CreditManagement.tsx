@@ -929,11 +929,6 @@ const CreditManagement: React.FC = () => {
         <div className="px-0 py-4 sm:py-0">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
             <h1 className="text-2xl md:text-3xl font-bold text-white">Credit Management</h1>
-            <div className="flex flex-wrap gap-2 sm:gap-4">
-              <Button variant="ghost" size="sm" onClick={() => loadCreditData()}>
-                <RefreshCwIcon className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-              </Button>
-            </div>
           </div>
 
           {loadError && (

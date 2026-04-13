@@ -338,11 +338,20 @@ export function App() {
       setSelectedRole('supplier');
       setRouteResolved(true);
       return;
+    } else if (path === '/superadmin' || path.startsWith('/superadmin')) {
+      setSelectedRole('superadmin');
+      setRouteResolved(true);
+      return;
     }
 
-    // Unknown path fallback: keep app loadable and show friendly message
+    // Unknown path fallback — restore saved role if available, otherwise show login
     window.history.replaceState({}, '', '/');
-    setSelectedRole(null);
+    const savedRole = localStorage.getItem('selectedRole');
+    if (savedRole) {
+      setSelectedRole(savedRole as UserRole);
+    } else {
+      setSelectedRole(null);
+    }
     setRouteResolved(true);
   }, []);
 

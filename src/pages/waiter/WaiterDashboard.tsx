@@ -716,7 +716,7 @@ export function WaiterDashboard({
                     <EmptyTab
                       icon={<ClipboardListIcon className="w-7 h-7" />}
                       title="No incoming orders"
-                      description="Orders placed from the customer QR menu will appear here in real time."
+                      desc="Orders placed from the customer QR menu will appear here in real time."
                     />
                   ) : (
                     <AnimatePresence>
@@ -753,7 +753,7 @@ export function WaiterDashboard({
                     <EmptyTab
                       icon={<UtensilsIcon className="w-7 h-7" />}
                       title="Nothing in kitchen"
-                      description="Food orders sent to the kitchen will appear here."
+                      desc="Food orders sent to the kitchen will appear here."
                     />
                   ) : (
                     <AnimatePresence>
@@ -789,7 +789,7 @@ export function WaiterDashboard({
                     <EmptyTab
                       icon={<CheckCircleIcon className="w-7 h-7" />}
                       title="Nothing ready yet"
-                      description="Orders ready to be served will appear here."
+                      desc="Orders ready to be served will appear here."
                     />
                   ) : (
                     <AnimatePresence>
@@ -819,7 +819,7 @@ export function WaiterDashboard({
                     <EmptyTab
                       icon={<StarIcon className="w-7 h-7" />}
                       title="No served orders yet"
-                      description="Completed orders from your shift appear here."
+                      desc="Completed orders from your shift appear here."
                     />
                   ) : (
                     <AnimatePresence>
