@@ -141,7 +141,8 @@ export function useOrders(): UseOrdersReturn {
     try {
       const fetched = await apiFetchOrders('all', id);
       setOrders((fetched ?? []).map((o: any) => normalizeOrderPayload(o)).filter(Boolean) as Order[]);
-    } catch {
+    } catch (e: any) {
+      console.error('[Orders] Poll failed:', e?.message ?? e);
       setOrders([]);
     }
   }, [restaurantId]);
@@ -294,8 +295,9 @@ export function useOrders(): UseOrdersReturn {
 
         savedOrder = normalizeOrderPayload(createdOrder) ?? localOrder;
         setOrders((prev) => prev.map((order) => (order.id === localOrderId ? savedOrder : order)));
-      } catch (e) {
-        console.warn('Failed to create order:', e);
+      } catch (e: any) {
+        console.error('[Order] Failed to save order to Supabase:', e?.message ?? e);
+        console.error('[Order] This is likely an RLS (Row Level Security) issue. Run the SQL fix in Supabase.');
       }
 
       return savedOrder;
