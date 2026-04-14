@@ -1,5 +1,22 @@
 import { supabase, type MenuItem } from '../lib/supabase';
 
+function toDbMenuItem(item: Partial<MenuItem> & Record<string, any>, restaurantId: string, fallbackId?: string) {
+  return {
+    id: item.id || fallbackId,
+    name: item.name,
+    description: item.description || '',
+    price: item.price || 0,
+    category: item.category || 'Uncategorized',
+    emoji: item.emoji || '🍽️',
+    prep_time: item.prep_time ?? item.prepTime ?? 15,
+    is_available: item.is_available ?? item.isAvailable ?? true,
+    is_popular: item.is_popular ?? item.isPopular ?? false,
+    image_url: item.image_url ?? item.imageUrl ?? null,
+    requires_kitchen: item.requires_kitchen ?? item.requiresKitchen ?? false,
+    restaurant_id: restaurantId,
+  };
+}
+
 function getRestaurantId(): string | null {
   if (typeof window === 'undefined') return null;
 
@@ -69,20 +86,7 @@ export async function createMenuItem(item: Partial<MenuItem>): Promise<MenuItem>
   
   const { data, error } = await supabase
     .from('menu_items')
-    .insert({
-      id,
-      name: item.name,
-      description: item.description || '',
-      price: item.price || 0,
-      category: item.category || 'Uncategorized',
-      emoji: item.emoji || '🍽️',
-      prep_time: item.prep_time || 15,
-      is_available: item.is_available !== false,
-      is_popular: item.is_popular || false,
-      image_url: item.image_url || null,
-      requires_kitchen: item.requires_kitchen || false,
-      restaurant_id: restaurantId
-    })
+    .insert(toDbMenuItem(item as Partial<MenuItem> & Record<string, any>, restaurantId, id))
     .select()
     .single();
 
@@ -91,6 +95,9 @@ export async function createMenuItem(item: Partial<MenuItem>): Promise<MenuItem>
 }
 
 export async function updateMenuItem(id: string, updates: Partial<MenuItem>): Promise<MenuItem> {
+  const restaurantId = getRestaurantId();
+  if (!restaurantId) throw new Error('No restaurant selected');
+
   const { data, error } = await supabase
     .from('menu_items')
     .update({
@@ -99,14 +106,15 @@ export async function updateMenuItem(id: string, updates: Partial<MenuItem>): Pr
       price: updates.price,
       category: updates.category,
       emoji: updates.emoji,
-      prep_time: updates.prep_time,
-      is_available: updates.is_available,
-      is_popular: updates.is_popular,
-      image_url: updates.image_url,
-      requires_kitchen: updates.requires_kitchen,
+      prep_time: updates.prep_time ?? (updates as any).prepTime,
+      is_available: updates.is_available ?? (updates as any).isAvailable,
+      is_popular: updates.is_popular ?? (updates as any).isPopular,
+      image_url: updates.image_url ?? (updates as any).imageUrl,
+      requires_kitchen: updates.requires_kitchen ?? (updates as any).requiresKitchen,
       updated_at: new Date().toISOString()
     })
     .eq('id', id)
+    .eq('restaurant_id', restaurantId)
     .select()
     .single();
 
@@ -135,20 +143,9 @@ export async function uploadMenu(items: Partial<MenuItem>[]): Promise<{ message:
   const restaurantId = getRestaurantId();
   if (!restaurantId) throw new Error('No restaurant selected');
   
-  const itemsToInsert = items.map((item, index) => ({
-    id: item.id || `item-${Date.now()}-${index}`,
-    name: item.name,
-    description: item.description || '',
-    price: item.price || 0,
-    category: item.category || 'Uncategorized',
-    emoji: item.emoji || '🍽️',
-    prep_time: item.prep_time || 15,
-    is_available: item.is_available !== false,
-    is_popular: item.is_popular || false,
-    image_url: item.image_url || null,
-    requires_kitchen: item.requires_kitchen || false,
-    restaurant_id: restaurantId
-  }));
+  const itemsToInsert = items.map((item, index) =>
+    toDbMenuItem(item as Partial<MenuItem> & Record<string, any>, restaurantId, `item-${Date.now()}-${index}`)
+  );
 
   const { error } = await supabase.from('menu_items').upsert(itemsToInsert, { onConflict: 'id' });
   if (error) throw error;

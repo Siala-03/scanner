@@ -38,6 +38,20 @@ export function useMenuContext() {
   return ctx;
 }
 
+// Normalize raw Supabase snake_case rows to the camelCase MenuItem shape used by the app
+const normalizeMenuItem = (item: any): MenuItem => ({
+  id: item.id,
+  name: item.name || '',
+  description: item.description || '',
+  price: item.price || 0,
+  category: item.category || 'lunch',
+  emoji: item.emoji || '🍽️',
+  prepTime: item.prep_time ?? item.prepTime ?? 15,
+  isAvailable: item.is_available ?? item.isAvailable ?? true,
+  isPopular: item.is_popular ?? item.isPopular ?? false,
+  requiresKitchen: item.requires_kitchen ?? item.requiresKitchen,
+});
+
 export function MenuProvider({ children }: { children: React.ReactNode }) {
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [isLoading, setIsLoading]   = useState(true);
@@ -47,7 +61,7 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
   const loadFallbackMenu = useCallback(() => {
     const stored = loadCustomMenu();
     if (stored && stored.length > 0) {
-      setMenuItems(stored);
+      setMenuItems(stored.map(normalizeMenuItem));
       setError(null);
       return true;
     }
@@ -59,7 +73,7 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
     try {
       const menu = await fetchMenu();
       if (menu.length > 0) {
-        setMenuItems(menu as unknown as MenuItem[]);
+        setMenuItems(menu.map(normalizeMenuItem));
       } else if (!loadFallbackMenu()) {
         setMenuItems(defaultMenuItems);
       }
@@ -97,7 +111,7 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
         const items = await fetchMenu();
         if (!isMounted) return;
         if (items.length > 0) {
-          setMenuItems(items as unknown as MenuItem[]);
+          setMenuItems(items.map(normalizeMenuItem));
         } else if (!loadFallbackMenu()) {
           setMenuItems(defaultMenuItems);
         }
