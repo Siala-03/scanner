@@ -132,7 +132,7 @@ export async function createOrder(order: CreateOrderInput): Promise<Order> {
     order_number: orderNumber,
     table_number: order.tableNumber,
     customer_name: order.customerName || null,
-    customer_phone: order.customerPhone || null,
+    customer_phone: (order as any).customerPhone || null,
     customer_id: order.customerId || null,
     status: 'pending',
     items,
@@ -154,9 +154,10 @@ export async function createOrder(order: CreateOrderInput): Promise<Order> {
     console.warn('[createOrder] Full insert failed, retrying with minimal columns:', result.error.message);
     const minimalPayload = {
       id: orderId,
+      order_number: orderNumber,
       table_number: order.tableNumber,
       customer_name: order.customerName || null,
-      customer_phone: order.customerPhone || null,
+      customer_phone: (order as any).customerPhone || null,
       customer_id: order.customerId || null,
       status: 'pending',
       items,
@@ -185,7 +186,7 @@ export async function updateOrderStatus(
     updates.assigned_waiter_id = statusUpdate.assignedTo;
   }
 
-  if (statusUpdate.status === 'served' || statusUpdate.status === 'completed') {
+  if (statusUpdate.status === 'served' || (statusUpdate.status as string) === 'completed') {
     updates.completed_at = new Date().toISOString();
   }
 
