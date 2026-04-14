@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(powershell -Command \"Get-ChildItem 'c:\\\\Users\\\\PC\\\\Desktop\\\\Projects\\\\scanner' | Select-Object Name\")"
+      "Bash(powershell -Command \"Get-ChildItem 'c:\\\\Users\\\\PC\\\\Desktop\\\\Projects\\\\scanner' | Select-Object Name\")",
+      "Bash(node -e \"const fs=require\\('fs'\\),path=require\\('path'\\);function w\\(d\\){fs.readdirSync\\(d,{withFileTypes:true}\\).forEach\\(f=>{const p=path.join\\(d,f.name\\);if\\(f.isDirectory\\(\\)\\)w\\(p\\);else if\\(f.name.endsWith\\('.tsx'\\)\\)console.log\\(p\\)}\\)};w\\('c:/Users/PC/Desktop/Projects/scanner/src/pages/customer'\\)\")"
     ]
   }
 }
