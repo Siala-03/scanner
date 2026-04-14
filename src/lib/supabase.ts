@@ -8,10 +8,17 @@ const supabaseServiceKey = import.meta.env.VITE_SUPABASE_SERVICE_KEY || '';
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // Admin client — uses service role key, bypasses RLS entirely.
-// Only used for superadmin write operations (create/update/delete restaurants and staff).
+// persistSession/autoRefreshToken disabled to prevent GoTrueClient storage conflicts
+// with the anon client running in the same browser tab.
 const isValidServiceKey = supabaseServiceKey && !supabaseServiceKey.startsWith('your_');
 export const supabaseAdmin = isValidServiceKey
-  ? createClient(supabaseUrl, supabaseServiceKey)
+  ? createClient(supabaseUrl, supabaseServiceKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+      },
+    })
   : supabase; // fallback to anon if key not configured
 export const isAdminConfigured = !!isValidServiceKey;
 
