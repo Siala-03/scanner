@@ -126,31 +126,49 @@ export async function createOrder(order: CreateOrderInput): Promise<Order> {
 
   const total = items.reduce((sum, item) => sum + item.total_price, 0);
 
-  const { data, error } = await db
-    .from('orders')
-    .insert({
+  // Full payload — includes optional columns that may or may not exist in the schema
+  const fullPayload = {
+    id: orderId,
+    order_number: orderNumber,
+    table_number: order.tableNumber,
+    customer_name: order.customerName || null,
+    customer_phone: order.customerPhone || null,
+    customer_id: order.customerId || null,
+    status: 'pending',
+    items,
+    subtotal: total,
+    tax: 0,
+    total,
+    notes: order.notes || null,
+    requires_kitchen: order.requiresKitchen ?? false,
+    created_by: staffId,
+    payment_status: 'unpaid',
+    restaurant_id: restaurantId,
+  };
+
+  let result = await db.from('orders').insert(fullPayload).select().single();
+
+  // If the full insert fails (e.g. some columns don't exist in this schema),
+  // retry with only the guaranteed-core columns.
+  if (result.error) {
+    console.warn('[createOrder] Full insert failed, retrying with minimal columns:', result.error.message);
+    const minimalPayload = {
       id: orderId,
-      order_number: orderNumber,
       table_number: order.tableNumber,
       customer_name: order.customerName || null,
       customer_phone: order.customerPhone || null,
       customer_id: order.customerId || null,
       status: 'pending',
       items,
-      subtotal: total,
-      tax: 0,
       total,
       notes: order.notes || null,
-      requires_kitchen: order.requiresKitchen ?? false,
-      created_by: staffId,
-      payment_status: 'unpaid',
-      restaurant_id: restaurantId
-    })
-    .select()
-    .single();
+      restaurant_id: restaurantId,
+    };
+    result = await db.from('orders').insert(minimalPayload).select().single();
+  }
 
-  if (error) throw error;
-  return data as Order;
+  if (result.error) throw result.error;
+  return result.data as Order;
 }
 
 export async function updateOrderStatus(
