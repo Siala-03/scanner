@@ -29,16 +29,11 @@ import { ReceiptShareModal } from '../../components/ui/ReceiptShareModal';
 import { supabaseAdmin } from '../../lib/supabase';
 
 // ─── Kitchen detection ────────────────────────────────────────────────────────
-const DRINK_CATEGORIES = new Set([
-  'alcoholic-drinks', 'beers', 'wine', 'soft-drinks', 'coffee',
-  'tea', 'juices', 'cocktails', 'mocktails', 'non-alcoholic', 'water',
-]);
+const KITCHEN_CATEGORIES = new Set(['breakfast', 'lunch', 'dinner', 'dessert', 'desserts']);
 
 function itemNeedsKitchen(item: OrderItem): boolean {
-  if (item.menuItem?.requiresKitchen === true) return true;
-  if (item.menuItem?.requiresKitchen === false) return false;
   const cat = String(item.menuItem?.category ?? '').toLowerCase();
-  return !cat || !DRINK_CATEGORIES.has(cat);
+  return KITCHEN_CATEGORIES.has(cat);
 }
 
 // ─── Props ───────────────────────────────────────────────────────────────────
@@ -662,7 +657,7 @@ export function WaiterDashboard({
 
   // ── Handlers ──
   const handleApprove = (order: Order) => {
-    const nextStatus = order.requiresKitchen ? 'verified' : 'ready';
+    const nextStatus = order.requiresKitchen === true ? 'verified' : 'ready';
     onUpdateOrderStatus(order.id, nextStatus, { assignedWaiterId: waiter.id });
   };
 

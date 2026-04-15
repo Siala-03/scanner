@@ -178,7 +178,7 @@ router.get('/kitchen', async (req: Request, res: Response) => {
     try {
       result = await pool.query(
         `SELECT * FROM orders
-         WHERE restaurant_id = $1 AND requires_kitchen IS DISTINCT FROM false AND status IN ('pending', 'verified', 'preparing', 'ready')
+         WHERE restaurant_id = $1 AND requires_kitchen = true AND status IN ('pending', 'verified', 'preparing', 'ready')
          ORDER BY created_at ASC`,
         [restaurantId]
       );
@@ -221,7 +221,7 @@ router.get('/kitchen/analytics', async (_req: Request, res: Response) => {
     let todayOrders;
     try {
       todayOrders = await pool.query(
-        `SELECT * FROM orders WHERE restaurant_id = $1 AND requires_kitchen IS DISTINCT FROM false AND created_at >= $2 AND created_at < $3`,
+        `SELECT * FROM orders WHERE restaurant_id = $1 AND requires_kitchen = true AND created_at >= $2 AND created_at < $3`,
         [restaurantId, today.toISOString(), tomorrow.toISOString()]
       );
     } catch (error: any) {

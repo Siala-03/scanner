@@ -197,28 +197,12 @@ export function useOrders(): UseOrdersReturn {
     };
   }, [restaurantId, loadOrders]);
 
-  const drinkCategories = new Set([
-    'beers',
-    'wine',
-    'alcoholic-drinks',
-    'soft-drinks',
-    'coffee',
-    'tea',
-    'juices',
-    'cocktails',
-    'mocktails',
-    'non-alcoholic',
-    'water',
-  ]);
+  const kitchenCategories = new Set(['breakfast', 'lunch', 'dinner', 'dessert', 'desserts']);
 
   const isFoodOrder = (items: CartItem[]) =>
     items.some((item) => {
-      // Explicit flag takes priority if set
-      if (item.menuItem.requiresKitchen === true) return true;
-      if (item.menuItem.requiresKitchen === false) return false;
-      // Fall back to category-based detection
       const category = String(item.menuItem.category ?? '').toLowerCase();
-      return category === '' || !drinkCategories.has(category);
+      return kitchenCategories.has(category);
     });
 
   const buildOrderItemPayload = (item: CartItem) => ({
