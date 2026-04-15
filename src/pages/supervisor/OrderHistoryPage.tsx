@@ -111,7 +111,7 @@ export function OrderHistoryPage({ onBack, existingOrders }: OrderHistoryPagePro
 
   const handlePrintReceipt = async (order: Order) => {
     const savedUser = (() => { try { return JSON.parse(localStorage.getItem('authUser') || '{}'); } catch { return {}; } })();
-    const restaurantName = localStorage.getItem('restaurantName') || savedUser?.restaurantName || 'Restaurant';
+    const restaurantName = localStorage.getItem('restaurantName') || savedUser?.restaurantName || 'Company';
     const receiptOptions: Parameters<typeof orderToReceiptData>[1] = {
       restaurantName,
       restaurantAddress: '',

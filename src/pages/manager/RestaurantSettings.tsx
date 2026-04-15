@@ -42,6 +42,7 @@ export function RestaurantSettings({ restaurantId, restaurantName, onNameChange,
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState<'success' | 'error' | null>(null);
+  const [saveErrorMessage, setSaveErrorMessage] = useState<string>('Failed to save. Please try again.');
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -82,12 +83,15 @@ export function RestaurantSettings({ restaurantId, restaurantName, onNameChange,
     if (!restaurantId) return;
     setSaving(true);
     setSaveMsg(null);
+    setSaveErrorMessage('Failed to save. Please try again.');
     try {
       await saveReceiptSettings(restaurantId, settings, name.trim() || undefined);
       onNameChange?.(name.trim());
       onSettingsSaved?.(settings);
       setSaveMsg('success');
-    } catch {
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Failed to save. Please try again.';
+      setSaveErrorMessage(msg);
       setSaveMsg('error');
     } finally {
       setSaving(false);
@@ -130,7 +134,7 @@ export function RestaurantSettings({ restaurantId, restaurantName, onNameChange,
 
       {/* ── Page Title ── */}
       <div>
-        <h1 className="text-xl font-bold text-white">Restaurant Settings</h1>
+        <h1 className="text-xl font-bold text-white">Company Settings</h1>
         <p className="text-sm text-slate-400 mt-1">
           These details appear in staff portal headers and on customer receipts.
         </p>
@@ -139,7 +143,7 @@ export function RestaurantSettings({ restaurantId, restaurantName, onNameChange,
       {/* ── Logo Upload ── */}
       <div className="bg-slate-800/60 rounded-xl border border-slate-700 p-6 space-y-4">
         <h2 className="text-sm font-semibold text-slate-200 uppercase tracking-wider flex items-center gap-2">
-          <ImageIcon className="w-4 h-4 text-amber-400" /> Restaurant Logo
+          <ImageIcon className="w-4 h-4 text-amber-400" /> Company Logo
         </h2>
 
         <div
@@ -152,7 +156,7 @@ export function RestaurantSettings({ restaurantId, restaurantName, onNameChange,
             <div className="flex flex-col items-center gap-3">
               <img
                 src={logoPreview}
-                alt="Restaurant logo preview"
+                alt="Company logo preview"
                 className="max-h-24 max-w-full object-contain rounded"
               />
               <span className="text-xs text-slate-400">Click or drag to replace</span>
@@ -184,14 +188,14 @@ export function RestaurantSettings({ restaurantId, restaurantName, onNameChange,
         />
       </div>
 
-      {/* ── Restaurant Name ── */}
+      {/* ── Company Name ── */}
       <div className="bg-slate-800/60 rounded-xl border border-slate-700 p-6 space-y-4">
         <h2 className="text-sm font-semibold text-slate-200 uppercase tracking-wider flex items-center gap-2">
-          <BuildingIcon className="w-4 h-4 text-amber-400" /> Restaurant Details
+          <BuildingIcon className="w-4 h-4 text-amber-400" /> Company Details
         </h2>
 
         <div>
-          <label className="block text-sm font-medium text-slate-300 mb-1.5">Restaurant Name</label>
+          <label className="block text-sm font-medium text-slate-300 mb-1.5">Company Name</label>
           <div className="relative">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
               <BuildingIcon className="w-4 h-4" />
@@ -200,7 +204,7 @@ export function RestaurantSettings({ restaurantId, restaurantName, onNameChange,
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. The Grand Bistro"
+              placeholder="e.g. The Grand Group"
               className="w-full pl-9 pr-3 py-2 rounded-lg bg-slate-800 border border-slate-600 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 text-sm"
             />
           </div>
@@ -217,7 +221,7 @@ export function RestaurantSettings({ restaurantId, restaurantName, onNameChange,
           <PhoneIcon className="w-4 h-4 text-amber-400" /> Contact Information
         </h2>
         {field('Phone Number', 'phone', 'e.g. +250 788 000 000', <PhoneIcon className="w-4 h-4" />, 'tel')}
-        {field('Email Address', 'email', 'e.g. info@restaurant.rw', <MailIcon className="w-4 h-4" />, 'email')}
+        {field('Email Address', 'email', 'e.g. info@company.rw', <MailIcon className="w-4 h-4" />, 'email')}
       </div>
 
       {/* ── Receipt Preview hint ── */}
@@ -241,7 +245,7 @@ export function RestaurantSettings({ restaurantId, restaurantName, onNameChange,
           <span className="text-sm text-emerald-400">Settings saved successfully.</span>
         )}
         {saveMsg === 'error' && (
-          <span className="text-sm text-red-400">Failed to save. Please try again.</span>
+          <span className="text-sm text-red-400">{saveErrorMessage}</span>
         )}
       </div>
 

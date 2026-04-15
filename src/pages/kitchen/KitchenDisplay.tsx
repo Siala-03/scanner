@@ -372,7 +372,7 @@ export function KitchenDisplay({ onLogout, restaurantId, restaurantName }: { onL
 
     const html = buildReceiptHtml(
       orderToReceiptData(fakeOrder, {
-        restaurantName: restaurantName || 'Restaurant',
+        restaurantName: restaurantName || 'Company',
         restaurantAddress: '',
         restaurantPhone: '',
         taxRate: 0,
@@ -462,7 +462,7 @@ export function KitchenDisplay({ onLogout, restaurantId, restaurantName }: { onL
             </div>
             <div>
               <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Kitchen Portal</p>
-              <h1 className="text-2xl font-semibold text-white">{restaurantName || 'Restaurant Kitchen'}</h1>
+              <h1 className="text-2xl font-semibold text-white">{restaurantName || 'Company Kitchen'}</h1>
             </div>
           </div>
           <div className="flex items-center gap-4">

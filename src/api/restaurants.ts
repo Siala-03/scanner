@@ -118,11 +118,17 @@ export async function deleteRestaurant(id: string): Promise<void> {
  * Returns empty object if the restaurant has no settings yet.
  */
 export async function fetchReceiptSettings(restaurantId: string): Promise<RestaurantReceiptSettings> {
-  const { data } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from('restaurants')
     .select('settings')
     .eq('id', restaurantId)
     .single();
+
+  // Some deployed schemas may not include the JSON settings column yet.
+  // In that case, return empty settings so the UI stays usable.
+  if (error) {
+    return {};
+  }
 
   if (!data?.settings) return {};
   return ((data.settings as Record<string, unknown>).receipt as RestaurantReceiptSettings) || {};
@@ -157,14 +163,32 @@ export async function saveReceiptSettings(
     .update(payload)
     .eq('id', restaurantId);
 
-  if (error) {
-    // Fallback: settings-only update
-    const { error: fallbackError } = await supabaseAdmin
+  if (!error) return;
+
+  // Fallback 1: settings-only update
+  const { error: settingsOnlyError } = await supabaseAdmin
+    .from('restaurants')
+    .update({ settings: merged })
+    .eq('id', restaurantId);
+
+  if (!settingsOnlyError) return;
+
+  // Fallback 2: core columns only (works even if JSON settings is unavailable)
+  const corePayload: Record<string, unknown> = {};
+  if (restaurantName) corePayload.name = restaurantName;
+  if (typeof receiptSettings.address === 'string') corePayload.address = receiptSettings.address;
+  if (typeof receiptSettings.phone === 'string') corePayload.phone = receiptSettings.phone;
+  if (typeof receiptSettings.email === 'string') corePayload.email = receiptSettings.email;
+
+  if (Object.keys(corePayload).length > 0) {
+    const { error: coreError } = await supabaseAdmin
       .from('restaurants')
-      .update({ settings: merged })
+      .update(corePayload)
       .eq('id', restaurantId);
-    if (fallbackError) throw fallbackError;
+    if (!coreError) return;
   }
+
+  throw settingsOnlyError || error;
 }
 
 export async function fetchRestaurantPublic(restaurantId: string): Promise<Restaurant> {

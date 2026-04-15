@@ -137,11 +137,9 @@ export async function createCreditAccount(data: {
   const restaurantId = getRestaurantId();
   if (!restaurantId) throw new Error('No restaurant selected');
 
-  const id = `cred-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   const { data: result, error } = await supabaseAdmin
     .from('credit_accounts')
     .insert({
-      id,
       customer_name: data.customerName,
       customer_phone: data.customerPhone,
       credit_limit: data.creditLimit,
@@ -213,12 +211,10 @@ export async function addCreditCharge(data: {
   performedByName: string;
 }): Promise<{ transaction: CreditTransaction; account: CustomerCreditAccount }> {
   const staffId = getStaffId();
-  const id = `credtx-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  
+
   const { data: txResult, error: txError } = await supabaseAdmin
     .from('credit_transactions')
     .insert({
-      id,
       account_id: data.accountId,
       order_id: data.orderId,
       amount: data.amount,
@@ -261,12 +257,10 @@ export async function addCreditPayment(data: {
   notes?: string;
 }): Promise<{ transaction: CreditTransaction; payment: CreditPayment; account: CustomerCreditAccount }> {
   const staffId = getStaffId();
-  const txId = `credtx-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  
+
   const { data: txResult, error: txError } = await supabaseAdmin
     .from('credit_transactions')
     .insert({
-      id: txId,
       account_id: data.accountId,
       amount: data.amount,
       type: 'payment',
@@ -296,8 +290,8 @@ export async function addCreditPayment(data: {
 
   const updatedAccount = await getCreditAccount(data.accountId);
   const payment: CreditPayment = {
-    id: txId,
-    transactionId: txId,
+    id: txResult.id,
+    transactionId: txResult.id,
     amount: data.amount,
     paymentMethod: data.paymentMethod,
     reference: data.reference || '',
@@ -315,12 +309,10 @@ export async function addCreditAdjustment(data: {
   performedByName: string;
 }): Promise<{ transaction: CreditTransaction; account: CustomerCreditAccount }> {
   const staffId = getStaffId();
-  const id = `credtx-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  
+
   const { data: txResult, error } = await supabaseAdmin
     .from('credit_transactions')
     .insert({
-      id,
       account_id: data.accountId,
       amount: data.amount,
       type: 'adjustment',
@@ -369,11 +361,9 @@ export async function submitCreditApplication(data: {
   const restaurantId = getRestaurantId();
   if (!restaurantId) throw new Error('No restaurant selected');
 
-  const id = `credapp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   const { data: result, error } = await supabaseAdmin
     .from('credit_applications')
     .insert({
-      id,
       customer_name: data.customerName,
       customer_phone: data.customerPhone,
       requested_limit: data.requestedLimit,

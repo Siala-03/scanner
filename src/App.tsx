@@ -517,7 +517,7 @@ export function App() {
               )}
               <span className="text-white font-medium">Supervisor Dashboard</span>
             </div>
-            <div className="text-sm text-slate-400">{restaurantName || 'Restaurant'}</div>
+            <div className="text-sm text-slate-400">{restaurantName || 'Company'}</div>
           </div>
         </div>
 
@@ -616,14 +616,14 @@ export function App() {
               {receiptSettings.logo && (
                 <img
                   src={receiptSettings.logo}
-                  alt="Restaurant logo"
+                  alt="Company logo"
                   className="h-9 w-auto object-contain rounded"
                 />
               )}
               <div>
                 <div className="text-xs sm:text-sm text-slate-300 uppercase tracking-wider">Manager Portal</div>
                 <div className="text-base sm:text-lg font-semibold">Welcome, {authUser.name}</div>
-                <div className="text-xs sm:text-sm text-slate-400">{restaurantName || 'Restaurant'}</div>
+                <div className="text-xs sm:text-sm text-slate-400">{restaurantName || 'Company'}</div>
               </div>
             </div>
             <button
@@ -736,7 +736,7 @@ export function App() {
               )}
               <span className="text-white font-medium">Kitchen Display</span>
             </div>
-            <div className="text-sm text-slate-400">{restaurantName || 'Restaurant'}</div>
+            <div className="text-sm text-slate-400">{restaurantName || 'Company'}</div>
           </div>
         </div>
         <KitchenDisplay

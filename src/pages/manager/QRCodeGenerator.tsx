@@ -84,7 +84,7 @@ export function QRCodeGenerator({
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
 
-      const titleText = restaurantName || 'Restaurant';
+      const titleText = restaurantName || 'Company';
       const qrLink = restaurantId
         ? `${resolvedBaseUrl}/r/${encodeURIComponent(restaurantId)}/t/${tableNum}`
         : `${resolvedBaseUrl}/t/${tableNum}`;

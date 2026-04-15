@@ -672,7 +672,7 @@ export function WaiterDashboard({
     try {
       const html = buildReceiptHtml(
         orderToReceiptData(order, {
-          restaurantName: restaurantName || 'Restaurant',
+          restaurantName: restaurantName || 'Company',
           restaurantAddress: restaurantInfo?.address || '',
           restaurantPhone: restaurantInfo?.phone || '',
           restaurantEmail: restaurantInfo?.email || '',
@@ -722,7 +722,7 @@ export function WaiterDashboard({
                   <img src={restaurantInfo.logo} alt="logo" className="h-7 w-auto object-contain rounded" />
                 )}
                 <span className="px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-300 text-xs font-semibold uppercase tracking-widest">
-                  {restaurantName || 'Restaurant'}
+                  {restaurantName || 'Company'}
                 </span>
                 <span className="text-xs text-slate-400">· Waiter Portal</span>
               </div>
@@ -1084,7 +1084,7 @@ export function WaiterDashboard({
           isOpen={showShareModal}
           onClose={() => { setShowShareModal(false); setSelectedOrderForShare(null); }}
           receipt={orderToReceiptData(selectedOrderForShare, {
-            restaurantName: restaurantName || 'Restaurant',
+            restaurantName: restaurantName || 'Company',
             restaurantAddress: restaurantInfo?.address || '',
             restaurantPhone: restaurantInfo?.phone || '',
             restaurantEmail: restaurantInfo?.email || '',
