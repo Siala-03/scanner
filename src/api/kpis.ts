@@ -85,37 +85,39 @@ async function computeProgress(
   let currentValue = 0;
 
   if (kpi.metric === 'orders_served' || kpi.metric === 'revenue' || kpi.metric === 'tables_served') {
-    // Try assigned_waiter_id first, fall back to assigned_to (both column names exist)
-    const { data: orders } = await supabaseAdmin
+    // Read whole rows to avoid schema-specific select errors on older deployments.
+    const { data: ordersRaw, error: ordersError } = await supabaseAdmin
       .from('orders')
-      .select('total, table_number, status, assigned_waiter_id, assigned_to, created_at')
+      .select('*')
       .eq('restaurant_id', kpi.restaurant_id)
       .eq('status', 'served')
       .gte('created_at', start.toISOString())
       .lte('created_at', end.toISOString());
 
-    // Waiter KPIs should be tied to the waiter's own fulfilled orders.
-    // Supervisor/kitchen KPIs are operational and can reflect restaurant-wide activity.
-    if (orders && normalizeRole(kpi.staff_role) === 'waiter') {
-      orders.splice(
-        0,
-        orders.length,
-        ...orders.filter(
-          (o: any) =>
-            o.assigned_waiter_id === staffId ||
-            o.assigned_to === staffId ||
-            o.created_by === staffId
-        )
-      );
+    if (ordersError) {
+      console.warn('KPI computeProgress orders query failed:', ordersError.message);
     }
 
-    const list = orders || [];
+    const orders = (ordersRaw || []) as any[];
+
+    // Waiter KPIs should be tied to the waiter's own fulfilled orders.
+    // Supervisor/kitchen KPIs are operational and can reflect restaurant-wide activity.
+    const waiterScoped = normalizeRole(kpi.staff_role) === 'waiter'
+      ? orders.filter((o: any) => {
+          const assignedWaiter = o.assigned_waiter_id ?? o.assignedWaiterId;
+          const assignedTo = o.assigned_to ?? o.assignedTo;
+          const createdBy = o.created_by ?? o.createdBy;
+          return assignedWaiter === staffId || assignedTo === staffId || createdBy === staffId;
+        })
+      : orders;
+
+    const list = waiterScoped;
     if (kpi.metric === 'orders_served') {
       currentValue = list.length;
     } else if (kpi.metric === 'revenue') {
-      currentValue = list.reduce((sum: number, o: any) => sum + (o.total || 0), 0);
+      currentValue = list.reduce((sum: number, o: any) => sum + Number(o.total ?? 0), 0);
     } else if (kpi.metric === 'tables_served') {
-      currentValue = new Set(list.map((o: any) => o.table_number)).size;
+      currentValue = new Set(list.map((o: any) => o.table_number ?? o.tableNumber)).size;
     }
   }
   // 'prep_time' and 'rating' require additional tables — leave at 0 for now
