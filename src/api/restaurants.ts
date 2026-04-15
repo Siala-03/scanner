@@ -160,54 +160,52 @@ export async function saveReceiptSettings(
   receiptSettings: RestaurantReceiptSettings,
   restaurantName?: string,
 ): Promise<void> {
-  // Fetch current settings so we don't overwrite unrelated keys
+  // Fetch whole row (schema-safe) so we can merge settings when available.
   const { data: current } = await supabaseAdmin
     .from('restaurants')
-    .select('settings')
+    .select('*')
     .eq('id', restaurantId)
     .single();
 
-  const existingSettings = (current?.settings as Record<string, unknown>) || {};
+  const existingSettings = ((current as any)?.settings as Record<string, unknown> | undefined) || {};
   const merged = { ...existingSettings, receipt: receiptSettings };
 
-  // Build the update payload — always update the settings blob
-  const payload: Record<string, unknown> = { settings: merged };
-  if (restaurantName) payload.name = restaurantName;
-  if (typeof receiptSettings.logo === 'string') payload.logo_url = receiptSettings.logo;
-
-  // Try a full update (including main columns that may or may not exist)
-  let { error } = await supabaseAdmin
-    .from('restaurants')
-    .update(payload)
-    .eq('id', restaurantId);
-
-  if (!error) return;
-
-  // Fallback 1: settings-only update
-  const { error: settingsOnlyError } = await supabaseAdmin
-    .from('restaurants')
-    .update({ settings: merged })
-    .eq('id', restaurantId);
-
-  if (!settingsOnlyError) return;
-
-  // Fallback 2: core columns only (works even if JSON settings is unavailable)
   const corePayload: Record<string, unknown> = {};
   if (restaurantName) corePayload.name = restaurantName;
   if (typeof receiptSettings.address === 'string') corePayload.address = receiptSettings.address;
   if (typeof receiptSettings.phone === 'string') corePayload.phone = receiptSettings.phone;
   if (typeof receiptSettings.email === 'string') corePayload.email = receiptSettings.email;
+  if (typeof receiptSettings.city === 'string') corePayload.city = receiptSettings.city;
+  if (typeof receiptSettings.country === 'string') corePayload.country = receiptSettings.country;
 
-  if (Object.keys(corePayload).length > 0) {
-    if (typeof receiptSettings.logo === 'string') corePayload.logo_url = receiptSettings.logo;
-    const { error: coreError } = await supabaseAdmin
+  const attempts: Record<string, unknown>[] = [
+    { ...corePayload, settings: merged, ...(typeof receiptSettings.logo === 'string' ? { logo_url: receiptSettings.logo } : {}) },
+    { ...corePayload, settings: merged },
+    { ...corePayload, ...(typeof receiptSettings.logo === 'string' ? { logo_url: receiptSettings.logo } : {}) },
+    { ...corePayload },
+    {
+      ...(restaurantName ? { name: restaurantName } : {}),
+      ...(typeof receiptSettings.address === 'string' ? { address: receiptSettings.address } : {}),
+      ...(typeof receiptSettings.phone === 'string' ? { phone: receiptSettings.phone } : {}),
+      ...(typeof receiptSettings.email === 'string' ? { email: receiptSettings.email } : {}),
+    },
+  ].filter((payload) => Object.keys(payload).length > 0);
+
+  let lastError: any = null;
+  for (const payload of attempts) {
+    const { error } = await supabaseAdmin
       .from('restaurants')
-      .update(corePayload)
+      .update(payload)
       .eq('id', restaurantId);
-    if (!coreError) return;
+
+    if (!error) return;
+    lastError = error;
   }
 
-  throw settingsOnlyError || error;
+  // If nothing could be persisted due to legacy schema mismatch, avoid breaking the UI.
+  if (Object.keys(corePayload).length === 0) return;
+
+  throw lastError || new Error('Failed to save restaurant settings');
 }
 
 export async function fetchRestaurantPublic(restaurantId: string): Promise<Restaurant> {
