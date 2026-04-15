@@ -1,7 +1,7 @@
 import { apiRequest, ApiError } from './http';
 import type { Customer, LoyaltyTransaction, Reward, RewardRedemption, LoyaltySummary } from '../types';
 
-const API_BASE = import.meta.env.VITE_API_URL || '';
+const LOYALTY_BASE = '/api/loyalty';
 
 function resolveRestaurantId(): string | undefined {
   const direct = localStorage.getItem('restaurantId');
@@ -34,7 +34,7 @@ export async function createOrFindCustomer(customerData: {
   const restaurantId = customerData.restaurantId || resolveRestaurantId();
   if (!restaurantId) throw new Error('No company selected');
 
-  return apiRequest<Customer>(`${API_BASE}/loyalty/customers`, {
+  return apiRequest<Customer>(`${LOYALTY_BASE}/customers`, {
     method: 'POST',
     json: { ...customerData, restaurantId },
   });
@@ -42,7 +42,7 @@ export async function createOrFindCustomer(customerData: {
 
 export async function getCustomers(): Promise<Customer[]> {
   try {
-    const response = await apiRequest<Customer[] | { data?: Customer[]; customers?: Customer[] }>(`${API_BASE}/loyalty/customers`);
+    const response = await apiRequest<Customer[] | { data?: Customer[]; customers?: Customer[] }>(`${LOYALTY_BASE}/customers`);
     if (Array.isArray(response)) return response;
     if (Array.isArray(response?.data)) return response.data;
     if (Array.isArray(response?.customers)) return response.customers;
@@ -62,7 +62,7 @@ export async function getCustomers(): Promise<Customer[]> {
 export async function getCustomerDetails(customerId: string): Promise<LoyaltySummary> {
   const restaurantId = resolveRestaurantId();
   const query = restaurantId ? `?restaurantId=${encodeURIComponent(restaurantId)}` : '';
-  return apiRequest<LoyaltySummary>(`${API_BASE}/loyalty/customers/${customerId}${query}`);
+  return apiRequest<LoyaltySummary>(`${LOYALTY_BASE}/customers/${customerId}${query}`);
 }
 
 // Points management
@@ -72,7 +72,7 @@ export async function awardPoints(data: {
   points: number;
   description: string;
 }): Promise<{ success: boolean; transactionId: string }> {
-  return apiRequest<{ success: boolean; transactionId: string }>(`${API_BASE}/loyalty/points/earn`, {
+  return apiRequest<{ success: boolean; transactionId: string }>(`${LOYALTY_BASE}/points/earn`, {
     method: 'POST',
     json: data,
   });
@@ -83,7 +83,7 @@ export async function getRewards(restaurantId?: string): Promise<Reward[]> {
   const resolvedRestaurantId = restaurantId || resolveRestaurantId();
   if (!resolvedRestaurantId) throw new Error('No company selected');
 
-  return apiRequest<Reward[]>(`${API_BASE}/loyalty/rewards?restaurantId=${encodeURIComponent(resolvedRestaurantId)}`);
+  return apiRequest<Reward[]>(`${LOYALTY_BASE}/rewards?restaurantId=${encodeURIComponent(resolvedRestaurantId)}`);
 }
 
 export async function createReward(rewardData: {
@@ -94,7 +94,7 @@ export async function createReward(rewardData: {
   discountPercentage?: number;
   freeItemId?: string;
 }): Promise<Reward> {
-  return apiRequest<Reward>(`${API_BASE}/loyalty/rewards`, {
+  return apiRequest<Reward>(`${LOYALTY_BASE}/rewards`, {
     method: 'POST',
     json: rewardData,
   });
@@ -115,7 +115,7 @@ export async function redeemReward(data: {
     redemptionId: string;
     reward: Reward;
     remainingPoints: number;
-  }>(`${API_BASE}/loyalty/rewards/redeem`, {
+  }>(`${LOYALTY_BASE}/rewards/redeem`, {
     method: 'POST',
     json: data,
   });

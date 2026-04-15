@@ -200,11 +200,25 @@ export async function createOrder(order: CreateOrderInput): Promise<Order> {
       items,
       total,
       notes: order.notes || null,
-      requires_kitchen: order.requiresKitchen ?? false,
-      assigned_waiter_id: assignedWaiterId,
       restaurant_id: restaurantId,
+      // Intentionally omitting assigned_waiter_id, requires_kitchen, subtotal, tax, etc.
+      // — these columns may not exist in all deployed schemas
     };
     result = await db.from('orders').insert(minimalPayload).select().single();
+  }
+
+  // Last-resort fallback: only the absolute bare-minimum columns that must exist
+  if (result.error) {
+    console.warn('[createOrder] Minimal insert failed, retrying with core-only columns:', result.error.message);
+    const corePayload = {
+      id: orderId,
+      table_number: order.tableNumber,
+      status: 'pending',
+      items,
+      total,
+      restaurant_id: restaurantId,
+    };
+    result = await db.from('orders').insert(corePayload).select().single();
   }
 
   if (result.error) throw result.error;
