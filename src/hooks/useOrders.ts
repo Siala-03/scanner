@@ -202,8 +202,7 @@ export function useOrders(): UseOrdersReturn {
   const isFoodOrder = (items: CartItem[]) =>
     items.some((item) => {
       if (item.menuItem.requiresKitchen === true) return true;
-      if (item.menuItem.requiresKitchen === false) return false;
-      const category = String(item.menuItem.category ?? '').toLowerCase();
+      const category = String(item.menuItem.category ?? '').trim().toLowerCase();
       return kitchenCategories.has(category);
     });
 

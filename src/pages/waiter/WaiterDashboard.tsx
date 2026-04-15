@@ -33,8 +33,7 @@ const KITCHEN_CATEGORIES = new Set(['breakfast', 'lunch', 'dinner', 'dessert', '
 
 function itemNeedsKitchen(item: OrderItem): boolean {
   if (item.menuItem?.requiresKitchen === true) return true;
-  if (item.menuItem?.requiresKitchen === false) return false;
-  const cat = String(item.menuItem?.category ?? '').toLowerCase();
+  const cat = String(item.menuItem?.category ?? '').trim().toLowerCase();
   return KITCHEN_CATEGORIES.has(cat);
 }
 
@@ -659,7 +658,8 @@ export function WaiterDashboard({
 
   // ── Handlers ──
   const handleApprove = (order: Order) => {
-    const nextStatus = order.requiresKitchen === true ? 'verified' : 'ready';
+    const shouldRouteToKitchen = order.requiresKitchen === true || order.items.some(itemNeedsKitchen);
+    const nextStatus = shouldRouteToKitchen ? 'verified' : 'ready';
     onUpdateOrderStatus(order.id, nextStatus, { assignedWaiterId: waiter.id });
   };
 

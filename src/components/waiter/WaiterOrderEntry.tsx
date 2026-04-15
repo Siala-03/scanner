@@ -33,6 +33,7 @@ interface WaiterOrderEntryProps {
 
 interface LocalCartItem extends OrderItem {
   tempId: string;
+  menuItem: MenuItem;
   notes?: string;
   modifiers?: string[];
 }
@@ -105,8 +106,9 @@ export function WaiterOrderEntry({
   // Add item to cart
   const addToCart = (item: MenuItem, quantity = 1, notes = '') => {
     const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    const cartItem: CartItem = {
+    const cartItem: LocalCartItem = {
       tempId,
+      menuItem: item,
       menuItemId: item.id,
       menuItemName: item.name,
       quantity,
@@ -150,7 +152,7 @@ export function WaiterOrderEntry({
     setIsSubmitting(true);
     try {
       const orderItems: CartItem[] = cart.map(({ tempId, ...item }) => ({
-        menuItem: item.menuItem as any,
+        menuItem: item.menuItem,
         quantity: item.quantity,
         specialInstructions: item.specialInstructions
       }));
