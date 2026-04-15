@@ -118,7 +118,7 @@ export interface ReceiptData {
   items: ReceiptItemData[];
 
   // Financials
-  currency: 'USD';
+  currency: 'USD' | 'RWF';
   subtotal: number;
   taxRate: number; // Configurable by manager (e.g., 18 for 18%)
   taxAmount: number;
@@ -177,94 +177,74 @@ export function orderToReceiptData(
   options: BuildReceiptOptions
 ): ReceiptData {
   const orderNumber = order.orderNumber || order.id;
-  const receiptId = `RCP-${orderNumber}-${Date.now().toString(36).toUpperCase()}`;
-  
+  // Receipt ID == Order ID (no separate generated ID)
+  const receiptId = orderNumber;
+
   // Convert order items to receipt items
   const items: ReceiptItemData[] = order.items.map(item => {
     const unitPrice = item.unitPrice ?? item.menuItem?.price ?? 0;
     const name = item.menuItemName ?? item.menuItem?.name ?? 'Unknown Item';
     const totalPrice = item.totalPrice ?? (unitPrice * item.quantity);
-    
     return {
       quantity: item.quantity,
       name,
       unitPrice,
       totalPrice,
       specialInstructions: item.specialInstructions,
-      category: item.menuItem?.category
+      category: item.menuItem?.category,
     };
   });
 
-  // Calculate subtotal from items
-  const subtotal = items.reduce((sum, item) => sum + item.totalPrice, 0);
-  
-  // Calculate tax
-  const taxAmount = (subtotal * options.taxRate) / 100;
-  
-  // Calculate total
-  const total = subtotal + taxAmount;
+  // Use the order's actual total (already tax-inclusive) — no recalculation
+  const total = order.total ?? items.reduce((s, i) => s + i.totalPrice, 0);
 
-  // Convert total to RWF for loyalty points calculation (assuming 1 USD = 1300 RWF)
-  const exchangeRate = 1300;
-  const totalRWF = total * exchangeRate;
-  
-  // Calculate loyalty points
-  const loyaltyCalc = calculateLoyaltyPoints(totalRWF);
+  // Loyalty points based on RWF total
+  const loyaltyCalc = calculateLoyaltyPoints(total);
   const loyaltyPoints = options.customerPointsBalance !== undefined ? {
     ...loyaltyCalc,
-    pointsBalance: options.customerPointsBalance + loyaltyCalc.pointsEarned
+    pointsBalance: options.customerPointsBalance + loyaltyCalc.pointsEarned,
   } : undefined;
 
-  // Determine order type
   const orderType = options.orderType || (order.deliveryAddress ? 'delivery' : 'dine-in');
 
   return {
-    // Restaurant Info
     restaurantName: options.restaurantName,
     restaurantAddress: options.restaurantAddress,
     restaurantPhone: options.restaurantPhone,
     restaurantEmail: options.restaurantEmail,
-    
-    // Order Info
+
     orderNumber,
     receiptId,
     orderType,
     tableNumber: order.tableNumber,
     serverName: options.serverName,
-    orderDate: order.createdAt,
+    orderDate: new Date(), // generation time, not order creation time
 
-    // Customer Info
     customerName: options.customerName || order.customerName,
     customerId: order.customerId,
 
-    // Items
     items,
 
-    // Financials
-    currency: 'USD',
-    subtotal,
-    taxRate: options.taxRate,
-    taxAmount,
+    currency: 'RWF',
+    subtotal: total,   // total is tax-inclusive; no separate subtotal/tax split
+    taxRate: 0,
+    taxAmount: 0,
     total,
 
-    // Payment
     paymentMethod: options.paymentMethod || 'Cash',
     paymentStatus: options.paymentStatus || 'paid',
     amountPaid: options.amountPaid || total,
     change: options.amountPaid ? options.amountPaid - total : undefined,
     cardLast4: options.cardLast4,
 
-    // Delivery Info
     deliveryAddress: order.deliveryAddress,
     deliveryProvider: order.deliveryProvider,
     deliveryFee: 0,
 
-    // Loyalty Points
     loyaltyPoints,
 
-    // Additional
     notes: options.notes || order.notes,
-    specialInstructions: order.specialInstructions
+    specialInstructions: order.specialInstructions,
   };
 }
 
@@ -291,7 +271,6 @@ export function buildReceiptHtml(receipt: ReceiptData): string {
     customerName,
     items,
     currency,
-    subtotal,
     taxRate,
     taxAmount,
     total,
@@ -607,9 +586,10 @@ export function buildReceiptHtml(receipt: ReceiptData): string {
 
   <!-- ── TOTALS ── -->
   <table class="totals">
-    <tr><td>Subtotal</td><td>${formatCurrency(subtotal, currency)}</td></tr>
-    ${taxRate > 0 ? `<tr><td>Tax (${taxRate}%)</td><td>${formatCurrency(taxAmount, currency)}</td></tr>` : ''}
-    <tr class="grand"><td>TOTAL</td><td>${formatCurrency(total, currency)}</td></tr>
+    <tr class="grand">
+      <td>TOTAL <span style="font-size:10px;font-weight:400;color:#555">(Tax Incl.)</span></td>
+      <td>${formatCurrency(total, currency)}</td>
+    </tr>
   </table>
 
   <hr class="line-dashed">
