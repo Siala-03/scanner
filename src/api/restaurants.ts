@@ -121,27 +121,20 @@ export async function deleteRestaurant(id: string): Promise<void> {
 export async function fetchReceiptSettings(restaurantId: string): Promise<RestaurantReceiptSettings> {
   const { data, error } = await supabaseAdmin
     .from('restaurants')
-    .select('settings, logo_url, address, phone, email, city, country')
+    .select('*')
     .eq('id', restaurantId)
     .single();
 
-  // Some deployed schemas may not include the JSON settings column yet.
-  // In that case, return empty settings so the UI stays usable.
+  // Some deployed schemas may not include receipt-related columns.
+  // We fetch the full row and read optional keys defensively to keep the UI usable.
   if (error) {
-    // Fallback for schemas where only classic columns exist.
-    const { data: legacyData } = await supabaseAdmin
-      .from('restaurants')
-      .select('logo_url, address, phone, email, city, country')
-      .eq('id', restaurantId)
-      .single();
-
     return {
-      logo: (legacyData as any)?.logo_url || undefined,
-      address: (legacyData as any)?.address || undefined,
-      city: (legacyData as any)?.city || undefined,
-      country: (legacyData as any)?.country || undefined,
-      phone: (legacyData as any)?.phone || undefined,
-      email: (legacyData as any)?.email || undefined,
+      logo: undefined,
+      address: undefined,
+      city: undefined,
+      country: undefined,
+      phone: undefined,
+      email: undefined,
       currency: undefined,
     };
   }

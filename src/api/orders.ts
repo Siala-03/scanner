@@ -200,8 +200,9 @@ export async function createOrder(order: CreateOrderInput): Promise<Order> {
       items,
       total,
       notes: order.notes || null,
+      requires_kitchen: order.requiresKitchen ?? false,
       restaurant_id: restaurantId,
-      // Intentionally omitting assigned_waiter_id, requires_kitchen, subtotal, tax, etc.
+      // Intentionally omitting assigned_waiter_id, subtotal, tax, etc.
       // — these columns may not exist in all deployed schemas
     };
     result = await db.from('orders').insert(minimalPayload).select().single();

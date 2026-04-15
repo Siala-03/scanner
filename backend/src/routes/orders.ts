@@ -174,12 +174,28 @@ router.get('/kitchen', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'restaurantId is required' });
     }
 
-    const result = await pool.query(
-      `SELECT * FROM orders
-       WHERE restaurant_id = $1 AND requires_kitchen = true AND status IN ('pending', 'verified', 'preparing', 'ready')
-       ORDER BY created_at ASC`,
-      [restaurantId]
-    );
+    let result;
+    try {
+      result = await pool.query(
+        `SELECT * FROM orders
+         WHERE restaurant_id = $1 AND requires_kitchen IS DISTINCT FROM false AND status IN ('pending', 'verified', 'preparing', 'ready')
+         ORDER BY created_at ASC`,
+        [restaurantId]
+      );
+    } catch (error: any) {
+      // Backward compatibility: older deployments may not have requires_kitchen yet.
+      if (error?.code === '42703') {
+        result = await pool.query(
+          `SELECT * FROM orders
+           WHERE restaurant_id = $1 AND status IN ('pending', 'verified', 'preparing', 'ready')
+           ORDER BY created_at ASC`,
+          [restaurantId]
+        );
+      } else {
+        throw error;
+      }
+    }
+
     const orders = result.rows.map((row: any) => normalizeOrder(row));
     res.json(orders);
   } catch (error) {
@@ -202,10 +218,23 @@ router.get('/kitchen/analytics', async (_req: Request, res: Response) => {
       return res.status(400).json({ error: 'restaurantId is required' });
     }
     // Get orders for today
-    const todayOrders = await pool.query(
-      `SELECT * FROM orders WHERE restaurant_id = $1 AND requires_kitchen = true AND created_at >= $2 AND created_at < $3`,
-      [restaurantId, today.toISOString(), tomorrow.toISOString()]
-    );
+    let todayOrders;
+    try {
+      todayOrders = await pool.query(
+        `SELECT * FROM orders WHERE restaurant_id = $1 AND requires_kitchen IS DISTINCT FROM false AND created_at >= $2 AND created_at < $3`,
+        [restaurantId, today.toISOString(), tomorrow.toISOString()]
+      );
+    } catch (error: any) {
+      // Backward compatibility: older deployments may not have requires_kitchen yet.
+      if (error?.code === '42703') {
+        todayOrders = await pool.query(
+          `SELECT * FROM orders WHERE restaurant_id = $1 AND created_at >= $2 AND created_at < $3`,
+          [restaurantId, today.toISOString(), tomorrow.toISOString()]
+        );
+      } else {
+        throw error;
+      }
+    }
 
     // Calculate stats
     const orders = todayOrders.rows.map((row: any) => ({
