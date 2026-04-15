@@ -110,7 +110,7 @@ export async function createOrder(order: CreateOrderInput): Promise<Order> {
   if (!restaurantId) throw new Error('No restaurant selected');
   
   const staffId = getStaffId();
-  const orderId = `order-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  const orderId = `order-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
   const orderNumber = Date.now().toString().slice(-6);
 
   const items = order.items.map((item, index) => ({
@@ -176,29 +176,35 @@ export async function updateOrderStatus(
   id: string,
   statusUpdate: UpdateOrderStatusInput
 ): Promise<Order> {
-  const updates: Record<string, unknown> = {
+  const fullUpdates: Record<string, unknown> = {
     status: statusUpdate.status,
-    updated_at: new Date().toISOString()
+    updated_at: new Date().toISOString(),
   };
 
   if (statusUpdate.assignedTo !== undefined) {
-    updates.assigned_to = statusUpdate.assignedTo;
-    updates.assigned_waiter_id = statusUpdate.assignedTo;
+    fullUpdates.assigned_to = statusUpdate.assignedTo;
+    fullUpdates.assigned_waiter_id = statusUpdate.assignedTo;
   }
 
   if (statusUpdate.status === 'served' || (statusUpdate.status as string) === 'completed') {
-    updates.completed_at = new Date().toISOString();
+    fullUpdates.completed_at = new Date().toISOString();
   }
 
-  const { data, error } = await db
-    .from('orders')
-    .update(updates)
-    .eq('id', id)
-    .select()
-    .single();
+  let result = await db.from('orders').update(fullUpdates).eq('id', id).select().single();
 
-  if (error) throw error;
-  return data as Order;
+  // If the full update fails (e.g. a column doesn't exist), retry with just status
+  if (result.error) {
+    console.warn('[updateOrderStatus] Full update failed, retrying with minimal fields:', result.error.message);
+    result = await db
+      .from('orders')
+      .update({ status: statusUpdate.status, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+      .single();
+  }
+
+  if (result.error) throw result.error;
+  return result.data as Order;
 }
 
 export async function updateOrderItemStatus(
