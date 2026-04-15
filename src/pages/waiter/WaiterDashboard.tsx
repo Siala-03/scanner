@@ -896,17 +896,8 @@ export function WaiterDashboard({
             <AnimatePresence mode="wait">
               {activeTab === 'incoming' && (
                 <motion.div key="incoming" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-3">
-                  <PortalSectionHeader
-                    title="Incoming orders"
-                    description="Confirm and route new customer orders before they enter the prep flow."
-                    count={incomingOrders.length}
-                    tone="border-amber-500/25 bg-amber-500/10 text-amber-200"
-                  />
-                  <div className="rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 flex items-start gap-3">
-                    <SmartphoneIcon className="w-4 h-4 text-blue-400 flex-shrink-0 mt-0.5" />
-                    <p className="text-sm text-blue-200">
-                      New orders from the customer QR menu appear here. Expand each order, verify with the customer, then approve — food items are automatically sent to the kitchen as a KOT.
-                    </p>
+                  <div className="flex flex-col gap-3 rounded-lg border border-slate-700 bg-slate-800 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+                    <h2 className="text-base font-semibold text-white sm:text-lg">Incoming orders</h2>
                   </div>
                   {incomingOrders.length === 0 ? (
                     <EmptyTab icon={<ClipboardListIcon className="w-7 h-7" />} title="No incoming orders" desc="Orders placed from the customer QR menu will appear here in real time." />
@@ -1047,20 +1038,6 @@ export function WaiterDashboard({
               </div>
             )}
 
-            <div className="rounded-lg border border-slate-700 bg-slate-800 p-4 md:col-span-2">
-              <p className="text-xs uppercase tracking-widest text-slate-500 mb-3">Customer Menu</p>
-              <div className="flex items-center gap-2 mb-2">
-                <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                <span className="text-sm font-medium text-emerald-300">Live sync active</span>
-              </div>
-              <p className="text-xs text-slate-500">Orders from QR code scans appear in Orders page instantly.</p>
-              {incomingOrders.length > 0 && (
-                <div className="mt-3 rounded-lg bg-amber-500/10 border border-amber-500/20 px-3 py-2 flex items-center gap-2">
-                  <BellIcon className="w-4 h-4 text-amber-400" />
-                  <span className="text-sm text-amber-200 font-medium">{incomingOrders.length} order{incomingOrders.length !== 1 ? 's' : ''} waiting</span>
-                </div>
-              )}
-            </div>
           </div>
         )}
       </div>
