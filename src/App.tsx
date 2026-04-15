@@ -2,6 +2,7 @@ import { useCallback, useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowLeftIcon, QrCodeIcon, LogOutIcon } from 'lucide-react';
 import { CartItem, OrderStatus, Customer } from './types';
+import { setCurrency, CurrencyCode } from './utils/currency';
 import { OrdersProvider, useOrdersContext } from './contexts/OrdersContext';
 import { useTables } from './hooks/useTables';
 import { callWaiter } from './api/tables';
@@ -408,7 +409,11 @@ export function App() {
       });
 
     fetchReceiptSettings(currentRestaurantId)
-      .then((s) => { if (active) setReceiptSettings(s); })
+      .then((s) => {
+        if (!active) return;
+        setReceiptSettings(s);
+        if (s.currency) setCurrency(s.currency as CurrencyCode);
+      })
       .catch(() => {/* non-fatal */});
 
     return () => {

@@ -140,18 +140,25 @@ export function useOrders(): UseOrdersReturn {
     const id = restId || restaurantId;
     try {
       const fetched = await apiFetchOrders('all', id);
-      setOrders((fetched ?? []).map((o: any) => normalizeOrderPayload(o)).filter(Boolean) as Order[]);
+      const normalized = (fetched ?? []).map((o: any) => normalizeOrderPayload(o)).filter(Boolean) as Order[];
+      // Merge: keep in-flight temp orders (id starts with "temp-") that aren't in the DB yet
+      setOrders((prev) => {
+        const tempOrders = prev.filter((o) => o.id.startsWith('temp-'));
+        const fetchedIds = new Set(normalized.map((o) => o.id));
+        const stillPending = tempOrders.filter((t) => !fetchedIds.has(t.id));
+        return [...stillPending, ...normalized];
+      });
     } catch (e: any) {
       console.error('[Orders] Poll failed:', e?.message ?? e);
-      setOrders([]);
+      // Do not clear orders on a failed poll — preserve existing state
     }
   }, [restaurantId]);
 
   useEffect(() => {
     loadOrders();
 
-    // Poll every 8 seconds as a reliable fallback (works even if Realtime is not enabled)
-    const pollInterval = setInterval(() => loadOrders(), 8000);
+    // Poll every 3 seconds as a reliable fallback (works even if Realtime is not enabled)
+    const pollInterval = setInterval(() => loadOrders(), 3000);
 
     // Also subscribe to Supabase Realtime for instant updates when it IS configured
     if (restaurantId) {
@@ -294,11 +301,21 @@ export function useOrders(): UseOrdersReturn {
         } as any);
 
         savedOrder = normalizeOrderPayload(createdOrder) ?? localOrder;
-        setOrders((prev) => prev.map((order) => (order.id === localOrderId ? savedOrder : order)));
+        // Upsert: replace temp order OR merge with real order if poll already added it
+        setOrders((prev) => {
+          const withoutTemp = prev.filter((o) => o.id !== localOrderId);
+          const alreadyHasReal = withoutTemp.some((o) => o.id === savedOrder.id);
+          if (alreadyHasReal) {
+            return withoutTemp.map((o) => (o.id === savedOrder.id ? savedOrder : o));
+          }
+          return [savedOrder, ...withoutTemp];
+        });
         window.dispatchEvent(new Event('ordersUpdated'));
       } catch (e: any) {
         console.error('[Order] Failed to save order to Supabase:', e?.message ?? e);
-        console.error('[Order] This is likely an RLS (Row Level Security) issue. Run the SQL fix in Supabase.');
+        // Remove the optimistic temp order so the customer sees the real failure
+        setOrders((prev) => prev.filter((o) => o.id !== localOrderId));
+        throw e; // rethrow so CartPage can display the error and keep the cart intact
       }
 
       return savedOrder;

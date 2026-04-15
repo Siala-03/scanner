@@ -22,6 +22,7 @@ export interface RestaurantReceiptSettings {
   country?: string;
   phone?: string;
   email?: string;
+  currency?: string; // e.g. 'RWF' | 'KShs' | 'UGX'
 }
 
 export async function fetchRestaurants(): Promise<Restaurant[]> {
@@ -141,6 +142,7 @@ export async function fetchReceiptSettings(restaurantId: string): Promise<Restau
       country: (legacyData as any)?.country || undefined,
       phone: (legacyData as any)?.phone || undefined,
       email: (legacyData as any)?.email || undefined,
+      currency: undefined,
     };
   }
 
@@ -152,6 +154,7 @@ export async function fetchReceiptSettings(restaurantId: string): Promise<Restau
     country: receiptFromSettings?.country || (data as any)?.country || undefined,
     phone: receiptFromSettings?.phone || (data as any)?.phone || undefined,
     email: receiptFromSettings?.email || (data as any)?.email || undefined,
+    currency: receiptFromSettings?.currency || undefined,
   };
 }
 

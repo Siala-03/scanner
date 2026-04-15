@@ -43,7 +43,7 @@ router.post('/customers', async (req, res) => {
         'SELECT * FROM customers WHERE phone = $1 AND restaurant_id = $2',
         [phone, restaurantId]
       );
-      customer = result.rows[0];
+      customer = toCamelCase(result.rows[0]);
     }
 
     if (!customer && email) {
@@ -51,7 +51,7 @@ router.post('/customers', async (req, res) => {
         'SELECT * FROM customers WHERE email = $1 AND restaurant_id = $2',
         [email, restaurantId]
       );
-      customer = result.rows[0];
+      customer = toCamelCase(result.rows[0]);
     }
 
     // Create new customer if not found
@@ -73,9 +73,10 @@ router.post('/customers', async (req, res) => {
 });
 
 // GET /api/loyalty/customers/:id - Get customer details with transactions
-router.get('/customers/:id', authenticate, async (req: AuthenticatedRequest, res: Response) => {
+// Accessible from customer-facing UI (no staff auth required); restaurantId comes from query param
+router.get('/customers/:id', async (req: Request, res: Response) => {
   const { id } = req.params;
-  const restaurantId = req.restaurantId;
+  const restaurantId = (req.query.restaurantId as string) || (req as AuthenticatedRequest).restaurantId;
   if (!restaurantId) return res.status(400).json({ error: 'restaurantId is required' });
 
   try {

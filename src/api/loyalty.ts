@@ -60,7 +60,9 @@ export async function getCustomers(): Promise<Customer[]> {
 }
 
 export async function getCustomerDetails(customerId: string): Promise<LoyaltySummary> {
-  return apiRequest<LoyaltySummary>(`${API_BASE}/loyalty/customers/${customerId}`);
+  const restaurantId = resolveRestaurantId();
+  const query = restaurantId ? `?restaurantId=${encodeURIComponent(restaurantId)}` : '';
+  return apiRequest<LoyaltySummary>(`${API_BASE}/loyalty/customers/${customerId}${query}`);
 }
 
 // Points management

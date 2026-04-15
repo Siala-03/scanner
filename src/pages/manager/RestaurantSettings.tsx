@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { BuildingIcon, PhoneIcon, MailIcon, MapPinIcon, GlobeIcon, ImageIcon, SaveIcon, UploadIcon, XIcon } from 'lucide-react';
+import { BuildingIcon, PhoneIcon, MailIcon, MapPinIcon, GlobeIcon, ImageIcon, SaveIcon, UploadIcon, XIcon, CoinsIcon } from 'lucide-react';
 import { fetchReceiptSettings, saveReceiptSettings } from '../../api/restaurants';
 import type { RestaurantReceiptSettings } from '../../api/restaurants';
+import { setCurrency, CURRENCY_OPTIONS, getCurrency, CurrencyCode } from '../../utils/currency';
 
 interface RestaurantSettingsProps {
   restaurantId: string;
@@ -86,6 +87,7 @@ export function RestaurantSettings({ restaurantId, restaurantName, onNameChange,
     setSaveErrorMessage('Failed to save. Please try again.');
     try {
       await saveReceiptSettings(restaurantId, settings, name.trim() || undefined);
+      if (settings.currency) setCurrency(settings.currency as CurrencyCode);
       onNameChange?.(name.trim());
       onSettingsSaved?.(settings);
       setSaveMsg('success');
@@ -222,6 +224,28 @@ export function RestaurantSettings({ restaurantId, restaurantName, onNameChange,
         </h2>
         {field('Phone Number', 'phone', 'e.g. +250 788 000 000', <PhoneIcon className="w-4 h-4" />, 'tel')}
         {field('Email Address', 'email', 'e.g. info@company.rw', <MailIcon className="w-4 h-4" />, 'email')}
+      </div>
+
+      {/* ── Currency ── */}
+      <div className="bg-slate-800/60 rounded-xl border border-slate-700 p-6 space-y-4">
+        <h2 className="text-sm font-semibold text-slate-200 uppercase tracking-wider flex items-center gap-2">
+          <CoinsIcon className="w-4 h-4 text-amber-400" /> Currency
+        </h2>
+        <div>
+          <label className="block text-sm font-medium text-slate-300 mb-1.5">System Currency</label>
+          <select
+            value={settings.currency ?? getCurrency()}
+            onChange={(e) => setSettings((prev) => ({ ...prev, currency: e.target.value }))}
+            className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-600 text-white focus:outline-none focus:ring-2 focus:ring-amber-500 text-sm"
+          >
+            {CURRENCY_OPTIONS.map((opt) => (
+              <option key={opt.code} value={opt.code}>{opt.label}</option>
+            ))}
+          </select>
+          <p className="mt-1.5 text-xs text-slate-500">
+            Applies to all prices shown in menus, orders, receipts and dashboards.
+          </p>
+        </div>
       </div>
 
       {/* ── Receipt Preview hint ── */}
