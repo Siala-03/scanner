@@ -8,7 +8,7 @@ import {
   Tooltip,
   ResponsiveContainer } from
 'recharts';
-import { StarIcon, TrophyIcon, ClockIcon, DollarSignIcon } from 'lucide-react';
+import { StarIcon, TrophyIcon, ClockIcon, DollarSignIcon, ArrowLeftIcon } from 'lucide-react';
 import { useWaiters } from '../../hooks/useStaff';
 import { useOrdersContext } from '../../contexts/OrdersContext';
 import { Card } from '../../components/ui/Card';
@@ -16,7 +16,11 @@ import { Badge } from '../../components/ui/Badge';
 import { ProgressBar } from '../../components/ui/ProgressBar';
 import { formatPrice } from '../../utils/currency';
 
-export function StaffPerformance() {
+interface StaffPerformanceProps {
+  onBack?: () => void;
+}
+
+export function StaffPerformance({ onBack }: StaffPerformanceProps) {
   const { waiters, isLoading } = useWaiters();
   const { orders } = useOrdersContext();
 
@@ -85,6 +89,15 @@ export function StaffPerformance() {
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-6">
+          {onBack && (
+            <button
+              onClick={onBack}
+              className="mb-3 inline-flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition"
+            >
+              <ArrowLeftIcon className="w-4 h-4" />
+              Back
+            </button>
+          )}
           <h1 className="text-2xl font-bold text-gray-100">Staff Performance</h1>
           <p className="text-slate-400">Track and compare team performance</p>
         </div>

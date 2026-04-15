@@ -81,7 +81,7 @@ export default function SupervisorExpenseManagement() {
       }
       
       // Fetch expenses
-      let expensesData = { data: [] };
+      let expensesData: Expense[] = [];
       try {
         expensesData = await fetchExpenses({ createdByRole: 'supervisor' });
       } catch (expErr) {
@@ -90,7 +90,7 @@ export default function SupervisorExpenseManagement() {
       }
       
       setCategories(categoriesData || []);
-      setExpenses(expensesData?.data || []);
+      setExpenses(expensesData || []);
     } catch (err) {
       setError('Failed to load data');
       console.error('❌ Critical error in loadData:', err);

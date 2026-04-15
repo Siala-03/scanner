@@ -23,6 +23,19 @@ import { downloadCsv, buildOrdersCsv } from '../../utils/csv';
 import type { Order } from '../../types/orders';
 
 export function RevenueReports() {
+    const normalizeOrderItems = (rawItems: any): any[] => {
+      if (Array.isArray(rawItems)) return rawItems;
+      if (typeof rawItems === 'string') {
+        try {
+          const parsed = JSON.parse(rawItems);
+          return Array.isArray(parsed) ? parsed : [];
+        } catch {
+          return [];
+        }
+      }
+      return [];
+    };
+
   const [dateRange, setDateRange] = useState('week');
   const [activeView, setActiveView] = useState<'revenue' | 'orders'>('revenue');
   const [orders, setOrders] = useState<Order[]>([]);
@@ -101,7 +114,7 @@ export function RevenueReports() {
     day.setDate(day.getDate() - (6 - idx));
     const dayKey = day.toDateString();
     const revenue = filteredByRange
-      .filter((o) => o.status === 'served' && new Date(o.createdAt).toDateString() === dayKey)
+      .filter((o) => o.status === 'served' && new Date((o as any).created_at || o.createdAt).toDateString() === dayKey)
       .reduce((sum, o) => sum + o.total, 0);
     return { date: dayKey, revenue };
   });
@@ -110,10 +123,11 @@ export function RevenueReports() {
   const itemMap = new Map<string, { revenue: number; orderCount: number }>();
   const tableMap = new Map<number, { totalRevenue: number; totalOrders: number }>();
   filteredByRange.forEach((order) => {
-    order.items?.forEach((item: any) => {
+    const items = normalizeOrderItems(order.items);
+    items.forEach((item: any) => {
       const name = item.menuItemName || item.menu_item_name || item.menuItemId || item.menu_item_id || 'Unknown';
+      const category = item.category || item.menuItem?.category || item.menu_item?.category || name;
       const itemRevenue = item.totalPrice || item.total_price || (item.unitPrice || item.unit_price || 0) * (item.quantity || 1);
-      const category = name;
 
       const current = categoryMap.get(category) || { revenue: 0, orders: 0 };
       current.revenue += itemRevenue;

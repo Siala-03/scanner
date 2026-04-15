@@ -30,6 +30,19 @@ export function AnalyticsPage() {
   const { menuItems } = useMenu();
   const menuById = useMemo(() => Object.fromEntries(menuItems.map((item) => [item.id, item])), [menuItems]);
 
+  const normalizeOrderItems = (rawItems: any): any[] => {
+    if (Array.isArray(rawItems)) return rawItems;
+    if (typeof rawItems === 'string') {
+      try {
+        const parsed = JSON.parse(rawItems);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  };
+
   useEffect(() => {
     let active = true;
     const load = async () => {
@@ -128,15 +141,22 @@ export function AnalyticsPage() {
     const map = new Map<string, { category: string; revenue: number; orders: number; percentage: number }>();
     let totalRevenue = 0;
     orders.forEach((order) => {
-      const total = order.total ?? order.total_price ?? 0;
-      totalRevenue += total;
-      (order.items || []).forEach((item: any) => {
-        const category = menuById[item.menuItemId]?.category ?? 'other';
+      if (order.status !== 'served') return;
+      const items = normalizeOrderItems(order.items);
+
+      items.forEach((item: any) => {
+        const menuItemId = item.menuItemId ?? item.menu_item_id;
+        const fallbackCategory = item.category ?? item.menuItem?.category ?? item.menu_item?.category;
+        const category = menuById[menuItemId]?.category ?? fallbackCategory ?? 'other';
         const existing = map.get(category) ?? { category, revenue: 0, orders: 0, percentage: 0 };
-        const itemRev = item.totalPrice ?? (item.unitPrice ?? 0) * (item.quantity ?? 1);
+        const itemRev =
+          item.totalPrice ??
+          item.total_price ??
+          (item.unitPrice ?? item.unit_price ?? 0) * (item.quantity ?? 1);
         existing.revenue += itemRev;
         existing.orders += item.quantity ?? 1;
         map.set(category, existing);
+        totalRevenue += itemRev;
       });
     });
     return Array.from(map.values())

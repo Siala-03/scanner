@@ -582,7 +582,7 @@ export function App() {
           />
         )}
         {supervisorPage === 'revenue' && <RevenueReports />}
-        {supervisorPage === 'staff' && <StaffPerformance />}
+        {supervisorPage === 'staff' && <StaffPerformance onBack={() => setSupervisorPage('dashboard')} />}
         {supervisorPage === 'qrcodes' && (
           <QRCodeGenerator
             tables={tables}
@@ -687,7 +687,7 @@ export function App() {
             {managerPage === 'menu' && <MenuManagement />}
             {managerPage === 'staff' && <StaffManagement onShowPerformance={() => setManagerPage('performance')} />}
             {managerPage === 'analytics' && <AnalyticsPage />}
-            {managerPage === 'performance' && <StaffPerformance />}
+            {managerPage === 'performance' && <StaffPerformance onBack={() => setManagerPage('staff')} />}
             {managerPage === 'inventory' && <InventoryManagement role="manager" />}
             {managerPage === 'qrcodes' && (
               <QRCodeGenerator

@@ -295,6 +295,7 @@ export function useOrders(): UseOrdersReturn {
 
         savedOrder = normalizeOrderPayload(createdOrder) ?? localOrder;
         setOrders((prev) => prev.map((order) => (order.id === localOrderId ? savedOrder : order)));
+        window.dispatchEvent(new Event('ordersUpdated'));
       } catch (e: any) {
         console.error('[Order] Failed to save order to Supabase:', e?.message ?? e);
         console.error('[Order] This is likely an RLS (Row Level Security) issue. Run the SQL fix in Supabase.');
@@ -331,6 +332,7 @@ export function useOrders(): UseOrdersReturn {
           return { ...order, ...updates };
         })
       );
+      window.dispatchEvent(new Event('ordersUpdated'));
     },
     []
   );

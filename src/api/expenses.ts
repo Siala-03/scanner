@@ -94,11 +94,21 @@ export async function fetchExpenseCategories(): Promise<ExpenseCategory[]> {
   const { data, error } = await supabase
     .from('expense_categories')
     .select('*')
-    .eq('restaurant_id', restaurantId)
+    .or(`restaurant_id.eq.${restaurantId},restaurant_id.is.null`)
     .order('name');
 
   if (error) { console.error('fetchExpenseCategories error:', error); return []; }
-  return (data || []).map(normalizeExpenseCategory);
+
+  const normalized = (data || []).map(normalizeExpenseCategory);
+  const byName = new Map<string, ExpenseCategory>();
+  normalized.forEach((cat) => {
+    const key = cat.name.toLowerCase();
+    const existing = byName.get(key);
+    if (!existing || existing.restaurantId !== restaurantId) {
+      byName.set(key, cat);
+    }
+  });
+  return Array.from(byName.values());
 }
 
 export async function createExpenseCategory(data: ExpenseCategoryFormData): Promise<ExpenseCategory> {
@@ -242,15 +252,15 @@ export async function updateExpense(
   data: Partial<ExpenseFormData>
 ): Promise<Expense> {
   const updateData: any = {};
-  if (data.categoryId) updateData.category_id = data.categoryId;
-  if (data.vendorName) updateData.vendor_name = data.vendorName;
-  if (data.description) updateData.description = data.description;
-  if (data.amount) updateData.amount = data.amount;
-  if (data.expenseDate) updateData.expense_date = data.expenseDate;
-  if (data.paymentMethod) updateData.payment_method = data.paymentMethod;
-  if (data.paymentStatus) updateData.payment_status = data.paymentStatus;
-  if (data.referenceNumber) updateData.reference_number = data.referenceNumber;
-  if (data.notes) updateData.notes = data.notes;
+  if (data.categoryId !== undefined) updateData.category_id = data.categoryId;
+  if (data.vendorName !== undefined) updateData.vendor_name = data.vendorName;
+  if (data.description !== undefined) updateData.description = data.description;
+  if (data.amount !== undefined) updateData.amount = data.amount;
+  if (data.expenseDate !== undefined) updateData.expense_date = data.expenseDate;
+  if (data.paymentMethod !== undefined) updateData.payment_method = data.paymentMethod;
+  if (data.paymentStatus !== undefined) updateData.payment_status = data.paymentStatus;
+  if (data.referenceNumber !== undefined) updateData.reference_number = data.referenceNumber;
+  if (data.notes !== undefined) updateData.notes = data.notes;
 
   const { data: result, error } = await supabaseAdmin
     .from('expenses')

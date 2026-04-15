@@ -696,6 +696,17 @@ const CreditManagement: React.FC = () => {
     });
     const [submitError, setSubmitError] = useState('');
 
+    useEffect(() => {
+      if (!showCreateModal) return;
+
+      setFormData({
+        customerName: customerNameInput || orderData?.customerName || '',
+        customerPhone: customerPhoneInput || (orderData as any)?.customerPhone || '',
+        creditLimit: creditLimit || creditAmount || (orderData?.total != null ? String(orderData.total) : ''),
+        notes: quickNotes || (orderData ? `Account opened from order ${orderData.orderNumber || orderData.id}` : ''),
+      });
+    }, [showCreateModal, customerNameInput, customerPhoneInput, creditLimit, creditAmount, quickNotes, orderData]);
+
     const handleSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
       setSubmitError('');

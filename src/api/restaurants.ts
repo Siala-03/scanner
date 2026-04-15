@@ -120,18 +120,39 @@ export async function deleteRestaurant(id: string): Promise<void> {
 export async function fetchReceiptSettings(restaurantId: string): Promise<RestaurantReceiptSettings> {
   const { data, error } = await supabaseAdmin
     .from('restaurants')
-    .select('settings')
+    .select('settings, logo_url, address, phone, email, city, country')
     .eq('id', restaurantId)
     .single();
 
   // Some deployed schemas may not include the JSON settings column yet.
   // In that case, return empty settings so the UI stays usable.
   if (error) {
-    return {};
+    // Fallback for schemas where only classic columns exist.
+    const { data: legacyData } = await supabaseAdmin
+      .from('restaurants')
+      .select('logo_url, address, phone, email, city, country')
+      .eq('id', restaurantId)
+      .single();
+
+    return {
+      logo: (legacyData as any)?.logo_url || undefined,
+      address: (legacyData as any)?.address || undefined,
+      city: (legacyData as any)?.city || undefined,
+      country: (legacyData as any)?.country || undefined,
+      phone: (legacyData as any)?.phone || undefined,
+      email: (legacyData as any)?.email || undefined,
+    };
   }
 
-  if (!data?.settings) return {};
-  return ((data.settings as Record<string, unknown>).receipt as RestaurantReceiptSettings) || {};
+  const receiptFromSettings = (data?.settings as Record<string, unknown> | undefined)?.receipt as RestaurantReceiptSettings | undefined;
+  return {
+    logo: receiptFromSettings?.logo || (data as any)?.logo_url || undefined,
+    address: receiptFromSettings?.address || (data as any)?.address || undefined,
+    city: receiptFromSettings?.city || (data as any)?.city || undefined,
+    country: receiptFromSettings?.country || (data as any)?.country || undefined,
+    phone: receiptFromSettings?.phone || (data as any)?.phone || undefined,
+    email: receiptFromSettings?.email || (data as any)?.email || undefined,
+  };
 }
 
 /**
@@ -156,6 +177,7 @@ export async function saveReceiptSettings(
   // Build the update payload — always update the settings blob
   const payload: Record<string, unknown> = { settings: merged };
   if (restaurantName) payload.name = restaurantName;
+  if (typeof receiptSettings.logo === 'string') payload.logo_url = receiptSettings.logo;
 
   // Try a full update (including main columns that may or may not exist)
   let { error } = await supabaseAdmin
@@ -181,6 +203,7 @@ export async function saveReceiptSettings(
   if (typeof receiptSettings.email === 'string') corePayload.email = receiptSettings.email;
 
   if (Object.keys(corePayload).length > 0) {
+    if (typeof receiptSettings.logo === 'string') corePayload.logo_url = receiptSettings.logo;
     const { error: coreError } = await supabaseAdmin
       .from('restaurants')
       .update(corePayload)

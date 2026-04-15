@@ -130,7 +130,7 @@ export function SupervisorDashboard({ onManageMenu, onLogout }: SupervisorDashbo
                   key={kpi.id}
                   label={kpi.name}
                   value={kpi.progress?.currentValue || 0}
-                  change={kpi.progress ? (kpi.progress.currentValue / kpi.targetValue) * 100 - 100 : 0}
+                  change={kpi.progress ? (kpi.progress.currentValue / Math.max(kpi.target_value || 1, 1)) * 100 - 100 : 0}
                   trend={kpi.progress?.achieved ? 'up' : 'neutral'}
                   icon={<TrendingUpIcon className="w-5 h-5" />}
                 />

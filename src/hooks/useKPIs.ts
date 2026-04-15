@@ -71,19 +71,28 @@ export function useStaffKPIs() {
   useEffect(() => {
     const onFocus = () => refetch();
     const onRestaurantChange = () => refetch();
+    const onOrdersUpdated = () => refetch();
     const onVisibility = () => {
       if (document.visibilityState === 'visible') {
         refetch();
       }
     };
 
+    // Keep KPI progress reasonably fresh during active shifts.
+    const intervalId = window.setInterval(() => {
+      refetch();
+    }, 15000);
+
     window.addEventListener('focus', onFocus);
     window.addEventListener('restaurantIdChanged', onRestaurantChange);
+    window.addEventListener('ordersUpdated', onOrdersUpdated);
     document.addEventListener('visibilitychange', onVisibility);
 
     return () => {
+      window.clearInterval(intervalId);
       window.removeEventListener('focus', onFocus);
       window.removeEventListener('restaurantIdChanged', onRestaurantChange);
+      window.removeEventListener('ordersUpdated', onOrdersUpdated);
       document.removeEventListener('visibilitychange', onVisibility);
     };
   }, []);

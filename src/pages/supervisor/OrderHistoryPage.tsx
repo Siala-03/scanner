@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { ShoppingCartIcon, ArrowLeftIcon, FileTextIcon, DownloadIcon, CalendarIcon } from 'lucide-react';
+import { ShoppingCartIcon, ArrowLeftIcon, FileTextIcon, CalendarIcon } from 'lucide-react';
 import type { Order as OrderType, OrderStatus } from '../../types';
 import { Card } from '../../components/ui/Card';
 import { OrdersHistoryTable } from '../../components/supervisor/OrdersHistoryTable';
@@ -258,13 +258,6 @@ export function OrderHistoryPage({ onBack, existingOrders }: OrderHistoryPagePro
                   <ShoppingCartIcon className="w-5 h-5" />
                   All Orders
                 </h2>
-                <button
-                  onClick={handleExport}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium transition-colors"
-                >
-                  <DownloadIcon className="w-4 h-4" />
-                  Export CSV
-                </button>
               </div>
             </div>
             
@@ -293,7 +286,7 @@ export function OrderHistoryPage({ onBack, existingOrders }: OrderHistoryPagePro
         order={selectedOrder as any}
         isOpen={!!selectedOrder}
         onClose={() => setSelectedOrder(null)}
-        onApprove={(id) => handleUpdateOrderStatus(id, 'verified')}
+        onApprove={(order) => handleUpdateOrderStatus(order.id, 'verified')}
         onReject={(id) => handleUpdateOrderStatus(id, 'cancelled')}
         onMarkReady={(id) => handleUpdateOrderStatus(id, 'ready')}
         onMarkServed={(id) => handleUpdateOrderStatus(id, 'served')}

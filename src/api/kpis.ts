@@ -94,11 +94,19 @@ async function computeProgress(
       .gte('created_at', start.toISOString())
       .lte('created_at', end.toISOString());
 
-    // Filter by staffId against both column names
-    if (orders) {
-      orders.splice(0, orders.length, ...orders.filter(
-        (o: any) => o.assigned_waiter_id === staffId || o.assigned_to === staffId
-      ));
+    // Waiter KPIs should be tied to the waiter's own fulfilled orders.
+    // Supervisor/kitchen KPIs are operational and can reflect restaurant-wide activity.
+    if (orders && normalizeRole(kpi.staff_role) === 'waiter') {
+      orders.splice(
+        0,
+        orders.length,
+        ...orders.filter(
+          (o: any) =>
+            o.assigned_waiter_id === staffId ||
+            o.assigned_to === staffId ||
+            o.created_by === staffId
+        )
+      );
     }
 
     const list = orders || [];
