@@ -34,29 +34,29 @@ interface KitchenStats {
 const STATUS_CONFIG = {
   pending: { 
     label: 'NEW', 
-    color: 'bg-blue-600', 
-    textColor: 'text-white',
+    color: 'bg-blue-500/20', 
+    textColor: 'text-blue-300',
     borderColor: 'border-blue-500',
     pulse: true
   },
   verified: {
     label: 'VERIFIED',
-    color: 'bg-cyan-600',
-    textColor: 'text-white',
+    color: 'bg-cyan-500/20',
+    textColor: 'text-cyan-300',
     borderColor: 'border-cyan-500',
     pulse: true
   },
   preparing: { 
-    label: 'COOKING', 
-    color: 'bg-amber-500', 
-    textColor: 'text-white',
+    label: 'COOKING',
+    color: 'bg-amber-500/20',
+    textColor: 'text-amber-300',
     borderColor: 'border-amber-500',
     pulse: false
   },
   ready: { 
     label: 'READY', 
-    color: 'bg-emerald-600', 
-    textColor: 'text-white',
+    color: 'bg-emerald-500/20', 
+    textColor: 'text-emerald-300',
     borderColor: 'border-emerald-500',
     pulse: false
   },
@@ -452,32 +452,32 @@ export function KitchenDisplay({ onLogout, restaurantId, restaurantName }: { onL
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+    <div className="min-h-screen bg-slate-900 text-slate-100">
       {/* Header */}
-      <header className="bg-slate-950/80 backdrop-blur-sm border-b border-slate-700 sticky top-0 z-50">
-        <div className="px-6 py-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+      <header className="sticky top-0 z-50 border-b border-slate-700 bg-slate-800/95 backdrop-blur-sm">
+        <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-4 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-gradient-to-br from-amber-400 to-orange-500 rounded-xl flex items-center justify-center shadow-lg shadow-amber-500/20">
-              <ChefHatIcon className="w-7 h-7 text-white" />
+            <div className="flex h-12 w-12 items-center justify-center rounded-lg border border-amber-500/25 bg-amber-500/10">
+              <ChefHatIcon className="w-7 h-7 text-amber-300" />
             </div>
             <div>
-              <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Kitchen Display</p>
+              <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Kitchen Portal</p>
               <h1 className="text-2xl font-semibold text-white">{restaurantName || 'Restaurant Kitchen'}</h1>
             </div>
           </div>
           <div className="flex items-center gap-4">
             {/* View Toggle */}
-            <div className="flex bg-slate-800 rounded-lg p-1">
+            <div className="flex rounded-lg bg-slate-900 p-1 border border-slate-700">
               <button
                 onClick={() => setViewMode('orders')}
-                className={`px-4 py-2 rounded-md flex items-center gap-2 transition-all ${viewMode === 'orders' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}
+                className={`px-4 py-2 rounded-md flex items-center gap-2 transition-colors ${viewMode === 'orders' ? 'bg-amber-500 text-slate-900' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}
               >
                 <ListOrderedIcon className="w-4 h-4" />
                 Orders
               </button>
               <button
                 onClick={() => setViewMode('analytics')}
-                className={`px-4 py-2 rounded-md flex items-center gap-2 transition-all ${viewMode === 'analytics' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}
+                className={`px-4 py-2 rounded-md flex items-center gap-2 transition-colors ${viewMode === 'analytics' ? 'bg-amber-500 text-slate-900' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}
               >
                 <BarChart3Icon className="w-4 h-4" />
                 Analytics
@@ -493,13 +493,13 @@ export function KitchenDisplay({ onLogout, restaurantId, restaurantName }: { onL
               </div>
               <button
                 onClick={loadOrders}
-                className="p-3 bg-slate-800 hover:bg-slate-700 rounded-xl transition-all hover:rotate-180 duration-500"
+                className="p-3 bg-slate-700 hover:bg-slate-600 rounded-lg transition-all hover:rotate-180 duration-500"
               >
                 <RefreshCwIcon className="w-5 h-5 text-slate-300" />
               </button>
               <button
                 onClick={onLogout}
-                className="p-3 bg-slate-800 hover:bg-red-600/20 hover:text-red-400 rounded-xl transition-all text-slate-300"
+                className="p-3 bg-slate-700 hover:bg-red-600 hover:text-white rounded-lg transition-colors text-slate-200"
                 title="Logout"
               >
                 <LogOutIcon className="w-5 h-5" />
@@ -509,7 +509,7 @@ export function KitchenDisplay({ onLogout, restaurantId, restaurantName }: { onL
         </div>
       </header>
 
-      <main className="p-4">
+      <main className="mx-auto max-w-6xl p-4">
         {/* Staff KPIs Section */}
         {staffKPIs.length > 0 && (
           <div className="mb-6">
@@ -543,7 +543,7 @@ export function KitchenDisplay({ onLogout, restaurantId, restaurantName }: { onL
             {/* More Stats */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Status Breakdown */}
-              <div className="bg-slate-800 rounded-2xl p-6">
+              <div className="bg-slate-800 border border-slate-700 rounded-lg p-6">
                 <h3 className="text-lg font-bold text-white mb-4">Order Status</h3>
                 <div className="space-y-4">
                   <ProgressBar label="Pending" value={stats.pendingOrders} total={stats.totalOrders || 1} color="blue" />
@@ -553,7 +553,7 @@ export function KitchenDisplay({ onLogout, restaurantId, restaurantName }: { onL
               </div>
 
               {/* Popular Items */}
-              <div className="bg-slate-800 rounded-2xl p-6">
+              <div className="bg-slate-800 border border-slate-700 rounded-lg p-6">
                 <h3 className="text-lg font-bold text-white mb-4">Popular Items Today</h3>
                 <div className="space-y-3">
                   {stats.itemCounts.length > 0 ? (
@@ -588,10 +588,10 @@ export function KitchenDisplay({ onLogout, restaurantId, restaurantName }: { onL
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                 {/* Pending Column */}
                 <div className="space-y-3">
-                  <div className="flex items-center gap-2 mb-3">
+                  <div className="flex items-center gap-2 mb-3 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2">
                     <div className="w-2.5 h-2.5 bg-blue-500 rounded-full animate-pulse"></div>
-                    <h2 className="text-sm font-bold text-blue-400 uppercase tracking-wider">New Orders</h2>
-                    <span className="bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded-full text-xs font-bold">{pendingOrders.length}</span>
+                    <h2 className="text-sm font-bold text-blue-300 uppercase tracking-wider">New Orders</h2>
+                    <span className="bg-blue-500/20 text-blue-300 px-1.5 py-0.5 rounded-full text-xs font-bold">{pendingOrders.length}</span>
                   </div>
                   {pendingOrders.map(order => (
                     <OrderCard 
@@ -607,10 +607,10 @@ export function KitchenDisplay({ onLogout, restaurantId, restaurantName }: { onL
 
                 {/* Preparing Column */}
                 <div className="space-y-3">
-                  <div className="flex items-center gap-2 mb-3">
+                  <div className="flex items-center gap-2 mb-3 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2">
                     <div className="w-2.5 h-2.5 bg-amber-500 rounded-full"></div>
-                    <h2 className="text-sm font-bold text-amber-400 uppercase tracking-wider">Cooking</h2>
-                    <span className="bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded-full text-xs font-bold">{preparingOrders.length}</span>
+                    <h2 className="text-sm font-bold text-amber-300 uppercase tracking-wider">Cooking</h2>
+                    <span className="bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded-full text-xs font-bold">{preparingOrders.length}</span>
                   </div>
                   {preparingOrders.map(order => (
                     <OrderCard 
@@ -626,10 +626,10 @@ export function KitchenDisplay({ onLogout, restaurantId, restaurantName }: { onL
 
                 {/* Ready Column */}
                 <div className="space-y-3">
-                  <div className="flex items-center gap-2 mb-3">
+                  <div className="flex items-center gap-2 mb-3 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2">
                     <div className="w-2.5 h-2.5 bg-green-500 rounded-full"></div>
-                    <h2 className="text-sm font-bold text-green-400 uppercase tracking-wider">Ready</h2>
-                    <span className="bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded-full text-xs font-bold">{readyOrders.length}</span>
+                    <h2 className="text-sm font-bold text-green-300 uppercase tracking-wider">Ready</h2>
+                    <span className="bg-green-500/20 text-green-300 px-1.5 py-0.5 rounded-full text-xs font-bold">{readyOrders.length}</span>
                   </div>
                   {readyOrders.map(order => (
                     <OrderCard 
@@ -670,21 +670,21 @@ function OrderCard({
   const config = STATUS_CONFIG[order.status];
 
   return (
-    <div className={`bg-slate-800 rounded-lg overflow-hidden border-2 ${config.borderColor} shadow-lg hover:shadow-xl transition-all hover:scale-[1.01]`}>
+    <div className={`bg-slate-800 rounded-lg overflow-hidden border ${config.borderColor} transition-all hover:-translate-y-0.5`}>
       {/* Header */}
-      <div className={`${config.color} ${config.textColor} px-3 py-2 flex items-center justify-between`}>
+      <div className="px-3 py-2 flex items-center justify-between border-b border-slate-700 bg-slate-900/70">
         <div className="flex items-center gap-2">
           <span className="text-base font-bold">{order.orderNumber}</span>
-          <span className="text-sm opacity-90">T{order.tableNumber}</span>
+          <span className="text-sm text-slate-300">T{order.tableNumber}</span>
         </div>
         <div className="flex items-center gap-1.5">
-          {config.pulse && <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>}
-          <span className="font-bold text-xs">{config.label}</span>
+          {config.pulse && <div className="w-2 h-2 bg-amber-400 rounded-full animate-pulse"></div>}
+          <span className={`font-bold text-xs px-2 py-0.5 rounded-full ${config.color} ${config.textColor}`}>{config.label}</span>
         </div>
       </div>
 
       {/* Time & Urgency */}
-      <div className="px-3 py-1.5 bg-slate-750 flex items-center justify-between border-b border-slate-700">
+      <div className="px-3 py-1.5 bg-slate-900/60 flex items-center justify-between border-b border-slate-700">
         <div className="flex items-center gap-1.5 text-slate-400 text-xs">
           <ClockIcon className="w-3 h-3" />
           <span className="font-mono">{formatTime(order.createdAt)}</span>
@@ -746,7 +746,7 @@ function OrderCard({
         {(order.status === 'pending' || order.status === 'verified') && (
           <button
             onClick={() => onStatusChange(order.id, 'preparing')}
-            className="w-full bg-amber-600 hover:bg-amber-500 text-white py-2 rounded-lg font-bold text-sm uppercase tracking-wider transition-all hover:scale-[1.02] active:scale-[0.98]"
+            className="w-full bg-amber-500 hover:bg-amber-400 text-slate-900 py-2 rounded-lg font-bold text-sm uppercase tracking-wider transition-colors"
           >
             Start Cooking
           </button>
@@ -754,7 +754,7 @@ function OrderCard({
         {order.status === 'preparing' && (
           <button
             onClick={() => onStatusChange(order.id, 'ready')}
-            className="w-full bg-green-600 hover:bg-green-500 text-white py-2 rounded-lg font-bold text-sm uppercase tracking-wider transition-all hover:scale-[1.02] active:scale-[0.98]"
+            className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-900 py-2 rounded-lg font-bold text-sm uppercase tracking-wider transition-colors"
           >
             Mark Ready
           </button>
@@ -762,7 +762,7 @@ function OrderCard({
         {order.status === 'ready' && (
           <button
             onClick={() => onComplete(order.id)}
-            className="w-full bg-slate-600 hover:bg-slate-500 text-white py-2 rounded-lg font-bold text-sm uppercase tracking-wider transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-1.5"
+            className="w-full bg-slate-700 hover:bg-slate-600 text-white py-2 rounded-lg font-bold text-sm uppercase tracking-wider transition-colors flex items-center justify-center gap-1.5"
           >
             <CheckCircleIcon className="w-4 h-4" />
             Complete
@@ -771,13 +771,13 @@ function OrderCard({
         <div className="flex gap-2">
           <button
             onClick={() => onPrint(order)}
-            className="flex-1 bg-slate-700 hover:bg-slate-600 text-white py-2 rounded-lg font-semibold text-xs uppercase tracking-wider transition-all hover:scale-[1.02] active:scale-[0.98]"
+            className="flex-1 bg-slate-700 hover:bg-slate-600 text-white py-2 rounded-lg font-semibold text-xs uppercase tracking-wider transition-colors"
           >
             KOT
           </button>
           <button
             onClick={() => onPrintReceipt(order)}
-            className="flex-1 bg-slate-700 hover:bg-slate-600 text-white py-2 rounded-lg font-semibold text-xs uppercase tracking-wider transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-1"
+            className="flex-1 bg-slate-700 hover:bg-slate-600 text-white py-2 rounded-lg font-semibold text-xs uppercase tracking-wider transition-colors flex items-center justify-center gap-1"
           >
             <PrinterIcon className="w-3.5 h-3.5" />
             Receipt
@@ -798,7 +798,7 @@ function StatCard({ title, value, color }: { title: string; value: string; color
   };
   
   return (
-    <div className={`bg-slate-800 rounded-2xl p-6 border-2 ${colorClasses[color]}`}>
+    <div className={`bg-slate-800 rounded-lg p-6 border ${colorClasses[color]}`}>
       <div className="text-slate-400 text-sm uppercase tracking-wider mb-2">{title}</div>
       <div className="text-3xl font-bold">{value}</div>
     </div>

@@ -99,7 +99,9 @@ export interface ReceiptData {
   restaurantAddress: string;
   restaurantPhone: string;
   restaurantEmail?: string;
-  restaurantLogo?: string;
+  restaurantLogo?: string;   // base64 data URL or https URL
+  restaurantCity?: string;
+  restaurantCountry?: string;
   taxId?: string;
 
   // Order Info
@@ -157,6 +159,9 @@ export interface BuildReceiptOptions {
   restaurantAddress: string;
   restaurantPhone: string;
   restaurantEmail?: string;
+  restaurantLogo?: string;    // base64 data URL or https URL
+  restaurantCity?: string;
+  restaurantCountry?: string;
   taxRate: number; // e.g., 18 for 18%
   serverName: string;
   orderType?: 'dine-in' | 'takeout' | 'delivery';
@@ -212,6 +217,9 @@ export function orderToReceiptData(
     restaurantAddress: options.restaurantAddress,
     restaurantPhone: options.restaurantPhone,
     restaurantEmail: options.restaurantEmail,
+    restaurantLogo: options.restaurantLogo,
+    restaurantCity: options.restaurantCity,
+    restaurantCountry: options.restaurantCountry,
 
     orderNumber,
     receiptId,
@@ -262,6 +270,9 @@ export function buildReceiptHtml(receipt: ReceiptData): string {
     restaurantAddress,
     restaurantPhone,
     restaurantEmail,
+    restaurantLogo,
+    restaurantCity,
+    restaurantCountry,
     orderNumber,
     receiptId,
     orderType,
@@ -429,6 +440,7 @@ export function buildReceiptHtml(receipt: ReceiptData): string {
 
     /* ── Header ── */
     .header { text-align: center; padding-bottom: 16px; }
+    .logo   { max-height: 72px; max-width: 180px; object-fit: contain; margin: 0 auto 10px; display: block; }
     .brand  { font-size: 22px; font-weight: 900; letter-spacing: 3px; text-transform: uppercase; }
     .sub    { font-size: 11px; color: #555; margin-top: 4px; line-height: 1.5; }
     .badge  {
@@ -545,9 +557,10 @@ export function buildReceiptHtml(receipt: ReceiptData): string {
 
   <!-- ── HEADER ── -->
   <div class="header">
+    ${restaurantLogo ? `<img src="${restaurantLogo}" alt="${restaurantName} logo" class="logo">` : ''}
     <div class="brand">${restaurantName}</div>
     <div class="sub">
-      ${restaurantAddress}<br>
+      ${[restaurantAddress, restaurantCity, restaurantCountry].filter(Boolean).join(', ')}<br>
       ${restaurantPhone}${restaurantEmail ? `<br>${restaurantEmail}` : ''}
     </div>
     <div class="badge">Official Receipt</div>

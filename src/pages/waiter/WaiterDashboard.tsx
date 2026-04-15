@@ -6,7 +6,6 @@ import {
   UtensilsIcon,
   BellIcon,
   DollarSignIcon,
-  ClockIcon,
   LogOutIcon,
   QrCodeIcon,
   SmartphoneIcon,
@@ -43,10 +42,20 @@ function itemNeedsKitchen(item: OrderItem): boolean {
 }
 
 // ─── Props ───────────────────────────────────────────────────────────────────
+interface RestaurantInfo {
+  logo?: string;
+  address?: string;
+  city?: string;
+  country?: string;
+  phone?: string;
+  email?: string;
+}
+
 interface WaiterDashboardProps {
   waiter: Staff;
   orders: Order[];
   restaurantName?: string;
+  restaurantInfo?: RestaurantInfo;
   onUpdateOrderStatus: (
     orderId: string,
     status: 'verified' | 'preparing' | 'ready' | 'served' | 'cancelled',
@@ -526,12 +535,14 @@ export function WaiterDashboard({
   waiter,
   orders,
   restaurantName,
+  restaurantInfo,
   onUpdateOrderStatus,
   onCreateOrder,
   waiterCalls = [],
   onDismissWaiterCall,
   onLogout,
 }: WaiterDashboardProps) {
+  const [portalPage, setPortalPage] = useState<'orders' | 'analytics'>('orders');
   const [activeTab, setActiveTab] = useState<'incoming' | 'kitchen' | 'ready' | 'served'>('incoming');
   const [showQRScanner, setShowQRScanner] = useState(false);
   const [showOrderEntry, setShowOrderEntry] = useState(false);
@@ -662,9 +673,12 @@ export function WaiterDashboard({
       const html = buildReceiptHtml(
         orderToReceiptData(order, {
           restaurantName: restaurantName || 'Restaurant',
-          restaurantAddress: '',
-          restaurantPhone: '',
-          restaurantEmail: '',
+          restaurantAddress: restaurantInfo?.address || '',
+          restaurantPhone: restaurantInfo?.phone || '',
+          restaurantEmail: restaurantInfo?.email || '',
+          restaurantLogo: restaurantInfo?.logo,
+          restaurantCity: restaurantInfo?.city,
+          restaurantCountry: restaurantInfo?.country,
           taxRate: 18,
           serverName: waiter.name,
           orderType: order.deliveryAddress ? 'delivery' : 'dine-in',
@@ -704,6 +718,9 @@ export function WaiterDashboard({
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div className="min-w-0">
               <div className="flex items-center gap-2 mb-1">
+                {restaurantInfo?.logo && (
+                  <img src={restaurantInfo.logo} alt="logo" className="h-7 w-auto object-contain rounded" />
+                )}
                 <span className="px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-300 text-xs font-semibold uppercase tracking-widest">
                   {restaurantName || 'Restaurant'}
                 </span>
@@ -714,7 +731,9 @@ export function WaiterDashboard({
                   {waiter.name.split(' ')[0]}'s service desk
                 </h1>
                 <p className="text-sm text-slate-400">
-                  {incomingOrders.length} incoming · {readyOrders.length} ready to serve
+                  {portalPage === 'orders'
+                    ? `${incomingOrders.length} incoming · ${readyOrders.length} ready to serve`
+                    : `${servedOrders.length} served · ${formatPrice(todaysRevenue)} revenue`}
                 </p>
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-400">
@@ -746,6 +765,30 @@ export function WaiterDashboard({
           <div className="flex flex-wrap items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-emerald-400" />
             <span className="text-xs text-emerald-400">Live — receiving customer orders</span>
+          </div>
+
+          {/* Primary pages */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPortalPage('orders')}
+              className={`rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
+                portalPage === 'orders'
+                  ? 'bg-amber-500 text-slate-900'
+                  : 'bg-slate-700 text-slate-300 hover:bg-slate-600 hover:text-white'
+              }`}
+            >
+              Orders
+            </button>
+            <button
+              onClick={() => setPortalPage('analytics')}
+              className={`rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
+                portalPage === 'analytics'
+                  ? 'bg-amber-500 text-slate-900'
+                  : 'bg-slate-700 text-slate-300 hover:bg-slate-600 hover:text-white'
+              }`}
+            >
+              Analytics
+            </button>
           </div>
 
           {/* Stats strip */}
@@ -806,95 +849,69 @@ export function WaiterDashboard({
 
       {/* ── Main Content ── */}
       <div className="mx-auto max-w-6xl px-4 py-5">
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
-          {/* ── Order Column ── */}
+        {portalPage === 'orders' ? (
           <div className="space-y-4">
-            {/* Tabs */}
+            {/* Order status tabs */}
             <div className="-mx-4 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
               <div className="flex min-w-max gap-2">
-              <TabButton
-                label="Incoming"
-                count={incomingOrders.length}
-                active={activeTab === 'incoming'}
-                dot={incomingOrders.length > 0}
-                onClick={() => setActiveTab('incoming')}
-              />
-              <TabButton
-                label="In Kitchen"
-                count={kitchenOrders.length}
-                active={activeTab === 'kitchen'}
-                onClick={() => setActiveTab('kitchen')}
-              />
-              <TabButton
-                label="Ready"
-                count={readyOrders.length}
-                active={activeTab === 'ready'}
-                dot={readyOrders.length > 0}
-                onClick={() => setActiveTab('ready')}
-              />
-              <TabButton
-                label="Served"
-                count={servedOrders.length}
-                active={activeTab === 'served'}
-                onClick={() => setActiveTab('served')}
-              />
+                <TabButton
+                  label="Incoming"
+                  count={incomingOrders.length}
+                  active={activeTab === 'incoming'}
+                  dot={incomingOrders.length > 0}
+                  onClick={() => setActiveTab('incoming')}
+                />
+                <TabButton
+                  label="In Kitchen"
+                  count={kitchenOrders.length}
+                  active={activeTab === 'kitchen'}
+                  onClick={() => setActiveTab('kitchen')}
+                />
+                <TabButton
+                  label="Ready"
+                  count={readyOrders.length}
+                  active={activeTab === 'ready'}
+                  dot={readyOrders.length > 0}
+                  onClick={() => setActiveTab('ready')}
+                />
+                <TabButton
+                  label="Served"
+                  count={servedOrders.length}
+                  active={activeTab === 'served'}
+                  onClick={() => setActiveTab('served')}
+                />
               </div>
             </div>
 
             <AnimatePresence mode="wait">
-              {/* ── INCOMING tab ── */}
               {activeTab === 'incoming' && (
-                <motion.div
-                  key="incoming"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  className="space-y-3"
-                >
+                <motion.div key="incoming" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-3">
                   <PortalSectionHeader
                     title="Incoming orders"
                     description="Confirm and route new customer orders before they enter the prep flow."
                     count={incomingOrders.length}
                     tone="border-amber-500/25 bg-amber-500/10 text-amber-200"
                   />
-                  {/* Instruction banner */}
                   <div className="rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 flex items-start gap-3">
                     <SmartphoneIcon className="w-4 h-4 text-blue-400 flex-shrink-0 mt-0.5" />
                     <p className="text-sm text-blue-200">
                       New orders from the customer QR menu appear here. Expand each order, verify with the customer, then approve — food items are automatically sent to the kitchen as a KOT.
                     </p>
                   </div>
-
                   {incomingOrders.length === 0 ? (
-                    <EmptyTab
-                      icon={<ClipboardListIcon className="w-7 h-7" />}
-                      title="No incoming orders"
-                      desc="Orders placed from the customer QR menu will appear here in real time."
-                    />
+                    <EmptyTab icon={<ClipboardListIcon className="w-7 h-7" />} title="No incoming orders" desc="Orders placed from the customer QR menu will appear here in real time." />
                   ) : (
                     <AnimatePresence>
                       {incomingOrders.map((order) => (
-                        <IncomingOrderCard
-                          key={order.id}
-                          order={order}
-                          onApprove={handleApprove}
-                          onReject={handleReject}
-                        />
+                        <IncomingOrderCard key={order.id} order={order} onApprove={handleApprove} onReject={handleReject} />
                       ))}
                     </AnimatePresence>
                   )}
                 </motion.div>
               )}
 
-              {/* ── KITCHEN tab ── */}
               {activeTab === 'kitchen' && (
-                <motion.div
-                  key="kitchen"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  className="space-y-3"
-                >
+                <motion.div key="kitchen" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-3">
                   <PortalSectionHeader
                     title="Kitchen follow-up"
                     description="Track verified food orders and promote them to ready as soon as the kitchen clears them."
@@ -907,37 +924,20 @@ export function WaiterDashboard({
                       These orders have been verified and sent to the kitchen. Click "Mark Ready" once the kitchen signals completion.
                     </p>
                   </div>
-
                   {kitchenOrders.length === 0 ? (
-                    <EmptyTab
-                      icon={<UtensilsIcon className="w-7 h-7" />}
-                      title="Nothing in kitchen"
-                      desc="Food orders sent to the kitchen will appear here."
-                    />
+                    <EmptyTab icon={<UtensilsIcon className="w-7 h-7" />} title="Nothing in kitchen" desc="Food orders sent to the kitchen will appear here." />
                   ) : (
                     <AnimatePresence>
                       {kitchenOrders.map((order) => (
-                        <ActiveOrderRow
-                          key={order.id}
-                          order={order}
-                          onMarkReady={handleMarkReady}
-                          onPrintReceipt={handlePrintReceipt}
-                        />
+                        <ActiveOrderRow key={order.id} order={order} onMarkReady={handleMarkReady} onPrintReceipt={handlePrintReceipt} />
                       ))}
                     </AnimatePresence>
                   )}
                 </motion.div>
               )}
 
-              {/* ── READY tab ── */}
               {activeTab === 'ready' && (
-                <motion.div
-                  key="ready"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  className="space-y-3"
-                >
+                <motion.div key="ready" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-3">
                   <PortalSectionHeader
                     title="Ready to serve"
                     description="Prioritize these orders for delivery and mark them served as soon as they reach the guest."
@@ -950,37 +950,20 @@ export function WaiterDashboard({
                       These orders are ready to be served. Click "Mark Served" once delivered to the table.
                     </p>
                   </div>
-
                   {readyOrders.length === 0 ? (
-                    <EmptyTab
-                      icon={<CheckCircleIcon className="w-7 h-7" />}
-                      title="Nothing ready yet"
-                      desc="Orders ready to be served will appear here."
-                    />
+                    <EmptyTab icon={<CheckCircleIcon className="w-7 h-7" />} title="Nothing ready yet" desc="Orders ready to be served will appear here." />
                   ) : (
                     <AnimatePresence>
                       {readyOrders.map((order) => (
-                        <ActiveOrderRow
-                          key={order.id}
-                          order={order}
-                          onMarkServed={handleMarkServed}
-                          onPrintReceipt={handlePrintReceipt}
-                        />
+                        <ActiveOrderRow key={order.id} order={order} onMarkServed={handleMarkServed} onPrintReceipt={handlePrintReceipt} />
                       ))}
                     </AnimatePresence>
                   )}
                 </motion.div>
               )}
 
-              {/* ── SERVED tab ── */}
               {activeTab === 'served' && (
-                <motion.div
-                  key="served"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  className="space-y-3"
-                >
+                <motion.div key="served" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-3">
                   <PortalSectionHeader
                     title="Completed service"
                     description="Review delivered orders, reprint receipts, or share them with guests when needed."
@@ -988,20 +971,11 @@ export function WaiterDashboard({
                     tone="border-slate-600 bg-slate-800/70 text-slate-200"
                   />
                   {servedOrders.length === 0 ? (
-                    <EmptyTab
-                      icon={<StarIcon className="w-7 h-7" />}
-                      title="No served orders yet"
-                      desc="Completed orders from your shift appear here."
-                    />
+                    <EmptyTab icon={<StarIcon className="w-7 h-7" />} title="No served orders yet" desc="Completed orders from your shift appear here." />
                   ) : (
                     <AnimatePresence>
                       {servedOrders.map((order) => (
-                        <ActiveOrderRow
-                          key={order.id}
-                          order={order}
-                          onPrintReceipt={handlePrintReceipt}
-                          onShare={handleShare}
-                        />
+                        <ActiveOrderRow key={order.id} order={order} onPrintReceipt={handlePrintReceipt} onShare={handleShare} />
                       ))}
                     </AnimatePresence>
                   )}
@@ -1009,17 +983,12 @@ export function WaiterDashboard({
               )}
             </AnimatePresence>
           </div>
-
-          {/* ── Sidebar ── */}
-          <aside className="grid gap-4 sm:grid-cols-2 xl:sticky xl:top-28 xl:grid-cols-1 xl:self-start">
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2">
             <div className="rounded-lg border border-slate-700 bg-slate-800 p-4">
               <div className="flex items-center gap-3">
                 <div className="flex h-14 w-14 items-center justify-center rounded-lg border border-amber-500/25 bg-amber-500/10 text-lg font-bold text-amber-300">
-                  {waiter.name
-                    .split(' ')
-                    .slice(0, 2)
-                    .map((part) => part[0])
-                    .join('')}
+                  {waiter.name.split(' ').slice(0, 2).map((part) => part[0]).join('')}
                 </div>
                 <div className="min-w-0">
                   <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Active waiter</p>
@@ -1028,47 +997,33 @@ export function WaiterDashboard({
                 </div>
               </div>
             </div>
-            {/* Shift summary */}
+
             <div className="rounded-lg border border-slate-700 bg-slate-800 p-4">
               <p className="text-xs uppercase tracking-widest text-slate-500 mb-3">Shift Summary</p>
               <div className="space-y-3">
-                <div className="flex justify-between text-sm">
-                  <span className="text-slate-400">Orders Served</span>
-                  <span className="font-semibold text-white">{servedOrders.length}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="flex items-center gap-2 text-slate-400"><ClockIcon className="h-3.5 w-3.5" />Avg Service Time</span>
-                  <span className="font-semibold text-white">{waiter.performance?.avgServiceTime ?? 15} min</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-slate-400">Rating</span>
-                  <span className="font-semibold text-white">{avgRating != null ? `${avgRating} ★` : '—'}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-slate-400">Revenue</span>
-                  <span className="font-semibold text-emerald-300">{formatPrice(todaysRevenue)}</span>
-                </div>
+                <div className="flex justify-between text-sm"><span className="text-slate-400">Orders Served</span><span className="font-semibold text-white">{servedOrders.length}</span></div>
+                <div className="flex justify-between text-sm"><span className="text-slate-400">Incoming Orders</span><span className="font-semibold text-white">{incomingOrders.length}</span></div>
+                <div className="flex justify-between text-sm"><span className="text-slate-400">Ready to Serve</span><span className="font-semibold text-white">{readyOrders.length}</span></div>
+                <div className="flex justify-between text-sm"><span className="text-slate-400">Avg Service Time</span><span className="font-semibold text-white">{waiter.performance?.avgServiceTime ?? 15} min</span></div>
+                <div className="flex justify-between text-sm"><span className="text-slate-400">Revenue</span><span className="font-semibold text-emerald-300">{formatPrice(todaysRevenue)}</span></div>
               </div>
             </div>
 
-            {/* KPIs */}
             {kpis.length > 0 && (
-              <div className="rounded-lg border border-slate-700 bg-slate-800 p-4">
+              <div className="rounded-lg border border-slate-700 bg-slate-800 p-4 md:col-span-2">
                 <div className="mb-3 flex items-center justify-between gap-2">
                   <p className="text-xs uppercase tracking-widest text-slate-500">Daily Targets</p>
-                  <span className="rounded-full border border-slate-700 bg-slate-900 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
-                    Live progress
-                  </span>
+                  <span className="rounded-full border border-slate-700 bg-slate-900 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">Live progress</span>
                 </div>
-                <div className="space-y-3">
+                <div className="grid gap-4 md:grid-cols-2">
                   {kpis.map((kpi) => {
                     const current = kpi.progress?.currentValue ?? 0;
                     const target = kpi.target_value || 1;
                     const pct = Math.min(100, Math.round((current / target) * 100));
                     return (
-                      <div key={kpi.id}>
+                      <div key={kpi.id} className="rounded-lg border border-slate-700 bg-slate-900/60 p-3">
                         <div className="flex justify-between text-sm mb-1">
-                          <span className="text-slate-400 truncate max-w-[140px]">{kpi.name}</span>
+                          <span className="text-slate-400 truncate max-w-[180px]">{kpi.name}</span>
                           <span className="font-semibold text-white ml-2">{current}/{target}</span>
                         </div>
                         <div className="h-1.5 rounded-full bg-slate-700 overflow-hidden">
@@ -1081,16 +1036,13 @@ export function WaiterDashboard({
               </div>
             )}
 
-            {/* Connection card */}
-            <div className="rounded-lg border border-slate-700 bg-slate-800 p-4">
+            <div className="rounded-lg border border-slate-700 bg-slate-800 p-4 md:col-span-2">
               <p className="text-xs uppercase tracking-widest text-slate-500 mb-3">Customer Menu</p>
               <div className="flex items-center gap-2 mb-2">
                 <span className="w-2 h-2 rounded-full bg-emerald-400" />
                 <span className="text-sm font-medium text-emerald-300">Live sync active</span>
               </div>
-              <p className="text-xs text-slate-500">
-                Orders from QR code scans appear in "Incoming" instantly.
-              </p>
+              <p className="text-xs text-slate-500">Orders from QR code scans appear in Orders page instantly.</p>
               {incomingOrders.length > 0 && (
                 <div className="mt-3 rounded-lg bg-amber-500/10 border border-amber-500/20 px-3 py-2 flex items-center gap-2">
                   <BellIcon className="w-4 h-4 text-amber-400" />
@@ -1098,8 +1050,8 @@ export function WaiterDashboard({
                 </div>
               )}
             </div>
-          </aside>
-        </div>
+          </div>
+        )}
       </div>
 
       {/* ── Modals ── */}
@@ -1133,9 +1085,12 @@ export function WaiterDashboard({
           onClose={() => { setShowShareModal(false); setSelectedOrderForShare(null); }}
           receipt={orderToReceiptData(selectedOrderForShare, {
             restaurantName: restaurantName || 'Restaurant',
-            restaurantAddress: '',
-            restaurantPhone: '',
-            restaurantEmail: '',
+            restaurantAddress: restaurantInfo?.address || '',
+            restaurantPhone: restaurantInfo?.phone || '',
+            restaurantEmail: restaurantInfo?.email || '',
+            restaurantLogo: restaurantInfo?.logo,
+            restaurantCity: restaurantInfo?.city,
+            restaurantCountry: restaurantInfo?.country,
             taxRate: 18,
             serverName: waiter.name,
             orderType: selectedOrderForShare.deliveryAddress ? 'delivery' : 'dine-in',

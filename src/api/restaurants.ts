@@ -9,7 +9,19 @@ export interface Restaurant {
   created_at?: string;
   city?: string;
   country?: string;
+  logo_url?: string;
   managerCount?: number;
+  settings?: Record<string, unknown>;
+}
+
+/** Receipt-header settings stored in restaurants.settings.receipt */
+export interface RestaurantReceiptSettings {
+  logo?: string;    // base64 data URL
+  address?: string;
+  city?: string;
+  country?: string;
+  phone?: string;
+  email?: string;
 }
 
 export async function fetchRestaurants(): Promise<Restaurant[]> {
@@ -98,6 +110,60 @@ export async function deleteRestaurant(id: string): Promise<void> {
   if (error) {
     console.error('Error deleting restaurant:', error);
     throw error;
+  }
+}
+
+/**
+ * Load receipt-customisation settings from the restaurant's settings JSONB column.
+ * Returns empty object if the restaurant has no settings yet.
+ */
+export async function fetchReceiptSettings(restaurantId: string): Promise<RestaurantReceiptSettings> {
+  const { data } = await supabaseAdmin
+    .from('restaurants')
+    .select('settings')
+    .eq('id', restaurantId)
+    .single();
+
+  if (!data?.settings) return {};
+  return ((data.settings as Record<string, unknown>).receipt as RestaurantReceiptSettings) || {};
+}
+
+/**
+ * Persist receipt-customisation settings into restaurants.settings.receipt.
+ * Also updates the main name / phone / email / address columns when provided.
+ */
+export async function saveReceiptSettings(
+  restaurantId: string,
+  receiptSettings: RestaurantReceiptSettings,
+  restaurantName?: string,
+): Promise<void> {
+  // Fetch current settings so we don't overwrite unrelated keys
+  const { data: current } = await supabaseAdmin
+    .from('restaurants')
+    .select('settings')
+    .eq('id', restaurantId)
+    .single();
+
+  const existingSettings = (current?.settings as Record<string, unknown>) || {};
+  const merged = { ...existingSettings, receipt: receiptSettings };
+
+  // Build the update payload — always update the settings blob
+  const payload: Record<string, unknown> = { settings: merged };
+  if (restaurantName) payload.name = restaurantName;
+
+  // Try a full update (including main columns that may or may not exist)
+  let { error } = await supabaseAdmin
+    .from('restaurants')
+    .update(payload)
+    .eq('id', restaurantId);
+
+  if (error) {
+    // Fallback: settings-only update
+    const { error: fallbackError } = await supabaseAdmin
+      .from('restaurants')
+      .update({ settings: merged })
+      .eq('id', restaurantId);
+    if (fallbackError) throw fallbackError;
   }
 }
 

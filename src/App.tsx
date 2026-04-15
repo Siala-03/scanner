@@ -31,16 +31,19 @@ import { Card } from './components/ui/Card';
 import { Button } from './components/ui/Button';
 import { Staff } from './types';
 import { SupplierUser, getSupplierMe, clearSupplierToken } from './api/supplier';
-import { fetchRestaurantPublic } from './api/restaurants';
+import { fetchRestaurantPublic, fetchReceiptSettings } from './api/restaurants';
+import type { RestaurantReceiptSettings } from './api/restaurants';
+import { RestaurantSettings } from './pages/manager/RestaurantSettings';
 
 type UserRole = 'customer' | 'waiter' | 'supervisor' | 'manager' | 'kitchen' | 'superadmin' | 'supplier' | null;
-type ManagerPage = 'dashboard' | 'menu' | 'staff' | 'analytics' | 'performance' | 'qrcodes' | 'inventory' | 'history' | 'expenses' | 'credit' | 'loyalty';
+type ManagerPage = 'dashboard' | 'menu' | 'staff' | 'analytics' | 'performance' | 'qrcodes' | 'inventory' | 'history' | 'expenses' | 'credit' | 'loyalty' | 'settings';
 type SupervisorPage = 'dashboard' | 'revenue' | 'staff' | 'qrcodes' | 'inventory' | 'menu' | 'history' | 'expenses';
 export function App() {
   const [selectedRole, setSelectedRole] = useState<UserRole>(null);
   const [authUser, setAuthUser] = useState<Staff | null>(null);
   const [supplierUser, setSupplierUser] = useState<SupplierUser | null>(null);
   const [restaurantName, setRestaurantName] = useState<string>('');
+  const [receiptSettings, setReceiptSettings] = useState<RestaurantReceiptSettings>({});
   const [currentRestaurantId, setCurrentRestaurantId] = useState<string | null>(null);
   const [tableNumber, setTableNumber] = useState<number | null>(null);
   const [managerPage, setManagerPage] = useState<ManagerPage>('dashboard');
@@ -398,6 +401,10 @@ export function App() {
         if (active) setRestaurantName('');
       });
 
+    fetchReceiptSettings(currentRestaurantId)
+      .then((s) => { if (active) setReceiptSettings(s); })
+      .catch(() => {/* non-fatal */});
+
     return () => {
       active = false;
     };
@@ -474,6 +481,7 @@ export function App() {
         waiter={authUser}
         orders={orders}
         restaurantName={restaurantName}
+        restaurantInfo={receiptSettings}
         onUpdateOrderStatus={handleUpdateOrderStatus}
         onCreateOrder={handlePlaceOrder}
         waiterCalls={waiterCalls}
@@ -498,6 +506,9 @@ export function App() {
               >
                 <ArrowLeftIcon className="w-5 h-5" />
               </button>
+              {receiptSettings.logo && (
+                <img src={receiptSettings.logo} alt="logo" className="h-8 w-auto object-contain rounded" />
+              )}
               <span className="text-white font-medium">Supervisor Dashboard</span>
             </div>
             <div className="text-sm text-slate-400">{restaurantName || 'Restaurant'}</div>
@@ -596,6 +607,13 @@ export function App() {
               >
                 <ArrowLeftIcon className="w-5 h-5" />
               </button>
+              {receiptSettings.logo && (
+                <img
+                  src={receiptSettings.logo}
+                  alt="Restaurant logo"
+                  className="h-9 w-auto object-contain rounded"
+                />
+              )}
               <div>
                 <div className="text-xs sm:text-sm text-slate-300 uppercase tracking-wider">Manager Portal</div>
                 <div className="text-base sm:text-lg font-semibold">Welcome, {authUser.name}</div>
@@ -629,6 +647,7 @@ export function App() {
                   { id: 'expenses', label: 'Expenses' },
                   { id: 'credit', label: 'Credit' },
                   { id: 'loyalty', label: 'Loyalty & SMS' },
+                  { id: 'settings', label: 'Settings' },
                 ] as Array<{ id: ManagerPage; label: string }>
               ).map((item) => (
                 <button
@@ -677,6 +696,14 @@ export function App() {
             {managerPage === 'credit' && <CreditManagement />}
             {managerPage === 'loyalty' && <LoyaltyManagement />}
             {managerPage === 'history' && <OrderHistoryPage onBack={() => setManagerPage('dashboard')} existingOrders={orders} />}
+            {managerPage === 'settings' && currentRestaurantId && (
+              <RestaurantSettings
+                restaurantId={currentRestaurantId}
+                restaurantName={restaurantName}
+                onNameChange={(newName) => setRestaurantName(newName)}
+                onSettingsSaved={(s) => setReceiptSettings(s)}
+              />
+            )}
           </main>
         </div>
       </div>
@@ -698,6 +725,9 @@ export function App() {
               >
                 <ArrowLeftIcon className="w-5 h-5" />
               </button>
+              {receiptSettings.logo && (
+                <img src={receiptSettings.logo} alt="logo" className="h-8 w-auto object-contain rounded" />
+              )}
               <span className="text-white font-medium">Kitchen Display</span>
             </div>
             <div className="text-sm text-slate-400">{restaurantName || 'Restaurant'}</div>
