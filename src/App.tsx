@@ -159,9 +159,12 @@ export function App() {
 
   const managerTotalOrders = orders.length;
   const managerActiveOrders = orders.filter((order) => ['pending', 'verified', 'preparing', 'ready'].includes(order.status)).length;
-  const managerServedOrders = orders.filter((order) => order.status === 'served').length;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
+  // Served orders for TODAY only (matches the "Completed today" label on the dashboard card)
+  const managerServedOrders = orders.filter(
+    (order) => order.status === 'served' && new Date(order.createdAt) >= today
+  ).length;
   const managerTodaysRevenue = orders
     .filter((order) => new Date(order.createdAt) >= today && order.status === 'served')
     .reduce((sum, order) => sum + (typeof order.total === 'number' ? order.total : 0), 0);
@@ -186,7 +189,10 @@ export function App() {
     return {
       hour: getHourKey(hourDate),
       orders: ordersInHour.length,
-      revenue: ordersInHour.reduce((sum, order) => sum + (typeof order.total === 'number' ? order.total : 0), 0) / 100
+      // Only served orders count as realised revenue; totals are in RWF (no /100 conversion needed)
+      revenue: ordersInHour
+        .filter((order) => order.status === 'served')
+        .reduce((sum, order) => sum + (typeof order.total === 'number' ? order.total : 0), 0),
     };
   });
 

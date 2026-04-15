@@ -69,9 +69,11 @@ export function AnalyticsPage() {
       const key = d.toISOString().slice(0, 10);
       if (!map.has(key)) return;
       const row = map.get(key)!;
-      const total = order.total ?? order.total_price ?? 0;
-      row.revenue += total;
       row.orders += 1;
+      // Only realised (served) orders count as revenue
+      if (order.status === 'served') {
+        row.revenue += order.total ?? order.total_price ?? 0;
+      }
     });
     return Array.from(map.values()).map((r) => ({ ...r, avgOrderValue: r.orders ? r.revenue / r.orders : 0 }));
   }, [last7Days, orders]);
@@ -88,16 +90,17 @@ export function AnalyticsPage() {
     orders.forEach((order) => {
       const d = new Date(order.createdAt ?? order.created_at);
       if (Number.isNaN(d.getTime())) return;
-      const total = order.total ?? order.total_price ?? 0;
+      // Prefer customerId for deduplication (unique customers); fall back to customerName
+      const customerKey = order.customerId ?? order.customer_id ?? order.customerName ?? order.customer_name;
       if (d.getMonth() === month && d.getFullYear() === year) {
-        current.revenue += total;
         current.orders += 1;
-        if (order.customerName) currSet.add(order.customerName);
+        if (order.status === 'served') current.revenue += order.total ?? order.total_price ?? 0;
+        if (customerKey) currSet.add(String(customerKey));
       }
       if (d.getMonth() === prevDate.getMonth() && d.getFullYear() === prevDate.getFullYear()) {
-        previous.revenue += total;
         previous.orders += 1;
-        if (order.customerName) prevSet.add(order.customerName);
+        if (order.status === 'served') previous.revenue += order.total ?? order.total_price ?? 0;
+        if (customerKey) prevSet.add(String(customerKey));
       }
     });
     current.avgOrderValue = current.orders ? current.revenue / current.orders : 0;
@@ -116,7 +119,7 @@ export function AnalyticsPage() {
       if (d.toISOString().slice(0, 10) !== todayKey) return;
       const row = hours[d.getHours()];
       row.orders += 1;
-      row.revenue += order.total ?? order.total_price ?? 0;
+      if (order.status === 'served') row.revenue += order.total ?? order.total_price ?? 0;
     });
     return hours.slice(8, 23);
   }, [orders, now]);
@@ -185,29 +188,41 @@ export function AnalyticsPage() {
     name: c.category.replace('-', ' ').replace(/\b\w/g, (l) => l.toUpperCase()),
     color: COLORS[i % COLORS.length]
   }));
-  const revenueChange = (
-  (monthlyComparison.currentMonth.revenue -
-  monthlyComparison.previousMonth.revenue) /
-  monthlyComparison.previousMonth.revenue *
-  100).
-  toFixed(1);
-  const ordersChange = (
-  (monthlyComparison.currentMonth.orders -
-  monthlyComparison.previousMonth.orders) /
-  monthlyComparison.previousMonth.orders *
-  100).
-  toFixed(1);
+  const revenueChange = monthlyComparison.previousMonth.revenue > 0
+    ? ((monthlyComparison.currentMonth.revenue - monthlyComparison.previousMonth.revenue) / monthlyComparison.previousMonth.revenue * 100).toFixed(1)
+    : '0';
+  const ordersChange = monthlyComparison.previousMonth.orders > 0
+    ? ((monthlyComparison.currentMonth.orders - monthlyComparison.previousMonth.orders) / monthlyComparison.previousMonth.orders * 100).toFixed(1)
+    : '0';
+  const yearlyTotals = useMemo(() => {
+    const currentYear = new Date().getFullYear();
+    return orders.reduce(
+      (acc, order) => {
+        const d = new Date(order.createdAt ?? order.created_at);
+        if (Number.isNaN(d.getTime()) || d.getFullYear() !== currentYear) return acc;
+        acc.orders += 1;
+        if (order.status === 'served') acc.revenue += order.total ?? order.total_price ?? 0;
+        return acc;
+      },
+      { revenue: 0, orders: 0 }
+    );
+  }, [orders]);
+
   const currentRevenue =
     timeRange === 'today'
       ? weeklyRevenue[weeklyRevenue.length - 1]?.revenue ?? 0
       : timeRange === 'week'
       ? weeklyRevenue.reduce((s, d) => s + d.revenue, 0)
+      : timeRange === 'year'
+      ? yearlyTotals.revenue
       : monthlyComparison.currentMonth.revenue;
   const currentOrders =
     timeRange === 'today'
       ? weeklyRevenue[weeklyRevenue.length - 1]?.orders ?? 0
       : timeRange === 'week'
       ? weeklyRevenue.reduce((s, d) => s + d.orders, 0)
+      : timeRange === 'year'
+      ? yearlyTotals.orders
       : monthlyComparison.currentMonth.orders;
 
   const totalWeeklyRevenue = weeklyRevenue.reduce((sum, d) => sum + d.revenue, 0);
@@ -273,8 +288,9 @@ export function AnalyticsPage() {
   if (parseFloat(revenueChange) <= -10) alerts.push('Revenue is down over 10% vs last month.');
   if (parseFloat(ordersChange) <= -10) alerts.push('Orders are down over 10% vs last month.');
   if (salesFunnel.cancelled > 5) alerts.push(`${salesFunnel.cancelled} cancelled orders this period. Review process.`);
-  if (avgDailyGrowth > 100) alerts.push('High growth: consider expanding staffing and inventory.');
-  if (avgDailyGrowth < -50) alerts.push('Declining growth: evaluate promotions and offer incentives.');
+  const avgDailyGrowthPct = avgDailyRevenue > 0 ? (avgDailyGrowth / avgDailyRevenue) * 100 : 0;
+  if (avgDailyGrowthPct > 20) alerts.push('High growth: consider expanding staffing and inventory.');
+  if (avgDailyGrowthPct < -15) alerts.push('Declining growth: evaluate promotions and offer incentives.');
 
   const decomposedTrend = {
     shortMA: (weeklyRevenue.slice(-7).reduce((sum, d) => sum + d.revenue, 0) / Math.min(7, weeklyRevenue.length)) || 0,
@@ -288,17 +304,17 @@ export function AnalyticsPage() {
 
   const predictiveRecommendations = {
     staffing:
-      avgDailyGrowth > 200
+      avgDailyGrowthPct > 20
         ? 'Increase staff by 10% to handle surge'
-        : avgDailyGrowth < -100
+        : avgDailyGrowthPct < -15
         ? 'Optimize labor schedule for lower demand'
         : 'Maintain current staffing levels',
     inventory:
-      avgDailyGrowth > 200
+      avgDailyGrowthPct > 20
         ? 'Order additional stock for high-demand items'
         : 'Continue regular inventory refresh cycle',
     marketing:
-      avgDailyGrowth < 0
+      avgDailyGrowthPct < 0
         ? 'Run promotions to boost off-peak revenue'
         : 'Reinforce high-performing menu items in campaigns'
   };

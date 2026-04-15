@@ -13,7 +13,7 @@ interface ManagerDashboardProps {
   servedOrders: number;
   todaysRevenue: number;
   tableCount: number;
-  ordersByHour: { hour: string; orders: number }[];
+  ordersByHour: { hour: string; orders: number; revenue: number }[];
   statusBreakdown: { status: string; count: number }[];
 }
 
