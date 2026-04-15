@@ -5,6 +5,49 @@ import { toCamelCase } from '../utils/camelCase.js';
 
 const router = Router();
 
+async function hasColumn(tableName: string, columnName: string): Promise<boolean> {
+  const result = await pool.query(
+    `SELECT EXISTS (
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = $1 AND column_name = $2
+    ) AS exists`,
+    [tableName, columnName]
+  );
+  return Boolean(result.rows[0]?.exists);
+}
+
+async function ensureCustomersTable(): Promise<void> {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS customers (
+      id text PRIMARY KEY,
+      phone text,
+      email text,
+      name text,
+      total_points integer NOT NULL DEFAULT 0,
+      total_spent numeric(10,2) NOT NULL DEFAULT 0,
+      join_date timestamptz NOT NULL DEFAULT now(),
+      last_visit timestamptz,
+      visit_count integer NOT NULL DEFAULT 0,
+      restaurant_id text,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now()
+    )
+  `);
+
+  await pool.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_customers_phone_restaurant
+    ON customers (phone, COALESCE(restaurant_id, 'default_restaurant'))
+    WHERE phone IS NOT NULL
+  `);
+
+  await pool.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_customers_email_restaurant
+    ON customers (email, COALESCE(restaurant_id, 'default_restaurant'))
+    WHERE email IS NOT NULL
+  `);
+}
+
 // GET /api/loyalty/customers - Get all customers (staff only)
 router.get('/customers', authenticate, async (req: AuthenticatedRequest, res: Response) => {
   try {
@@ -35,38 +78,63 @@ router.post('/customers', async (req, res) => {
     return res.status(400).json({ error: 'restaurantId is required' });
   }
 
-  try {
+  const run = async (): Promise<any> => {
+    const hasRestaurantId = await hasColumn('customers', 'restaurant_id');
+
     // Try to find existing customer
     let customer;
     if (phone) {
-      const result = await pool.query(
-        'SELECT * FROM customers WHERE phone = $1 AND restaurant_id = $2',
-        [phone, restaurantId]
-      );
+      const result = hasRestaurantId
+        ? await pool.query('SELECT * FROM customers WHERE phone = $1 AND restaurant_id = $2', [phone, restaurantId])
+        : await pool.query('SELECT * FROM customers WHERE phone = $1', [phone]);
       customer = toCamelCase(result.rows[0]);
     }
 
     if (!customer && email) {
-      const result = await pool.query(
-        'SELECT * FROM customers WHERE email = $1 AND restaurant_id = $2',
-        [email, restaurantId]
-      );
+      const result = hasRestaurantId
+        ? await pool.query('SELECT * FROM customers WHERE email = $1 AND restaurant_id = $2', [email, restaurantId])
+        : await pool.query('SELECT * FROM customers WHERE email = $1', [email]);
       customer = toCamelCase(result.rows[0]);
     }
 
     // Create new customer if not found
     if (!customer) {
       const customerId = `cust-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-      const result = await pool.query(`
-        INSERT INTO customers (id, phone, email, name, restaurant_id)
-        VALUES ($1, $2, $3, $4, $5)
-        RETURNING *
-      `, [customerId, phone, email, name, restaurantId]);
+      const result = hasRestaurantId
+        ? await pool.query(
+            `INSERT INTO customers (id, phone, email, name, restaurant_id)
+             VALUES ($1, $2, $3, $4, $5)
+             RETURNING *`,
+            [customerId, phone, email, name, restaurantId]
+          )
+        : await pool.query(
+            `INSERT INTO customers (id, phone, email, name)
+             VALUES ($1, $2, $3, $4)
+             RETURNING *`,
+            [customerId, phone, email, name]
+          );
       customer = toCamelCase(result.rows[0]);
     }
 
+    return customer;
+  };
+
+  try {
+    const customer = await run();
     res.json(customer);
-  } catch (error) {
+  } catch (error: any) {
+    // Older deployments may not have the customers table yet.
+    if (error?.code === '42P01') {
+      try {
+        await ensureCustomersTable();
+        const customer = await run();
+        return res.json(customer);
+      } catch (retryError) {
+        console.error('Error creating/finding customer after bootstrap:', retryError);
+        return res.status(500).json({ error: 'Failed to create/find customer' });
+      }
+    }
+
     console.error('Error creating/finding customer:', error);
     res.status(500).json({ error: 'Failed to create/find customer' });
   }
@@ -80,12 +148,22 @@ router.get('/customers/:id', async (req: Request, res: Response) => {
   if (!restaurantId) return res.status(400).json({ error: 'restaurantId is required' });
 
   try {
+    const customerHasRestaurantId = await hasColumn('customers', 'restaurant_id');
+    const transactionsHasRestaurantId = await hasColumn('loyalty_transactions', 'restaurant_id');
+    const rewardsHasRestaurantId = await hasColumn('rewards', 'restaurant_id');
+
     // Get customer
-    const customerResult = await pool.query(`
-      SELECT id, phone, email, name, total_points, total_spent, join_date, last_visit, visit_count
-      FROM customers
-      WHERE id = $1 AND restaurant_id = $2
-    `, [id, restaurantId]);
+    const customerResult = customerHasRestaurantId
+      ? await pool.query(`
+          SELECT id, phone, email, name, total_points, total_spent, join_date, last_visit, visit_count
+          FROM customers
+          WHERE id = $1 AND restaurant_id = $2
+        `, [id, restaurantId])
+      : await pool.query(`
+          SELECT id, phone, email, name, total_points, total_spent, join_date, last_visit, visit_count
+          FROM customers
+          WHERE id = $1
+        `, [id]);
 
     if (customerResult.rows.length === 0) {
       return res.status(404).json({ error: 'Customer not found' });
@@ -94,21 +172,36 @@ router.get('/customers/:id', async (req: Request, res: Response) => {
     const customer = customerResult.rows[0];
 
     // Get recent transactions
-    const transactionsResult = await pool.query(`
-      SELECT id, order_id, transaction_type, points, description, created_at
-      FROM loyalty_transactions
-      WHERE customer_id = $1 AND restaurant_id = $2
-      ORDER BY created_at DESC
-      LIMIT 20
-    `, [id, restaurantId]);
+    const transactionsResult = transactionsHasRestaurantId
+      ? await pool.query(`
+          SELECT id, order_id, transaction_type, points, description, created_at
+          FROM loyalty_transactions
+          WHERE customer_id = $1 AND restaurant_id = $2
+          ORDER BY created_at DESC
+          LIMIT 20
+        `, [id, restaurantId])
+      : await pool.query(`
+          SELECT id, order_id, transaction_type, points, description, created_at
+          FROM loyalty_transactions
+          WHERE customer_id = $1
+          ORDER BY created_at DESC
+          LIMIT 20
+        `, [id]);
 
     // Get available rewards
-    const rewardsResult = await pool.query(`
-      SELECT id, name, description, points_required, reward_type, discount_percentage, free_item_id
-      FROM rewards
-      WHERE is_active = true AND restaurant_id = $1 AND points_required <= $2
-      ORDER BY points_required ASC
-    `, [restaurantId, customer.total_points]);
+    const rewardsResult = rewardsHasRestaurantId
+      ? await pool.query(`
+          SELECT id, name, description, points_required, reward_type, discount_percentage, free_item_id
+          FROM rewards
+          WHERE is_active = true AND restaurant_id = $1 AND points_required <= $2
+          ORDER BY points_required ASC
+        `, [restaurantId, customer.total_points])
+      : await pool.query(`
+          SELECT id, name, description, points_required, reward_type, discount_percentage, free_item_id
+          FROM rewards
+          WHERE is_active = true AND points_required <= $1
+          ORDER BY points_required ASC
+        `, [customer.total_points]);
 
     res.json({
       customer: toCamelCase(customer),
