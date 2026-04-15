@@ -336,15 +336,23 @@ export function useOrders(): UseOrdersReturn {
         prev.map((order) => {
           if (order.id !== orderId) return order;
 
+          const now = new Date();
+
           const updates: Partial<Order> = {
             status,
-            updatedAt: new Date(),
+            updatedAt: now,
             assignedWaiterId: opts?.assignedWaiterId ?? order.assignedWaiterId
           };
 
-          if (status === 'verified' || status === 'preparing') updates.updatedAt = new Date();
-          if (status === 'ready') updates.updatedAt = new Date();
-          if (status === 'served') updates.updatedAt = new Date();
+          if (status === 'verified' || status === 'preparing') {
+            updates.verifiedAt = order.verifiedAt ?? now;
+          }
+          if (status === 'ready') {
+            updates.readyAt = now;
+          }
+          if (status === 'served') {
+            updates.servedAt = now;
+          }
 
           return { ...order, ...updates };
         })

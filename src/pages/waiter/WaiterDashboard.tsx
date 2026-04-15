@@ -90,6 +90,13 @@ function statusColor(status: string): string {
   }
 }
 
+function isSameDay(value: Date | string | undefined, today: Date): boolean {
+  if (!value) return false;
+  const dt = new Date(value);
+  if (Number.isNaN(dt.getTime())) return false;
+  return dt.toDateString() === today.toDateString();
+}
+
 function OverviewStatCard({
   icon,
   label,
@@ -621,13 +628,19 @@ export function WaiterDashboard({
     [orders]
   );
 
+  const todayServedOrders = useMemo(() => {
+    const today = new Date();
+    return orders.filter((o) =>
+      o.status === 'served' &&
+      (isSameDay(o.servedAt as any, today) || isSameDay(o.updatedAt as any, today) || isSameDay(o.createdAt as any, today))
+    );
+  }, [orders]);
+
   // Stats
   const todaysRevenue = useMemo(
     () =>
-      orders
-        .filter((o) => o.status === 'served' && new Date(o.createdAt).toDateString() === new Date().toDateString())
-        .reduce((s, o) => s + (o.total || 0), 0),
-    [orders]
+      todayServedOrders.reduce((sum, order) => sum + Number(order.total ?? 0), 0),
+    [todayServedOrders]
   );
 
   const waiterReviews = useMemo(
@@ -733,7 +746,7 @@ export function WaiterDashboard({
                 <p className="text-sm text-slate-400">
                   {portalPage === 'orders'
                     ? `${incomingOrders.length} incoming · ${readyOrders.length} ready to serve`
-                    : `${servedOrders.length} served · ${formatPrice(todaysRevenue)} revenue`}
+                    : `${todayServedOrders.length} served · ${formatPrice(todaysRevenue)} revenue`}
                 </p>
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-400">
@@ -1002,6 +1015,7 @@ export function WaiterDashboard({
               <p className="text-xs uppercase tracking-widest text-slate-500 mb-3">Shift Summary</p>
               <div className="space-y-3">
                 <div className="flex justify-between text-sm"><span className="text-slate-400">Orders Served</span><span className="font-semibold text-white">{servedOrders.length}</span></div>
+                <div className="flex justify-between text-sm"><span className="text-slate-400">Served Today</span><span className="font-semibold text-white">{todayServedOrders.length}</span></div>
                 <div className="flex justify-between text-sm"><span className="text-slate-400">Incoming Orders</span><span className="font-semibold text-white">{incomingOrders.length}</span></div>
                 <div className="flex justify-between text-sm"><span className="text-slate-400">Ready to Serve</span><span className="font-semibold text-white">{readyOrders.length}</span></div>
                 <div className="flex justify-between text-sm"><span className="text-slate-400">Avg Service Time</span><span className="font-semibold text-white">{waiter.performance?.avgServiceTime ?? 15} min</span></div>
