@@ -27,6 +27,16 @@ interface CustomerAppProps {
   onCallWaiter: () => void;
 }
 type CustomerTab = 'menu' | 'cart' | 'orders';
+
+const resolveMenuItemKey = (item: MenuItem): string => {
+  const rawId = (item as any)?.id;
+  const normalizedId = rawId !== undefined && rawId !== null ? String(rawId).trim() : '';
+  if (normalizedId) return normalizedId;
+  const name = String(item.name || 'item').trim().toLowerCase().replace(/\s+/g, '-');
+  const category = String(item.category || 'uncategorized').trim().toLowerCase().replace(/\s+/g, '-');
+  return `menu-${category}-${name}`;
+};
+
 export function CustomerApp({
   tableNumber,
   orders,
@@ -40,7 +50,8 @@ export function CustomerApp({
   const [showToast, setShowToast] = useState(false);
   const handleAddToCart = useCallback((item: MenuItem, quantity: number) => {
     setCartItems((prev) => {
-      const existingIndex = prev.findIndex((ci) => ci.menuItem.id === item.id);
+      const itemKey = resolveMenuItemKey(item);
+      const existingIndex = prev.findIndex((ci) => resolveMenuItemKey(ci.menuItem) === itemKey);
       if (existingIndex >= 0) {
         const updated = [...prev];
         updated[existingIndex] = {
@@ -49,10 +60,16 @@ export function CustomerApp({
         };
         return updated;
       }
+
+      const normalizedItem: MenuItem = {
+        ...item,
+        id: itemKey,
+      };
+
       return [
       ...prev,
       {
-        menuItem: item,
+        menuItem: normalizedItem,
         quantity
       }];
 
@@ -62,12 +79,12 @@ export function CustomerApp({
     (itemId: string, quantity: number) => {
       if (quantity <= 0) {
         setCartItems((prev) =>
-        prev.filter((item) => item.menuItem.id !== itemId)
+        prev.filter((item) => resolveMenuItemKey(item.menuItem) !== itemId)
         );
       } else {
         setCartItems((prev) =>
         prev.map((item) =>
-        item.menuItem.id === itemId ?
+        resolveMenuItemKey(item.menuItem) === itemId ?
         {
           ...item,
           quantity
@@ -80,7 +97,7 @@ export function CustomerApp({
     []
   );
   const handleRemoveItem = useCallback((itemId: string) => {
-    setCartItems((prev) => prev.filter((item) => item.menuItem.id !== itemId));
+    setCartItems((prev) => prev.filter((item) => resolveMenuItemKey(item.menuItem) !== itemId));
   }, []);
   const handleConfirmOrder = useCallback(
     async (
