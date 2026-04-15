@@ -4,6 +4,7 @@ import { buildReceiptHtml, orderToReceiptData } from '../../utils/receipt';
 import { useSocket } from '../../hooks/useSocket';
 import { useStaffKPIs } from '../../hooks/useKPIs';
 import { KPICard } from '../../components/supervisor/KPICard';
+import { fetchKitchenOrders as fetchKitchenOrdersFromDb, updateOrderStatus as updateOrderStatusApi } from '../../api/orders';
 
 // Backend API
 const API_BASE = import.meta.env.VITE_API_URL || '';
@@ -76,10 +77,7 @@ function formatTime(createdAt: string): string {
 
 async function fetchKitchenOrders(restaurantId?: string): Promise<KitchenOrder[]> {
   try {
-    const query = restaurantId ? `?restaurantId=${encodeURIComponent(restaurantId)}` : '';
-    const res = await fetch(`${API_BASE}/api/orders/kitchen${query}`);
-    if (!res.ok) throw new Error('Failed to fetch');
-    const data = await res.json();
+    const data = await fetchKitchenOrdersFromDb(restaurantId);
     return data
       // Show orders where requires_kitchen is true OR null/undefined (legacy orders where the flag wasn't saved).
       // Only exclude orders explicitly marked requires_kitchen = false (drink-only service orders).
@@ -119,12 +117,7 @@ async function fetchKitchenAnalytics(restaurantId?: string): Promise<any> {
 }
 
 async function updateOrderStatus(orderId: string, status: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/orders/${orderId}/status`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ status })
-  });
-  if (!res.ok) throw new Error('Failed to update');
+  await updateOrderStatusApi(orderId, { status: status as any });
 }
 
 // Simple menu item lookup for free items (in production, fetch from API)
