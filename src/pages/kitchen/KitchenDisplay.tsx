@@ -81,7 +81,9 @@ async function fetchKitchenOrders(restaurantId?: string): Promise<KitchenOrder[]
     if (!res.ok) throw new Error('Failed to fetch');
     const data = await res.json();
     return data
-      .filter((o: any) => o.requiresKitchen || o.requires_kitchen)
+      // Show orders where requires_kitchen is true OR null/undefined (legacy orders where the flag wasn't saved).
+      // Only exclude orders explicitly marked requires_kitchen = false (drink-only service orders).
+      .filter((o: any) => (o.requiresKitchen ?? o.requires_kitchen) !== false)
       .map((o: any) => ({
         id: o.id,
         orderNumber: o.orderNumber || o.order_number,
@@ -183,7 +185,9 @@ export function KitchenDisplay({ onLogout, restaurantId, restaurantName }: { onL
     if (restaurantId && orderRestaurantId && orderRestaurantId !== restaurantId) return;
 
     const requiresKitchen = rawOrder.requiresKitchen ?? rawOrder.requires_kitchen;
-    if (!requiresKitchen) return;
+    // Only skip orders explicitly marked as not requiring kitchen (false).
+    // null/undefined means the flag wasn't saved — treat as kitchen order.
+    if (requiresKitchen === false) return;
 
     const status = rawOrder.status;
     if (!['pending', 'verified', 'preparing', 'ready'].includes(status)) return;

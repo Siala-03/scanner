@@ -11,6 +11,16 @@ interface MenuItemEditorProps {
   categories: MenuCategoryInfo[];
   onAddCategory: (category: { id: string; name: string; emoji: string }) => void;
 }
+// Categories that go to bar/service only — everything else goes to kitchen
+const DRINK_CATEGORIES = new Set([
+  'beers', 'wine', 'alcoholic-drinks', 'soft-drinks', 'coffee',
+  'tea', 'juices', 'cocktails', 'mocktails', 'non-alcoholic', 'water', 'drinks', 'beverages',
+]);
+
+function categoryRequiresKitchen(category: string): boolean {
+  return !DRINK_CATEGORIES.has(category.toLowerCase());
+}
+
 const EMOJI_OPTIONS = [
 '🍔',
 '🍕',
@@ -47,7 +57,8 @@ export function MenuItemEditor({
     emoji: '🍽️',
     prepTime: '',
     isAvailable: true,
-    isPopular: false
+    isPopular: false,
+    requiresKitchen: true,
   });
   const [categoryMode, setCategoryMode] = useState<'existing' | 'new'>('existing');
   const [newCategory, setNewCategory] = useState({ id: '', name: '', emoji: '🍽️' });
@@ -55,15 +66,17 @@ export function MenuItemEditor({
   const categoryOptions = categories;
   useEffect(() => {
     if (item) {
+      const cat = item.category || 'lunch';
       setFormData({
         name: item.name || '',
         description: item.description || '',
         price: item.price !== undefined && item.price !== null ? item.price.toString() : '',
-        category: item.category || 'lunch',
+        category: cat,
         emoji: item.emoji || '🍽️',
         prepTime: item.prepTime !== undefined && item.prepTime !== null ? item.prepTime.toString() : '',
         isAvailable: item.isAvailable ?? true,
-        isPopular: item.isPopular ?? false
+        isPopular: item.isPopular ?? false,
+        requiresKitchen: item.requiresKitchen ?? categoryRequiresKitchen(cat),
       });
       setCategoryMode('existing');
       setNewCategory({ id: '', name: '', emoji: '🍽️' });
@@ -76,7 +89,8 @@ export function MenuItemEditor({
         emoji: '🍽️',
         prepTime: '',
         isAvailable: true,
-        isPopular: false
+        isPopular: false,
+        requiresKitchen: true,
       });
       setCategoryMode('existing');
       setNewCategory({ id: '', name: '', emoji: '🍽️' });
@@ -106,7 +120,8 @@ export function MenuItemEditor({
       emoji: formData.emoji,
       prepTime: parsedPrepTime,
       isAvailable: formData.isAvailable,
-      isPopular: formData.isPopular
+      isPopular: formData.isPopular,
+      requiresKitchen: formData.requiresKitchen,
     });
     onClose();
   };
@@ -256,12 +271,15 @@ export function MenuItemEditor({
 
           <select
             value={formData.category}
-            onChange={(e) =>
-            setFormData({
-              ...formData,
-              category: e.target.value as MenuCategory
-            })
-            }
+            onChange={(e) => {
+              const cat = e.target.value as MenuCategory;
+              setFormData((prev) => ({
+                ...prev,
+                category: cat,
+                // Auto-update requiresKitchen only when the user hasn't manually overridden it
+                requiresKitchen: categoryRequiresKitchen(cat),
+              }));
+            }}
             className="w-full px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white focus:outline-none focus:ring-2 focus:ring-amber-500">
 
             {categoryOptions.map((cat) =>
@@ -301,6 +319,17 @@ export function MenuItemEditor({
               className="w-4 h-4 rounded border-slate-600 bg-slate-700 text-amber-500 focus:ring-amber-500" />
 
             <span className="text-slate-300">Mark as Popular</span>
+          </label>
+
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={formData.requiresKitchen}
+              onChange={(e) =>
+                setFormData({ ...formData, requiresKitchen: e.target.checked })
+              }
+              className="w-4 h-4 rounded border-slate-600 bg-slate-700 text-orange-500 focus:ring-orange-500" />
+            <span className="text-slate-300">Requires Kitchen</span>
           </label>
         </div>
 

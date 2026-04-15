@@ -164,6 +164,7 @@ export async function createOrder(order: CreateOrderInput): Promise<Order> {
       items,
       total,
       notes: order.notes || null,
+      requires_kitchen: order.requiresKitchen ?? false,
       restaurant_id: restaurantId,
     };
     result = await db.from('orders').insert(minimalPayload).select().single();

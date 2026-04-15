@@ -168,7 +168,8 @@ export function MenuManagement() {
         emoji: itemData.emoji || '🍽️',
         prepTime: itemData.prepTime || 15,
         isAvailable: itemData.isAvailable ?? true,
-        isPopular: itemData.isPopular ?? false
+        isPopular: itemData.isPopular ?? false,
+        requiresKitchen: itemData.requiresKitchen ?? true,
       };
       updatedItems = [newItem, ...menuItemsState];
     }
