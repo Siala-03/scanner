@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { Button } from '../../components/ui/Button';
 import { MenuIcon, AlertCircleIcon, TruckIcon, MapPinIcon, PhoneIcon, LogOutIcon } from 'lucide-react';
+import { formatPrice } from '../../utils/currency';
 import { useMenu } from '../../hooks/useMenu';
 import { useStaff, useStaffOnDuty } from '../../hooks/useStaff';
 import { useTodayKPIs } from '../../hooks/useAnalytics';
@@ -99,12 +100,12 @@ export function SupervisorDashboard({ onManageMenu, onLogout }: SupervisorDashbo
                 <p className="text-2xl font-bold">{kpis.totalOrders}</p>
               </div>
               <div>
-                <p className="text-slate-300 text-sm">Revenue</p>
-                <p className="text-2xl font-bold">${(kpis.totalRevenue / 100).toFixed(2)}</p>
+                <p className="text-slate-300 text-sm">Revenue (served)</p>
+                <p className="text-2xl font-bold">{formatPrice(kpis.totalRevenue)}</p>
               </div>
               <div>
-                <p className="text-slate-300 text-sm">Average Order Value</p>
-                <p className="text-2xl font-bold">${(kpis.avgOrderValue / 100).toFixed(2)}</p>
+                <p className="text-slate-300 text-sm">Avg Order Value (served)</p>
+                <p className="text-2xl font-bold">{formatPrice(kpis.avgOrderValue)}</p>
               </div>
               <div>
                 <p className="text-slate-300 text-sm">Peak Hour</p>
@@ -256,7 +257,7 @@ export function SupervisorDashboard({ onManageMenu, onLogout }: SupervisorDashbo
                       </div>
                       <div className="text-right flex-shrink-0">
                         <div className="text-sm font-semibold text-amber-400">
-                          ${(order.total / 100).toFixed(2)}
+                          {formatPrice(order.total)}
                         </div>
                         <div className="text-xs text-slate-400 mt-1">
                           {order.createdAt

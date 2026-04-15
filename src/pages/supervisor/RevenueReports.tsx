@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
   BarChart,
@@ -12,7 +12,7 @@ import {
   Pie,
   Cell } from
 'recharts';
-import { CalendarIcon, DownloadIcon, TrendingUpIcon, TrendingDownIcon, FileTextIcon, FilterIcon } from 'lucide-react';
+import { DownloadIcon, TrendingUpIcon, FilterIcon } from 'lucide-react';
 import { fetchOrders } from '../../api/orders';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -92,14 +92,16 @@ export function RevenueReports() {
 
   const filteredByRange = filteredOrders;
 
-  const totalRevenue = filteredByRange.reduce((sum, order) => sum + order.total, 0);
+  const servedInRange = filteredByRange.filter(o => o.status === 'served');
+  const totalRevenue = servedInRange.reduce((sum, order) => sum + order.total, 0);
   const totalOrders = filteredByRange.length;
+  const servedCount = servedInRange.length;
   const dailyRevenue = [...Array(7)].map((_, idx) => {
     const day = new Date();
     day.setDate(day.getDate() - (6 - idx));
     const dayKey = day.toDateString();
     const revenue = filteredByRange
-      .filter((o) => new Date(o.createdAt).toDateString() === dayKey)
+      .filter((o) => o.status === 'served' && new Date(o.createdAt).toDateString() === dayKey)
       .reduce((sum, o) => sum + o.total, 0);
     return { date: dayKey, revenue };
   });
@@ -126,7 +128,7 @@ export function RevenueReports() {
 
     if (order.tableNumber != null) {
       const tableStats = tableMap.get(order.tableNumber) || { totalRevenue: 0, totalOrders: 0 };
-      tableStats.totalRevenue += order.total;
+      if (order.status === 'served') tableStats.totalRevenue += order.total;
       tableStats.totalOrders += 1;
       tableMap.set(order.tableNumber, tableStats);
     }
@@ -159,11 +161,11 @@ export function RevenueReports() {
   const rangeStart = new Date(now.getTime() - (rangeDays - 1) * 24 * 60 * 60 * 1000);
   const previousStart = new Date(rangeStart.getTime() - rangeDays * 24 * 60 * 60 * 1000);
 
-  const revenueInRange = filteredByRange.reduce((sum, order) => sum + order.total, 0);
+  const revenueInRange = filteredByRange.filter(o => o.status === 'served').reduce((sum, order) => sum + order.total, 0);
   const revenuePrevious = orders
     .filter((order) => {
       const createdAt = new Date((order as any).created_at || order.createdAt);
-      return createdAt >= previousStart && createdAt < rangeStart;
+      return order.status === 'served' && createdAt >= previousStart && createdAt < rangeStart;
     })
     .reduce((sum, order) => sum + order.total, 0);
 
@@ -269,9 +271,9 @@ export function RevenueReports() {
             <Card className="bg-gradient-to-br from-slate-800 to-slate-800/50 border border-slate-700/50 hover:border-slate-600/50 transition">
               <p className="text-sm text-slate-400 font-medium mb-2">Avg Order Value</p>
               <p className="text-2xl font-bold text-white">
-                {formatPrice(totalOrders > 0 ? totalRevenue / totalOrders : 0)}
+                {formatPrice(servedCount > 0 ? totalRevenue / servedCount : 0)}
               </p>
-              <p className="text-xs text-slate-400 mt-2">Per order</p>
+              <p className="text-xs text-slate-400 mt-2">Per served order</p>
             </Card>
           </motion.div>
 

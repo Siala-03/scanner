@@ -61,9 +61,10 @@ export async function fetchTodayKPIs(): Promise<KPIMetrics> {
   if (error) throw error;
 
   const list = orders || [];
-  const totalRevenue = list.reduce((sum: number, o: any) => sum + (o.total || 0), 0);
   const totalOrders = list.length;
-  const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+  const servedOrders = list.filter((o: any) => o.status === 'served');
+  const totalRevenue = servedOrders.reduce((sum: number, o: any) => sum + (o.total || 0), 0);
+  const avgOrderValue = servedOrders.length > 0 ? totalRevenue / servedOrders.length : 0;
 
   // Peak hours
   const hourMap = new Map<number, number>();
