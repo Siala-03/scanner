@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ArrowLeftIcon, TruckIcon } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
-import { supplierLogin, setSupplierToken } from '../../api/supplier';
+import { supplierLogin, setSupplierToken, buildSupplierToken } from '../../api/supplier';
 import { SupplierUser } from '../../api/supplier';
 
 interface SupplierLoginPageProps {
@@ -22,7 +22,7 @@ export function SupplierLoginPage({ onLogin, onBack }: SupplierLoginPageProps) {
 
     try {
       const user = await supplierLogin(email, password);
-      setSupplierToken(`${user.id}:${user.supplierId}`);
+      setSupplierToken(buildSupplierToken(user));
       onLogin(user);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Login failed');

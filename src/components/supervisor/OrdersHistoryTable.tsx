@@ -1,7 +1,6 @@
-import React, { useState, useMemo, ReactNode } from 'react';
+import { useState, useMemo, ReactNode } from 'react';
 import { ChevronUpIcon, ChevronDownIcon, SearchIcon, CalendarIcon, DownloadIcon, FilterIcon } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { Order, OrderStatus } from '../../types/orders';
 import { StatusBadge } from '../ui/Badge';
 import { useStaff } from '../../hooks/useStaff';
 import { formatPrice } from '../../utils/currency';
@@ -30,17 +29,35 @@ export function OrdersHistoryTable({ orders, onSelectOrder, onExport }: OrdersHi
   
   const { staff } = useStaff();
 
+  // Build table-number → waiter-id lookup from current assignments
+  const tableToWaiter = useMemo(() => {
+    const map = new Map<number, string>();
+    staff.forEach(s => {
+      ((s as any).assignedTables || []).forEach((t: number) => map.set(t, s.id));
+    });
+    return map;
+  }, [staff]);
+
+  const staffIds = useMemo(() => new Set(staff.map(s => s.id)), [staff]);
+
+  /** Resolve the responsible waiter for an order using three-tier fallback. */
+  const resolveWaiterId = (order: any): string | null =>
+    (order.assignedWaiterId && staffIds.has(order.assignedWaiterId) ? order.assignedWaiterId : null) ??
+    (order.created_by && staffIds.has(order.created_by) ? order.created_by : null) ??
+    (order.tableNumber != null ? tableToWaiter.get(order.tableNumber) ?? null : null);
+
   // Get unique waiters from orders
   const waiters = useMemo(() => {
     const uniqueWaiters = new Map<string, string>();
     orders.forEach(order => {
-      if (order.assignedWaiterId) {
-        const waiter = staff.find((s) => s.id === order.assignedWaiterId);
-        uniqueWaiters.set(order.assignedWaiterId, waiter?.name || order.assignedWaiterId);
+      const wid = resolveWaiterId(order);
+      if (wid) {
+        const s = staff.find(s => s.id === wid);
+        uniqueWaiters.set(wid, s?.name || wid);
       }
     });
     return Array.from(uniqueWaiters.entries()).map(([id, name]) => ({ id, name }));
-  }, [orders, staff]);
+  }, [orders, staff, tableToWaiter, staffIds]);
 
   // Status options
   const statusOptions: { value: string; label: string }[] = [
@@ -75,7 +92,7 @@ export function OrdersHistoryTable({ orders, onSelectOrder, onExport }: OrdersHi
     
     // Waiter filter
     if (waiterFilter !== 'all') {
-      result = result.filter(order => order.assignedWaiterId === waiterFilter);
+      result = result.filter(order => resolveWaiterId(order) === waiterFilter);
     }
     
     // Date range filter
@@ -92,7 +109,7 @@ export function OrdersHistoryTable({ orders, onSelectOrder, onExport }: OrdersHi
     }
     
     return result;
-  }, [orders, searchQuery, statusFilter, waiterFilter, dateFrom, dateTo]);
+  }, [orders, searchQuery, statusFilter, waiterFilter, dateFrom, dateTo, staffIds, tableToWaiter]);
 
   // Sort orders
   const sortedOrders = useMemo(() => {
@@ -281,7 +298,8 @@ export function OrdersHistoryTable({ orders, onSelectOrder, onExport }: OrdersHi
               </tr>
             ) : (
               sortedOrders.map((order: any, index) => {
-                const waiter = order.assignedWaiterId ? staff.find((s) => s.id === order.assignedWaiterId) : null;
+                const resolvedWaiterId = resolveWaiterId(order);
+                const waiter = resolvedWaiterId ? staff.find((s) => s.id === resolvedWaiterId) : null;
                 const createdAt = new Date(order.createdAt);
                 
                 return (

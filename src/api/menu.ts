@@ -80,7 +80,7 @@ export async function fetchMenuByCategory(category: string): Promise<MenuItem[]>
 
 export async function createMenuItem(item: Partial<MenuItem>): Promise<MenuItem> {
   const restaurantId = getRestaurantId();
-  if (!restaurantId) throw new Error('No restaurant selected');
+  if (!restaurantId) throw new Error('No company selected');
   
   const id = `item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   
@@ -96,7 +96,7 @@ export async function createMenuItem(item: Partial<MenuItem>): Promise<MenuItem>
 
 export async function updateMenuItem(id: string, updates: Partial<MenuItem>): Promise<MenuItem> {
   const restaurantId = getRestaurantId();
-  if (!restaurantId) throw new Error('No restaurant selected');
+  if (!restaurantId) throw new Error('No company selected');
 
   const { data, error } = await supabase
     .from('menu_items')
@@ -141,7 +141,7 @@ export async function toggleMenuItemAvailability(id: string, isAvailable: boolea
 
 export async function uploadMenu(items: Partial<MenuItem>[]): Promise<{ message: string; count: number }> {
   const restaurantId = getRestaurantId();
-  if (!restaurantId) throw new Error('No restaurant selected');
+  if (!restaurantId) throw new Error('No company selected');
   
   const itemsToInsert = items.map((item, index) =>
     toDbMenuItem(item as Partial<MenuItem> & Record<string, any>, restaurantId, `item-${Date.now()}-${index}`)
@@ -154,7 +154,7 @@ export async function uploadMenu(items: Partial<MenuItem>[]): Promise<{ message:
 
 export async function clearMenu(): Promise<{ message: string }> {
   const restaurantId = getRestaurantId();
-  if (!restaurantId) throw new Error('No restaurant selected');
+  if (!restaurantId) throw new Error('No company selected');
   
   const { error } = await supabase.from('menu_items').delete().eq('restaurant_id', restaurantId);
   if (error) throw error;

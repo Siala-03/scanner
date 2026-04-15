@@ -22,7 +22,7 @@ export function AIInsightsChat({ alerts }: AIInsightsChatProps) {
   const [messages, setMessages] = useState<Message[]>([
     { 
       role: 'assistant', 
-      content: "Hello! I'm your AI Operations Analyst. I've analyzed your current stock, waste, and sales data. How can I help you optimize your restaurant today?" 
+      content: "Hello! I'm your AI Operations Analyst. I've analyzed your current stock, waste, and sales data. How can I help you optimize your company today?" 
     }
   ]);
   const [isLoading, setIsLoading] = useState(false);

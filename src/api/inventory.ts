@@ -1,5 +1,10 @@
 import { supabase, supabaseAdmin } from '../lib/supabase';
 import type { InventoryRecord, Supplier, PurchaseOrder, StockMovement, WasteEntry, InventoryAnalytics } from '../types/inventory';
+import { apiRequest } from './http';
+
+const API_BASE = import.meta.env.VITE_API_URL
+  ? `${import.meta.env.VITE_API_URL.replace(/\/$/, '')}/api`
+  : '/api';
 
 function getRestaurantId(): string | undefined {
   if (typeof window !== 'undefined') {
@@ -181,8 +186,15 @@ export async function updateInventoryRecord(
 ): Promise<InventoryRecord> {
   const restaurantId = getRestaurantId();
   if (!restaurantId) {
-    throw new Error('No restaurant selected. Please sign in again or reselect your restaurant.');
+    throw new Error('No company selected. Please sign in again or reselect your company.');
   }
+
+  const { data: previous } = await supabaseAdmin
+    .from('inventory_records')
+    .select('stock,reorder_point,reorder_qty,supplier_id,unit_cost')
+    .eq('menu_item_id', menuItemId)
+    .eq('restaurant_id', restaurantId)
+    .maybeSingle();
 
   // Accept both camelCase (from UI) and snake_case (from direct callers)
   const updateFields: Record<string, any> = {
@@ -217,7 +229,16 @@ export async function updateInventoryRecord(
   }
 
   if (!updateError && updated && updated.length > 0) {
-    return normalizeInventoryRecord(updated[0]);
+    const normalized = normalizeInventoryRecord(updated[0]);
+    await maybeAutoReorder({
+      menuItemId,
+      restaurantId,
+      previous,
+      current: updated[0],
+      overrideSupplierId: record.supplierId ?? record.supplier_id,
+      overrideUnitCost: record.unitCost ?? record.unit_cost,
+    });
+    return normalized;
   }
 
   // No existing row — INSERT with a generated id
@@ -243,7 +264,90 @@ export async function updateInventoryRecord(
   if (error) {
     throw new Error(`Failed to insert inventory record: ${error.message}`);
   }
+  await maybeAutoReorder({
+    menuItemId,
+    restaurantId,
+    previous,
+    current: data,
+    overrideSupplierId: record.supplierId ?? record.supplier_id,
+    overrideUnitCost: record.unitCost ?? record.unit_cost,
+  });
   return normalizeInventoryRecord(data);
+}
+
+async function maybeAutoReorder(params: {
+  menuItemId: string;
+  restaurantId: string;
+  previous: any;
+  current: any;
+  overrideSupplierId?: string;
+  overrideUnitCost?: number;
+}): Promise<void> {
+  const previousStock = Number(params.previous?.stock ?? NaN);
+  const currentStock = Number(params.current?.stock ?? 0);
+  const reorderPoint = Number(params.current?.reorder_point ?? params.current?.reorderPoint ?? params.previous?.reorder_point ?? 0);
+  const reorderQty = Number(params.current?.reorder_qty ?? params.current?.reorderQty ?? params.previous?.reorder_qty ?? 0);
+  const supplierId = (params.overrideSupplierId || params.current?.supplier_id || params.current?.supplierId || params.previous?.supplier_id || '').trim();
+
+  if (!supplierId || reorderPoint <= 0 || reorderQty <= 0) return;
+
+  // Trigger only on threshold crossing to avoid duplicate orders on every save.
+  const crossedThreshold = Number.isFinite(previousStock)
+    ? previousStock > reorderPoint && currentStock <= reorderPoint
+    : currentStock <= reorderPoint;
+  if (!crossedThreshold) return;
+
+  const { data: existingOpen, error: existingError } = await supabaseAdmin
+    .from('purchase_orders')
+    .select('id, items, status')
+    .eq('restaurant_id', params.restaurantId)
+    .eq('supplier_id', supplierId)
+    .in('status', ['draft', 'sent', 'confirmed', 'shipped', 'partial'])
+    .order('created_at', { ascending: false })
+    .limit(25);
+
+  if (!existingError && Array.isArray(existingOpen)) {
+    const alreadyQueued = existingOpen.some((po: any) => {
+      const items = Array.isArray(po.items) ? po.items : [];
+      return items.some((item: any) => (item.menu_item_id || item.menuItemId) === params.menuItemId);
+    });
+    if (alreadyQueued) return;
+  }
+
+  const { data: supplier } = await supabaseAdmin
+    .from('suppliers')
+    .select('name')
+    .eq('id', supplierId)
+    .maybeSingle();
+  const { data: menuItem } = await supabaseAdmin
+    .from('menu_items')
+    .select('name')
+    .eq('id', params.menuItemId)
+    .maybeSingle();
+
+  const supplierName = supplier?.name || 'Supplier';
+  const itemName = menuItem?.name || params.menuItemId;
+  const unitCost = Number(params.overrideUnitCost ?? params.current?.unit_cost ?? params.current?.unitCost ?? params.previous?.unit_cost ?? 0);
+
+  try {
+    await createPurchaseOrder({
+      supplierId,
+      supplierName,
+      items: [{
+        menuItemId: params.menuItemId,
+        menuItemName: itemName,
+        orderedQty: reorderQty,
+        receivedQty: 0,
+        unitCost,
+        totalCost: reorderQty * unitCost,
+      }],
+      totalCost: reorderQty * unitCost,
+      notes: `Auto reorder triggered at stock ${currentStock} (reorder point ${reorderPoint}).`,
+      createdBy: getStaffId(),
+    });
+  } catch (err) {
+    console.warn('Auto reorder trigger failed:', err);
+  }
 }
 
 export async function deleteInventoryRecord(menuItemId: string): Promise<void> {
@@ -378,7 +482,7 @@ export async function fetchSuppliers(): Promise<Supplier[]> {
 
 export async function createSupplier(supplier: Partial<Supplier>): Promise<Supplier> {
   const restaurantId = getRestaurantId();
-  if (!restaurantId) throw new Error('No restaurant selected');
+  if (!restaurantId) throw new Error('No company selected');
   
   const id = `sup-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   console.log('Creating supplier:', supplier, 'restaurant:', restaurantId);
@@ -462,7 +566,7 @@ export async function fetchPurchaseOrders(status?: string): Promise<PurchaseOrde
 
 export async function createPurchaseOrder(po: Partial<PurchaseOrder>): Promise<PurchaseOrder> {
   const restaurantId = getRestaurantId();
-  const id = `po-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  if (!restaurantId) throw new Error('No company selected');
 
   const dbItems = (po.items || []).map(i => ({
     menu_item_id:   i.menuItemId,
@@ -473,13 +577,40 @@ export async function createPurchaseOrder(po: Partial<PurchaseOrder>): Promise<P
     total_cost:     i.totalCost,
   }));
 
+  // Primary path: backend route emits supplier real-time notifications.
+  try {
+    return await apiRequest<PurchaseOrder>(`${API_BASE}/purchase-orders`, {
+      method: 'POST',
+      json: {
+        supplierId: po.supplierId,
+        supplierName: po.supplierName,
+        items: (po.items || []).map((i) => ({
+          menuItemId: i.menuItemId,
+          menuItemName: i.menuItemName,
+          orderedQty: i.orderedQty,
+          receivedQty: i.receivedQty ?? 0,
+          unitCost: i.unitCost,
+          totalCost: i.totalCost,
+        })),
+        totalCost: po.totalCost ?? 0,
+        expectedDelivery: po.expectedDelivery ?? null,
+        notes: po.notes ?? null,
+        createdBy: po.createdBy || getStaffId(),
+        restaurantId,
+      },
+    });
+  } catch (apiErr) {
+    console.warn('Backend purchase order API failed, falling back to direct insert:', apiErr);
+  }
+
+  const id = `po-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   const { data, error } = await supabaseAdmin
     .from('purchase_orders')
     .insert({
       id,
       supplier_id:       po.supplierId,
       supplier_name:     po.supplierName,
-      status:            'draft',
+      status:            'sent',
       items:             dbItems,
       total_cost:        po.totalCost      ?? 0,
       expected_delivery: po.expectedDelivery ?? null,

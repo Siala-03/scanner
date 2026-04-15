@@ -6,6 +6,9 @@ dotenv.config();
 const EnvSchema = z.object({
   PORT: z.coerce.number().int().positive().default(4000),
   DATABASE_URL: z.string().min(1),
+  SUPABASE_URL: z.string().url(),
+  SUPABASE_SERVICE_KEY: z.string().min(1),
+  GEMINI_API_KEY: z.string().min(1),
   WEB_ORIGIN: z.string().min(1).default('http://localhost:5173'),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(60 * 1000), // 1 minute window
@@ -22,6 +25,9 @@ export type Env = z.infer<typeof EnvSchema>;
 export const env: Env = EnvSchema.parse({
   PORT: process.env.PORT ?? 4000,
   DATABASE_URL: process.env.DATABASE_URL,
+  SUPABASE_URL: process.env.SUPABASE_URL,
+  SUPABASE_SERVICE_KEY: process.env.SUPABASE_SERVICE_KEY,
+  GEMINI_API_KEY: process.env.GEMINI_API_KEY,
   WEB_ORIGIN: process.env.WEB_ORIGIN ?? 'http://localhost:5173',
   NODE_ENV: process.env.NODE_ENV ?? 'development',
   RATE_LIMIT_WINDOW_MS: process.env.RATE_LIMIT_WINDOW_MS ?? (60 * 1000), // 1 minute

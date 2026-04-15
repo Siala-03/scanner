@@ -135,7 +135,7 @@ export async function createCreditAccount(data: {
   notes?: string;
 }): Promise<CustomerCreditAccount> {
   const restaurantId = getRestaurantId();
-  if (!restaurantId) throw new Error('No restaurant selected');
+  if (!restaurantId) throw new Error('No company selected');
 
   const { data: result, error } = await supabaseAdmin
     .from('credit_accounts')
@@ -359,7 +359,7 @@ export async function submitCreditApplication(data: {
   requestedByName: string;
 }): Promise<CreditApplication> {
   const restaurantId = getRestaurantId();
-  if (!restaurantId) throw new Error('No restaurant selected');
+  if (!restaurantId) throw new Error('No company selected');
 
   const { data: result, error } = await supabaseAdmin
     .from('credit_applications')

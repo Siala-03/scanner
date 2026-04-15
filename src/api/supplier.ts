@@ -61,6 +61,30 @@ export interface SupplierStats {
   completed_value: number;
 }
 
+export interface SupplierPortalAccessProvisionResult {
+  id: string;
+  supplierId: string;
+  supplierName: string;
+  email: string;
+  name: string;
+  phone?: string | null;
+  password: string;
+  isNew: boolean;
+}
+
+export interface SupplierPortalAccessInfo {
+  exists: boolean;
+  supplierId: string;
+  supplierName?: string;
+  id?: string;
+  email?: string;
+  name?: string;
+  phone?: string | null;
+  isActive?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 function getAuthHeader(): Record<string, string> {
   const token = localStorage.getItem('supplier_token');
   return token ? { Authorization: `Bearer ${token}` } : {};
@@ -128,6 +152,28 @@ export async function fetchSupplierStats(): Promise<SupplierStats> {
   return apiRequest<SupplierStats>(`${API_BASE}/supplier-portal/stats`, {
     headers: getAuthHeader(),
   });
+}
+
+export async function provisionSupplierPortalAccess(data: {
+  supplierId: string;
+  email: string;
+  name: string;
+  phone?: string;
+  password?: string;
+}): Promise<SupplierPortalAccessProvisionResult> {
+  return apiRequest<SupplierPortalAccessProvisionResult>(`${API_BASE}/supplier-auth/manager-access`, {
+    method: 'POST',
+    json: data,
+  });
+}
+
+export async function fetchSupplierPortalAccess(supplierId: string): Promise<SupplierPortalAccessInfo> {
+  return apiRequest<SupplierPortalAccessInfo>(`${API_BASE}/supplier-auth/manager-access/${supplierId}`);
+}
+
+export function buildSupplierToken(user: SupplierUser): string {
+  // Canonical token format used by backend: supplierId:userId
+  return `${user.supplierId}:${user.id}`;
 }
 
 export function setSupplierToken(token: string) {

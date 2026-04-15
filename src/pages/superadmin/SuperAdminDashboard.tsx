@@ -195,7 +195,7 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this restaurant?')) return;
+    if (!confirm('Are you sure you want to delete this company?')) return;
     try {
       await deleteRestaurant(id);
       await loadRestaurants();
@@ -229,7 +229,7 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
               <Lock className="w-8 h-8" />
               SuperAdmin Dashboard
             </h1>
-            <p className="text-slate-300 mt-1">Manage restaurants and operators for Servv IQ</p>
+            <p className="text-slate-300 mt-1">Manage companies and operators for Servv IQ</p>
           </div>
           <div className="flex flex-wrap gap-3">
             <Button
@@ -245,7 +245,7 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
                 setShowCreateModal(true);
               }}
             >
-              <Plus className="w-4 h-4 mr-2" /> Add Restaurant
+              <Plus className="w-4 h-4 mr-2" /> Add Company
             </Button>
           </div>
         </div>
@@ -253,7 +253,7 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
         {/* Admin key warning */}
         {!isAdminConfigured && (
           <div className="mb-4 px-4 py-3 bg-yellow-500/10 border border-yellow-500/40 rounded-lg text-yellow-400 text-sm">
-            <strong>Warning:</strong> VITE_SUPABASE_SERVICE_KEY is not configured. Restaurant creation and staff management will fail due to RLS. Add the service role key to your <code>.env</code> file and restart the dev server.
+            <strong>Warning:</strong> VITE_SUPABASE_SERVICE_KEY is not configured. Company creation and staff management will fail due to RLS. Add the service role key to your <code>.env</code> file and restart the dev server.
           </div>
         )}
 
@@ -262,7 +262,7 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
           <Card className="bg-slate-800/70 border-slate-700 p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-slate-400 text-sm">Total Restaurants</p>
+                <p className="text-slate-400 text-sm">Total Companies</p>
                 <p className="text-2xl font-bold mt-2">{restaurants.length}</p>
               </div>
               <Building2 className="w-8 h-8 text-amber-500" />
@@ -292,17 +292,17 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
           </Card>
         </div>
 
-        {/* Restaurants List */}
+        {/* Companies List */}
         <Card className="bg-slate-800/50 border-slate-700">
           <div className="p-4 border-b border-slate-700">
-            <h2 className="text-xl font-bold">Restaurants</h2>
+            <h2 className="text-xl font-bold">Companies</h2>
           </div>
 
           {isLoading ? (
             <div className="p-8 text-center text-slate-400">Loading...</div>
           ) : restaurants.length === 0 ? (
             <div className="p-8 text-center text-slate-400">
-              <p>No restaurants yet. Create one to get started.</p>
+              <p>No companies yet. Create one to get started.</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -358,13 +358,13 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
               <QrCode className="w-5 h-5" />
               QR Codes Overview
             </h2>
-            <p className="text-slate-400 text-sm mt-1">View QR codes for each restaurant. QR code deletion is performed by the restaurant manager.</p>
+            <p className="text-slate-400 text-sm mt-1">View QR codes for each company. QR code deletion is performed by the company manager.</p>
           </div>
 
           {selectedRestaurantId === null ? (
             <div className="p-4">
               <div className="space-y-2">
-                <p className="text-slate-300 font-semibold mb-3">Select a restaurant to view its QR codes:</p>
+                <p className="text-slate-300 font-semibold mb-3">Select a company to view its QR codes:</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                   {restaurants.map((restaurant) => (
                     <button
@@ -389,7 +389,7 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
                 className="mb-4 flex items-center gap-2 text-blue-400 hover:text-blue-300 text-sm"
               >
                 <ChevronDown className="w-4 h-4 rotate-90" />
-                Back to Restaurant Selection
+                Back to Company Selection
               </button>
 
               <div className="space-y-3">
@@ -404,7 +404,7 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
                   <div className="p-4 text-center text-slate-400">Loading QR codes...</div>
                 ) : restaurantTables.length === 0 ? (
                   <div className="p-4 text-center text-slate-400">
-                    No QR codes/tables created yet for this restaurant.
+                    No QR codes/tables created yet for this company.
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
@@ -512,11 +512,11 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
             setFormError('');
             resetForm();
           }}
-          title={editingId ? 'Edit Restaurant' : 'Add New Restaurant'}
+          title={editingId ? 'Edit Company' : 'Add New Company'}
         >
           <form onSubmit={handleCreateOrUpdate} className="space-y-4">
             <Input
-              label="Restaurant Name"
+              label="Company Name"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               placeholder="e.g., The Burger Joint"
@@ -528,7 +528,7 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
               type="email"
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              placeholder="contact@restaurant.com"
+              placeholder="contact@company.com"
               required
             />
 
@@ -565,7 +565,7 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
                   type="email"
                   value={formData.managerEmail}
                   onChange={(e) => setFormData({ ...formData, managerEmail: e.target.value })}
-                  placeholder="manager@restaurant.com"
+                  placeholder="manager@company.com"
                   required
                 />
 
@@ -610,7 +610,7 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
                 isLoading={isSubmitting}
                 disabled={isSubmitting}
               >
-                {editingId ? 'Update' : 'Create'} Restaurant
+                {editingId ? 'Update' : 'Create'} Company
               </Button>
               <Button
                 type="button"

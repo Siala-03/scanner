@@ -67,13 +67,18 @@ const getLowStockContext = async (restaurantId: string) => {
 
 const getTopSalesContext = async (restaurantId: string) => {
   try {
-    // Query order_items to get sales data for items in this restaurant's orders
+    // Items are stored as a JSONB array in orders.items, not in a separate table
     const res = await pool.query(`
-      SELECT oi.menu_item_name, COUNT(*) as order_count, SUM(oi.quantity) as total_qty
-      FROM order_items oi
-      JOIN orders o ON oi.order_id = o.id
-      WHERE o.restaurant_id = $1 AND o.status = 'served' AND o.created_at >= NOW() - INTERVAL '30 days'
-      GROUP BY oi.menu_item_name
+      SELECT
+        item->>'menu_item_name' AS menu_item_name,
+        COUNT(*) AS order_count,
+        SUM((item->>'quantity')::int) AS total_qty
+      FROM orders o,
+        jsonb_array_elements(o.items) AS item
+      WHERE o.restaurant_id = $1
+        AND o.status = 'served'
+        AND o.created_at >= NOW() - INTERVAL '30 days'
+      GROUP BY item->>'menu_item_name'
       ORDER BY order_count DESC
       LIMIT 5
     `, [restaurantId]);

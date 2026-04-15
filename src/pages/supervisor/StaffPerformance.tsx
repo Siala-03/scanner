@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
 import {
   BarChart,
   Bar,
@@ -20,20 +20,39 @@ export function StaffPerformance() {
   const { waiters, isLoading } = useWaiters();
   const { orders } = useOrdersContext();
 
-  // Compute real performance from actual orders
+  // Build a table-number → waiter-id lookup from current assignments
+  const tableToWaiter = useMemo(() => {
+    const map = new Map<number, string>();
+    waiters.forEach(w => {
+      (w.assignedTables || []).forEach((t: number) => map.set(t, w.id));
+    });
+    return map;
+  }, [waiters]);
+
+  // Compute real performance from actual orders.
+  // Priority for resolving the waiter: assignedWaiterId → created_by → table assignment
   const performanceMap = useMemo(() => {
     const map = new Map<string, { ordersServed: number; totalRevenue: number }>();
+    const waiterIds = new Set(waiters.map(w => w.id));
+
     orders.forEach(order => {
-      if (!order.assignedWaiterId) return;
-      const cur = map.get(order.assignedWaiterId) || { ordersServed: 0, totalRevenue: 0 };
+      const o = order as any;
+      const waiterId =
+        (order.assignedWaiterId && waiterIds.has(order.assignedWaiterId) ? order.assignedWaiterId : null) ??
+        (o.created_by && waiterIds.has(o.created_by) ? o.created_by : null) ??
+        (order.tableNumber != null ? tableToWaiter.get(order.tableNumber) ?? null : null);
+
+      if (!waiterId) return;
+
+      const cur = map.get(waiterId) || { ordersServed: 0, totalRevenue: 0 };
       if (order.status === 'served') {
         cur.ordersServed += 1;
         cur.totalRevenue += order.total || 0;
       }
-      map.set(order.assignedWaiterId, cur);
+      map.set(waiterId, cur);
     });
     return map;
-  }, [orders]);
+  }, [orders, waiters, tableToWaiter]);
 
   const maxOrders = useMemo(() => {
     let max = 1;
@@ -53,10 +72,6 @@ export function StaffPerformance() {
 
   const sortedByOrders = [...waiters].sort(
     (a, b) => getPerf(b.id).ordersServed - getPerf(a.id).ordersServed
-  );
-
-  const sortedByRating = [...waiters].sort(
-    (a, b) => (b.performance?.rating || 0) - (a.performance?.rating || 0)
   );
 
   const chartData = waiters.map((w) => ({

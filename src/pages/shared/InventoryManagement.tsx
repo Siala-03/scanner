@@ -41,6 +41,10 @@ import {
   receivePurchaseOrder as apiReceivePurchaseOrder,
   recordWaste as apiRecordWaste,
 } from '../../api/inventory';
+import {
+  provisionSupplierPortalAccess,
+  type SupplierPortalAccessProvisionResult,
+} from '../../api/supplier';
 
 interface InventoryManagementProps {
   role: 'manager' | 'supervisor';
@@ -117,6 +121,15 @@ function getErrorMessage(err: unknown): string {
     if (typeof message === 'string' && message.trim()) return message;
   }
   return 'Unknown error';
+}
+
+function generatePortalPassword(length = 12): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%';
+  let out = '';
+  for (let i = 0; i < length; i += 1) {
+    out += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return out;
 }
 
 // ── Main Component ───────────────────────────────────────────────────────────
@@ -518,6 +531,13 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
   const [showSupplierModal, setShowSupplierModal] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
   const [supplierForm, setSupplierForm] = useState<Partial<Supplier>>({});
+  const [enablePortalAccess, setEnablePortalAccess] = useState(false);
+  const [portalEmail, setPortalEmail] = useState('');
+  const [portalName, setPortalName] = useState('');
+  const [portalPhone, setPortalPhone] = useState('');
+  const [portalPassword, setPortalPassword] = useState('');
+  const [provisioningPortal, setProvisioningPortal] = useState(false);
+  const [provisionedAccess, setProvisionedAccess] = useState<SupplierPortalAccessProvisionResult | null>(null);
 
   const handleSaveSupplier = async () => {
     if (!supplierForm.name) return;
@@ -535,20 +555,56 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
       notes: supplierForm.notes ?? '',
     };
     try {
+      let savedSupplier: Supplier;
       if (editingSupplier) {
-        await apiUpdateSupplier(editingSupplier.id, payload);
+        savedSupplier = await apiUpdateSupplier(editingSupplier.id, payload);
       } else {
-        await apiCreateSupplier(payload);
+        savedSupplier = await apiCreateSupplier(payload);
       }
+
+      if (enablePortalAccess) {
+        const email = portalEmail.trim();
+        const name = portalName.trim() || savedSupplier.contactPerson || savedSupplier.name;
+        const password = portalPassword.trim() || generatePortalPassword();
+
+        if (!email) {
+          throw new Error('Supplier portal email is required when portal access is enabled.');
+        }
+        if (!name) {
+          throw new Error('Supplier portal name is required when portal access is enabled.');
+        }
+
+        setProvisioningPortal(true);
+        try {
+          const access = await provisionSupplierPortalAccess({
+            supplierId: savedSupplier.id,
+            email,
+            name,
+            phone: portalPhone.trim() || undefined,
+            password,
+          });
+          setProvisionedAccess(access);
+        } finally {
+          setProvisioningPortal(false);
+        }
+      }
+
       await refresh();
       alert('Supplier saved successfully');
     } catch (err) {
       console.error('Failed to save supplier', err);
       alert(`Failed to save supplier: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      setProvisioningPortal(false);
+      return;
     }
     setShowSupplierModal(false);
     setEditingSupplier(null);
     setSupplierForm({});
+    setEnablePortalAccess(false);
+    setPortalEmail('');
+    setPortalName('');
+    setPortalPhone('');
+    setPortalPassword('');
   };
 
   // ── Waste state ─────────────────────────────────────────────────────────
@@ -642,7 +698,7 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                 </Button>
               )}
               {isManager && activeTab === 'suppliers' && (
-                <Button variant="primary" size="sm" onClick={() => { setEditingSupplier(null); setSupplierForm({}); setShowSupplierModal(true); }}>
+                <Button variant="primary" size="sm" onClick={() => { setEditingSupplier(null); setSupplierForm({}); setEnablePortalAccess(false); setPortalEmail(''); setPortalName(''); setPortalPhone(''); setPortalPassword(generatePortalPassword()); setShowSupplierModal(true); }}>
                   <PlusIcon className="w-4 h-4" />
                   Add Supplier
                 </Button>
@@ -1252,7 +1308,7 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                   {isManager && (
                     <div className="flex gap-2">
                       <button
-                        onClick={() => { setEditingSupplier(sup); setSupplierForm({ ...sup }); setShowSupplierModal(true); }}
+                        onClick={() => { setEditingSupplier(sup); setSupplierForm({ ...sup }); setEnablePortalAccess(false); setPortalEmail(sup.email ?? ''); setPortalName(sup.contactPerson ?? sup.name ?? ''); setPortalPhone(sup.phone ?? ''); setPortalPassword(generatePortalPassword()); setShowSupplierModal(true); }}
                         className="px-3 py-1 rounded-lg bg-slate-700 text-slate-300 text-xs hover:bg-slate-600 transition"
                       >
                         Edit
@@ -1716,7 +1772,7 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
         </Modal>
 
         {/* Supplier Modal */}
-        <Modal isOpen={showSupplierModal} onClose={() => { setShowSupplierModal(false); setEditingSupplier(null); setSupplierForm({}); }} title={editingSupplier ? 'Edit Supplier' : 'Add Supplier'}>
+        <Modal isOpen={showSupplierModal} onClose={() => { setShowSupplierModal(false); setEditingSupplier(null); setSupplierForm({}); setEnablePortalAccess(false); setPortalEmail(''); setPortalName(''); setPortalPhone(''); setPortalPassword(''); }} title={editingSupplier ? 'Edit Supplier' : 'Add Supplier'}>
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <input
@@ -1794,6 +1850,73 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
               className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
               rows={2}
             />
+
+            <div className="space-y-3 rounded-lg border border-slate-700/60 bg-slate-800/40 p-3">
+              <label className="flex items-center gap-2 text-slate-200 text-sm">
+                <input
+                  type="checkbox"
+                  checked={enablePortalAccess}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setEnablePortalAccess(checked);
+                    if (checked) {
+                      setPortalEmail((prev) => prev || (supplierForm.email ?? ''));
+                      setPortalName((prev) => prev || (supplierForm.contactPerson ?? supplierForm.name ?? ''));
+                      setPortalPhone((prev) => prev || (supplierForm.phone ?? ''));
+                      setPortalPassword((prev) => prev || generatePortalPassword());
+                    }
+                  }}
+                  className="rounded border-slate-600 text-amber-500 focus:ring-amber-500"
+                />
+                Enable Supplier Portal Access
+              </label>
+
+              {enablePortalAccess && (
+                <div className="space-y-2">
+                  <div className="grid grid-cols-2 gap-3">
+                    <input
+                      placeholder="Portal Email"
+                      value={portalEmail}
+                      onChange={(e) => setPortalEmail(e.target.value)}
+                      className="px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <input
+                      placeholder="Portal Name"
+                      value={portalName}
+                      onChange={(e) => setPortalName(e.target.value)}
+                      className="px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <input
+                      placeholder="Portal Phone (optional)"
+                      value={portalPhone}
+                      onChange={(e) => setPortalPhone(e.target.value)}
+                      className="px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <div className="flex gap-2">
+                      <input
+                        placeholder="Portal Password"
+                        value={portalPassword}
+                        onChange={(e) => setPortalPassword(e.target.value)}
+                        className="min-w-0 flex-1 px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setPortalPassword(generatePortalPassword())}
+                        className="px-2 py-1 rounded-lg bg-slate-700 text-slate-200 text-xs hover:bg-slate-600 transition"
+                        title="Generate password"
+                      >
+                        Generate
+                      </button>
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-slate-400">
+                    The manager creates and shares these credentials with the supplier for portal login.
+                  </p>
+                </div>
+              )}
+            </div>
             <div className="flex justify-between items-center pt-3 border-t border-slate-700/30">
               <p className="text-slate-400 text-sm">Categories</p>
               <div className="flex flex-wrap gap-1">
@@ -1816,19 +1939,43 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
             </div>
             <div className="flex justify-end gap-2 pt-3 border-t border-slate-700/30">
               <button
-                onClick={() => { setShowSupplierModal(false); setEditingSupplier(null); setSupplierForm({}); }}
+                onClick={() => { setShowSupplierModal(false); setEditingSupplier(null); setSupplierForm({}); setEnablePortalAccess(false); setPortalEmail(''); setPortalName(''); setPortalPhone(''); setPortalPassword(''); }}
                 className="px-3 py-1 rounded-lg bg-slate-700 text-slate-300 text-xs hover:bg-slate-600 transition"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSaveSupplier}
-                className="px-3 py-1 rounded-lg bg-emerald-500/20 text-emerald-400 text-xs font-medium hover:bg-emerald-500/30 transition"
+                disabled={provisioningPortal}
+                className="px-3 py-1 rounded-lg bg-emerald-500/20 text-emerald-400 text-xs font-medium hover:bg-emerald-500/30 transition disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                Save
+                {provisioningPortal ? 'Provisioning...' : 'Save'}
               </button>
             </div>
           </div>
+        </Modal>
+
+        <Modal isOpen={!!provisionedAccess} onClose={() => setProvisionedAccess(null)} title="Supplier Portal Credentials">
+          {provisionedAccess && (
+            <div className="space-y-3">
+              <p className="text-sm text-slate-300">
+                Share these credentials with the supplier.
+              </p>
+              <div className="rounded-lg border border-slate-700 bg-slate-900/60 p-3 text-sm text-slate-200 space-y-1">
+                <p><span className="text-slate-400">Supplier:</span> {provisionedAccess.supplierName}</p>
+                <p><span className="text-slate-400">Email:</span> {provisionedAccess.email}</p>
+                <p><span className="text-slate-400">Password:</span> {provisionedAccess.password}</p>
+              </div>
+              <div className="flex justify-end">
+                <button
+                  onClick={() => setProvisionedAccess(null)}
+                  className="px-3 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-300 text-xs font-medium hover:bg-emerald-500/30 transition"
+                >
+                  Done
+                </button>
+              </div>
+            </div>
+          )}
         </Modal>
 
         {/* Waste Modal */}

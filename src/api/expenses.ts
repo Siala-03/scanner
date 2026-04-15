@@ -103,7 +103,7 @@ export async function fetchExpenseCategories(): Promise<ExpenseCategory[]> {
 
 export async function createExpenseCategory(data: ExpenseCategoryFormData): Promise<ExpenseCategory> {
   const restaurantId = getRestaurantId();
-  if (!restaurantId) throw new Error('No restaurant selected');
+  if (!restaurantId) throw new Error('No company selected');
 
   const id = `cat-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   const { data: result, error } = await supabaseAdmin
@@ -204,7 +204,7 @@ export async function fetchExpense(id: string): Promise<Expense> {
 
 export async function createExpense(data: ExpenseFormData): Promise<Expense> {
   const restaurantId = getRestaurantId();
-  if (!restaurantId) throw new Error('No restaurant selected');
+  if (!restaurantId) throw new Error('No company selected');
 
   const staffId = getStaffId();
   const id = `exp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;

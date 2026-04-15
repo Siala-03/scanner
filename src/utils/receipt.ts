@@ -733,7 +733,7 @@ export interface ExpenseReceiptData {
  */
 export function buildExpenseReceiptHtml(
   expense: ExpenseReceiptData,
-  restaurantName = 'Restaurant Name',
+  restaurantName = 'Company Name',
   restaurantAddress = '123 Main St',
   restaurantPhone = '(555) 123-4567'
 ): string {

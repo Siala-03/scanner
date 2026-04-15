@@ -3,11 +3,17 @@ import { env } from './env.js';
 
 const { Pool } = pg;
 
+// Supabase and most hosted Postgres instances require SSL
+const sslConfig = env.DATABASE_URL.includes('supabase') || env.NODE_ENV === 'production'
+  ? { rejectUnauthorized: false }
+  : undefined;
+
 export const pool = new Pool({
   connectionString: env.DATABASE_URL,
   max: env.DB_POOL_SIZE,
   idleTimeoutMillis: env.DB_IDLE_TIMEOUT,
-  connectionTimeoutMillis: env.DB_CONNECTION_TIMEOUT
+  connectionTimeoutMillis: env.DB_CONNECTION_TIMEOUT,
+  ssl: sslConfig,
 });
 
 // Log pool events in development

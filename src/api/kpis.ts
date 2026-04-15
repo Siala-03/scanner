@@ -166,7 +166,7 @@ export async function createKPI(kpi: {
   assignedStaffIds?: string[];
 }): Promise<KPI> {
   const restaurantId = getRestaurantId();
-  if (!restaurantId) throw new Error('No restaurant selected');
+  if (!restaurantId) throw new Error('No company selected');
   const staff = getCurrentStaff();
 
   const { data, error } = await supabaseAdmin

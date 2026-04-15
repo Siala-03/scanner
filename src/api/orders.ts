@@ -106,11 +106,33 @@ export async function fetchOrderById(id: string): Promise<Order> {
   return data as Order;
 }
 
+/** Look up which staff member is assigned to a given table for a restaurant. */
+async function lookupAssignedWaiter(restaurantId: string, tableNumber: number): Promise<string | null> {
+  try {
+    const { data } = await db
+      .from('staff')
+      .select('id, assigned_tables')
+      .eq('restaurant_id', restaurantId)
+      .not('assigned_tables', 'is', null);
+
+    if (!data) return null;
+    // assigned_tables is stored as a JSON array of numbers
+    for (const row of data) {
+      const tables: number[] = Array.isArray(row.assigned_tables) ? row.assigned_tables : [];
+      if (tables.includes(tableNumber)) return row.id;
+    }
+  } catch {
+    // Non-fatal — order creation continues without assignment
+  }
+  return null;
+}
+
 export async function createOrder(order: CreateOrderInput): Promise<Order> {
   const restaurantId = (order as any).restaurantId || getRestaurantId();
-  if (!restaurantId) throw new Error('No restaurant selected');
-  
+  if (!restaurantId) throw new Error('No company selected');
+
   const staffId = getStaffId();
+  const staffRole = typeof window !== 'undefined' ? localStorage.getItem('staffRole') : null;
   const orderId = `order-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
   const orderNumber = Date.now().toString().slice(-6);
 
@@ -126,6 +148,19 @@ export async function createOrder(order: CreateOrderInput): Promise<Order> {
   }));
 
   const total = items.reduce((sum, item) => sum + item.total_price, 0);
+
+  // Resolve which waiter should be assigned to this order:
+  // 1. If explicitly provided in input, use that.
+  // 2. If the person creating the order is a waiter, assign to them.
+  // 3. Otherwise, look up the waiter assigned to the table.
+  let assignedWaiterId: string | null = (order as any).assignedWaiterId ?? null;
+  if (!assignedWaiterId) {
+    if (staffId && staffRole === 'waiter') {
+      assignedWaiterId = staffId;
+    } else if (order.tableNumber != null) {
+      assignedWaiterId = await lookupAssignedWaiter(restaurantId, order.tableNumber);
+    }
+  }
 
   // Full payload — includes optional columns that may or may not exist in the schema
   const fullPayload = {
@@ -143,6 +178,7 @@ export async function createOrder(order: CreateOrderInput): Promise<Order> {
     notes: order.notes || null,
     requires_kitchen: order.requiresKitchen ?? false,
     created_by: staffId,
+    assigned_waiter_id: assignedWaiterId,
     payment_status: 'unpaid',
     restaurant_id: restaurantId,
   };
@@ -165,6 +201,7 @@ export async function createOrder(order: CreateOrderInput): Promise<Order> {
       total,
       notes: order.notes || null,
       requires_kitchen: order.requiresKitchen ?? false,
+      assigned_waiter_id: assignedWaiterId,
       restaurant_id: restaurantId,
     };
     result = await db.from('orders').insert(minimalPayload).select().single();
@@ -260,7 +297,7 @@ export async function cancelOrder(id: string): Promise<void> {
 
 export async function seedTestOrders(): Promise<{ message: string; count: number }> {
   const restaurantId = getRestaurantId();
-  if (!restaurantId) throw new Error('No restaurant selected');
+  if (!restaurantId) throw new Error('No company selected');
   
   const testOrders = [
     { table: 1, items: [{ name: 'Burger', price: 1299 }, { name: 'Fries', price: 499 }] },

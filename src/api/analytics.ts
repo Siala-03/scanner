@@ -47,7 +47,7 @@ export interface KPIMetrics {
 
 export async function fetchTodayKPIs(): Promise<KPIMetrics> {
   const restaurantId = getRestaurantId();
-  if (!restaurantId) throw new Error('No restaurant selected');
+  if (!restaurantId) throw new Error('No company selected');
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -99,7 +99,7 @@ export async function fetchTodayKPIs(): Promise<KPIMetrics> {
 
 export async function fetchWeeklyRevenue(): Promise<WeeklyRevenue> {
   const restaurantId = getRestaurantId();
-  if (!restaurantId) throw new Error('No restaurant selected');
+  if (!restaurantId) throw new Error('No company selected');
 
   const now = new Date();
   const twoWeeksAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { StarIcon, XIcon } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
@@ -17,14 +17,37 @@ export function ServiceReviewModal({ order, isOpen, onClose }: ServiceReviewModa
   const [comment, setComment] = useState('');
 
   const { staff } = useStaff();
-  const waiter: Staff | null = useMemo(() => {
-    if (!order?.assignedWaiterId) return null;
-    return staff.find((s) => s.id === order.assignedWaiterId) ?? null;
-  }, [order?.assignedWaiterId, staff]);
+
+  // Build table-number → waiter-id lookup from current staff assignments
+  const tableToWaiter = useMemo(() => {
+    const map = new Map<number, string>();
+    staff.forEach(s => {
+      ((s as any).assignedTables || []).forEach((t: number) => map.set(t, s.id));
+    });
+    return map;
+  }, [staff]);
+
+  const staffIds = useMemo(() => new Set(staff.map(s => s.id)), [staff]);
+
+  // Resolve the waiter: assignedWaiterId → created_by → table assignment
+  const resolvedWaiterId = useMemo(() => {
+    if (!order) return null;
+    const o = order as any;
+    return (
+      (order.assignedWaiterId && staffIds.has(order.assignedWaiterId) ? order.assignedWaiterId : null) ??
+      (o.created_by && staffIds.has(o.created_by) ? o.created_by : null) ??
+      (order.tableNumber != null ? tableToWaiter.get(order.tableNumber) ?? null : null)
+    );
+  }, [order, staffIds, tableToWaiter]);
+
+  const waiter: Staff | null = useMemo(
+    () => (resolvedWaiterId ? staff.find(s => s.id === resolvedWaiterId) ?? null : null),
+    [resolvedWaiterId, staff]
+  );
 
   if (!order) return null;
 
-  const canSubmit = !!order.assignedWaiterId && rating >= 1 && rating <= 5;
+  const canSubmit = !!resolvedWaiterId && rating >= 1 && rating <= 5;
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Rate your service" size="md">
@@ -32,7 +55,7 @@ export function ServiceReviewModal({ order, isOpen, onClose }: ServiceReviewModa
         <div className="flex items-start justify-between">
           <div>
             <p className="text-sm text-slate-400">Order</p>
-            <p className="text-white font-semibold">{order.id} • Table {order.tableNumber}</p>
+            <p className="text-white font-semibold">{(order as any).orderNumber || order.id.slice(0, 8)} • Table {order.tableNumber}</p>
             <p className="text-sm text-slate-400 mt-1">
               {waiter ? `Waiter: ${waiter.name}` : 'Waiter: (not assigned)'}
             </p>
@@ -79,9 +102,9 @@ export function ServiceReviewModal({ order, isOpen, onClose }: ServiceReviewModa
           />
         </div>
 
-        {!order.assignedWaiterId && (
+        {!resolvedWaiterId && (
           <p className="text-xs text-amber-300 bg-amber-500/10 border border-amber-500/20 rounded-lg p-3">
-            This order is not linked to a waiter yet, so a rating can’t be recorded.
+            No waiter is currently assigned to this table, so a rating can't be recorded.
           </p>
         )}
 
@@ -94,12 +117,12 @@ export function ServiceReviewModal({ order, isOpen, onClose }: ServiceReviewModa
             fullWidth
             disabled={!canSubmit}
             onClick={() => {
-              if (!order.assignedWaiterId) return;
+              if (!resolvedWaiterId) return;
               addReview({
                 id: `rev-${Date.now()}`,
                 orderId: order.id,
-                tableNumber: order.tableNumber,
-                waiterId: order.assignedWaiterId,
+                tableNumber: order.tableNumber ?? 0,
+                waiterId: resolvedWaiterId,
                 rating,
                 comment: comment.trim() ? comment.trim() : undefined,
                 createdAt: new Date().toISOString()
@@ -114,4 +137,3 @@ export function ServiceReviewModal({ order, isOpen, onClose }: ServiceReviewModa
     </Modal>
   );
 }
-

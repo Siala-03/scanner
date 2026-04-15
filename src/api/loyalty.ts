@@ -32,7 +32,7 @@ export async function createOrFindCustomer(customerData: {
   restaurantId?: string;
 }): Promise<Customer> {
   const restaurantId = customerData.restaurantId || resolveRestaurantId();
-  if (!restaurantId) throw new Error('No restaurant selected');
+  if (!restaurantId) throw new Error('No company selected');
 
   return apiRequest<Customer>(`${API_BASE}/loyalty/customers`, {
     method: 'POST',
@@ -79,7 +79,7 @@ export async function awardPoints(data: {
 // Rewards management
 export async function getRewards(restaurantId?: string): Promise<Reward[]> {
   const resolvedRestaurantId = restaurantId || resolveRestaurantId();
-  if (!resolvedRestaurantId) throw new Error('No restaurant selected');
+  if (!resolvedRestaurantId) throw new Error('No company selected');
 
   return apiRequest<Reward[]>(`${API_BASE}/loyalty/rewards?restaurantId=${encodeURIComponent(resolvedRestaurantId)}`);
 }

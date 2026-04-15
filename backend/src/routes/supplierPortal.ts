@@ -5,6 +5,31 @@ import { getIO } from '../socket.js';
 
 export const supplierPortalRouter = Router();
 
+async function resolveSupplierIdentityFromToken(token: string): Promise<{ supplierId: string; userId: string }> {
+  const [first, second] = token.split(':');
+  if (!first || !second) {
+    throw new HttpError(401, 'Invalid token');
+  }
+
+  const result = await pool.query(
+    `SELECT id, supplier_id
+     FROM supplier_users
+     WHERE is_active = true
+       AND ((id = $1 AND supplier_id = $2) OR (id = $2 AND supplier_id = $1))
+     LIMIT 1`,
+    [first, second]
+  );
+
+  if (result.rows.length === 0) {
+    throw new HttpError(401, 'Invalid token');
+  }
+
+  return {
+    userId: result.rows[0].id,
+    supplierId: result.rows[0].supplier_id,
+  };
+}
+
 function emitToSupplier(supplierId: string, event: string, data: unknown) {
   const io = getIO();
   if (io) {
@@ -27,7 +52,7 @@ supplierPortalRouter.get('/orders', async (req: Request, res: Response) => {
     }
 
     const token = authHeader.split(' ')[1];
-    const [supplierId] = token.split(':');
+    const { supplierId } = await resolveSupplierIdentityFromToken(token);
 
     const { status } = req.query;
     let query = `
@@ -84,7 +109,7 @@ supplierPortalRouter.get('/orders/:id', async (req: Request, res: Response) => {
     }
 
     const token = authHeader.split(' ')[1];
-    const [supplierId] = token.split(':');
+    const { supplierId } = await resolveSupplierIdentityFromToken(token);
     const { id } = req.params;
 
     const result = await pool.query(
@@ -134,7 +159,7 @@ supplierPortalRouter.post('/orders/:id/confirm', async (req: Request, res: Respo
     }
 
     const token = authHeader.split(' ')[1];
-    const [supplierId, supplierUserId] = token.split(':');
+    const { supplierId, userId: supplierUserId } = await resolveSupplierIdentityFromToken(token);
     const { id } = req.params;
     const { notes } = req.body;
 
@@ -203,7 +228,7 @@ supplierPortalRouter.post('/orders/:id/ship', async (req: Request, res: Response
     }
 
     const token = authHeader.split(' ')[1];
-    const [supplierId, supplierUserId] = token.split(':');
+    const { supplierId, userId: supplierUserId } = await resolveSupplierIdentityFromToken(token);
     const { id } = req.params;
     const { carrier, tracking_number, notes } = req.body;
 
@@ -281,7 +306,7 @@ supplierPortalRouter.get('/stats', async (req: Request, res: Response) => {
     }
 
     const token = authHeader.split(' ')[1];
-    const [supplierId] = token.split(':');
+    const { supplierId } = await resolveSupplierIdentityFromToken(token);
 
     const stats = await pool.query(
       `SELECT 

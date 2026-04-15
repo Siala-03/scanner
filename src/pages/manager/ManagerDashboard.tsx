@@ -38,7 +38,7 @@ export function ManagerDashboard({ onNavigate, totalOrders, activeOrders, served
         <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-3 mb-4">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold text-gray-100">Manager Dashboard</h1>
-            <p className="text-slate-300 text-sm md:text-base">High-level operations overview for your restaurant.</p>
+            <p className="text-slate-300 text-sm md:text-base">High-level operations overview for your company.</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <Button variant="secondary" size="sm" onClick={() => onNavigate('menu')}>

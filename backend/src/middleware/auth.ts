@@ -1,6 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
 import { HttpError } from '../http.js';
-import { pool } from '../db.js';
 
 export interface AuthenticatedRequest extends Request {
   staffId?: string;
@@ -9,36 +8,53 @@ export interface AuthenticatedRequest extends Request {
 }
 
 /**
- * Authentication middleware
- * This is a basic implementation - in production, consider using JWT
+ * Authentication middleware.
+ * Validates the x-staff-id header against Supabase (where all staff data lives).
  */
 export async function authenticate(
   req: AuthenticatedRequest,
-  res: Response,
+  _res: Response,
   next: NextFunction
 ) {
   try {
-    // Get staff_id from request header (set by login)
     const staffId = req.headers['x-staff-id'] as string;
-    
+
     if (!staffId) {
       throw new HttpError(401, 'Authentication required');
     }
 
-    // Verify the staff exists and get restaurant context
-    const result = await pool.query(
-      'SELECT id, role, restaurant_id FROM staff WHERE id = $1',
-      [staffId]
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
+
+    if (!supabaseUrl || !supabaseServiceKey) {
+      throw new HttpError(500, 'Server misconfiguration: Supabase credentials not set.');
+    }
+
+    // Verify the staff member exists in Supabase
+    const response = await fetch(
+      `${supabaseUrl}/rest/v1/staff?id=eq.${encodeURIComponent(staffId)}&select=id,role,restaurant_id&limit=1`,
+      {
+        headers: {
+          apikey: supabaseServiceKey,
+          Authorization: `Bearer ${supabaseServiceKey}`,
+          Accept: 'application/json',
+        },
+      }
     );
 
-    if (result.rows.length === 0) {
+    if (!response.ok) {
+      throw new HttpError(401, 'Authentication failed');
+    }
+
+    const rows: any[] = await response.json();
+    if (!rows.length) {
       throw new HttpError(401, 'Invalid authentication');
     }
 
-    req.staffId = result.rows[0].id;
-    req.staffRole = result.rows[0].role;
-    req.restaurantId = result.rows[0].restaurant_id;
-    
+    req.staffId = rows[0].id;
+    req.staffRole = rows[0].role;
+    req.restaurantId = rows[0].restaurant_id;
+
     next();
   } catch (error) {
     if (error instanceof HttpError) {
@@ -53,7 +69,7 @@ export async function authenticate(
  * Role-based authorization middleware
  */
 export function requireRole(...allowedRoles: string[]) {
-  return (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  return (req: AuthenticatedRequest, _res: Response, next: NextFunction) => {
     if (!req.staffRole) {
       next(new HttpError(401, 'Authentication required'));
       return;

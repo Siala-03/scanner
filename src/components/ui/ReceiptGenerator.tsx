@@ -12,7 +12,7 @@ interface ReceiptGeneratorProps {
 
 export default function ReceiptGenerator({
   expense,
-  restaurantName = 'Restaurant Name',
+  restaurantName = 'Company Name',
   restaurantAddress = '123 Main St',
   restaurantPhone = '(555) 123-4567',
   onClose,
