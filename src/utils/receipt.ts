@@ -273,7 +273,8 @@ export function orderToReceiptData(
 // ============================================
 
 /**
- * Generate a professional HTML receipt for printing
+ * Generate a professional HTML receipt for printing.
+ * Designed for 80 mm thermal printers and screen display.
  */
 export function buildReceiptHtml(receipt: ReceiptData): string {
   const {
@@ -404,392 +405,272 @@ export function buildReceiptHtml(receipt: ReceiptData): string {
     </div>
   ` : '';
 
-  return `
-<!DOCTYPE html>
+  const dashedLine = '- '.repeat(24);
+  const solidLine  = '─'.repeat(48);
+
+  const itemsHtmlNew = items.map(item => `
+    <tr>
+      <td class="qty">${item.quantity}×</td>
+      <td class="name">
+        ${item.name}
+        ${item.specialInstructions ? `<div class="note">↳ ${item.specialInstructions}</div>` : ''}
+      </td>
+      <td class="price">${formatCurrency(item.totalPrice, currency)}</td>
+    </tr>`).join('');
+
+  return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Receipt - ${orderNumber}</title>
+  <title>Receipt #${orderNumber}</title>
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-    
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
     body {
-      font-family: 'Courier New', monospace;
-      background: #f5f5f5;
-      padding: 20px;
-      color: #1a1a1a;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 13px;
+      background: #f0f0f0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 12px 40px;
+      color: #111;
     }
-    
+
+    /* ── Paper ── */
     .receipt {
-      max-width: 400px;
-      margin: 0 auto;
-      background: white;
-      padding: 24px;
-      border: 1px solid #e5e5e5;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      width: 100%;
+      max-width: 380px;
+      background: #fff;
+      padding: 28px 24px 24px;
+      box-shadow: 0 4px 24px rgba(0,0,0,.12);
+      border-radius: 4px;
     }
-    
-    .header {
-      text-align: center;
-      margin-bottom: 20px;
-      border-bottom: 2px solid #1a1a1a;
-      padding-bottom: 16px;
-    }
-    
-    .restaurant-name {
-      font-size: 1.4rem;
-      font-weight: bold;
-      margin-bottom: 8px;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-    }
-    
-    .restaurant-info {
-      font-size: 0.85rem;
-      line-height: 1.4;
-      color: #555;
-    }
-    
-    .receipt-title {
-      text-align: center;
-      font-size: 1.1rem;
-      font-weight: bold;
-      margin: 16px 0;
-      text-transform: uppercase;
+
+    /* ── Header ── */
+    .header { text-align: center; padding-bottom: 16px; }
+    .brand  { font-size: 22px; font-weight: 900; letter-spacing: 3px; text-transform: uppercase; }
+    .sub    { font-size: 11px; color: #555; margin-top: 4px; line-height: 1.5; }
+    .badge  {
+      display: inline-block;
+      margin-top: 10px;
+      padding: 3px 12px;
+      border: 1px solid #111;
+      font-size: 10px;
       letter-spacing: 2px;
-    }
-    
-    .meta-info {
-      font-size: 0.85rem;
-      line-height: 1.6;
-      margin-bottom: 16px;
-    }
-    
-    .meta-row {
-      display: flex;
-      justify-content: space-between;
-      margin-bottom: 4px;
-    }
-    
-    .meta-label {
-      font-weight: bold;
-    }
-    
-    .section {
-      margin: 16px 0;
-    }
-    
-    .section-title {
-      font-weight: bold;
-      font-size: 0.9rem;
-      margin-bottom: 8px;
       text-transform: uppercase;
+    }
+
+    /* ── Dividers ── */
+    .line-solid  { border: none; border-top: 2px solid #111; margin: 14px 0; }
+    .line-dashed { border: none; border-top: 1px dashed #999; margin: 12px 0; }
+
+    /* ── Meta grid ── */
+    .meta { width: 100%; font-size: 12px; border-collapse: collapse; }
+    .meta td { padding: 3px 0; vertical-align: top; }
+    .meta td:first-child { color: #555; width: 50%; }
+    .meta td:last-child  { font-weight: 600; text-align: right; }
+
+    /* ── Items ── */
+    .items { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .items th {
+      text-align: left; font-size: 10px; letter-spacing: 1.5px;
+      text-transform: uppercase; color: #555;
+      padding: 0 0 6px; border-bottom: 1px solid #ddd;
+    }
+    .items th:last-child { text-align: right; }
+    .items td { padding: 7px 0; vertical-align: top; border-bottom: 1px dotted #e5e5e5; }
+    .items .qty   { width: 28px; color: #555; }
+    .items .name  { padding-right: 8px; }
+    .items .price { text-align: right; font-weight: 600; white-space: nowrap; }
+    .note { font-size: 11px; color: #888; font-style: italic; margin-top: 2px; }
+
+    /* ── Totals ── */
+    .totals { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .totals td { padding: 4px 0; }
+    .totals td:last-child { text-align: right; }
+    .totals .grand td {
+      font-size: 16px; font-weight: 900;
+      border-top: 2px solid #111; padding-top: 10px; margin-top: 6px;
+      letter-spacing: .5px;
+    }
+
+    /* ── Payment badge ── */
+    .payment-row { display: flex; justify-content: space-between; align-items: center; font-size: 12px; padding: 3px 0; }
+    .status-badge {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 20px;
+      font-size: 10px;
+      font-weight: 700;
       letter-spacing: 1px;
+      text-transform: uppercase;
     }
-    
-    .items-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 0.85rem;
-    }
-    
-    .items-table th {
-      text-align: left;
-      padding: 8px 0;
-      border-bottom: 2px solid #1a1a1a;
-      font-weight: bold;
-    }
-    
-    .items-table td {
-      padding: 6px 0;
-      vertical-align: top;
-    }
-    
-    .item-row {
-      border-bottom: 1px dotted #ccc;
-    }
-    
-    .item-qty {
-      width: 40px;
-      font-weight: bold;
-    }
-    
-    .item-name {
-      flex: 1;
-    }
-    
-    .item-note {
-      font-size: 0.75rem;
-      color: #666;
-      font-style: italic;
-      margin-top: 2px;
-    }
-    
-    .item-price {
-      text-align: right;
-      font-weight: bold;
-      white-space: nowrap;
-    }
-    
-    .totals-table {
-      width: 100%;
-      font-size: 0.9rem;
-    }
-    
-    .totals-table td {
-      padding: 6px 0;
-    }
-    
-    .totals-table .total-row {
-      font-weight: bold;
-      font-size: 1.1rem;
-      border-top: 2px solid #1a1a1a;
-      padding-top: 8px;
-      margin-top: 4px;
-    }
-    
-    .text-right {
-      text-align: right;
-    }
-    
-    .info-row {
-      display: flex;
-      justify-content: space-between;
-      padding: 4px 0;
-      font-size: 0.85rem;
-    }
-    
-    .info-row .label {
-      color: #555;
-    }
-    
-    .info-row.highlight {
-      font-weight: bold;
-      font-size: 1rem;
-      color: #1a1a1a;
-    }
-    
-    .info-row.small {
-      font-size: 0.75rem;
-      color: #666;
-      justify-content: flex-start;
-    }
-    
-    .loyalty-section {
-      background: #f9f9f9;
-      padding: 12px;
+    .status-paid    { background: #d1fae5; color: #065f46; }
+    .status-pending { background: #fef3c7; color: #92400e; }
+
+    /* ── Notes ── */
+    .notes-box {
+      background: #fafafa;
       border: 1px dashed #ccc;
-      text-align: center;
-    }
-    
-    .loyalty-section .section-title {
-      text-align: center;
-      margin-bottom: 12px;
-    }
-    
-    .loyalty-section .info-row {
-      justify-content: center;
-      gap: 8px;
-    }
-    
-    .notes-content {
-      font-size: 0.85rem;
+      border-radius: 4px;
+      padding: 8px 10px;
+      font-size: 11px;
       color: #555;
       font-style: italic;
-      line-height: 1.4;
+      line-height: 1.5;
     }
-    
-    .footer {
+
+    /* ── Loyalty ── */
+    .loyalty-box {
+      border: 1px dashed #c0a060;
+      border-radius: 4px;
+      padding: 10px;
       text-align: center;
-      margin-top: 24px;
-      padding-top: 16px;
-      border-top: 2px solid #1a1a1a;
+      background: #fffbf0;
     }
-    
-    .footer-message {
-      font-size: 1rem;
-      font-weight: bold;
-      margin-bottom: 8px;
+    .loyalty-box .pts { font-size: 18px; font-weight: 900; color: #92400e; }
+    .loyalty-box .lbl { font-size: 10px; color: #92400e; letter-spacing: 1px; text-transform: uppercase; }
+
+    /* ── Footer ── */
+    .footer { text-align: center; font-size: 11px; color: #555; line-height: 1.7; }
+    .footer .thanks { font-size: 14px; font-weight: 800; color: #111; letter-spacing: 1px; margin-bottom: 4px; }
+    .powered { font-size: 10px; color: #bbb; margin-top: 8px; letter-spacing: 1px; }
+
+    /* ── Screen-only print button ── */
+    .print-btn {
+      margin-top: 20px;
+      padding: 10px 32px;
+      background: #111;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      font-family: inherit;
+      font-size: 13px;
+      cursor: pointer;
+      letter-spacing: 1px;
     }
-    
-    .footer-info {
-      font-size: 0.75rem;
-      color: #666;
-      line-height: 1.4;
-    }
-    
-    .barcode {
-      text-align: center;
-      margin: 16px 0;
-      font-size: 0.75rem;
-      letter-spacing: 2px;
-      word-break: break-all;
-    }
-    
+    .print-btn:hover { background: #333; }
+
     @media print {
-      body {
-        background: white;
-        padding: 0;
-      }
-      
-      .receipt {
-        box-shadow: none;
-        border: none;
-        max-width: 100%;
-        padding: 16px;
-      }
-      
-      .no-print {
-        display: none;
-      }
+      body { background: #fff; padding: 0; }
+      .receipt { box-shadow: none; max-width: 100%; padding: 8px; border-radius: 0; }
+      .no-print { display: none !important; }
     }
   </style>
 </head>
 <body>
-  <div class="receipt">
-    <!-- Header -->
-    <div class="header">
-      <div class="restaurant-name">${restaurantName}</div>
-      <div class="restaurant-info">
-        ${restaurantAddress}<br>
-        ${restaurantPhone}<br>
-        ${restaurantEmail || ''}
-      </div>
+
+<div class="receipt">
+
+  <!-- ── HEADER ── -->
+  <div class="header">
+    <div class="brand">${restaurantName}</div>
+    <div class="sub">
+      ${restaurantAddress}<br>
+      ${restaurantPhone}${restaurantEmail ? `<br>${restaurantEmail}` : ''}
     </div>
-
-    <!-- Receipt Title -->
-    <div class="receipt-title">Receipt</div>
-
-    <!-- Order Meta Info -->
-    <div class="meta-info">
-      <div class="meta-row">
-        <span class="meta-label">Order #:</span>
-        <span>${orderNumber}</span>
-      </div>
-      <div class="meta-row">
-        <span class="meta-label">Receipt ID:</span>
-        <span>${receiptId}</span>
-      </div>
-      <div class="meta-row">
-        <span class="meta-label">Date:</span>
-        <span>${formatDateTime(orderDate)}</span>
-      </div>
-      <div class="meta-row">
-        <span class="meta-label">Type:</span>
-        <span>${orderTypeDisplay}</span>
-      </div>
-      ${tableNumber ? `
-      <div class="meta-row">
-        <span class="meta-label">Table:</span>
-        <span>${tableNumber}</span>
-      </div>
-      ` : ''}
-      <div class="meta-row">
-        <span class="meta-label">Server:</span>
-        <span>${serverName}</span>
-      </div>
-      ${customerName ? `
-      <div class="meta-row">
-        <span class="meta-label">Customer:</span>
-        <span>${customerName}</span>
-      </div>
-      ` : ''}
-    </div>
-
-    <!-- Items Section -->
-    <div class="section">
-      <div class="section-title">Items</div>
-      <table class="items-table">
-        <thead>
-          <tr>
-            <th>Qty</th>
-            <th>Item</th>
-            <th style="text-align: right;">Price</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${itemsHtml}
-        </tbody>
-      </table>
-    </div>
-
-    <!-- Totals Section -->
-    <div class="section">
-      <table class="totals-table">
-        <tbody>
-          <tr>
-            <td>Subtotal</td>
-            <td class="text-right">${formatCurrency(subtotal, currency)}</td>
-          </tr>
-          ${taxLine}
-          <tr class="total-row">
-            <td>TOTAL</td>
-            <td class="text-right">${formatCurrency(total, currency)}</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <!-- Payment Info -->
-    <div class="section">
-      <div class="section-title">Payment</div>
-      <table class="totals-table">
-        <tbody>
-          ${paymentInfo}
-        </tbody>
-      </table>
-    </div>
-
-    <!-- Delivery Info -->
-    ${deliveryInfo}
-
-    <!-- Loyalty Points -->
-    ${loyaltySection}
-
-    <!-- Notes -->
-    ${notesSection}
-
-    <!-- Footer -->
-    <div class="footer">
-      <div class="footer-message">Thank you for dining with us!</div>
-      <div class="footer-info">
-        We hope to see you again soon.<br>
-        Receipt ID: ${receiptId}<br>
-        Generated: ${new Date().toLocaleString()}
-      </div>
-    </div>
+    <div class="badge">Official Receipt</div>
   </div>
 
-  <!-- Print Button (hidden when printing) -->
-  <div class="no-print" style="text-align: center; margin-top: 20px;">
-    <button onclick="window.print()" style="
-      padding: 12px 24px;
-      font-size: 1rem;
-      background: #1a1a1a;
-      color: white;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-      font-family: inherit;
-    ">
-      Print Receipt
-    </button>
+  <hr class="line-solid">
+
+  <!-- ── ORDER META ── -->
+  <table class="meta">
+    <tr><td>Order #</td>         <td>${orderNumber}</td></tr>
+    <tr><td>Receipt ID</td>      <td>${receiptId}</td></tr>
+    <tr><td>Date &amp; Time</td> <td>${formatDateTime(orderDate)}</td></tr>
+    <tr><td>Type</td>            <td>${orderTypeDisplay}</td></tr>
+    ${tableNumber  ? `<tr><td>Table</td><td>${tableNumber}</td></tr>` : ''}
+    <tr><td>Served by</td>       <td>${serverName}</td></tr>
+    ${customerName ? `<tr><td>Customer</td><td>${customerName}</td></tr>` : ''}
+  </table>
+
+  <hr class="line-dashed">
+
+  <!-- ── ITEMS ── -->
+  <table class="items">
+    <thead>
+      <tr>
+        <th>Qty</th>
+        <th>Item</th>
+        <th style="text-align:right">Price</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${itemsHtmlNew}
+    </tbody>
+  </table>
+
+  <hr class="line-dashed">
+
+  <!-- ── TOTALS ── -->
+  <table class="totals">
+    <tr><td>Subtotal</td><td>${formatCurrency(subtotal, currency)}</td></tr>
+    ${taxRate > 0 ? `<tr><td>Tax (${taxRate}%)</td><td>${formatCurrency(taxAmount, currency)}</td></tr>` : ''}
+    <tr class="grand"><td>TOTAL</td><td>${formatCurrency(total, currency)}</td></tr>
+  </table>
+
+  <hr class="line-dashed">
+
+  <!-- ── PAYMENT ── -->
+  <div class="payment-row">
+    <span style="color:#555">Payment</span>
+    <span>${paymentMethod}${cardLast4 ? ` ····${cardLast4}` : ''}</span>
+  </div>
+  <div class="payment-row">
+    <span style="color:#555">Status</span>
+    <span class="status-badge ${paymentStatus === 'paid' ? 'status-paid' : 'status-pending'}">${paymentStatus}</span>
+  </div>
+  ${amountPaid && amountPaid !== total ? `
+  <div class="payment-row"><span style="color:#555">Amount Paid</span><span>${formatCurrency(amountPaid, currency)}</span></div>
+  ` : ''}
+  ${change !== undefined && change > 0 ? `
+  <div class="payment-row"><span style="color:#555">Change</span><span>${formatCurrency(change, currency)}</span></div>
+  ` : ''}
+
+  <!-- ── DELIVERY ── -->
+  ${deliveryAddress ? `
+  <hr class="line-dashed">
+  <div style="font-size:11px;color:#555;line-height:1.6">
+    <strong style="color:#111;text-transform:uppercase;letter-spacing:1px;font-size:10px">Delivery</strong><br>
+    ${receipt.deliveryProvider ? `${receipt.deliveryProvider} · ` : ''}${deliveryAddress}
+  </div>` : ''}
+
+  <!-- ── NOTES ── -->
+  ${notes || specialInstructions ? `
+  <hr class="line-dashed">
+  <div class="notes-box">
+    <strong>Note:</strong> ${notes || specialInstructions}
+  </div>` : ''}
+
+  <!-- ── LOYALTY ── -->
+  ${loyaltyPoints && loyaltyPoints.pointsEarned > 0 ? `
+  <hr class="line-dashed">
+  <div class="loyalty-box">
+    <div class="lbl">Points Earned This Visit</div>
+    <div class="pts">+${loyaltyPoints.pointsEarned} pts</div>
+    <div style="font-size:11px;color:#92400e;margin-top:4px">Balance: ${loyaltyPoints.pointsBalance} pts</div>
+  </div>` : ''}
+
+  <hr class="line-solid">
+
+  <!-- ── FOOTER ── -->
+  <div class="footer">
+    <div class="thanks">Thank you for dining with us!</div>
+    We hope to see you again soon.<br>
+    <span style="font-size:10px;color:#aaa">${receiptId} · ${new Date().toLocaleString()}</span>
+    <div class="powered">Powered by SERVV IQ</div>
   </div>
 
-  <script>
-    // Auto-print on load (optional - remove if not desired)
-    // window.onload = function() {
-    //   window.print();
-    // };
-  </script>
+</div>
+
+<!-- Screen-only print button -->
+<button class="print-btn no-print" onclick="window.print()">Print Receipt</button>
+
 </body>
-</html>
-  `;
+</html>`;
 }
 
 // ============================================

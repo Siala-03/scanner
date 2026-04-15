@@ -68,5 +68,25 @@ export function useStaffKPIs() {
     refetch();
   }, []);
 
+  useEffect(() => {
+    const onFocus = () => refetch();
+    const onRestaurantChange = () => refetch();
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        refetch();
+      }
+    };
+
+    window.addEventListener('focus', onFocus);
+    window.addEventListener('restaurantIdChanged', onRestaurantChange);
+    document.addEventListener('visibilitychange', onVisibility);
+
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      window.removeEventListener('restaurantIdChanged', onRestaurantChange);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, []);
+
   return { kpis, isLoading, error, refetch };
 }

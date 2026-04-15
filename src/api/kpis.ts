@@ -24,14 +24,29 @@ function getRestaurantId(): string | null {
   return null;
 }
 
+function normalizeRole(value: unknown): string {
+  return String(value || '').trim().toLowerCase();
+}
+
 function getCurrentStaff(): { id: string; role: string } | null {
   try {
     const raw = localStorage.getItem('authUser');
-    if (!raw) return null;
-    const u = JSON.parse(raw);
-    if (!u?.id || !u?.role) return null;
-    return { id: u.id, role: u.role };
+    if (raw) {
+      const u = JSON.parse(raw);
+      const id = String(u?.id || '').trim();
+      const role = normalizeRole(u?.role);
+      if (id && role) return { id, role };
+    }
+
+    const id = String(localStorage.getItem('staffId') || '').trim();
+    const role = normalizeRole(localStorage.getItem('staffRole'));
+    if (id && role) return { id, role };
+
+    return null;
   } catch {
+    const id = String(localStorage.getItem('staffId') || '').trim();
+    const role = normalizeRole(localStorage.getItem('staffRole'));
+    if (id && role) return { id, role };
     return null;
   }
 }
@@ -193,6 +208,9 @@ export async function getStaffKPIs(): Promise<KPIWithProgress[]> {
   const staff = getCurrentStaff();
   if (!restaurantId || !staff) return [];
 
+  const staffId = String(staff.id).trim();
+  const staffRole = normalizeRole(staff.role);
+
   // Fetch KPIs where this staff's role matches OR they are in assigned_staff_ids
   const { data, error } = await supabaseAdmin
     .from('kpis')
@@ -207,9 +225,11 @@ export async function getStaffKPIs(): Promise<KPIWithProgress[]> {
   const all = (data || []) as any[];
   // Filter to KPIs relevant to this staff member
   const relevant = all.filter((row) => {
-    if (row.staff_role === staff.role) return true;
-    const ids: string[] = row.assigned_staff_ids || [];
-    return ids.includes(staff.id);
+    if (normalizeRole(row.staff_role) === staffRole) return true;
+
+    const ids = Array.isArray(row.assigned_staff_ids) ? row.assigned_staff_ids : [];
+    const normalizedIds = ids.map((id: unknown) => String(id).trim());
+    return normalizedIds.includes(staffId);
   });
 
   if (relevant.length === 0) return [];
@@ -231,7 +251,7 @@ export async function getStaffKPIs(): Promise<KPIWithProgress[]> {
         updated_at: new Date(row.updated_at),
         assigned_staff_ids: row.assigned_staff_ids || [],
       };
-      const progress = await computeProgress(kpi, staff.id);
+      const progress = await computeProgress(kpi, staffId);
       return { ...kpi, progress };
     })
   );
