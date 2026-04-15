@@ -535,29 +535,32 @@ export async function receivePurchaseOrder(
   for (const item of receivedItems) {
     if (!item.received_qty || item.received_qty <= 0) continue;
 
-    const { data: inv } = await supabase
+    // Use supabaseAdmin so RLS never blocks the fetch — same client used for the write below
+    let fetchQuery = supabaseAdmin
       .from('inventory_records')
       .select('stock')
-      .eq('menu_item_id', item.menu_item_id)
-      .eq('restaurant_id', restaurantId)
-      .maybeSingle();
+      .eq('menu_item_id', item.menu_item_id);
+    if (restaurantId) fetchQuery = fetchQuery.eq('restaurant_id', restaurantId);
+
+    const { data: inv } = await fetchQuery.maybeSingle();
 
     const oldStock = inv?.stock ?? 0;
     const newStock = oldStock + item.received_qty;
 
     if (inv) {
       // Existing record — update stock in place
-      await supabaseAdmin
+      let updateQuery = supabaseAdmin
         .from('inventory_records')
         .update({ stock: newStock, updated_at: new Date().toISOString() })
-        .eq('menu_item_id', item.menu_item_id)
-        .eq('restaurant_id', restaurantId);
+        .eq('menu_item_id', item.menu_item_id);
+      if (restaurantId) updateQuery = updateQuery.eq('restaurant_id', restaurantId);
+      await updateQuery;
     } else {
       // No record yet — insert with generated id
       await supabaseAdmin
         .from('inventory_records')
         .insert({
-          id:                  `inv-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          id:                  `inv-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
           menu_item_id:        item.menu_item_id,
           stock:               newStock,
           restaurant_id:       restaurantId,
