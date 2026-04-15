@@ -139,6 +139,7 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
     isLoading,
     refresh,
     upsertInventoryRecords,
+    removeInventoryRecord,
     locations,
   } = useInventoryData();
   const menuCategories = useMemo(() => Array.from(new Set(menuItems.map((m) => m.category))), [menuItems]);
@@ -415,8 +416,10 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
     if (!isManager) return;
     try {
       await apiDeleteInventoryRecord(menuItemId);
-      await refresh();
-      // Show success message
+      // Remove immediately from local state so the card disappears without waiting for a full refresh
+      removeInventoryRecord(menuItemId);
+      // Then sync with the server in the background
+      refresh();
       alert('Inventory item deleted successfully');
     } catch (err) {
       console.error('Failed to delete inventory record', err);

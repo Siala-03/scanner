@@ -1,5 +1,6 @@
 import { supabaseAdmin } from '../lib/supabase';
 import type { Order, CreateOrderInput, UpdateOrderStatusInput } from '../types/orders';
+import { decrementInventoryForOrder } from './inventory';
 
 // Use supabaseAdmin for all order operations so RLS never blocks customers or staff
 const db = supabaseAdmin;
@@ -169,6 +170,12 @@ export async function createOrder(order: CreateOrderInput): Promise<Order> {
   }
 
   if (result.error) throw result.error;
+
+  // Decrement inventory stock for each ordered item (best-effort, does not block order creation)
+  decrementInventoryForOrder(
+    order.items.map(item => ({ menuItemId: item.menuItemId, quantity: item.quantity }))
+  ).catch(err => console.warn('[createOrder] Inventory decrement failed:', err));
+
   return result.data as Order;
 }
 

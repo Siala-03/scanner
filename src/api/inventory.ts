@@ -248,13 +248,54 @@ export async function updateInventoryRecord(
 
 export async function deleteInventoryRecord(menuItemId: string): Promise<void> {
   const restaurantId = getRestaurantId();
-  const { error } = await supabaseAdmin
+  // Build query — only add restaurant_id filter when it's available (undefined breaks the eq filter)
+  let deleteQuery = supabaseAdmin
     .from('inventory_records')
     .delete()
-    .eq('menu_item_id', menuItemId)
-    .eq('restaurant_id', restaurantId);
+    .eq('menu_item_id', menuItemId);
 
+  if (restaurantId) {
+    deleteQuery = deleteQuery.eq('restaurant_id', restaurantId);
+  }
+
+  const { error } = await deleteQuery;
   if (error) throw error;
+}
+
+/**
+ * Decrements inventory stock for each item in an order.
+ * Called after a successful order creation.
+ * Failures are logged but do NOT throw — order creation takes priority over inventory sync.
+ */
+export async function decrementInventoryForOrder(
+  items: Array<{ menuItemId: string; quantity: number }>
+): Promise<void> {
+  const restaurantId = getRestaurantId();
+  if (!restaurantId || !items.length) return;
+
+  await Promise.allSettled(
+    items.map(async ({ menuItemId, quantity }) => {
+      const { data: rec, error: fetchErr } = await supabaseAdmin
+        .from('inventory_records')
+        .select('stock')
+        .eq('menu_item_id', menuItemId)
+        .eq('restaurant_id', restaurantId)
+        .maybeSingle();
+
+      if (fetchErr || !rec) return; // No inventory record for this item — skip silently
+
+      const newStock = Math.max(0, (rec.stock ?? 0) - quantity);
+      const { error: updateErr } = await supabaseAdmin
+        .from('inventory_records')
+        .update({ stock: newStock, updated_at: new Date().toISOString() })
+        .eq('menu_item_id', menuItemId)
+        .eq('restaurant_id', restaurantId);
+
+      if (updateErr) {
+        console.warn(`[decrementInventoryForOrder] Failed to decrement stock for ${menuItemId}:`, updateErr.message);
+      }
+    })
+  );
 }
 
 export async function fetchLowStockItems(): Promise<InventoryRecord[]> {

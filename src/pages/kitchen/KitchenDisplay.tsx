@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { ClockIcon, ChefHatIcon, UtensilsIcon, RefreshCwIcon, CheckCircleIcon, FlameIcon, AlertTriangleIcon, BarChart3Icon, ListOrderedIcon, TrendingUpIcon, LogOutIcon } from 'lucide-react';
+import { ClockIcon, ChefHatIcon, UtensilsIcon, RefreshCwIcon, CheckCircleIcon, FlameIcon, AlertTriangleIcon, BarChart3Icon, ListOrderedIcon, TrendingUpIcon, LogOutIcon, PrinterIcon } from 'lucide-react';
+import { buildReceiptHtml, orderToReceiptData } from '../../utils/receipt';
 import { useSocket } from '../../hooks/useSocket';
 import { useStaffKPIs } from '../../hooks/useKPIs';
 import { KPICard } from '../../components/supervisor/KPICard';
@@ -346,6 +347,39 @@ export function KitchenDisplay({ onLogout, restaurantId, restaurantName }: { onL
     }
   };
 
+  const handlePrintCustomerReceipt = (order: KitchenOrder) => {
+    const fakeOrder = {
+      id: order.id,
+      orderNumber: order.orderNumber,
+      tableNumber: order.tableNumber,
+      status: order.status,
+      total: order.items.reduce((s, i) => s + (i as any).unit_price * i.quantity || 0, 0),
+      items: order.items.map((i: any) => ({
+        quantity: i.quantity,
+        menuItemName: i.name || i.menu_item_name,
+        unitPrice: i.unit_price ?? i.unitPrice ?? 0,
+        totalPrice: (i.unit_price ?? i.unitPrice ?? 0) * i.quantity,
+        specialInstructions: i.notes,
+      })),
+      notes: order.notes,
+      createdAt: new Date(order.createdAt),
+      updatedAt: new Date(),
+    } as any;
+
+    const html = buildReceiptHtml(
+      orderToReceiptData(fakeOrder, {
+        restaurantName: restaurantName || 'Restaurant',
+        restaurantAddress: '',
+        restaurantPhone: '',
+        taxRate: 0,
+        serverName: 'Kitchen',
+        paymentStatus: 'pending',
+      })
+    );
+    const win = window.open('', '_blank', 'width=450,height=900');
+    if (win) { win.document.open(); win.document.write(html); win.document.close(); }
+  };
+
   // Use analytics from backend when available, otherwise calculate from orders
   const stats: KitchenStats = analytics ? {
     totalOrders: analytics.totalOrders || 0,
@@ -562,6 +596,7 @@ export function KitchenDisplay({ onLogout, restaurantId, restaurantName }: { onL
                       onStatusChange={handleStatusChange}
                       onComplete={handleComplete}
                       onPrint={handlePrintReceipt}
+                      onPrintReceipt={handlePrintCustomerReceipt}
                     />
                   ))}
                 </div>
@@ -580,6 +615,7 @@ export function KitchenDisplay({ onLogout, restaurantId, restaurantName }: { onL
                       onStatusChange={handleStatusChange}
                       onComplete={handleComplete}
                       onPrint={handlePrintReceipt}
+                      onPrintReceipt={handlePrintCustomerReceipt}
                     />
                   ))}
                 </div>
@@ -598,6 +634,7 @@ export function KitchenDisplay({ onLogout, restaurantId, restaurantName }: { onL
                       onStatusChange={handleStatusChange}
                       onComplete={handleComplete}
                       onPrint={handlePrintReceipt}
+                      onPrintReceipt={handlePrintCustomerReceipt}
                     />
                   ))}
                 </div>
@@ -612,16 +649,18 @@ export function KitchenDisplay({ onLogout, restaurantId, restaurantName }: { onL
 }
 
 // Order Card Component
-function OrderCard({ 
-  order, 
-  onStatusChange, 
+function OrderCard({
+  order,
+  onStatusChange,
   onComplete,
-  onPrint
-}: { 
-  order: KitchenOrder; 
+  onPrint,
+  onPrintReceipt,
+}: {
+  order: KitchenOrder;
   onStatusChange: (id: string, status: any) => void;
   onComplete: (id: string) => void;
   onPrint: (order: KitchenOrder) => void;
+  onPrintReceipt: (order: KitchenOrder) => void;
 }) {
   const urgency = getUrgency(order.createdAt);
   const config = STATUS_CONFIG[order.status];
@@ -725,12 +764,21 @@ function OrderCard({
             Complete
           </button>
         )}
-        <button
-          onClick={() => onPrint(order)}
-          className="w-full bg-slate-700 hover:bg-slate-600 text-white py-2 rounded-lg font-semibold text-sm uppercase tracking-wider transition-all hover:scale-[1.02] active:scale-[0.98]"
-        >
-          Print Ticket
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => onPrint(order)}
+            className="flex-1 bg-slate-700 hover:bg-slate-600 text-white py-2 rounded-lg font-semibold text-xs uppercase tracking-wider transition-all hover:scale-[1.02] active:scale-[0.98]"
+          >
+            KOT
+          </button>
+          <button
+            onClick={() => onPrintReceipt(order)}
+            className="flex-1 bg-slate-700 hover:bg-slate-600 text-white py-2 rounded-lg font-semibold text-xs uppercase tracking-wider transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-1"
+          >
+            <PrinterIcon className="w-3.5 h-3.5" />
+            Receipt
+          </button>
+        </div>
       </div>
     </div>
   );

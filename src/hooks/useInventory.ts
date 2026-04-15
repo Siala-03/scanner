@@ -59,6 +59,14 @@ export function useInventoryData() {
     });
   }, []);
 
+  const removeInventoryRecord = useCallback((menuItemId: string) => {
+    setInventory(prev => {
+      const next = prev.filter(r => r.menuItemId !== menuItemId);
+      inventoryRef.current = next;
+      return next;
+    });
+  }, []);
+
   const loadAll = useCallback(async () => {
     setIsLoading(true);
     setLoadError(null);
@@ -177,6 +185,7 @@ export function useInventoryData() {
     loadError,
     refresh: loadAll,
     upsertInventoryRecords,
+    removeInventoryRecord,
     // Legacy compat
     joinInventory: () => {},
     socket: { on: () => {}, off: () => {} },

@@ -93,13 +93,13 @@ function OverviewStatCard({
   tone: string;
 }) {
   return (
-    <div className="rounded-2xl border border-slate-700/80 bg-slate-800/90 px-3.5 py-3 sm:px-4 sm:py-4">
+    <div className="rounded-lg border border-slate-700 bg-slate-800 px-3.5 py-3 sm:px-4 sm:py-4">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">{label}</p>
           <p className={`mt-2 text-lg font-bold sm:text-xl ${tone}`}>{value}</p>
         </div>
-        <div className="rounded-xl border border-slate-700 bg-slate-900/80 p-2 text-slate-300">
+        <div className="rounded-lg border border-slate-700 bg-slate-900 p-2 text-slate-300">
           {icon}
         </div>
       </div>
@@ -119,7 +119,7 @@ function PortalSectionHeader({
   tone: string;
 }) {
   return (
-    <div className="flex flex-col gap-3 rounded-2xl border border-slate-800/90 bg-slate-900/70 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex flex-col gap-3 rounded-lg border border-slate-700 bg-slate-800 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
       <div>
         <h2 className="text-base font-semibold text-white sm:text-lg">{title}</h2>
         <p className="mt-1 text-sm text-slate-400">{description}</p>
@@ -154,9 +154,9 @@ function IncomingOrderCard({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, x: -60 }}
       whileHover={{ y: -2 }}
-      className="group relative overflow-hidden rounded-3xl border border-amber-500/20 bg-[linear-gradient(180deg,rgba(30,41,59,0.96),rgba(15,23,42,1))] shadow-[0_18px_50px_-30px_rgba(245,158,11,0.45)]"
+      className="group relative overflow-hidden rounded-lg border border-slate-700 bg-slate-800"
     >
-      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-amber-400/70 to-transparent" />
+      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-amber-400/60 to-transparent" />
       {/* Card Header — always visible */}
       <button
         className="flex w-full items-start justify-between gap-3 p-4 text-left transition-colors group-hover:bg-slate-800/40 sm:items-center"
@@ -164,7 +164,7 @@ function IncomingOrderCard({
       >
         <div className="flex items-center gap-3 min-w-0">
           {/* Table badge */}
-          <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl border border-amber-500/25 bg-amber-500/10 shadow-inner shadow-amber-500/10">
+          <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg border border-amber-500/25 bg-amber-500/10">
             <span className="text-amber-300 font-bold text-sm">T{order.tableNumber ?? '–'}</span>
           </div>
 
@@ -189,8 +189,8 @@ function IncomingOrderCard({
               {order.items.length} item{order.items.length !== 1 ? 's' : ''} · {formatPrice(order.total)} · {timeAgo(order.createdAt)}
             </p>
             <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-              <span className="rounded-full border border-slate-700/80 bg-slate-900/80 px-2 py-1">Needs confirmation</span>
-              <span className="rounded-full border border-slate-700/80 bg-slate-900/80 px-2 py-1">
+              <span className="rounded-full border border-slate-700 bg-slate-900 px-2 py-1">Needs confirmation</span>
+              <span className="rounded-full border border-slate-700 bg-slate-900 px-2 py-1">
                 {isQROrder ? 'Customer self-order' : 'Staff-assisted order'}
               </span>
             </div>
@@ -333,14 +333,14 @@ function ActiveOrderRow({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, x: -60 }}
       whileHover={{ y: -2 }}
-      className="group overflow-hidden rounded-3xl border border-slate-700/90 bg-[linear-gradient(180deg,rgba(30,41,59,0.94),rgba(15,23,42,1))] shadow-[0_18px_45px_-34px_rgba(15,23,42,0.9)]"
+      className="group overflow-hidden rounded-lg border border-slate-700 bg-slate-800"
     >
       <button
         className="flex w-full items-start justify-between gap-3 p-4 text-left sm:items-center"
         onClick={() => setExpanded((v) => !v)}
       >
         <div className="flex items-center gap-3 min-w-0">
-          <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl border border-slate-600 bg-slate-700/70">
+          <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg border border-slate-600 bg-slate-700/70">
             <span className="text-white font-bold text-sm">T{order.tableNumber ?? '–'}</span>
           </div>
           <div className="min-w-0">
@@ -359,11 +359,11 @@ function ActiveOrderRow({
               {order.items.length} item{order.items.length !== 1 ? 's' : ''} · {formatPrice(order.total)} · {timeAgo(order.createdAt)}
             </p>
             <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-500">
-              <span className="rounded-full border border-slate-700/80 bg-slate-900/80 px-2 py-1">
+              <span className="rounded-full border border-slate-700 bg-slate-900 px-2 py-1">
                 {order.requiresKitchen ? 'Kitchen tracked' : 'Service only'}
               </span>
               {order.assignedWaiterId && (
-                <span className="rounded-full border border-slate-700/80 bg-slate-900/80 px-2 py-1">
+                <span className="rounded-full border border-slate-700 bg-slate-900 px-2 py-1">
                   Assigned to you
                 </span>
               )}
@@ -390,7 +390,7 @@ function ActiveOrderRow({
                 Mark Served
               </button>
             )}
-            {order.status === 'served' && onPrintReceipt && (
+            {onPrintReceipt && (
               <button
                 onClick={() => onPrintReceipt(order)}
                 className="px-3 py-1.5 rounded-lg bg-slate-700 text-slate-300 hover:bg-slate-600 text-xs font-medium border border-slate-600 transition-colors flex items-center gap-1"
@@ -449,7 +449,7 @@ function ActiveOrderRow({
                     Mark Served
                   </button>
                 )}
-                {order.status === 'served' && onPrintReceipt && (
+                {onPrintReceipt && (
                   <button
                     onClick={() => onPrintReceipt(order)}
                     className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-slate-700 text-slate-300 hover:bg-slate-600 text-sm transition-colors"
@@ -493,15 +493,15 @@ function TabButton({
   return (
     <button
       onClick={onClick}
-      className={`relative flex shrink-0 items-center gap-1.5 rounded-full px-4 py-2.5 text-sm font-medium transition-colors ${
-        active ? 'bg-amber-500 text-slate-950 shadow-[0_12px_30px_-18px_rgba(245,158,11,0.9)]' : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white'
+      className={`relative flex shrink-0 items-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${
+        active ? 'bg-amber-500 text-slate-900' : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white'
       }`}
     >
       {dot && !active && (
         <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-amber-400 border-2 border-slate-900" />
       )}
       {label}
-      <span className={`px-1.5 py-0.5 rounded-full text-xs font-bold ${active ? 'bg-slate-950/20 text-slate-950' : 'bg-slate-700 text-slate-300'}`}>
+      <span className={`px-1.5 py-0.5 rounded-full text-xs font-bold ${active ? 'bg-slate-900/20 text-slate-900' : 'bg-slate-700 text-slate-300'}`}>
         {count}
       </span>
     </button>
@@ -551,14 +551,16 @@ export function WaiterDashboard({
       .filter((o) => o.status === 'pending')
       .forEach((order) => {
         if (knownOrderIdsRef.current.has(order.id)) return;
+        if (order.tableNumber == null) return;
+        const tableNumber = order.tableNumber;
         // Only notify for orders placed in the last 90 seconds so the initial
         // load of old pending orders doesn't spam the waiter with stale alerts.
         const ageMs = now - new Date(order.createdAt).getTime();
         if (ageMs < 90_000) {
           setSocketCalls((prev) => {
-            const alreadyHas = prev.some((c) => c.tableNumber === order.tableNumber);
+            const alreadyHas = prev.some((c) => c.tableNumber === tableNumber);
             if (alreadyHas) return prev;
-            return [...prev, { tableNumber: order.tableNumber, timestamp: new Date(order.createdAt) }];
+            return [...prev, { tableNumber, timestamp: new Date(order.createdAt) }];
           });
         }
       });
@@ -694,10 +696,10 @@ export function WaiterDashboard({
   }, [incomingOrders.length, activeTab]);
 
   return (
-    <div className="dark min-h-screen bg-[radial-gradient(circle_at_top,_rgba(245,158,11,0.12),_transparent_34%),linear-gradient(180deg,_#0f172a_0%,_#111827_100%)] pb-24 sm:pb-8">
+    <div className="dark min-h-screen bg-slate-900 text-slate-100 pb-24 sm:pb-8">
       {/* ── Header ── */}
-      <div className="sticky top-0 z-20 border-b border-slate-800 bg-slate-950/90 px-4 py-4 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl flex-col gap-4">
+      <div className="sticky top-0 z-50 border-b border-slate-700 bg-slate-800/95 px-4 py-4 backdrop-blur">
+        <div className="mx-auto flex max-w-6xl flex-col gap-4">
           {/* Top row */}
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div className="min-w-0">
@@ -705,7 +707,7 @@ export function WaiterDashboard({
                 <span className="px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-300 text-xs font-semibold uppercase tracking-widest">
                   {restaurantName || 'Restaurant'}
                 </span>
-                <span className="text-xs text-slate-500">· Waiter Portal</span>
+                <span className="text-xs text-slate-400">· Waiter Portal</span>
               </div>
               <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
                 <h1 className="text-xl font-bold text-white sm:text-2xl">
@@ -716,8 +718,8 @@ export function WaiterDashboard({
                 </p>
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-400">
-                <span className="rounded-full border border-slate-700 bg-slate-900/75 px-2.5 py-1">Assigned tables: {waiter.assignedTables?.length || 0}</span>
-                <span className="rounded-full border border-slate-700 bg-slate-900/75 px-2.5 py-1">Status: on shift</span>
+                <span className="rounded-full border border-slate-700 bg-slate-900 px-2.5 py-1">Assigned tables: {waiter.assignedTables?.length || 0}</span>
+                <span className="rounded-full border border-slate-700 bg-slate-900 px-2.5 py-1">Status: on shift</span>
               </div>
             </div>
 
@@ -725,14 +727,14 @@ export function WaiterDashboard({
               {/* Take table order */}
               <button
                 onClick={() => setShowQRScanner(true)}
-                className="hidden items-center gap-2 rounded-xl bg-amber-500 px-3.5 py-2.5 text-sm font-semibold text-slate-950 transition-colors hover:bg-amber-400 sm:flex"
+                className="hidden items-center gap-2 rounded-lg bg-amber-500 px-3.5 py-2.5 text-sm font-semibold text-slate-900 transition-colors hover:bg-amber-400 sm:flex"
               >
                 <QrCodeIcon className="w-4 h-4" />
                 <span>Take Order</span>
               </button>
               <button
                 onClick={onLogout}
-                className="p-2 rounded-xl bg-slate-800 text-slate-400 hover:text-red-400 hover:bg-slate-700 transition-colors"
+                className="p-2 rounded-lg bg-slate-700/60 text-slate-200 hover:bg-red-600 hover:text-white transition-colors"
                 title="Logout"
               >
                 <LogOutIcon className="w-4 h-4" />
@@ -778,11 +780,11 @@ export function WaiterDashboard({
 
       {/* ── Waiter Calls ── */}
       {allWaiterCalls.length > 0 && (
-        <div className="mx-auto max-w-7xl px-4 pt-4 space-y-2">
+        <div className="mx-auto max-w-6xl px-4 pt-4 space-y-2">
           {allWaiterCalls.map((call) => (
             <div
               key={call.tableNumber}
-              className="flex flex-col gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3 sm:flex-row sm:items-center sm:justify-between"
+              className="flex flex-col gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 sm:flex-row sm:items-center sm:justify-between"
             >
               <div className="flex items-center gap-3">
                 <BellIcon className="w-5 h-5 text-amber-400" />
@@ -803,7 +805,7 @@ export function WaiterDashboard({
       )}
 
       {/* ── Main Content ── */}
-      <div className="mx-auto max-w-7xl px-4 py-5">
+      <div className="mx-auto max-w-6xl px-4 py-5">
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
           {/* ── Order Column ── */}
           <div className="space-y-4">
@@ -856,7 +858,7 @@ export function WaiterDashboard({
                     tone="border-amber-500/25 bg-amber-500/10 text-amber-200"
                   />
                   {/* Instruction banner */}
-                  <div className="rounded-2xl border border-blue-500/20 bg-blue-500/5 px-4 py-3 flex items-start gap-3">
+                  <div className="rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 flex items-start gap-3">
                     <SmartphoneIcon className="w-4 h-4 text-blue-400 flex-shrink-0 mt-0.5" />
                     <p className="text-sm text-blue-200">
                       New orders from the customer QR menu appear here. Expand each order, verify with the customer, then approve — food items are automatically sent to the kitchen as a KOT.
@@ -899,7 +901,7 @@ export function WaiterDashboard({
                     count={kitchenOrders.length}
                     tone="border-orange-500/25 bg-orange-500/10 text-orange-200"
                   />
-                  <div className="rounded-2xl border border-orange-500/20 bg-orange-500/5 px-4 py-3 flex items-start gap-3">
+                  <div className="rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 flex items-start gap-3">
                     <UtensilsIcon className="w-4 h-4 text-orange-400 flex-shrink-0 mt-0.5" />
                     <p className="text-sm text-orange-200">
                       These orders have been verified and sent to the kitchen. Click "Mark Ready" once the kitchen signals completion.
@@ -919,6 +921,7 @@ export function WaiterDashboard({
                           key={order.id}
                           order={order}
                           onMarkReady={handleMarkReady}
+                          onPrintReceipt={handlePrintReceipt}
                         />
                       ))}
                     </AnimatePresence>
@@ -941,7 +944,7 @@ export function WaiterDashboard({
                     count={readyOrders.length}
                     tone="border-green-500/25 bg-green-500/10 text-green-200"
                   />
-                  <div className="rounded-2xl border border-green-500/20 bg-green-500/5 px-4 py-3 flex items-start gap-3">
+                  <div className="rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 flex items-start gap-3">
                     <CheckCircleIcon className="w-4 h-4 text-green-400 flex-shrink-0 mt-0.5" />
                     <p className="text-sm text-green-200">
                       These orders are ready to be served. Click "Mark Served" once delivered to the table.
@@ -1009,9 +1012,9 @@ export function WaiterDashboard({
 
           {/* ── Sidebar ── */}
           <aside className="grid gap-4 sm:grid-cols-2 xl:sticky xl:top-28 xl:grid-cols-1 xl:self-start">
-            <div className="rounded-3xl border border-slate-700 bg-[linear-gradient(180deg,rgba(51,65,85,0.92),rgba(15,23,42,0.98))] p-4">
+            <div className="rounded-lg border border-slate-700 bg-slate-800 p-4">
               <div className="flex items-center gap-3">
-                <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-amber-500/25 bg-amber-500/10 text-lg font-bold text-amber-300">
+                <div className="flex h-14 w-14 items-center justify-center rounded-lg border border-amber-500/25 bg-amber-500/10 text-lg font-bold text-amber-300">
                   {waiter.name
                     .split(' ')
                     .slice(0, 2)
@@ -1026,7 +1029,7 @@ export function WaiterDashboard({
               </div>
             </div>
             {/* Shift summary */}
-            <div className="rounded-2xl border border-slate-700 bg-slate-800/80 p-4">
+            <div className="rounded-lg border border-slate-700 bg-slate-800 p-4">
               <p className="text-xs uppercase tracking-widest text-slate-500 mb-3">Shift Summary</p>
               <div className="space-y-3">
                 <div className="flex justify-between text-sm">
@@ -1050,10 +1053,10 @@ export function WaiterDashboard({
 
             {/* KPIs */}
             {kpis.length > 0 && (
-              <div className="rounded-2xl border border-slate-700 bg-slate-800/80 p-4">
+              <div className="rounded-lg border border-slate-700 bg-slate-800 p-4">
                 <div className="mb-3 flex items-center justify-between gap-2">
                   <p className="text-xs uppercase tracking-widest text-slate-500">Daily Targets</p>
-                  <span className="rounded-full border border-slate-700 bg-slate-900/70 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+                  <span className="rounded-full border border-slate-700 bg-slate-900 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
                     Live progress
                   </span>
                 </div>
@@ -1079,7 +1082,7 @@ export function WaiterDashboard({
             )}
 
             {/* Connection card */}
-            <div className="rounded-2xl border border-slate-700 bg-slate-800/80 p-4">
+            <div className="rounded-lg border border-slate-700 bg-slate-800 p-4">
               <p className="text-xs uppercase tracking-widest text-slate-500 mb-3">Customer Menu</p>
               <div className="flex items-center gap-2 mb-2">
                 <span className="w-2 h-2 rounded-full bg-emerald-400" />
@@ -1089,7 +1092,7 @@ export function WaiterDashboard({
                 Orders from QR code scans appear in "Incoming" instantly.
               </p>
               {incomingOrders.length > 0 && (
-                <div className="mt-3 rounded-xl bg-amber-500/10 border border-amber-500/20 px-3 py-2 flex items-center gap-2">
+                <div className="mt-3 rounded-lg bg-amber-500/10 border border-amber-500/20 px-3 py-2 flex items-center gap-2">
                   <BellIcon className="w-4 h-4 text-amber-400" />
                   <span className="text-sm text-amber-200 font-medium">{incomingOrders.length} order{incomingOrders.length !== 1 ? 's' : ''} waiting</span>
                 </div>
@@ -1145,7 +1148,7 @@ export function WaiterDashboard({
 
       <button
         onClick={() => setShowQRScanner(true)}
-        className="fixed bottom-5 right-4 z-20 flex items-center gap-2 rounded-full bg-amber-500 px-4 py-3 text-sm font-semibold text-slate-950 shadow-[0_16px_40px_-18px_rgba(245,158,11,0.9)] transition-colors hover:bg-amber-400 sm:hidden"
+        className="fixed bottom-5 right-4 z-20 flex items-center gap-2 rounded-full bg-amber-500 px-4 py-3 text-sm font-semibold text-slate-900 shadow-[0_16px_40px_-18px_rgba(245,158,11,0.9)] transition-colors hover:bg-amber-400 sm:hidden"
       >
         <QrCodeIcon className="h-4 w-4" />
         Take Order
