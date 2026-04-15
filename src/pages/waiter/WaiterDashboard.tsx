@@ -32,6 +32,8 @@ import { supabaseAdmin } from '../../lib/supabase';
 const KITCHEN_CATEGORIES = new Set(['breakfast', 'lunch', 'dinner', 'dessert', 'desserts']);
 
 function itemNeedsKitchen(item: OrderItem): boolean {
+  if (item.menuItem?.requiresKitchen === true) return true;
+  if (item.menuItem?.requiresKitchen === false) return false;
   const cat = String(item.menuItem?.category ?? '').toLowerCase();
   return KITCHEN_CATEGORIES.has(cat);
 }
