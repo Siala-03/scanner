@@ -2,6 +2,7 @@ import React from 'react';
 import { MinusIcon, PlusIcon, TrashIcon } from 'lucide-react';
 import { CartItem as CartItemType } from '../../types';
 import { formatPrice } from '../../utils/currency';
+import { getEffectivePrice } from '../../utils/pricing';
 interface CartItemProps {
   item: CartItemType;
   onUpdateQuantity: (itemId: string, quantity: number) => void;
@@ -12,7 +13,7 @@ export function CartItemCard({
   onUpdateQuantity,
   onRemove
 }: CartItemProps) {
-  const subtotal = item.menuItem.price * item.quantity;
+  const subtotal = getEffectivePrice(item.menuItem) * item.quantity;
   return (
     <div className="flex gap-4 p-4 bg-white rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
       <div className="text-4xl flex-shrink-0">{item.menuItem.emoji}</div>
@@ -22,7 +23,7 @@ export function CartItemCard({
           {item.menuItem.name}
         </h4>
         <p className="text-sm text-slate-500">
-          {formatPrice(item.menuItem.price)} each
+          {formatPrice(getEffectivePrice(item.menuItem))} each
         </p>
 
         <div className="flex items-center justify-between mt-3">

@@ -35,7 +35,7 @@ const categoryNames: Record<string, string> = {
 };
 
 export function MenuPage({ onAddToCart }: MenuPageProps) {
-  const { menuItems, categories, isLoading, error, refetch } = useMenu();
+  const { menuItems, categories, isLoading, error, refresh: refetch } = useMenu();
   const [activeCategory, setActiveCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null);

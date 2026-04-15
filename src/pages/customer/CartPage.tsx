@@ -18,7 +18,7 @@ interface CartPageProps {
     customer?: Customer | null,
     delivery?: { provider: string; address: string },
     loyaltyRewardId?: string
-  ) => void;
+  ) => Promise<void>;
   tableNumber: number;
   onCallWaiter: () => void;
 }
@@ -102,15 +102,16 @@ export function CartPage({
 
   const handleSubmitOrder = async () => {
     setIsOrdering(true);
+    setRewardError('');
     try {
       const delivery = isDelivery && deliveryProvider
         ? { provider: deliveryProvider, address: deliveryAddress }
         : undefined;
-      onPlaceOrder(specialInstructions, identifiedCustomer, delivery, appliedReward?.id);
+      await onPlaceOrder(specialInstructions, identifiedCustomer, delivery, appliedReward?.id);
       setOrderPlaced(true);
     } catch (err) {
       console.error('Place order failed', err);
-      setRewardError('Unable to place order right now. Please try again.');
+      setRewardError(err instanceof Error ? err.message : 'Unable to place order right now. Please try again.');
     } finally {
       setIsOrdering(false);
     }

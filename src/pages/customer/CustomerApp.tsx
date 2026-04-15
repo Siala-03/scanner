@@ -23,7 +23,7 @@ interface CustomerAppProps {
   delivery?: { provider: string; address: string },
   loyaltyRewardId?: string
   )
-  => void;
+  => Promise<void>;
   onCallWaiter: () => void;
 }
 type CustomerTab = 'menu' | 'cart' | 'orders';
@@ -83,17 +83,17 @@ export function CustomerApp({
     setCartItems((prev) => prev.filter((item) => item.menuItem.id !== itemId));
   }, []);
   const handleConfirmOrder = useCallback(
-    (
+    async (
       specialInstructions: string,
       customer?: Customer | null,
       delivery?: { provider: string; address: string },
       loyaltyRewardId?: string
-    ) => {
+    ): Promise<void> => {
       if (typeof onPlaceOrder !== 'function') {
         console.error('onPlaceOrder prop is missing or not a function');
-        return;
+        throw new Error('Order placement is not available. Please refresh and try again.');
       }
-      onPlaceOrder(tableNumber, cartItems, specialInstructions, customer, delivery, loyaltyRewardId);
+      await onPlaceOrder(tableNumber, cartItems, specialInstructions, customer, delivery, loyaltyRewardId);
       setCartItems([]);
       setActiveTab('orders');
     },
