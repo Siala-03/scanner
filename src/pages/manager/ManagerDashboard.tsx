@@ -52,9 +52,9 @@ export function ManagerDashboard({ onNavigate, totalOrders, activeOrders, served
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
           <div className="rounded-xl border border-slate-700 p-3 bg-slate-800/70">
-            <div className="text-xs uppercase tracking-wide text-slate-400">Total Orders</div>
+            <div className="text-xs uppercase tracking-wide text-slate-400">Orders Today</div>
             <div className="mt-2 text-2xl font-semibold text-gray-100">{totalOrders}</div>
-            <div className="text-xs text-slate-300 mt-1">All-time</div>
+            <div className="text-xs text-slate-300 mt-1">Daily order count</div>
           </div>
           <div className="rounded-xl border border-slate-700 p-3 bg-slate-800/70">
             <div className="text-xs uppercase tracking-wide text-slate-400">Active Orders</div>
@@ -66,15 +66,23 @@ export function ManagerDashboard({ onNavigate, totalOrders, activeOrders, served
             <div className="mt-2 text-2xl font-semibold text-gray-100">{servedOrders}</div>
             <div className="text-xs text-slate-300 mt-1">Completed today</div>
           </div>
-          <div className="rounded-xl border border-slate-700 p-3 bg-slate-800/70">
-            <div className="text-xs uppercase tracking-wide text-slate-400">Tables</div>
-            <div className="mt-2 text-2xl font-semibold text-gray-100">{tableCount}</div>
-            <div className="text-xs text-slate-300 mt-1">Configured tables</div>
+          <div className="rounded-xl border border-emerald-500/30 p-3 bg-emerald-500/5">
+            <div className="text-xs uppercase tracking-wide text-emerald-400">Revenue Today</div>
+            <div className="mt-2 text-2xl font-semibold text-emerald-400">{formatPrice(todaysRevenue)}</div>
+            <div className="text-xs text-slate-300 mt-1">Served orders only</div>
           </div>
         </div>
 
         {/* Inventory KPIs */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+          <button 
+            onClick={() => onNavigate('qrcodes')}
+            className="rounded-xl border border-slate-700 p-3 bg-slate-800/70 hover:bg-slate-800 transition text-left"
+          >
+            <div className="text-xs uppercase tracking-wide text-slate-400">Tables Configured</div>
+            <div className="mt-2 text-2xl font-semibold text-gray-100">{tableCount}</div>
+            <div className="text-xs text-slate-300 mt-1">Service capacity</div>
+          </button>
           <button 
             onClick={() => onNavigate('inventory')}
             className="rounded-xl border border-slate-700 p-3 bg-slate-800/70 hover:bg-slate-800 transition text-left"
@@ -99,13 +107,13 @@ export function ManagerDashboard({ onNavigate, totalOrders, activeOrders, served
             <div className="mt-2 text-2xl font-semibold text-red-400">{analytics.outOfStockCount}</div>
             <div className="text-xs text-slate-300 mt-1">Immediate action</div>
           </button>
-          <button 
-            onClick={() => onNavigate('inventory')}
-            className="rounded-xl border border-emerald-500/30 p-3 bg-emerald-500/5 hover:bg-emerald-500/10 transition text-left"
+          <button
+            onClick={() => onNavigate('analytics')}
+            className="rounded-xl border border-sky-500/30 p-3 bg-sky-500/5 hover:bg-sky-500/10 transition text-left"
           >
-            <div className="text-xs uppercase tracking-wide text-emerald-400">Stock Value</div>
-            <div className="mt-2 text-2xl font-semibold text-emerald-400">{formatPrice(analytics.totalStockValue)}</div>
-            <div className="text-xs text-slate-300 mt-1">Total value</div>
+            <div className="text-xs uppercase tracking-wide text-sky-400">Stock Value</div>
+            <div className="mt-2 text-2xl font-semibold text-sky-400">{formatPrice(analytics.totalStockValue)}</div>
+            <div className="text-xs text-slate-300 mt-1">Current inventory value</div>
           </button>
         </div>
 

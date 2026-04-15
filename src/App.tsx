@@ -158,16 +158,29 @@ export function App() {
     window.history.pushState({}, '', '/supplier');
   };
 
-  const managerTotalOrders = orders.length;
+  const isSameDay = (value: Date | string | undefined, dayStart: Date) => {
+    if (!value) return false;
+    const dt = new Date(value);
+    if (Number.isNaN(dt.getTime())) return false;
+    return dt >= dayStart;
+  };
+
   const managerActiveOrders = orders.filter((order) => ['pending', 'verified', 'preparing', 'ready'].includes(order.status)).length;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
+  const managerTotalOrders = orders.filter((order) => isSameDay(order.createdAt, today)).length;
   // Served orders for TODAY only (matches the "Completed today" label on the dashboard card)
   const managerServedOrders = orders.filter(
-    (order) => order.status === 'served' && new Date(order.createdAt) >= today
+    (order) =>
+      order.status === 'served' &&
+      (isSameDay(order.servedAt, today) || isSameDay(order.updatedAt, today) || isSameDay(order.createdAt, today))
   ).length;
   const managerTodaysRevenue = orders
-    .filter((order) => new Date(order.createdAt) >= today && order.status === 'served')
+    .filter(
+      (order) =>
+        order.status === 'served' &&
+        (isSameDay(order.servedAt, today) || isSameDay(order.updatedAt, today) || isSameDay(order.createdAt, today))
+    )
     .reduce((sum, order) => sum + (typeof order.total === 'number' ? order.total : 0), 0);
 
   const getHourKey = (date: Date) => `${date.getHours().toString().padStart(2, '0')}:00`;
