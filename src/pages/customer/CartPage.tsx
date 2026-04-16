@@ -191,33 +191,19 @@ export function CartPage({
 
         {/* Cart items */}
         <div className="space-y-3 mb-6">
-          <AnimatePresence mode="popLayout">
-            {cartItems.map((item) =>
+          {cartItems.map((item) =>
             <motion.div
               key={item.menuItem.id}
-              layout
-              initial={{
-                opacity: 0,
-                x: -20
-              }}
-              animate={{
-                opacity: 1,
-                x: 0
-              }}
-              exit={{
-                opacity: 0,
-                x: 20,
-                height: 0
-              }}>
-
-                <CartItemCard
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.15 }}>
+              <CartItemCard
                 item={item}
                 onUpdateQuantity={onUpdateQuantity}
                 onRemove={onRemoveItem} />
-
-              </motion.div>
-            )}
-          </AnimatePresence>
+            </motion.div>
+          )}
         </div>
 
         {/* Customer identification for loyalty program */}

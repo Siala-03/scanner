@@ -79,8 +79,9 @@ async function fetchKitchenOrders(restaurantId?: string): Promise<KitchenOrder[]
   try {
     const data = await fetchKitchenOrdersFromDb(restaurantId);
     return data
-      // Only explicit kitchen orders should appear.
-      .filter((o: any) => (o.requiresKitchen ?? o.requires_kitchen) === true)
+      // Show orders unless explicitly marked as non-kitchen (e.g. drinks).
+      // null/undefined means the column may not exist in this schema — show by default.
+      .filter((o: any) => (o.requiresKitchen ?? o.requires_kitchen) !== false)
       .map((o: any) => ({
         id: o.id,
         orderNumber: o.orderNumber || o.order_number,
@@ -177,8 +178,8 @@ export function KitchenDisplay({ onLogout, restaurantId, restaurantName }: { onL
     if (restaurantId && orderRestaurantId && orderRestaurantId !== restaurantId) return;
 
     const requiresKitchen = rawOrder.requiresKitchen ?? rawOrder.requires_kitchen;
-    // Only explicit kitchen orders should appear.
-    if (requiresKitchen !== true) return;
+    // Hide only if explicitly marked as non-kitchen (e.g. pure drink orders).
+    if (requiresKitchen === false) return;
 
     const status = rawOrder.status;
     if (!['pending', 'verified', 'preparing', 'ready'].includes(status)) return;

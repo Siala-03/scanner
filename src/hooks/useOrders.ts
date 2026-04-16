@@ -202,7 +202,7 @@ export function useOrders(): UseOrdersReturn {
     };
   }, [restaurantId, loadOrders]);
 
-  const kitchenCategories = new Set(['breakfast', 'lunch', 'dinner', 'dessert', 'desserts']);
+  const kitchenCategories = new Set(['breakfast', 'lunch', 'dinner', 'dessert', 'desserts', 'snacks']);
 
   const isFoodOrder = (items: CartItem[]) =>
     items.some((item) => {
