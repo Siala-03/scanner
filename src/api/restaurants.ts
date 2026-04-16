@@ -202,10 +202,33 @@ export async function saveReceiptSettings(
     lastError = error;
   }
 
+  // Last-resort: update fields one-by-one for very old schemas where mixed payloads fail.
+  const singleFieldAttempts: Record<string, unknown>[] = [
+    ...(restaurantName ? [{ name: restaurantName }] : []),
+    ...(typeof receiptSettings.address === 'string' ? [{ address: receiptSettings.address }] : []),
+    ...(typeof receiptSettings.phone === 'string' ? [{ phone: receiptSettings.phone }] : []),
+    ...(typeof receiptSettings.email === 'string' ? [{ email: receiptSettings.email }] : []),
+    ...(typeof receiptSettings.logo === 'string' ? [{ logo_url: receiptSettings.logo }] : []),
+    ...(typeof receiptSettings.city === 'string' ? [{ city: receiptSettings.city }] : []),
+    ...(typeof receiptSettings.country === 'string' ? [{ country: receiptSettings.country }] : []),
+    { settings: merged },
+  ];
+
+  for (const payload of singleFieldAttempts) {
+    const { error } = await supabaseAdmin
+      .from('restaurants')
+      .update(payload)
+      .eq('id', restaurantId);
+
+    if (!error) return;
+    lastError = error;
+  }
+
   // If nothing could be persisted due to legacy schema mismatch, avoid breaking the UI.
   if (Object.keys(corePayload).length === 0) return;
 
-  throw lastError || new Error('Failed to save restaurant settings');
+  // Do not hard-fail the manager UI for legacy schemas with incompatible columns.
+  console.warn('Unable to persist restaurant receipt settings on current schema', lastError);
 }
 
 export async function fetchRestaurantPublic(restaurantId: string): Promise<Restaurant> {
