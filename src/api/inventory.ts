@@ -902,6 +902,41 @@ export async function computeInventoryAnalytics(): Promise<InventoryAnalytics> {
 // ── Locations / Forecasting (stubs — tables may not exist yet) ───────────────
 
 export async function fetchLocations() { return []; }
-export async function fetchForecasts() { return []; }
-export async function generateForecasts() { return { success: true, count: 0, forecasts: [] }; }
-export async function fetchForecastAlerts() { return []; }
+
+type ForecastGenerateResponse = {
+  success: boolean;
+  count: number;
+  forecasts: any[];
+};
+
+export async function fetchForecasts() {
+  try {
+    const forecasts = await apiRequest<any[]>('/api/forecasting');
+    return Array.isArray(forecasts) ? forecasts : [];
+  } catch (error) {
+    console.error('fetchForecasts error:', error);
+    return [];
+  }
+}
+
+export async function generateForecasts() {
+  const payload = await apiRequest<ForecastGenerateResponse>('/api/forecasting/generate', {
+    method: 'POST',
+  });
+
+  return {
+    success: Boolean(payload?.success),
+    count: Number(payload?.count || 0),
+    forecasts: Array.isArray(payload?.forecasts) ? payload.forecasts : [],
+  };
+}
+
+export async function fetchForecastAlerts() {
+  try {
+    const alerts = await apiRequest<any[]>('/api/forecasting/alerts');
+    return Array.isArray(alerts) ? alerts : [];
+  } catch (error) {
+    console.error('fetchForecastAlerts error:', error);
+    return [];
+  }
+}
