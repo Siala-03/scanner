@@ -196,11 +196,10 @@ export async function createOrder(order: CreateOrderInput): Promise<Order> {
 
   let result = await db.from('orders').insert(fullPayload).select().single();
 
-  // If the full insert fails (e.g. some columns don't exist in this schema),
-  // retry with only the guaranteed-core columns.
+  // Fallback 1: remove assigned_waiter_id (may not exist in schema)
   if (result.error) {
-    console.warn('[createOrder] Full insert failed, retrying with minimal columns:', result.error.message);
-    const minimalPayload = {
+    console.warn('[createOrder] Full insert failed, retrying without assigned_waiter_id:', result.error.message);
+    const payload2 = {
       id: orderId,
       order_number: orderNumber,
       table_number: order.tableNumber,
@@ -209,19 +208,38 @@ export async function createOrder(order: CreateOrderInput): Promise<Order> {
       customer_id: order.customerId || null,
       status: 'pending',
       items,
+      subtotal: total,
+      tax: 0,
       total,
       notes: order.notes || null,
-      requires_kitchen: order.requiresKitchen ?? false,
+      requires_kitchen: order.requiresKitchen ?? true,
+      payment_status: 'unpaid',
       restaurant_id: restaurantId,
-      // Intentionally omitting assigned_waiter_id, subtotal, tax, etc.
-      // — these columns may not exist in all deployed schemas
     };
-    result = await db.from('orders').insert(minimalPayload).select().single();
+    result = await db.from('orders').insert(payload2).select().single();
   }
 
-  // Last-resort fallback: only the absolute bare-minimum columns that must exist
+  // Fallback 2: also remove requires_kitchen (may not exist in schema)
   if (result.error) {
-    console.warn('[createOrder] Minimal insert failed, retrying with core-only columns:', result.error.message);
+    console.warn('[createOrder] Retrying without requires_kitchen:', result.error.message);
+    const payload3 = {
+      id: orderId,
+      order_number: orderNumber,
+      table_number: order.tableNumber,
+      customer_name: order.customerName || null,
+      customer_id: order.customerId || null,
+      status: 'pending',
+      items,
+      total,
+      notes: order.notes || null,
+      restaurant_id: restaurantId,
+    };
+    result = await db.from('orders').insert(payload3).select().single();
+  }
+
+  // Fallback 3: absolute bare minimum
+  if (result.error) {
+    console.warn('[createOrder] Retrying with core-only columns:', result.error.message);
     const corePayload = {
       id: orderId,
       table_number: order.tableNumber,

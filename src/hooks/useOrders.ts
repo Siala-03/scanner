@@ -203,13 +203,20 @@ export function useOrders(): UseOrdersReturn {
     };
   }, [restaurantId, loadOrders]);
 
-  const kitchenCategories = new Set(['breakfast', 'lunch', 'dinner', 'dessert', 'desserts', 'snacks']);
+  // Categories that are explicitly bar/beverage — everything else goes to kitchen.
+  // Using a blacklist is safer: unknown or new categories default to kitchen.
+  const drinkCategories = new Set([
+    'alcoholic-drinks', 'beers', 'wine', 'soft-drinks',
+    'drinks', 'beverages', 'cocktails', 'bar',
+  ]);
 
   const isFoodOrder = (items: CartItem[]) =>
     items.some((item) => {
-      if (item.menuItem.requiresKitchen === true) return true;
+      if (item.menuItem.requiresKitchen === false) return false; // explicitly bar-only
+      if (item.menuItem.requiresKitchen === true) return true;  // explicitly kitchen
       const category = String(item.menuItem.category ?? '').trim().toLowerCase();
-      return kitchenCategories.has(category);
+      if (!category || category === 'unknown') return true; // unknown → assume kitchen
+      return !drinkCategories.has(category);
     });
 
   const buildOrderItemPayload = (item: CartItem) => ({

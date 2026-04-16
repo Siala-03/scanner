@@ -29,12 +29,21 @@ import { ReceiptShareModal } from '../../components/ui/ReceiptShareModal';
 import { supabaseAdmin } from '../../lib/supabase';
 
 // ─── Kitchen detection ────────────────────────────────────────────────────────
-const KITCHEN_CATEGORIES = new Set(['breakfast', 'lunch', 'dinner', 'dessert', 'desserts', 'snacks']);
+// Blacklist: these categories are bar/beverage only — everything else goes to kitchen.
+const DRINK_CATEGORIES = new Set([
+  'alcoholic-drinks', 'beers', 'wine', 'soft-drinks',
+  'drinks', 'beverages', 'cocktails', 'bar',
+]);
 
 function itemNeedsKitchen(item: OrderItem): boolean {
-  if (item.menuItem?.requiresKitchen === true) return true;
-  const cat = String(item.menuItem?.category ?? '').trim().toLowerCase();
-  return KITCHEN_CATEGORIES.has(cat);
+  if (item.menuItem?.requiresKitchen === false) return false; // explicitly bar-only
+  if (item.menuItem?.requiresKitchen === true) return true;  // explicitly kitchen
+  // Fall back to category: check stored category on item OR on menuItem
+  const cat = String(
+    item.menuItem?.category ?? (item as any).category ?? ''
+  ).trim().toLowerCase();
+  if (!cat || cat === 'unknown') return true; // unknown → assume kitchen
+  return !DRINK_CATEGORIES.has(cat);
 }
 
 // ─── Props ───────────────────────────────────────────────────────────────────
@@ -658,10 +667,12 @@ export function WaiterDashboard({
 
   // ── Handlers ──
   const handleApprove = (order: Order) => {
-    // requiresKitchen may be null/undefined when the DB column doesn't exist —
-    // treat null as "kitchen" (safe default). Only explicit false means bar-only.
+    // If requiresKitchen is explicitly false → bar-only order, mark ready immediately.
+    // For null/undefined (column may not exist), fall back to item-level check.
+    // itemNeedsKitchen uses a drink-category blacklist so unknowns default to kitchen.
     const shouldRouteToKitchen =
-      order.requiresKitchen !== false || order.items.some(itemNeedsKitchen);
+      order.requiresKitchen === true ||
+      (order.requiresKitchen !== false && order.items.some(itemNeedsKitchen));
     const nextStatus = shouldRouteToKitchen ? 'verified' : 'ready';
     onUpdateOrderStatus(order.id, nextStatus, { assignedWaiterId: waiter.id });
   };
