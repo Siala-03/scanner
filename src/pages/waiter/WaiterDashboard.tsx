@@ -29,7 +29,7 @@ import { ReceiptShareModal } from '../../components/ui/ReceiptShareModal';
 import { supabaseAdmin } from '../../lib/supabase';
 
 // ─── Kitchen detection ────────────────────────────────────────────────────────
-const KITCHEN_CATEGORIES = new Set(['breakfast', 'lunch', 'dinner', 'dessert', 'desserts']);
+const KITCHEN_CATEGORIES = new Set(['breakfast', 'lunch', 'dinner', 'dessert', 'desserts', 'snacks']);
 
 function itemNeedsKitchen(item: OrderItem): boolean {
   if (item.menuItem?.requiresKitchen === true) return true;
@@ -658,7 +658,10 @@ export function WaiterDashboard({
 
   // ── Handlers ──
   const handleApprove = (order: Order) => {
-    const shouldRouteToKitchen = order.requiresKitchen === true || order.items.some(itemNeedsKitchen);
+    // requiresKitchen may be null/undefined when the DB column doesn't exist —
+    // treat null as "kitchen" (safe default). Only explicit false means bar-only.
+    const shouldRouteToKitchen =
+      order.requiresKitchen !== false || order.items.some(itemNeedsKitchen);
     const nextStatus = shouldRouteToKitchen ? 'verified' : 'ready';
     onUpdateOrderStatus(order.id, nextStatus, { assignedWaiterId: waiter.id });
   };

@@ -20,6 +20,7 @@ const normalizeOrderPayload = (rawOrder: any): Order | undefined => {
       prepTime: item.menuItem?.prepTime ?? item.prepTime ?? 0,
       isAvailable: item.menuItem?.isAvailable ?? item.is_available ?? true,
       isPopular: item.menuItem?.isPopular ?? item.is_popular ?? false,
+      requiresKitchen: item.menuItem?.requiresKitchen ?? item.requiresKitchen ?? item.requires_kitchen,
     };
 
     return {
@@ -217,6 +218,8 @@ export function useOrders(): UseOrdersReturn {
     quantity: item.quantity,
     unitPrice: getEffectivePrice(item.menuItem),
     notes: item.specialInstructions,
+    category: item.menuItem.category,
+    requiresKitchen: item.menuItem.requiresKitchen,
   });
 
   const buildLocalOrderItem = (item: CartItem) => ({

@@ -153,6 +153,8 @@ export async function createOrder(order: CreateOrderInput): Promise<Order> {
     unit_price: item.unitPrice,
     total_price: item.quantity * item.unitPrice,
     notes: item.notes || null,
+    category: (item as any).category || null,
+    requires_kitchen: (item as any).requiresKitchen ?? null,
     status: 'pending'
   }));
 

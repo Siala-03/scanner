@@ -914,7 +914,7 @@ export async function fetchForecasts() {
     const forecasts = await apiRequest<any[]>('/api/forecasting');
     return Array.isArray(forecasts) ? forecasts : [];
   } catch (error) {
-    console.error('fetchForecasts error:', error);
+    console.warn('fetchForecasts unavailable, returning empty list.');
     return [];
   }
 }
@@ -936,7 +936,7 @@ export async function fetchForecastAlerts() {
     const alerts = await apiRequest<any[]>('/api/forecasting/alerts');
     return Array.isArray(alerts) ? alerts : [];
   } catch (error) {
-    console.error('fetchForecastAlerts error:', error);
+    console.warn('fetchForecastAlerts unavailable, returning empty list.');
     return [];
   }
 }
