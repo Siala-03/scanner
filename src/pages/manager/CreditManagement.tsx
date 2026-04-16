@@ -37,7 +37,7 @@ const normalizeOrderItems = (items: any[] = []) =>
 const CreditManagement: React.FC = () => {
   // Get user from localStorage (same pattern as other manager pages)
   const [user, setUser] = useState<Staff | null>(null);
-  
+
   useEffect(() => {
     const savedUser = localStorage.getItem('authUser');
     if (savedUser) {
@@ -68,6 +68,20 @@ const CreditManagement: React.FC = () => {
   const [quickNotes, setQuickNotes] = useState('');
   const [selectedAccountId, setSelectedAccountId] = useState('');
 
+  // Create account modal state (lifted to avoid component-inside-component re-mount issues)
+  const [createModalFormData, setCreateModalFormData] = useState({
+    customerName: '',
+    customerPhone: '',
+    creditLimit: '',
+    notes: '',
+  });
+  const [createModalSubmitError, setCreateModalSubmitError] = useState('');
+
+  // Transaction modal state (lifted for the same reason)
+  const [txAmount, setTxAmount] = useState('');
+  const [txDescription, setTxDescription] = useState('');
+  const [txReference, setTxReference] = useState('');
+
   const {
     accounts,
     applications,
@@ -97,6 +111,29 @@ const CreditManagement: React.FC = () => {
       setCreditLimit(total > 0 ? total.toFixed(2) : '');
     }
   }, [orderData]);
+
+  // Populate create modal form when it opens
+  useEffect(() => {
+    if (!showCreateModal) {
+      setCreateModalSubmitError('');
+      return;
+    }
+    setCreateModalFormData({
+      customerName: customerNameInput || (orderData as any)?.customerName || '',
+      customerPhone: customerPhoneInput || getOrderCustomerPhone(orderData) || '',
+      creditLimit: creditLimit || creditAmount || (orderData?.total != null ? String(orderData.total) : ''),
+      notes: quickNotes || (orderData ? `Account opened from order ${getOrderNumberSafe(orderData)}` : ''),
+    });
+  }, [showCreateModal]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Reset transaction modal when it closes
+  useEffect(() => {
+    if (!showTransactionModal) {
+      setTxAmount('');
+      setTxDescription('');
+      setTxReference('');
+    }
+  }, [showTransactionModal]);
 
   // Filter accounts based on search
   const filteredAccounts = accounts.filter(account =>
@@ -256,6 +293,80 @@ const CreditManagement: React.FC = () => {
     }
   };
 
+  const handleCreateAccountSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCreateModalSubmitError('');
+    const parsedLimit = parseFloat(createModalFormData.creditLimit);
+    if (
+      !createModalFormData.customerName.trim() ||
+      !createModalFormData.customerPhone.trim() ||
+      Number.isNaN(parsedLimit) ||
+      parsedLimit < 0
+    ) {
+      setCreateModalSubmitError('Please enter a valid name, phone number, and credit limit.');
+      return;
+    }
+    try {
+      await createAccount({
+        customerName: createModalFormData.customerName.trim(),
+        customerPhone: createModalFormData.customerPhone.trim(),
+        creditLimit: parsedLimit,
+        notes: createModalFormData.notes.trim() || undefined,
+      });
+      setShowCreateModal(false);
+      setCreateModalFormData({ customerName: '', customerPhone: '', creditLimit: '', notes: '' });
+      loadCreditData();
+    } catch (err: any) {
+      console.error('Failed to create account:', err);
+      setCreateModalSubmitError(err?.message || 'Failed to create credit account. Check backend connectivity.');
+    }
+  };
+
+  const handleTransactionSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedAccount) return;
+    try {
+      switch (transactionType) {
+        case 'charge':
+          await chargeCredit({
+            accountId: selectedAccount.id,
+            customerId: String(selectedAccount.customerId || ''),
+            amount: parseFloat(txAmount),
+            description: txDescription || 'Credit charge',
+            performedBy: user?.id || '',
+            performedByName: user?.name || '',
+          });
+          break;
+        case 'payment':
+          await makePayment({
+            accountId: selectedAccount.id,
+            customerId: String(selectedAccount.customerId || ''),
+            amount: parseFloat(txAmount),
+            paymentMethod: 'cash',
+            reference: txReference,
+            paidBy: user?.id || '',
+            paidByName: user?.name || '',
+          });
+          break;
+        case 'adjustment':
+          await adjustCredit({
+            accountId: selectedAccount.id,
+            customerId: String(selectedAccount.customerId || ''),
+            amount: parseFloat(txAmount),
+            reason: txDescription,
+            performedBy: user?.id || '',
+            performedByName: user?.name || '',
+          });
+          break;
+      }
+      setShowTransactionModal(false);
+      loadCreditData();
+    } catch (err) {
+      console.error('Transaction failed:', err);
+      alert('Transaction failed. Please try again.');
+    }
+  };
+
   // Render Accounts Tab
   const renderAccountsTab = () => (
     <div className="space-y-6">
@@ -378,13 +489,16 @@ const CreditManagement: React.FC = () => {
                   onChange={(e) => setSelectedAccountId(e.target.value)}
                   className="mt-2 w-full rounded-2xl border border-slate-700 bg-slate-700 px-4 py-3 text-slate-100 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/40"
                 >
-                  <option value="">Use or create a new account</option>
+                  <option value="">— Create new account —</option>
                   {accounts.map((account) => (
                     <option key={account.id} value={account.id}>
                       {account.customerName} — {account.customerPhone}
                     </option>
                   ))}
                 </select>
+                {accounts.length === 0 && (
+                  <p className="mt-1 text-xs text-slate-400">No existing accounts yet. Leave blank to create one automatically.</p>
+                )}
               </div>
 
               {quickSelectedAccount && (
@@ -724,254 +838,6 @@ const CreditManagement: React.FC = () => {
     </div>
   );
 
-  // Create Account Modal
-  const CreateAccountModal = () => {
-    const [formData, setFormData] = useState({
-      customerName: '',
-      customerPhone: '',
-      creditLimit: '',
-      notes: '',
-    });
-    const [submitError, setSubmitError] = useState('');
-
-    useEffect(() => {
-      if (!showCreateModal) return;
-
-      setFormData({
-        customerName: customerNameInput || orderData?.customerName || '',
-        customerPhone: customerPhoneInput || getOrderCustomerPhone(orderData) || '',
-        creditLimit: creditLimit || creditAmount || (orderData?.total != null ? String(orderData.total) : ''),
-        notes: quickNotes || (orderData ? `Account opened from order ${getOrderNumberSafe(orderData)}` : ''),
-      });
-    }, [showCreateModal, customerNameInput, customerPhoneInput, creditLimit, creditAmount, quickNotes, orderData]);
-
-    const handleSubmit = async (e: React.FormEvent) => {
-      e.preventDefault();
-      setSubmitError('');
-      const parsedLimit = parseFloat(formData.creditLimit);
-      if (!formData.customerName.trim() || !formData.customerPhone.trim() || Number.isNaN(parsedLimit) || parsedLimit < 0) {
-        setSubmitError('Please enter a valid name, phone number, and credit limit.');
-        return;
-      }
-      try {
-        await createAccount({
-          customerName: formData.customerName.trim(),
-          customerPhone: formData.customerPhone.trim(),
-          creditLimit: parsedLimit,
-          notes: formData.notes.trim() || undefined,
-        });
-        setShowCreateModal(false);
-        setFormData({ customerName: '', customerPhone: '', creditLimit: '', notes: '' });
-        loadCreditData();
-      } catch (err: any) {
-        console.error('Failed to create account:', err);
-        setSubmitError(err?.message || 'Failed to create credit account. Check backend connectivity.');
-      }
-    };
-
-    if (!showCreateModal) return null;
-
-    return (
-      <div className="fixed inset-0 bg-slate-900 bg-opacity-90 overflow-y-auto h-full w-full z-50">
-        <div className="relative top-10 sm:top-20 mx-auto p-4 sm:p-5 border border-slate-700 w-full sm:w-96 shadow-2xl rounded-2xl sm:rounded-3xl bg-slate-800 text-slate-100">
-          <h3 className="text-lg font-medium text-white mb-4">Create New Credit Account</h3>
-          {submitError && (
-            <div className="rounded-md border border-red-500 bg-red-500/10 px-3 py-2 text-sm text-red-200">
-              {submitError}
-            </div>
-          )}
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-300">Customer Name</label>
-              <input
-                type="text"
-                required
-                value={formData.customerName}
-                onChange={(e) => setFormData({ ...formData, customerName: e.target.value })}
-                className="mt-1 block w-full rounded-md border border-slate-700 bg-slate-700 px-3 py-2 text-slate-100 focus:outline-none focus:ring-amber-500 focus:border-amber-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-300">Phone Number</label>
-              <input
-                type="tel"
-                required
-                value={formData.customerPhone}
-                onChange={(e) => setFormData({ ...formData, customerPhone: e.target.value })}
-                className="mt-1 block w-full rounded-md border border-slate-700 bg-slate-700 px-3 py-2 text-slate-100 focus:outline-none focus:ring-amber-500 focus:border-amber-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-300">Credit Limit (RWF)</label>
-              <input
-                type="number"
-                required
-                min="0"
-                step="0.01"
-                value={formData.creditLimit}
-                onChange={(e) => setFormData({ ...formData, creditLimit: e.target.value })}
-                className="mt-1 block w-full rounded-md border border-slate-700 bg-slate-700 px-3 py-2 text-slate-100 focus:outline-none focus:ring-amber-500 focus:border-amber-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-300">Notes (Optional)</label>
-              <textarea
-                value={formData.notes}
-                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                rows={3}
-                className="mt-1 block w-full rounded-md border border-slate-700 bg-slate-700 px-3 py-2 text-slate-100 focus:outline-none focus:ring-amber-500 focus:border-amber-500"
-              />
-            </div>
-            <div className="flex justify-end space-x-3">
-              <button
-                type="button"
-                onClick={() => setShowCreateModal(false)}
-                className="px-4 py-2 rounded-md border border-slate-700 bg-slate-700 text-sm font-medium text-slate-200 hover:bg-slate-600"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="px-4 py-2 bg-amber-600 border border-transparent rounded-md shadow-sm text-sm font-medium text-slate-950 hover:bg-amber-500"
-              >
-                Create Account
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    );
-  };
-
-  // Transaction Modal
-  const TransactionModal = () => {
-    const [amount, setAmount] = useState('');
-    const [description, setDescription] = useState('');
-    const [reference, setReference] = useState('');
-
-    const handleSubmit = async (e: React.FormEvent) => {
-      e.preventDefault();
-      if (!selectedAccount) return;
-
-      try {
-        switch (transactionType) {
-          case 'charge':
-            await chargeCredit({
-              accountId: selectedAccount.id,
-              customerId: String(selectedAccount.customerId || ''),
-              amount: parseFloat(amount),
-              description: description || 'Credit charge',
-              performedBy: user?.id || '',
-              performedByName: user?.name || '',
-            });
-            break;
-          case 'payment':
-            await makePayment({
-              accountId: selectedAccount.id,
-              customerId: String(selectedAccount.customerId || ''),
-              amount: parseFloat(amount),
-              paymentMethod: 'cash',
-              reference: reference,
-              paidBy: user?.id || '',
-              paidByName: user?.name || '',
-            });
-            break;
-          case 'adjustment':
-            await adjustCredit({
-              accountId: selectedAccount.id,
-              customerId: String(selectedAccount.customerId || ''),
-              amount: parseFloat(amount),
-              reason: description,
-              performedBy: user?.id || '',
-              performedByName: user?.name || '',
-            });
-            break;
-        }
-        setShowTransactionModal(false);
-        setAmount('');
-        setDescription('');
-        setReference('');
-        loadCreditData();
-      } catch (err) {
-        console.error('Transaction failed:', err);
-        alert('Transaction failed. Please try again.');
-      }
-    };
-
-    if (!showTransactionModal || !selectedAccount) return null;
-
-    return (
-      <div className="fixed inset-0 bg-slate-900 bg-opacity-80 overflow-y-auto h-full w-full z-50">
-        <div className="relative top-10 sm:top-20 mx-auto p-4 sm:p-5 border border-slate-700 w-full sm:w-96 shadow-2xl rounded-2xl sm:rounded-3xl bg-slate-800 text-slate-100">
-          <h3 className="text-lg font-medium text-white mb-4">
-            {transactionType === 'charge' && 'Add Charge'}
-            {transactionType === 'payment' && 'Record Payment'}
-            {transactionType === 'adjustment' && 'Manual Adjustment'}
-          </h3>
-          <div className="mb-4 p-3 bg-slate-800 rounded-2xl border border-slate-700">
-            <p className="text-sm text-slate-300">Account: <strong className="text-white">{selectedAccount.customerName}</strong></p>
-            <p className="text-sm text-slate-300">Current Balance: <strong className="text-white">{formatCurrency(selectedAccount.currentBalance)}</strong></p>
-            <p className="text-sm text-slate-300">Available Credit: <strong className="text-white">{formatCurrency(selectedAccount.availableCredit)}</strong></p>
-          </div>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-300">Amount (RWF)</label>
-              <input
-                type="number"
-                required
-                min="0"
-                step="0.01"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                className="mt-1 block w-full rounded-md border border-slate-700 bg-slate-700 px-3 py-2 text-slate-100 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/40"
-              />
-            </div>
-            {transactionType !== 'payment' && (
-              <div>
-                <label className="block text-sm font-medium text-slate-300">Description</label>
-                <input
-                  type="text"
-                  required
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  className="mt-1 block w-full rounded-md border border-slate-700 bg-slate-700 px-3 py-2 text-slate-100 focus:outline-none focus:ring-amber-500 focus:border-amber-500"
-                />
-              </div>
-            )}
-            {transactionType === 'payment' && (
-              <div>
-                <label className="block text-sm font-medium text-slate-300">Reference (Optional)</label>
-                <input
-                  type="text"
-                  value={reference}
-                  onChange={(e) => setReference(e.target.value)}
-                  className="mt-1 block w-full rounded-md border border-slate-700 bg-slate-700 px-3 py-2 text-slate-100 focus:outline-none focus:ring-amber-500 focus:border-amber-500"
-                />
-              </div>
-            )}
-            <div className="flex justify-end space-x-3">
-              <button
-                type="button"
-                onClick={() => setShowTransactionModal(false)}
-                className="px-4 py-2 rounded-md border border-slate-700 bg-slate-700 text-sm font-medium text-slate-200 hover:bg-slate-600"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="px-4 py-2 bg-amber-600 border border-transparent rounded-md shadow-sm text-sm font-medium text-slate-950 hover:bg-amber-500"
-              >
-                {transactionType === 'charge' && 'Add Charge'}
-                {transactionType === 'payment' && 'Record Payment'}
-                {transactionType === 'adjustment' && 'Apply Adjustment'}
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    );
-  };
-
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100">
       <div className="max-w-7xl mx-auto p-4 md:py-6 sm:px-6 lg:px-8">
@@ -1055,8 +921,149 @@ const CreditManagement: React.FC = () => {
         </div>
       </div>
 
-      <CreateAccountModal />
-      <TransactionModal />
+      {/* Create Account Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-slate-900 bg-opacity-90 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-10 sm:top-20 mx-auto p-4 sm:p-5 border border-slate-700 w-full sm:w-96 shadow-2xl rounded-2xl sm:rounded-3xl bg-slate-800 text-slate-100">
+            <h3 className="text-lg font-medium text-white mb-4">Create New Credit Account</h3>
+            {createModalSubmitError && (
+              <div className="rounded-md border border-red-500 bg-red-500/10 px-3 py-2 text-sm text-red-200 mb-3">
+                {createModalSubmitError}
+              </div>
+            )}
+            <form onSubmit={handleCreateAccountSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-300">Customer Name</label>
+                <input
+                  type="text"
+                  required
+                  value={createModalFormData.customerName}
+                  onChange={(e) => setCreateModalFormData({ ...createModalFormData, customerName: e.target.value })}
+                  className="mt-1 block w-full rounded-md border border-slate-700 bg-slate-700 px-3 py-2 text-slate-100 focus:outline-none focus:ring-amber-500 focus:border-amber-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-300">Phone Number</label>
+                <input
+                  type="tel"
+                  required
+                  value={createModalFormData.customerPhone}
+                  onChange={(e) => setCreateModalFormData({ ...createModalFormData, customerPhone: e.target.value })}
+                  className="mt-1 block w-full rounded-md border border-slate-700 bg-slate-700 px-3 py-2 text-slate-100 focus:outline-none focus:ring-amber-500 focus:border-amber-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-300">Credit Limit (RWF)</label>
+                <input
+                  type="number"
+                  required
+                  min="0"
+                  step="0.01"
+                  value={createModalFormData.creditLimit}
+                  onChange={(e) => setCreateModalFormData({ ...createModalFormData, creditLimit: e.target.value })}
+                  className="mt-1 block w-full rounded-md border border-slate-700 bg-slate-700 px-3 py-2 text-slate-100 focus:outline-none focus:ring-amber-500 focus:border-amber-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-300">Notes (Optional)</label>
+                <textarea
+                  value={createModalFormData.notes}
+                  onChange={(e) => setCreateModalFormData({ ...createModalFormData, notes: e.target.value })}
+                  rows={3}
+                  className="mt-1 block w-full rounded-md border border-slate-700 bg-slate-700 px-3 py-2 text-slate-100 focus:outline-none focus:ring-amber-500 focus:border-amber-500"
+                />
+              </div>
+              <div className="flex justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateModal(false)}
+                  className="px-4 py-2 rounded-md border border-slate-700 bg-slate-700 text-sm font-medium text-slate-200 hover:bg-slate-600"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-amber-600 border border-transparent rounded-md shadow-sm text-sm font-medium text-slate-950 hover:bg-amber-500"
+                >
+                  Create Account
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Transaction Modal */}
+      {showTransactionModal && selectedAccount && (
+        <div className="fixed inset-0 bg-slate-900 bg-opacity-80 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-10 sm:top-20 mx-auto p-4 sm:p-5 border border-slate-700 w-full sm:w-96 shadow-2xl rounded-2xl sm:rounded-3xl bg-slate-800 text-slate-100">
+            <h3 className="text-lg font-medium text-white mb-4">
+              {transactionType === 'charge' && 'Add Charge'}
+              {transactionType === 'payment' && 'Record Payment'}
+              {transactionType === 'adjustment' && 'Manual Adjustment'}
+            </h3>
+            <div className="mb-4 p-3 bg-slate-800 rounded-2xl border border-slate-700">
+              <p className="text-sm text-slate-300">Account: <strong className="text-white">{selectedAccount.customerName}</strong></p>
+              <p className="text-sm text-slate-300">Current Balance: <strong className="text-white">{formatCurrency(selectedAccount.currentBalance)}</strong></p>
+              <p className="text-sm text-slate-300">Available Credit: <strong className="text-white">{formatCurrency(selectedAccount.availableCredit)}</strong></p>
+            </div>
+            <form onSubmit={handleTransactionSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-300">Amount (RWF)</label>
+                <input
+                  type="number"
+                  required
+                  min="0"
+                  step="0.01"
+                  value={txAmount}
+                  onChange={(e) => setTxAmount(e.target.value)}
+                  className="mt-1 block w-full rounded-md border border-slate-700 bg-slate-700 px-3 py-2 text-slate-100 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/40"
+                />
+              </div>
+              {transactionType !== 'payment' && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-300">Description</label>
+                  <input
+                    type="text"
+                    required
+                    value={txDescription}
+                    onChange={(e) => setTxDescription(e.target.value)}
+                    className="mt-1 block w-full rounded-md border border-slate-700 bg-slate-700 px-3 py-2 text-slate-100 focus:outline-none focus:ring-amber-500 focus:border-amber-500"
+                  />
+                </div>
+              )}
+              {transactionType === 'payment' && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-300">Reference (Optional)</label>
+                  <input
+                    type="text"
+                    value={txReference}
+                    onChange={(e) => setTxReference(e.target.value)}
+                    className="mt-1 block w-full rounded-md border border-slate-700 bg-slate-700 px-3 py-2 text-slate-100 focus:outline-none focus:ring-amber-500 focus:border-amber-500"
+                  />
+                </div>
+              )}
+              <div className="flex justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={() => setShowTransactionModal(false)}
+                  className="px-4 py-2 rounded-md border border-slate-700 bg-slate-700 text-sm font-medium text-slate-200 hover:bg-slate-600"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-amber-600 border border-transparent rounded-md shadow-sm text-sm font-medium text-slate-950 hover:bg-amber-500"
+                >
+                  {transactionType === 'charge' && 'Add Charge'}
+                  {transactionType === 'payment' && 'Record Payment'}
+                  {transactionType === 'adjustment' && 'Apply Adjustment'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

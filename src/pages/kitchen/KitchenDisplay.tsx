@@ -5,6 +5,7 @@ import { useSocket } from '../../hooks/useSocket';
 import { useStaffKPIs } from '../../hooks/useKPIs';
 import { KPICard } from '../../components/supervisor/KPICard';
 import { fetchKitchenOrders as fetchKitchenOrdersFromDb, updateOrderStatus as updateOrderStatusApi } from '../../api/orders';
+import { fetchRestaurantPublic } from '../../api/restaurants';
 
 // Backend API
 const API_BASE = import.meta.env.VITE_API_URL || '';
@@ -166,8 +167,32 @@ export function KitchenDisplay({ onLogout, restaurantId, restaurantName }: { onL
   const [lastUpdate, setLastUpdate] = useState(new Date());
   const [viewMode, setViewMode] = useState<'orders' | 'analytics'>('orders');
   const [analytics, setAnalytics] = useState<any>(null);
+  const [resolvedRestaurantName, setResolvedRestaurantName] = useState<string>(restaurantName || '');
   const { socket, joinOrders, joinRestaurant } = useSocket();
   const { kpis: staffKPIs } = useStaffKPIs();
+
+  useEffect(() => {
+    setResolvedRestaurantName(restaurantName || '');
+  }, [restaurantName]);
+
+  useEffect(() => {
+    let active = true;
+    if (restaurantName || !restaurantId) return;
+
+    fetchRestaurantPublic(restaurantId)
+      .then((restaurant: { name?: string }) => {
+        if (!active) return;
+        setResolvedRestaurantName(restaurant?.name || '');
+      })
+      .catch(() => {
+        if (!active) return;
+        setResolvedRestaurantName('');
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [restaurantId, restaurantName]);
 
   const handleKitchenSocketUpdate = useCallback((data: any) => {
     const rawOrder = data?.order;
@@ -291,7 +316,7 @@ export function KitchenDisplay({ onLogout, restaurantId, restaurantName }: { onL
         </head>
         <body>
           <div class="center">
-            <div class="restaurant">${restaurantName || 'KITCHEN'}</div>
+            <div class="restaurant">${resolvedRestaurantName || 'KITCHEN'}</div>
             <div class="ticket-title">★ KITCHEN TICKET ★</div>
           </div>
           <hr class="divider-solid" />
@@ -364,7 +389,7 @@ export function KitchenDisplay({ onLogout, restaurantId, restaurantName }: { onL
 
     const html = buildReceiptHtml(
       orderToReceiptData(fakeOrder, {
-        restaurantName: restaurantName || 'Company',
+        restaurantName: resolvedRestaurantName || 'Company',
         restaurantAddress: '',
         restaurantPhone: '',
         taxRate: 0,
@@ -454,7 +479,7 @@ export function KitchenDisplay({ onLogout, restaurantId, restaurantName }: { onL
             </div>
             <div>
               <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Kitchen Portal</p>
-              <h1 className="text-2xl font-semibold text-white">{restaurantName || 'Company Kitchen'}</h1>
+              <h1 className="text-2xl font-semibold text-white">{resolvedRestaurantName || 'Company Kitchen'}</h1>
             </div>
           </div>
           <div className="flex items-center gap-4">

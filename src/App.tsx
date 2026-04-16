@@ -76,15 +76,15 @@ export function App() {
     if (savedAuthUser) {
       try {
         const user = JSON.parse(savedAuthUser);
-        if (savedRestaurantId && !user.restaurantId) {
-          user.restaurantId = savedRestaurantId;
+        const restoredRestaurantId = user.restaurantId || user.restaurant_id || savedRestaurantId || null;
+        if (restoredRestaurantId && !user.restaurantId) {
+          user.restaurantId = restoredRestaurantId;
         }
         setAuthUser(user);
         restoreStaffIdFromAuthUser(user);
-        if (user.restaurantId) {
-          setCurrentRestaurantId(user.restaurantId);
-        } else if (savedRestaurantId) {
-          setCurrentRestaurantId(savedRestaurantId);
+        if (restoredRestaurantId) {
+          setCurrentRestaurantId(restoredRestaurantId);
+          localStorage.setItem('restaurantId', restoredRestaurantId);
         }
         if (!savedSelectedRole && user.role) {
           setSelectedRole(user.role as UserRole);
@@ -460,9 +460,10 @@ export function App() {
           // Save to localStorage and update state immediately
           localStorage.setItem('authUser', JSON.stringify(user));
           localStorage.setItem('selectedRole', user.role);
-          if (user.restaurantId) {
-            localStorage.setItem('restaurantId', user.restaurantId);
-            setCurrentRestaurantId(user.restaurantId);
+          const loginRestaurantId = user.restaurantId || (user as any).restaurant_id;
+          if (loginRestaurantId) {
+            localStorage.setItem('restaurantId', loginRestaurantId);
+            setCurrentRestaurantId(loginRestaurantId);
             window.dispatchEvent(new Event('restaurantIdChanged'));
           }
         }}
