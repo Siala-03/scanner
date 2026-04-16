@@ -43,10 +43,15 @@ const normalizeOrderPayload = (rawOrder: any): Order | undefined => {
     return Number.isNaN(date.getTime()) ? undefined : date;
   };
 
+  const normalizedOrderNumber = String(rawOrder.orderNumber ?? rawOrder.order_number ?? rawOrder.id ?? '')
+    .trim()
+    .slice(0, 7)
+    .toUpperCase();
+
   return {
     ...rawOrder,
     id: rawOrder.id,
-    orderNumber: rawOrder.orderNumber ?? rawOrder.order_number,
+    orderNumber: normalizedOrderNumber,
     tableNumber: rawOrder.tableNumber ?? rawOrder.table_number,
     customerName: rawOrder.customerName ?? rawOrder.customer_name,
     customerId: rawOrder.customerId ?? rawOrder.customer_id,

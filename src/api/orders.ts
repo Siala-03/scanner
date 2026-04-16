@@ -36,6 +36,15 @@ function getStaffId(): string | null {
   return null;
 }
 
+function generateShortOrderNumber(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let value = '';
+  for (let i = 0; i < 7; i += 1) {
+    value += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return value;
+}
+
 export async function fetchOrders(status?: string, restaurantId?: string): Promise<Order[]> {
   const restaurant = restaurantId || getRestaurantId();
   
@@ -134,7 +143,7 @@ export async function createOrder(order: CreateOrderInput): Promise<Order> {
   const staffId = getStaffId();
   const staffRole = typeof window !== 'undefined' ? localStorage.getItem('staffRole') : null;
   const orderId = `order-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
-  const orderNumber = Date.now().toString().slice(-6);
+  const orderNumber = generateShortOrderNumber();
 
   const items = order.items.map((item, index) => ({
     id: `item-${Date.now()}-${index}`,

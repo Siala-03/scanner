@@ -185,7 +185,7 @@ export function KitchenDisplay({ onLogout, restaurantId, restaurantName }: { onL
 
     const normalizedOrder: KitchenOrder = {
       id: rawOrder.id,
-      orderNumber: rawOrder.orderNumber || rawOrder.order_number,
+      orderNumber: String(rawOrder.orderNumber || rawOrder.order_number || rawOrder.id || '').trim().slice(0, 7).toUpperCase(),
       tableNumber: rawOrder.tableNumber ?? rawOrder.table_number,
       status,
       notes: rawOrder.notes || rawOrder.note,

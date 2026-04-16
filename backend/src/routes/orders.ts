@@ -23,10 +23,12 @@ function normalizeOrder(row: any): any {
 
 // Generate order number
 function generateOrderNumber(): string {
-  const now = new Date();
-  const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
-  const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
-  return `ORD-${dateStr}-${random}`;
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let value = '';
+  for (let i = 0; i < 7; i += 1) {
+    value += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return value;
 }
 
 // POST seed test orders

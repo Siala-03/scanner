@@ -8,6 +8,32 @@ import { Staff } from '../../types';
 
 type TabType = 'accounts' | 'applications' | 'transactions' | 'reports';
 
+const normalizeOrderRef = (raw: any): string => {
+  const value = String(raw || '').trim();
+  if (!value) return 'UNKNOWN';
+  return value.slice(0, 7).toUpperCase();
+};
+
+const getOrderNumberSafe = (order: any): string =>
+  normalizeOrderRef(order?.orderNumber ?? order?.order_number ?? order?.id);
+
+const getOrderCustomerName = (order: any): string =>
+  String(order?.customerName ?? order?.customer_name ?? '').trim();
+
+const getOrderCustomerPhone = (order: any): string =>
+  String(order?.customerPhone ?? order?.customer_phone ?? '').trim();
+
+const getOrderCreatedAt = (order: any): string =>
+  String(order?.createdAt ?? order?.created_at ?? new Date().toISOString());
+
+const normalizeOrderItems = (items: any[] = []) =>
+  items.map((item, index) => ({
+    id: item?.id ?? `item-${index}`,
+    menuItemName: item?.menuItemName ?? item?.menu_item_name ?? item?.name ?? 'Item',
+    quantity: item?.quantity ?? 0,
+    totalPrice: item?.totalPrice ?? item?.total_price ?? 0,
+  }));
+
 const CreditManagement: React.FC = () => {
   // Get user from localStorage (same pattern as other manager pages)
   const [user, setUser] = useState<Staff | null>(null);
@@ -64,22 +90,26 @@ const CreditManagement: React.FC = () => {
 
   useEffect(() => {
     if (orderData) {
-      setCustomerNameInput(orderData.customerName ?? '');
-      setCreditAmount(orderData.total?.toFixed(2) ?? '');
-      setCreditLimit(orderData.total?.toFixed(2) ?? '');
+      const total = Number((orderData as any)?.total ?? 0);
+      setCustomerNameInput(getOrderCustomerName(orderData));
+      setCustomerPhoneInput(getOrderCustomerPhone(orderData));
+      setCreditAmount(total > 0 ? total.toFixed(2) : '');
+      setCreditLimit(total > 0 ? total.toFixed(2) : '');
     }
   }, [orderData]);
 
   // Filter accounts based on search
   const filteredAccounts = accounts.filter(account =>
     account.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    account.customerPhone.includes(searchTerm)
+    (account.customerPhone || '').includes(searchTerm)
   );
 
   const filteredApplications = applications.filter(app =>
     app.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    app.customerPhone.includes(searchTerm)
+    (app.customerPhone || '').includes(searchTerm)
   );
+
+  const summaryView = (summary || {}) as any;
 
   // Format currency
   const formatCurrency = (amount: number) => {
@@ -147,7 +177,15 @@ const CreditManagement: React.FC = () => {
         if (!fetchedOrder) {
           setOrderLookupError('Order not found. Please confirm the ID.');
         } else {
-          setOrderData(fetchedOrder);
+          const normalizedFetchedOrder = {
+            ...(fetchedOrder as any),
+            orderNumber: getOrderNumberSafe(fetchedOrder),
+            customerName: getOrderCustomerName(fetchedOrder),
+            customerPhone: getOrderCustomerPhone(fetchedOrder),
+            createdAt: getOrderCreatedAt(fetchedOrder),
+            items: normalizeOrderItems((fetchedOrder as any)?.items || []),
+          };
+          setOrderData(normalizedFetchedOrder as Order);
         }
       }
     } catch (err) {
@@ -204,7 +242,7 @@ const CreditManagement: React.FC = () => {
         customerId: account.customerId || orderData?.customerId || '',
         amount,
         orderId: orderData?.id,
-        description: quickNotes || `Credit for order ${orderData?.orderNumber ?? orderLookupId}`,
+        description: quickNotes || `Credit for order ${getOrderNumberSafe(orderData) || orderLookupId}`,
         performedBy: user?.id || '',
         performedByName: user?.name || '',
       });
@@ -271,10 +309,10 @@ const CreditManagement: React.FC = () => {
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <p className="text-sm uppercase tracking-wide text-amber-300">Order details</p>
-                    <p className="text-lg font-semibold">{orderData.orderNumber || orderData.id}</p>
+                    <p className="text-lg font-semibold">{getOrderNumberSafe(orderData)}</p>
                   </div>
                   <div className="space-y-1 text-right text-sm text-slate-400">
-                    <p>Placed: {formatDate(String(orderData.createdAt))}</p>
+                    <p>Placed: {formatDate(getOrderCreatedAt(orderData))}</p>
                     <p>Status: <span className="font-semibold text-white">{orderData.status}</span></p>
                     <p>Served by: <span className="font-semibold text-white">{orderData.assignedWaiterId || 'Unknown'}</span></p>
                   </div>
@@ -286,10 +324,10 @@ const CreditManagement: React.FC = () => {
                     {orderData.items.map((item) => (
                       <li key={item.id} className="flex items-center justify-between rounded-2xl bg-slate-800 p-3">
                         <div>
-                          <p className="font-medium text-slate-100">{item.menuItemName}</p>
+                          <p className="font-medium text-slate-100">{(item as any).menuItemName || (item as any).menu_item_name || 'Item'}</p>
                           <p className="text-sm text-slate-400">Qty: {item.quantity}</p>
                         </div>
-                        <p className="text-sm font-semibold text-amber-300">{formatCurrency(item.totalPrice ?? 0)}</p>
+                        <p className="text-sm font-semibold text-amber-300">{formatCurrency((item as any).totalPrice ?? (item as any).total_price ?? 0)}</p>
                       </li>
                     ))}
                   </ul>
@@ -551,9 +589,9 @@ const CreditManagement: React.FC = () => {
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="text-sm font-medium text-slate-100">{application.customerName}</div>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-400">{application.customerPhone}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-400">{application.customerPhone || 'N/A'}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-100">{formatCurrency(application.requestedLimit)}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-400">{formatDate(application.requestedAt)}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-400">{formatDate(application.requestedAt || application.createdAt || new Date().toISOString())}</td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(application.status)}`}>
                     {application.status}
@@ -649,13 +687,13 @@ const CreditManagement: React.FC = () => {
         <div className="bg-slate-800 shadow rounded-2xl sm:rounded-3xl border border-slate-700">
           <div className="px-3 py-4 sm:px-4 sm:py-5">
             <dt className="text-xs sm:text-sm font-medium text-slate-400 truncate">Total Outstanding</dt>
-            <dd className="mt-1 text-2xl sm:text-3xl font-semibold text-rose-300">{formatCurrency(summary?.totalOutstanding || 0)}</dd>
+            <dd className="mt-1 text-2xl sm:text-3xl font-semibold text-rose-300">{formatCurrency(summaryView.totalOutstanding || 0)}</dd>
           </div>
         </div>
         <div className="bg-slate-800 shadow rounded-2xl sm:rounded-3xl border border-slate-700">
           <div className="px-3 py-4 sm:px-4 sm:py-5">
             <dt className="text-xs sm:text-sm font-medium text-slate-400 truncate">Accounts Overdue</dt>
-            <dd className="mt-1 text-2xl sm:text-3xl font-semibold text-amber-300">{summary?.accountsOverLimit || 0}</dd>
+            <dd className="mt-1 text-2xl sm:text-3xl font-semibold text-amber-300">{summaryView.accountsOverLimit || 0}</dd>
           </div>
         </div>
       </div>
@@ -667,19 +705,19 @@ const CreditManagement: React.FC = () => {
         <div className="p-6 space-y-4 text-slate-300">
           <div className="flex justify-between">
             <span className="text-slate-400">Total Outstanding</span>
-            <span className="font-medium text-slate-100">{formatCurrency(summary?.totalOutstanding || 0)}</span>
+            <span className="font-medium text-slate-100">{formatCurrency(summaryView.totalOutstanding || 0)}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-slate-400">Average Credit Utilization</span>
-            <span className="font-medium text-slate-100">{((summary?.averageCreditUtilization || 0) * 100).toFixed(1)}%</span>
+            <span className="font-medium text-slate-100">{((summaryView.averageCreditUtilization || 0) * 100).toFixed(1)}%</span>
           </div>
           <div className="flex justify-between">
             <span className="text-slate-400">Accounts Over Limit</span>
-            <span className="font-medium text-rose-300">{summary?.accountsOverLimit || 0}</span>
+            <span className="font-medium text-rose-300">{summaryView.accountsOverLimit || 0}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-slate-400">Overdue Amount</span>
-            <span className="font-medium text-amber-300">{formatCurrency(summary?.overdueAmount || 0)}</span>
+            <span className="font-medium text-amber-300">{formatCurrency(summaryView.overdueAmount || 0)}</span>
           </div>
         </div>
       </div>
@@ -701,9 +739,9 @@ const CreditManagement: React.FC = () => {
 
       setFormData({
         customerName: customerNameInput || orderData?.customerName || '',
-        customerPhone: customerPhoneInput || (orderData as any)?.customerPhone || '',
+        customerPhone: customerPhoneInput || getOrderCustomerPhone(orderData) || '',
         creditLimit: creditLimit || creditAmount || (orderData?.total != null ? String(orderData.total) : ''),
-        notes: quickNotes || (orderData ? `Account opened from order ${orderData.orderNumber || orderData.id}` : ''),
+        notes: quickNotes || (orderData ? `Account opened from order ${getOrderNumberSafe(orderData)}` : ''),
       });
     }, [showCreateModal, customerNameInput, customerPhoneInput, creditLimit, creditAmount, quickNotes, orderData]);
 
@@ -820,7 +858,7 @@ const CreditManagement: React.FC = () => {
           case 'charge':
             await chargeCredit({
               accountId: selectedAccount.id,
-              customerId: selectedAccount.customerId,
+              customerId: String(selectedAccount.customerId || ''),
               amount: parseFloat(amount),
               description: description || 'Credit charge',
               performedBy: user?.id || '',
@@ -830,7 +868,7 @@ const CreditManagement: React.FC = () => {
           case 'payment':
             await makePayment({
               accountId: selectedAccount.id,
-              customerId: selectedAccount.customerId,
+              customerId: String(selectedAccount.customerId || ''),
               amount: parseFloat(amount),
               paymentMethod: 'cash',
               reference: reference,
@@ -841,7 +879,7 @@ const CreditManagement: React.FC = () => {
           case 'adjustment':
             await adjustCredit({
               accountId: selectedAccount.id,
-              customerId: selectedAccount.customerId,
+              customerId: String(selectedAccount.customerId || ''),
               amount: parseFloat(amount),
               reason: description,
               performedBy: user?.id || '',

@@ -38,6 +38,37 @@ function getStaffId(): string {
   return localStorage.getItem('staffId') || 'system';
 }
 
+const DEFAULT_EXPENSE_CATEGORIES = [
+  { name: 'Utilities', description: 'Water, electricity, internet and other utility bills', color: '#0EA5E9', icon: 'zap' },
+  { name: 'Supplies', description: 'General operations and office supplies', color: '#22C55E', icon: 'package' },
+  { name: 'Maintenance', description: 'Repairs and maintenance costs', color: '#F59E0B', icon: 'wrench' },
+  { name: 'Transport', description: 'Delivery and transportation expenses', color: '#8B5CF6', icon: 'truck' },
+  { name: 'Marketing', description: 'Advertising and promotion spend', color: '#EC4899', icon: 'megaphone' },
+  { name: 'Payroll', description: 'Salaries, allowances and staff benefits', color: '#EF4444', icon: 'users' },
+  { name: 'Other', description: 'Miscellaneous business expenses', color: '#64748B', icon: 'tag' },
+];
+
+async function ensureDefaultExpenseCategories(restaurantId: string): Promise<void> {
+  const seedRows = DEFAULT_EXPENSE_CATEGORIES.map((cat) => ({
+    id: `cat-${restaurantId}-${cat.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+    name: cat.name,
+    description: cat.description,
+    color: cat.color,
+    icon: cat.icon,
+    is_active: true,
+    restaurant_id: restaurantId,
+  }));
+
+  // Try best-effort seeding when no categories exist for this restaurant.
+  const { error } = await supabaseAdmin
+    .from('expense_categories')
+    .upsert(seedRows, { onConflict: 'id' });
+
+  if (error) {
+    console.warn('ensureDefaultExpenseCategories failed:', error.message);
+  }
+}
+
 // ── Normalizers ──────────────────────────────────────────────────────────────
 
 function normalizeExpenseCategory(raw: any): ExpenseCategory {
@@ -91,13 +122,29 @@ export async function fetchExpenseCategories(): Promise<ExpenseCategory[]> {
   const restaurantId = getRestaurantId();
   if (!restaurantId) return [];
 
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from('expense_categories')
     .select('*')
     .or(`restaurant_id.eq.${restaurantId},restaurant_id.is.null`)
     .order('name');
 
-  if (error) { console.error('fetchExpenseCategories error:', error); return []; }
+  if (error) {
+    console.error('fetchExpenseCategories error:', error);
+    return [];
+  }
+
+  if (!data || data.length === 0) {
+    await ensureDefaultExpenseCategories(restaurantId);
+    const seeded = await supabaseAdmin
+      .from('expense_categories')
+      .select('*')
+      .eq('restaurant_id', restaurantId)
+      .order('name');
+
+    if (!seeded.error && seeded.data && seeded.data.length > 0) {
+      return seeded.data.map(normalizeExpenseCategory);
+    }
+  }
 
   const normalized = (data || []).map(normalizeExpenseCategory);
   const byName = new Map<string, ExpenseCategory>();

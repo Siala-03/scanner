@@ -34,7 +34,7 @@ export function OrderHistoryPage({ onBack, existingOrders }: OrderHistoryPagePro
     return orders.map(order => ({
       ...order,
       id: order.id,
-      orderNumber: order.orderNumber || order.order_number || order.id.slice(0, 8),
+      orderNumber: String(order.orderNumber || order.order_number || order.id || '').trim().slice(0, 7).toUpperCase(),
       tableNumber: order.tableNumber ?? order.table_number,
       customerName: order.customerName || order.customer_name,
       status: order.status,

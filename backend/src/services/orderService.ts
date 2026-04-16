@@ -3,6 +3,15 @@ import { emitOrderUpdate } from '../socket.js';
 import { decrementStockForOrderLines } from './inventoryService.js';
 import { createVubaVubaOrder, updateVubaVubaOrderStatus } from './vubaVubaService.js';
 
+function generateOrderNumber(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let value = '';
+  for (let i = 0; i < 7; i += 1) {
+    value += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return value;
+}
+
 export interface OrderLine {
   menuItemId: string;
   menuItemName?: string;
@@ -56,7 +65,7 @@ export async function createOrder(orderInput: {
   }
 
   const id = `order_${Date.now().toString(36)}`;
-  const orderNumber = `ORD-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`;
+  const orderNumber = generateOrderNumber();
 
   const subtotal = items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
   const tax = Math.round(subtotal * 0.15);
