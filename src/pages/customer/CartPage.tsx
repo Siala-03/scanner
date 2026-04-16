@@ -192,17 +192,12 @@ export function CartPage({
         {/* Cart items */}
         <div className="space-y-3 mb-6">
           {cartItems.map((item) =>
-            <motion.div
-              key={item.menuItem.id}
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -6 }}
-              transition={{ duration: 0.15 }}>
+            <div key={item.menuItem.id}>
               <CartItemCard
                 item={item}
                 onUpdateQuantity={onUpdateQuantity}
                 onRemove={onRemoveItem} />
-            </motion.div>
+            </div>
           )}
         </div>
 

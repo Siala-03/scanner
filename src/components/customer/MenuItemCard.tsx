@@ -18,7 +18,6 @@ export function MenuItemCard({
 }: MenuItemCardProps) {
   return (
     <motion.div
-      layout
       initial={{
         opacity: 0,
         y: 10

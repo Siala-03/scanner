@@ -176,23 +176,20 @@ export function CustomerApp({
       </AnimatePresence>
 
       {/* Content */}
-      <AnimatePresence mode="wait">
+      <AnimatePresence mode="sync">
         <motion.div
           key={activeTab}
           initial={{
             opacity: 0,
-            x: 20
           }}
           animate={{
             opacity: 1,
-            x: 0
           }}
           exit={{
             opacity: 0,
-            x: -20
           }}
           transition={{
-            duration: 0.2
+            duration: 0.15
           }}>
 
           {activeTab === 'menu' && <MenuPage onAddToCart={handleAddToCart} />}
