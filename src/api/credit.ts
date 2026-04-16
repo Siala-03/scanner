@@ -137,19 +137,37 @@ export async function createCreditAccount(data: {
   const restaurantId = getRestaurantId();
   if (!restaurantId) throw new Error('No company selected');
 
-  const { data: result, error } = await supabaseAdmin
+  const fullPayload = {
+    customer_name: data.customerName,
+    customer_phone: data.customerPhone,
+    credit_limit: data.creditLimit,
+    current_balance: 0,
+    status: 'active',
+    notes: data.notes || '',
+    restaurant_id: restaurantId,
+  };
+
+  let { data: result, error } = await supabaseAdmin
     .from('credit_accounts')
-    .insert({
-      customer_name: data.customerName,
-      customer_phone: data.customerPhone,
-      credit_limit: data.creditLimit,
-      current_balance: 0,
-      status: 'active',
-      notes: data.notes || '',
-      restaurant_id: restaurantId,
-    })
+    .insert(fullPayload)
     .select()
     .single();
+
+  // Legacy schema compatibility: retry without notes if the column does not exist.
+  if (error?.code === 'PGRST204' && String(error?.message || '').includes("'notes'")) {
+    ({ data: result, error } = await supabaseAdmin
+      .from('credit_accounts')
+      .insert({
+        customer_name: data.customerName,
+        customer_phone: data.customerPhone,
+        credit_limit: data.creditLimit,
+        current_balance: 0,
+        status: 'active',
+        restaurant_id: restaurantId,
+      })
+      .select()
+      .single());
+  }
 
   if (error) { console.error('createCreditAccount error:', error); throw error; }
   return normalizeCreditAccount(result);
@@ -163,17 +181,33 @@ export async function updateCreditAccount(
     notes: string;
   }>
 ): Promise<CustomerCreditAccount> {
-  const { data: result, error } = await supabaseAdmin
+  const fullPayload = {
+    credit_limit: data.creditLimit,
+    status: data.status,
+    notes: data.notes,
+    updated_at: new Date().toISOString(),
+  };
+
+  let { data: result, error } = await supabaseAdmin
     .from('credit_accounts')
-    .update({
-      credit_limit: data.creditLimit,
-      status: data.status,
-      notes: data.notes,
-      updated_at: new Date().toISOString(),
-    })
+    .update(fullPayload)
     .eq('id', accountId)
     .select()
     .single();
+
+  // Legacy schema compatibility: retry without notes if the column does not exist.
+  if (error?.code === 'PGRST204' && String(error?.message || '').includes("'notes'")) {
+    ({ data: result, error } = await supabaseAdmin
+      .from('credit_accounts')
+      .update({
+        credit_limit: data.creditLimit,
+        status: data.status,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', accountId)
+      .select()
+      .single());
+  }
 
   if (error) { console.error('updateCreditAccount error:', error); throw error; }
   return normalizeCreditAccount(result);

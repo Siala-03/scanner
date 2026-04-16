@@ -12,7 +12,6 @@ interface ManagerDashboardProps {
   activeOrders: number;
   servedOrders: number;
   todaysRevenue: number;
-  tableCount: number;
   ordersByHour: { hour: string; orders: number; revenue: number }[];
   statusBreakdown: { status: string; count: number }[];
 }
@@ -25,7 +24,7 @@ const statusColors: Record<string, string> = {
   served: '#22c55e'
 };
 
-export function ManagerDashboard({ onNavigate, totalOrders, activeOrders, servedOrders, todaysRevenue, tableCount, ordersByHour, statusBreakdown }: ManagerDashboardProps) {
+export function ManagerDashboard({ onNavigate, totalOrders, activeOrders, servedOrders, todaysRevenue, ordersByHour, statusBreakdown }: ManagerDashboardProps) {
   const { forecasts, forecastAlerts, isGeneratingForecasts, runForecasting, analytics, inventory } = useInventoryData();
   const trackedInventoryCount = useMemo(
     () => new Set(inventory.map((item) => item.menuItemId).filter(Boolean)).size,
@@ -75,14 +74,6 @@ export function ManagerDashboard({ onNavigate, totalOrders, activeOrders, served
 
         {/* Inventory KPIs */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-          <button 
-            onClick={() => onNavigate('qrcodes')}
-            className="rounded-xl border border-slate-700 p-3 bg-slate-800/70 hover:bg-slate-800 transition text-left"
-          >
-            <div className="text-xs uppercase tracking-wide text-slate-400">Tables Configured</div>
-            <div className="mt-2 text-2xl font-semibold text-gray-100">{tableCount}</div>
-            <div className="text-xs text-slate-300 mt-1">Service capacity</div>
-          </button>
           <button 
             onClick={() => onNavigate('inventory')}
             className="rounded-xl border border-slate-700 p-3 bg-slate-800/70 hover:bg-slate-800 transition text-left"

@@ -697,7 +697,6 @@ export function App() {
                 activeOrders={managerActiveOrders}
                 servedOrders={managerServedOrders}
                 todaysRevenue={managerTodaysRevenue}
-                tableCount={tables.length}
                 ordersByHour={ordersByHour}
                 statusBreakdown={statusBreakdown}
               />
