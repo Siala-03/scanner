@@ -4,6 +4,7 @@ import { fetchMenu, uploadMenu } from '../api/menu';
 import { supabase } from '../lib/supabase';
 import { menuItems as defaultMenuItems } from '../data/menuData';
 import { loadCustomMenu } from '../utils/menuImportExport';
+import { getMenuItemCartKey } from '../utils/menuKeys';
 
 function getRestaurantIdFromUrl(): string | null {
   if (typeof window === 'undefined') return null;
@@ -40,7 +41,7 @@ export function useMenuContext() {
 
 // Normalize raw Supabase snake_case rows to the camelCase MenuItem shape used by the app
 const normalizeMenuItem = (item: any): MenuItem => ({
-  id: item.id,
+  id: getMenuItemCartKey(item),
   name: item.name || '',
   description: item.description || '',
   price: item.price || 0,

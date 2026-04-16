@@ -41,6 +41,8 @@ export function MenuPage({ onAddToCart }: MenuPageProps) {
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null);
   const [quantity, setQuantity] = useState(1);
 
+  const normalizeCategory = (value: string) => value.trim().toLowerCase();
+
   // Get popular items from the fetched menu
   const popularItems = useMemo(() => 
     menuItems.filter((item) => item.isPopular && item.isAvailable).slice(0, 6),
@@ -51,7 +53,7 @@ export function MenuPage({ onAddToCart }: MenuPageProps) {
     let items =
     activeCategory === 'all' ?
     menuItems :
-    menuItems.filter((item) => item.category === activeCategory);
+    menuItems.filter((item) => normalizeCategory(item.category) === normalizeCategory(activeCategory));
     items = items.filter((item) => item.isAvailable);
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
