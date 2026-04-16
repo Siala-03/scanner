@@ -87,9 +87,12 @@ export function RestaurantSettings({ restaurantId, restaurantName, onNameChange,
     setSaveErrorMessage('Failed to save. Please try again.');
     try {
       await saveReceiptSettings(restaurantId, settings, name.trim() || undefined);
-      if (settings.currency) setCurrency(settings.currency as CurrencyCode);
+      const persisted = await fetchReceiptSettings(restaurantId);
+      setSettings(persisted);
+      setLogoPreview(persisted.logo || null);
+      if (persisted.currency) setCurrency(persisted.currency as CurrencyCode);
       onNameChange?.(name.trim());
-      onSettingsSaved?.(settings);
+      onSettingsSaved?.(persisted);
       setSaveMsg('success');
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Failed to save. Please try again.';

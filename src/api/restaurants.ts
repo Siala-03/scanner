@@ -224,11 +224,15 @@ export async function saveReceiptSettings(
     lastError = error;
   }
 
-  // If nothing could be persisted due to legacy schema mismatch, avoid breaking the UI.
-  if (Object.keys(corePayload).length === 0) return;
+  const hasReceiptValues = Object.values(receiptSettings).some((value) => {
+    if (typeof value === 'string') return value.trim().length > 0;
+    return value !== undefined && value !== null;
+  });
 
-  // Do not hard-fail the manager UI for legacy schemas with incompatible columns.
-  console.warn('Unable to persist restaurant receipt settings on current schema', lastError);
+  // Allow no-op saves only when absolutely nothing was requested.
+  if (Object.keys(corePayload).length === 0 && !hasReceiptValues) return;
+
+  throw lastError || new Error('Failed to persist restaurant receipt settings');
 }
 
 export async function fetchRestaurantPublic(restaurantId: string): Promise<Restaurant> {
