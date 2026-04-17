@@ -503,7 +503,7 @@ export function App() {
   // Waiter portal
   if (selectedRole === 'waiter' && authUser) {
     return (
-       <div className="supervisor-surface min-h-screen bg-slate-900 text-slate-100 transition-colors">
+      <WaiterDashboard
         waiter={authUser}
         orders={orders}
         restaurantName={restaurantName}
@@ -676,7 +676,7 @@ export function App() {
                   { id: 'history', label: 'Order History' },
                   { id: 'analytics', label: 'Analytics' },
                   { id: 'staff', label: 'Staff' },
-                      <div className="flex flex-col gap-2 px-4 py-3">
+                  { id: 'expenses', label: 'Expenses' },
                   { id: 'credit', label: 'Credit' },
                   { id: 'loyalty', label: 'Loyalty & SMS' },
                   { id: 'settings', label: 'Settings' },
