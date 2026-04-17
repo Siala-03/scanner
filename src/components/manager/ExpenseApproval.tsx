@@ -103,7 +103,14 @@ export default function ManagerExpenseApproval() {
       setPendingExpenses(unwrapData<ExpenseWithDetails>(pending as any));
       setApprovedExpenses(unwrapData<ExpenseWithDetails>(approved as any));
       setRejectedExpenses(unwrapData<ExpenseWithDetails>(rejected as any));
-      setCategories(unwrapData<ExpenseCategory>(cats as any));
+      const loadedCategories = unwrapData<ExpenseCategory>(cats as any);
+      setCategories(loadedCategories);
+      if (loadedCategories.length > 0) {
+        setFormData((prev) => ({
+          ...prev,
+          categoryId: prev.categoryId || loadedCategories[0].id,
+        }));
+      }
       setSummary(normalizeSummary(sum));
       setError(null);
     } catch (err) {

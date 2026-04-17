@@ -1,5 +1,15 @@
 import { supabase, supabaseAdmin } from '../lib/supabase';
-import type { InventoryRecord, Supplier, PurchaseOrder, StockMovement, WasteEntry, InventoryAnalytics } from '../types/inventory';
+import type {
+  InventoryRecord,
+  Supplier,
+  PurchaseOrder,
+  StockMovement,
+  WasteEntry,
+  InventoryAnalytics,
+  InventoryLocation,
+  InventoryForecast,
+  PurchaseOrderStatus,
+} from '../types/inventory';
 import { apiRequest } from './http';
 
 const API_BASE = import.meta.env.VITE_API_URL
@@ -69,6 +79,14 @@ function normalizeSupplier(raw: any): Supplier {
 }
 
 function normalizePurchaseOrder(raw: any): PurchaseOrder {
+  const normalizePoStatus = (value: any): PurchaseOrderStatus => {
+    const normalized = String(value ?? 'draft').toLowerCase().trim();
+    if (normalized === 'draft' || normalized === 'sent' || normalized === 'confirmed' || normalized === 'partial' || normalized === 'received' || normalized === 'cancelled') {
+      return normalized;
+    }
+    return 'draft';
+  };
+
   const items = Array.isArray(raw.items) ? raw.items.map((i: any) => ({
     menuItemId:   i.menu_item_id   ?? i.menuItemId   ?? '',
     menuItemName: i.menu_item_name ?? i.menuItemName ?? '',
@@ -82,7 +100,7 @@ function normalizePurchaseOrder(raw: any): PurchaseOrder {
     id:               raw.id,
     supplierId:       raw.supplier_id       ?? raw.supplierId       ?? '',
     supplierName:     raw.supplier_name     ?? raw.supplierName     ?? '',
-    status:           raw.status            ?? 'draft',
+    status:           normalizePoStatus(raw.status),
     items,
     totalCost:        raw.total_cost        ?? raw.totalCost        ?? 0,
     expectedDelivery: raw.expected_delivery ?? raw.expectedDelivery ?? null,
@@ -557,7 +575,7 @@ export async function fetchPurchaseOrders(status?: string): Promise<PurchaseOrde
     .eq('restaurant_id', restaurantId)
     .order('created_at', { ascending: false });
 
-  if (status && status !== 'all') query = query.eq('status', status);
+  if (status && status !== 'all') query = query.eq('status', status.toLowerCase());
 
   const { data, error } = await query;
   if (error) { console.error('fetchPurchaseOrders error:', error); return []; }
@@ -899,9 +917,135 @@ export async function computeInventoryAnalytics(): Promise<InventoryAnalytics> {
   };
 }
 
-// ── Locations / Forecasting (stubs — tables may not exist yet) ───────────────
+// ── Locations / Forecasting ───────────────────────────────────────────────────
 
-export async function fetchLocations() { return []; }
+function normalizeLocation(raw: any): InventoryLocation {
+  return {
+    id: raw.id,
+    restaurantId: raw.restaurant_id ?? raw.restaurantId ?? '',
+    name: raw.name ?? '',
+    type: raw.type ?? 'other',
+    description: raw.description ?? undefined,
+    isActive: raw.is_active ?? raw.isActive ?? true,
+    capacity: raw.capacity ?? undefined,
+    temperatureRange: raw.temperature_range ?? raw.temperatureRange ?? undefined,
+    totalItems: Number(raw.total_items ?? raw.totalItems ?? 0),
+    totalStock: Number(raw.total_stock ?? raw.totalStock ?? 0),
+    lowStockItems: Number(raw.low_stock_items ?? raw.lowStockItems ?? 0),
+    createdAt: raw.created_at ?? raw.createdAt ?? new Date().toISOString(),
+    updatedAt: raw.updated_at ?? raw.updatedAt ?? new Date().toISOString(),
+  };
+}
+
+function normalizeForecast(raw: any): InventoryForecast {
+  return {
+    id: raw.id,
+    menuItemId: raw.menu_item_id ?? raw.menuItemId ?? '',
+    menuItemName: raw.menu_item_name ?? raw.menuItemName ?? '',
+    forecastDate: raw.forecast_date ?? raw.forecastDate ?? new Date().toISOString().split('T')[0],
+    predictedConsumption: Number(raw.predicted_consumption ?? raw.predictedConsumption ?? 0),
+    confidenceLevel: Number(raw.confidence_level ?? raw.confidenceLevel ?? 0),
+    recommendedReorderQty: Number(raw.recommended_reorder_qty ?? raw.recommendedReorderQty ?? 0),
+    leadTimeDays: Number(raw.lead_time_days ?? raw.leadTimeDays ?? 0),
+    seasonalityFactor: Number(raw.seasonality_factor ?? raw.seasonalityFactor ?? 1),
+    trendFactor: Number(raw.trend_factor ?? raw.trendFactor ?? 1),
+    lastStockLevel: Number(raw.last_stock_level ?? raw.lastStockLevel ?? 0),
+    daysUntilStockout: Number(raw.days_until_stockout ?? raw.daysUntilStockout ?? 0),
+    alertStatus: raw.alert_status ?? raw.alertStatus ?? 'none',
+  };
+}
+
+export async function fetchLocations(): Promise<InventoryLocation[]> {
+  const restaurantId = getRestaurantId();
+  if (!restaurantId) return [];
+
+  try {
+    const payload = await apiRequest<any[]>('/api/locations');
+    if (Array.isArray(payload)) {
+      return payload.map(normalizeLocation);
+    }
+  } catch (apiErr) {
+    console.warn('fetchLocations backend endpoint unavailable, using Supabase fallback.');
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('inventory_locations')
+      .select('*')
+      .eq('restaurant_id', restaurantId)
+      .eq('is_active', true)
+      .order('name');
+
+    if (error) throw error;
+
+    const inventory = await fetchInventory();
+    const byLocation = new Map<string, { totalItems: number; totalStock: number; lowStockItems: number }>();
+    inventory.forEach((rec) => {
+      const key = (rec.location || '').trim().toLowerCase();
+      if (!key) return;
+      const stats = byLocation.get(key) || { totalItems: 0, totalStock: 0, lowStockItems: 0 };
+      stats.totalItems += 1;
+      stats.totalStock += rec.stock;
+      if (rec.stock <= rec.lowStockThreshold) stats.lowStockItems += 1;
+      byLocation.set(key, stats);
+    });
+
+    return (data || []).map((row: any) => {
+      const fallbackStats = byLocation.get(String(row.name || '').trim().toLowerCase()) || {
+        totalItems: 0,
+        totalStock: 0,
+        lowStockItems: 0,
+      };
+      return normalizeLocation({
+        ...row,
+        total_items: row.total_items ?? fallbackStats.totalItems,
+        total_stock: row.total_stock ?? fallbackStats.totalStock,
+        low_stock_items: row.low_stock_items ?? fallbackStats.lowStockItems,
+      });
+    });
+  } catch (error) {
+    console.warn('fetchLocations fallback unavailable, returning empty list.');
+    return [];
+  }
+}
+
+export async function createLocation(payload: {
+  name: string;
+  type: InventoryLocation['type'];
+  description?: string;
+  capacity?: number;
+  temperatureRange?: string;
+}): Promise<InventoryLocation> {
+  try {
+    const created = await apiRequest<any>('/api/locations', {
+      method: 'POST',
+      json: payload,
+    });
+    return normalizeLocation(created);
+  } catch (apiErr) {
+    const restaurantId = getRestaurantId();
+    if (!restaurantId) throw new Error('No company selected');
+
+    const id = `loc-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    const { data, error } = await supabaseAdmin
+      .from('inventory_locations')
+      .insert({
+        id,
+        restaurant_id: restaurantId,
+        name: payload.name,
+        type: payload.type,
+        description: payload.description ?? null,
+        capacity: payload.capacity ?? null,
+        temperature_range: payload.temperatureRange ?? null,
+        is_active: true,
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return normalizeLocation(data);
+  }
+}
 
 type ForecastGenerateResponse = {
   success: boolean;
@@ -909,34 +1053,58 @@ type ForecastGenerateResponse = {
   forecasts: any[];
 };
 
-export async function fetchForecasts() {
+export async function fetchForecasts(): Promise<InventoryForecast[]> {
   try {
     const forecasts = await apiRequest<any[]>('/api/forecasting');
-    return Array.isArray(forecasts) ? forecasts : [];
+    return Array.isArray(forecasts) ? forecasts.map(normalizeForecast) : [];
   } catch (error) {
-    console.warn('fetchForecasts unavailable, returning empty list.');
+    console.warn('fetchForecasts backend endpoint unavailable, using Supabase fallback.');
+  }
+
+  try {
+    const restaurantId = getRestaurantId();
+    if (!restaurantId) return [];
+
+    const { data, error } = await supabase
+      .from('inventory_forecasts')
+      .select('*')
+      .order('days_until_stockout', { ascending: true });
+
+    if (error) throw error;
+    return (data || []).map(normalizeForecast);
+  } catch (fallbackErr) {
+    console.warn('fetchForecasts fallback unavailable, returning empty list.');
     return [];
   }
 }
 
 export async function generateForecasts() {
-  const payload = await apiRequest<ForecastGenerateResponse>('/api/forecasting/generate', {
-    method: 'POST',
-  });
+  try {
+    const payload = await apiRequest<ForecastGenerateResponse>('/api/forecasting/generate', {
+      method: 'POST',
+    });
 
-  return {
-    success: Boolean(payload?.success),
-    count: Number(payload?.count || 0),
-    forecasts: Array.isArray(payload?.forecasts) ? payload.forecasts : [],
-  };
+    return {
+      success: Boolean(payload?.success),
+      count: Number(payload?.count || 0),
+      forecasts: Array.isArray(payload?.forecasts) ? payload.forecasts.map(normalizeForecast) : [],
+    };
+  } catch (error) {
+    const existing = await fetchForecasts();
+    return {
+      success: existing.length > 0,
+      count: existing.length,
+      forecasts: existing,
+    };
+  }
 }
 
-export async function fetchForecastAlerts() {
+export async function fetchForecastAlerts(): Promise<InventoryForecast[]> {
   try {
     const alerts = await apiRequest<any[]>('/api/forecasting/alerts');
-    return Array.isArray(alerts) ? alerts : [];
+    return Array.isArray(alerts) ? alerts.map(normalizeForecast) : [];
   } catch (error) {
-    console.warn('fetchForecastAlerts unavailable, returning empty list.');
-    return [];
+    const forecasts = await fetchForecasts();
+    return forecasts.filter((f) => f.alertStatus === 'critical' || f.alertStatus === 'warning');
   }
 }

@@ -55,7 +55,7 @@ export function SupervisorDashboard({ onManageMenu, onLogout }: SupervisorDashbo
 
   return (
     <div className="min-h-screen bg-slate-950 text-white p-4">
-      <div className="max-w-5xl mx-auto">
+      <div className="max-w-[96rem] 2xl:max-w-[110rem] mx-auto">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
           <div>
             <h1 className="text-3xl font-bold">Supervisor Dashboard</h1>

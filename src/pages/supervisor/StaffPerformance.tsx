@@ -86,7 +86,7 @@ export function StaffPerformance({ onBack }: StaffPerformanceProps) {
   }));
   return (
     <div className="dark min-h-screen bg-slate-900 p-4 md:p-6">
-      <div className="max-w-7xl mx-auto">
+      <div className="max-w-[96rem] 2xl:max-w-[110rem] mx-auto">
         {/* Header */}
         <div className="mb-6">
           {onBack && (

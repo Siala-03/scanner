@@ -129,11 +129,6 @@ export default function SupervisorExpenseManagement() {
       try {
         categoriesData = await fetchExpenseCategories();
         console.log('📋 Categories loaded:', categoriesData.length, 'categories');
-        
-        if (!categoriesData || categoriesData.length === 0) {
-          console.warn('⚠️ No expense categories available');
-          setError('No expense categories available. Please contact administrator.');
-        }
       } catch (catErr) {
         console.error('❌ Failed to load categories:', catErr);
         setError('Failed to load expense categories');
@@ -149,6 +144,12 @@ export default function SupervisorExpenseManagement() {
       }
       
       setCategories(categoriesData || []);
+      if ((categoriesData || []).length > 0) {
+        setFormData((prev) => ({
+          ...prev,
+          categoryId: prev.categoryId || categoriesData[0].id,
+        }));
+      }
       setExpenses(expensesData || []);
     } catch (err) {
       setError('Failed to load data');

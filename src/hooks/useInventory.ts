@@ -20,10 +20,8 @@ import type {
   WasteEntry,
   InventoryAnalytics,
   InventoryForecast,
+  InventoryLocation,
 } from '../types/inventory';
-
-// InventoryLocation might not be in the types yet — use a safe fallback
-type InventoryLocation = any;
 
 export function useInventoryData() {
   const [inventory, setInventory]           = useState<InventoryRecord[]>([]);

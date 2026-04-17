@@ -36,6 +36,7 @@ import {
   deleteInventoryRecord as apiDeleteInventoryRecord,
   createSupplier as apiCreateSupplier,
   updateSupplier as apiUpdateSupplier,
+  createLocation as apiCreateLocation,
   createPurchaseOrder as apiCreatePurchaseOrder,
   updatePurchaseOrder as apiUpdatePurchaseOrder,
   receivePurchaseOrder as apiReceivePurchaseOrder,
@@ -161,6 +162,12 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
   // Calculate pendingPO stats from loaded purchase orders
   const pendingPOCount = useMemo(() => purchaseOrders.filter(po => !['received', 'cancelled'].includes(po.status)).length, [purchaseOrders]);
   const pendingPOValue = useMemo(() => purchaseOrders.filter(po => !['received', 'cancelled'].includes(po.status)).reduce((sum, po) => sum + (po.totalCost || 0), 0), [purchaseOrders]);
+  const pastPOValue = useMemo(
+    () => purchaseOrders
+      .filter((po) => po.status === 'received')
+      .reduce((sum, po) => sum + (po.totalCost || 0), 0),
+    [purchaseOrders]
+  );
 
   // Combined item list for PO creation: menu items + standalone inventory items
   const allInventoryItems = useMemo(() => {
@@ -176,6 +183,14 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
   }, [menuItems, inventory]);
   const [activeTab, setActiveTab] = useState<Tab>('overview');
   const [showAddInventoryModal, setShowAddInventoryModal] = useState(false);
+  const [showLocationModal, setShowLocationModal] = useState(false);
+  const [newLocation, setNewLocation] = useState({
+    name: '',
+    type: 'kitchen' as 'warehouse' | 'walk_in' | 'dry_store' | 'bar' | 'kitchen' | 'cold_room' | 'freezer' | 'display' | 'other',
+    description: '',
+    capacity: '',
+    temperatureRange: '',
+  });
   const [newInventoryItemName, setNewInventoryItemName] = useState('');
   const [newInventoryItemCategory, setNewInventoryItemCategory] = useState('Other');
   const [newInventoryItemLocation, setNewInventoryItemLocation] = useState('');
@@ -449,6 +464,11 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
   const [receiveModal, setReceiveModal] = useState<PurchaseOrder | null>(null);
   const [receiveQtys, setReceiveQtys] = useState<Record<string, number>>({});
 
+  const filteredPurchaseOrders = useMemo(
+    () => purchaseOrders.filter((po) => poFilter === 'all' || po.status === poFilter),
+    [purchaseOrders, poFilter]
+  );
+
   const handleCreatePO = async () => {
     // Validate required fields
     if (!newPO.supplierId) {
@@ -525,6 +545,37 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
     }
     setReceiveModal(null);
     setReceiveQtys({});
+  };
+
+  const handleCreateLocation = async () => {
+    const name = newLocation.name.trim();
+    if (!name) {
+      alert('Please enter a location name');
+      return;
+    }
+
+    try {
+      await apiCreateLocation({
+        name,
+        type: newLocation.type,
+        description: newLocation.description.trim() || undefined,
+        capacity: newLocation.capacity ? Number(newLocation.capacity) : undefined,
+        temperatureRange: newLocation.temperatureRange.trim() || undefined,
+      });
+      await refresh();
+      setShowLocationModal(false);
+      setNewLocation({
+        name: '',
+        type: 'kitchen',
+        description: '',
+        capacity: '',
+        temperatureRange: '',
+      });
+      alert('Location created successfully');
+    } catch (err) {
+      console.error('Failed to create location', err);
+      alert(`Failed to create location: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    }
   };
 
   // ── Suppliers state ─────────────────────────────────────────────────────
@@ -651,7 +702,7 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
     <div className="dark min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
       {/* Header */}
       <div className="border-b border-slate-700/50 bg-slate-900/80 backdrop-blur sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 md:px-6 py-4">
+        <div className="max-w-[96rem] 2xl:max-w-[110rem] mx-auto px-4 md:px-6 py-4">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h1 className="text-2xl font-bold text-white flex items-center gap-2">
@@ -703,6 +754,12 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                   Add Supplier
                 </Button>
               )}
+              {activeTab === 'locations' && (
+                <Button variant="primary" size="sm" onClick={() => setShowLocationModal(true)}>
+                  <PlusIcon className="w-4 h-4" />
+                  Add Location
+                </Button>
+              )}
             </div>
           </div>
 
@@ -731,7 +788,7 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 md:px-6 py-6">
+      <div className="max-w-[96rem] 2xl:max-w-[110rem] mx-auto px-4 md:px-6 py-6">
         {isLoading && (
           <div className="mb-4 rounded-xl border border-amber-400/30 bg-amber-500/10 p-3 text-amber-100">
             Loading inventory data from server. Please wait...
@@ -784,13 +841,14 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
         {activeTab === 'overview' && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
             {/* KPI row */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+            <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-3 mb-5">
               {[
                 { label: 'Total Items', value: allInventoryItems.length, icon: <PackageIcon className="w-5 h-5 text-blue-400" />, color: 'text-blue-400' },
                 { label: 'Total Stock Value', value: formatPrice(analytics.totalStockValue), icon: <TrendingUpIcon className="w-5 h-5 text-emerald-400" />, color: 'text-emerald-400' },
                 { label: 'Low Stock', value: analytics.lowStockCount, icon: <AlertTriangleIcon className="w-5 h-5 text-amber-400" />, color: 'text-amber-400' },
                 { label: 'Out of Stock', value: analytics.outOfStockCount, icon: <XCircleIcon className="w-5 h-5 text-red-400" />, color: 'text-red-400' },
                 { label: 'Below Reorder', value: analytics.belowReorderCount, icon: <TruckIcon className="w-5 h-5 text-indigo-400" />, color: 'text-indigo-400' },
+                { label: 'Past PO Value', value: formatPrice(pastPOValue), icon: <TruckIcon className="w-5 h-5 text-cyan-400" />, color: 'text-cyan-400' },
               ].map((kpi) => (
                 <Card key={kpi.label} className="bg-slate-800/50 border border-slate-700/50">
                   <div className="flex items-center gap-3">
@@ -1125,7 +1183,9 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                 </Card>
               ))}
               {locations.length === 0 && (
-                <div className="py-16 text-center text-slate-500">No locations found.</div>
+                <div className="py-16 text-center text-slate-500">
+                  No locations found. Create locations like Kitchen, Bar, or Restaurant to support stock routing and operational redirection.
+                </div>
               )}
             </div>
 
@@ -1198,7 +1258,7 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
             </div>
 
             <div className="space-y-3">
-              {purchaseOrders.map((po) => (
+              {filteredPurchaseOrders.map((po) => (
                 <Card key={po.id} className="bg-slate-800/50 border border-slate-700/50 hover:border-slate-600/50 transition cursor-pointer" onClick={() => setSelectedPO(po)}>
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1 min-w-0">
@@ -1257,7 +1317,7 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                   </div>
                 </Card>
               ))}
-              {purchaseOrders.length === 0 && (
+              {filteredPurchaseOrders.length === 0 && (
                 <div className="py-16 text-center text-slate-500">No purchase orders found.</div>
               )}
             </div>
@@ -1976,6 +2036,61 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
               </div>
             </div>
           )}
+        </Modal>
+
+        <Modal isOpen={showLocationModal} onClose={() => setShowLocationModal(false)} title="Add Inventory Location">
+          <div className="space-y-3">
+            <input
+              value={newLocation.name}
+              onChange={(e) => setNewLocation((prev) => ({ ...prev, name: e.target.value }))}
+              placeholder="Location name (e.g., Kitchen, Bar, Restaurant)"
+              className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+            />
+            <select
+              value={newLocation.type}
+              onChange={(e) => setNewLocation((prev) => ({ ...prev, type: e.target.value as typeof prev.type }))}
+              className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+            >
+              {['kitchen', 'bar', 'warehouse', 'walk_in', 'dry_store', 'cold_room', 'freezer', 'display', 'other'].map((type) => (
+                <option key={type} value={type}>{type.replace(/_/g, ' ')}</option>
+              ))}
+            </select>
+            <input
+              value={newLocation.capacity}
+              onChange={(e) => setNewLocation((prev) => ({ ...prev, capacity: e.target.value }))}
+              placeholder="Capacity (optional)"
+              type="number"
+              min={0}
+              className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+            />
+            <input
+              value={newLocation.temperatureRange}
+              onChange={(e) => setNewLocation((prev) => ({ ...prev, temperatureRange: e.target.value }))}
+              placeholder="Temperature range (optional)"
+              className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+            />
+            <textarea
+              value={newLocation.description}
+              onChange={(e) => setNewLocation((prev) => ({ ...prev, description: e.target.value }))}
+              placeholder="Description (optional)"
+              rows={2}
+              className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+            />
+            <div className="flex justify-end gap-2 pt-3 border-t border-slate-700/30">
+              <button
+                onClick={() => setShowLocationModal(false)}
+                className="px-3 py-1 rounded-lg bg-slate-700 text-slate-300 text-xs hover:bg-slate-600 transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreateLocation}
+                className="px-3 py-1 rounded-lg bg-emerald-500/20 text-emerald-400 text-xs font-medium hover:bg-emerald-500/30 transition"
+              >
+                Save Location
+              </button>
+            </div>
+          </div>
         </Modal>
 
         {/* Waste Modal */}

@@ -540,8 +540,8 @@ export function App() {
           </div>
         </div>
 
-        <div className="dark bg-slate-900 px-4 pb-4">
-          <div className="max-w-7xl mx-auto flex gap-2 py-4">
+        <div className="dark bg-slate-900 px-3 sm:px-4 pb-4">
+          <div className="max-w-[96rem] 2xl:max-w-[110rem] mx-auto flex gap-2 py-4 overflow-x-auto">
             <Button
               variant={supervisorPage === 'dashboard' ? 'primary' : 'ghost'}
               size="sm"

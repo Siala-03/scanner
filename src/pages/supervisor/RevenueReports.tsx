@@ -140,11 +140,13 @@ export function RevenueReports() {
       itemMap.set(name, itemCurrent);
     });
 
-    if (order.tableNumber != null) {
-      const tableStats = tableMap.get(order.tableNumber) || { totalRevenue: 0, totalOrders: 0 };
+    const rawTableNumber = (order as any).tableNumber ?? (order as any).table_number;
+    const normalizedTableNumber = Number(rawTableNumber);
+    if (Number.isFinite(normalizedTableNumber) && normalizedTableNumber > 0) {
+      const tableStats = tableMap.get(normalizedTableNumber) || { totalRevenue: 0, totalOrders: 0 };
       if (order.status === 'served') tableStats.totalRevenue += order.total;
       tableStats.totalOrders += 1;
-      tableMap.set(order.tableNumber, tableStats);
+      tableMap.set(normalizedTableNumber, tableStats);
     }
   });
 
@@ -202,7 +204,7 @@ export function RevenueReports() {
 
   return (
     <div className="dark min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4 md:p-8">
-      <div className="max-w-7xl mx-auto">
+      <div className="max-w-[96rem] 2xl:max-w-[110rem] mx-auto">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
@@ -471,7 +473,13 @@ export function RevenueReports() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-700/50">
-                  {tablePerformance.slice(0, 10).map((table, idx) =>
+                  {tablePerformance.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="px-4 py-8 text-center text-slate-400">
+                        No table performance data for the selected filters.
+                      </td>
+                    </tr>
+                  ) : tablePerformance.slice(0, 10).map((table, idx) =>
                   <motion.tr key={table.tableNumber} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.6 + idx * 0.02 }} className="hover:bg-slate-700/30 transition">
                       <td className="px-4 py-3 text-sm font-bold text-white">
                         Table {table.tableNumber}

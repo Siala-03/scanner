@@ -168,6 +168,14 @@ export function OrdersHistoryTable({ orders, onSelectOrder, onExport }: OrdersHi
 
   const hasActiveFilters = searchQuery || statusFilter !== 'all' || waiterFilter !== 'all' || dateFrom || dateTo;
 
+  const formatDuration = (minutes: number | null): string => {
+    if (minutes === null || !Number.isFinite(minutes) || minutes < 0) return '-';
+    if (minutes < 60) return `${minutes}m`;
+    const hrs = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return mins === 0 ? `${hrs}h` : `${hrs}h ${mins}m`;
+  };
+
   return (
     <div className="space-y-4">
       {/* Filters */}
@@ -286,12 +294,15 @@ export function OrdersHistoryTable({ orders, onSelectOrder, onExport }: OrdersHi
               <HeaderCell field="total">Total</HeaderCell>
               <HeaderCell field="status">Status</HeaderCell>
               <HeaderCell field="createdAt">Date & Time</HeaderCell>
+              <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                Duration
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-700/50">
             {sortedOrders.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-4 py-12 text-center text-slate-400">
+                <td colSpan={9} className="px-4 py-12 text-center text-slate-400">
                   <FilterIcon className="w-12 h-12 mx-auto mb-3 opacity-50" />
                   <p>No orders found matching your filters</p>
                 </td>
@@ -301,6 +312,12 @@ export function OrdersHistoryTable({ orders, onSelectOrder, onExport }: OrdersHi
                 const resolvedWaiterId = resolveWaiterId(order);
                 const waiter = resolvedWaiterId ? staff.find((s) => s.id === resolvedWaiterId) : null;
                 const createdAt = new Date(order.createdAt);
+                const servedAtRaw = (order as any).servedAt ?? (order as any).served_at ??
+                  ((order.status === 'served') ? ((order as any).updatedAt ?? (order as any).updated_at) : null);
+                const servedAt = servedAtRaw ? new Date(servedAtRaw) : null;
+                const durationMinutes = servedAt && !Number.isNaN(servedAt.getTime())
+                  ? Math.max(0, Math.round((servedAt.getTime() - createdAt.getTime()) / 60000))
+                  : null;
                 
                 return (
                   <motion.tr
@@ -339,6 +356,9 @@ export function OrdersHistoryTable({ orders, onSelectOrder, onExport }: OrdersHi
                     <td className="px-4 py-3 text-sm text-slate-400">
                       <div>{createdAt.toLocaleDateString()}</div>
                       <div className="text-xs">{createdAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-slate-300">
+                      {order.status === 'served' ? formatDuration(durationMinutes) : '-'}
                     </td>
                   </motion.tr>
                 );
