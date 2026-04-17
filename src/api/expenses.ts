@@ -395,10 +395,19 @@ export async function createExpense(data: ExpenseFormData): Promise<Expense> {
 
       lastError = error;
 
-      // If the category doesn't exist yet, seed defaults and retry once.
+      // If the category FK fails, seed defaults then swap in a real category ID.
       if (isCategoryFkError(error) && !categorySeeded) {
         categorySeeded = true;
         await ensureDefaultExpenseCategories(restaurantId);
+        const { data: validCat } = await supabaseAdmin
+          .from('expense_categories')
+          .select('id')
+          .eq('restaurant_id', restaurantId)
+          .limit(1)
+          .single();
+        if (validCat?.id) {
+          currentPayload = { ...currentPayload, category_id: validCat.id };
+        }
         continue;
       }
 
