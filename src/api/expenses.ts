@@ -382,7 +382,48 @@ export async function createExpense(data: ExpenseFormData): Promise<Expense> {
   };
 
   const isCategoryFkError = (error: any): boolean => {
-    return error?.code === '23503' && String(error?.details || '').includes('category_id');
+    return error?.code === '23503' && String(error?.details || error?.message || '').includes('category_id');
+  };
+
+  // Resolve a valid category_id that actually exists in the DB.
+  // Tries full seeding first, then a minimal single-row insert, then gives up.
+  const resolveValidCategoryId = async (): Promise<string | null> => {
+    await ensureDefaultExpenseCategories(restaurantId);
+
+    const { data: existing } = await supabaseAdmin
+      .from('expense_categories')
+      .select('id')
+      .eq('restaurant_id', restaurantId)
+      .limit(1)
+      .single();
+    if (existing?.id) return existing.id;
+
+    // Full seeding failed — try inserting one minimal "Other" category,
+    // stripping columns the schema doesn't have.
+    const fallbackId = seedCategoryId(restaurantId, 'Other');
+    const missingColRegex = /Could not find the '([^']+)' column/i;
+    let minRow: Record<string, unknown> = {
+      id: fallbackId,
+      name: 'Other',
+      restaurant_id: restaurantId,
+    };
+    for (let g = 0; g < 8; g++) {
+      const { error: catErr } = await supabaseAdmin
+        .from('expense_categories')
+        .upsert(minRow, { onConflict: 'id' });
+      if (!catErr) return fallbackId;
+      const col = String(catErr.message || '').match(missingColRegex)?.[1];
+      if (!col) break;
+      const { [col]: _d, ...rest } = minRow;
+      minRow = rest;
+    }
+
+    // Last resort — any category in the table, regardless of restaurant
+    const { data: any_ } = await supabaseAdmin
+      .from('expense_categories')
+      .select('id')
+      .limit(1);
+    return (Array.isArray(any_) ? any_[0]?.id : null) ?? null;
   };
 
   for (const payload of attempts) {
@@ -404,18 +445,16 @@ export async function createExpense(data: ExpenseFormData): Promise<Expense> {
 
       lastError = error;
 
-      // If the category FK fails, seed defaults then swap in a real category ID.
+      // Category FK violation — resolve a real ID and swap it in.
       if (isCategoryFkError(error) && !categorySeeded) {
         categorySeeded = true;
-        await ensureDefaultExpenseCategories(restaurantId);
-        const { data: validCat } = await supabaseAdmin
-          .from('expense_categories')
-          .select('id')
-          .eq('restaurant_id', restaurantId)
-          .limit(1)
-          .single();
-        if (validCat?.id) {
-          currentPayload = { ...currentPayload, category_id: validCat.id };
+        const validId = await resolveValidCategoryId();
+        if (validId) {
+          currentPayload = { ...currentPayload, category_id: validId };
+        } else {
+          // No categories at all — drop category_id and let the DB decide (nullable).
+          const { category_id: _dropped, ...withoutCat } = currentPayload;
+          currentPayload = withoutCat;
         }
         continue;
       }
