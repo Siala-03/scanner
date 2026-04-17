@@ -7,8 +7,6 @@ import { OrdersHistoryTable } from '../../components/supervisor/OrdersHistoryTab
 import { OrderDetailModal } from '../../components/waiter/OrderDetailModal';
 import { fetchOrders } from '../../api/orders';
 import { downloadCsv, buildOrdersCsv } from '../../utils/csv';
-import { orderToReceiptData } from '../../utils/receipt';
-import { printOrderReceipt } from '../../utils/sunmiPrinter';
 
 // Type alias to handle both API and local Order types
 type Order = OrderType & {
@@ -110,29 +108,8 @@ export function OrderHistoryPage({ onBack, existingOrders }: OrderHistoryPagePro
     setSelectedOrder(null);
   };
 
-  const handlePrintReceipt = async (order: Order) => {
-    const savedUser = (() => { try { return JSON.parse(localStorage.getItem('authUser') || '{}'); } catch { return {}; } })();
-    const restaurantName = localStorage.getItem('restaurantName') || savedUser?.restaurantName || 'Company';
-    const receiptOptions: Parameters<typeof orderToReceiptData>[1] = {
-      restaurantName,
-      restaurantAddress: '',
-      restaurantPhone: '',
-      restaurantEmail: '',
-      taxRate: 0,
-      serverName: savedUser?.name || 'Supervisor',
-      orderType: order.deliveryAddress ? 'delivery' as const : 'dine-in' as const,
-      paymentMethod: 'Cash',
-      paymentStatus: 'paid' as const,
-      amountPaid: order.total,
-    };
-
-    try {
-      const receiptData = orderToReceiptData(order, receiptOptions);
-      await printOrderReceipt(receiptData);
-    } catch (error) {
-      console.error('Error generating receipt:', error);
-      window.print();
-    }
+  const handlePrintReceipt = (_order: Order) => {
+    window.print();
   };
 
   return (

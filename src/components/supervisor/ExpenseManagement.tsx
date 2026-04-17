@@ -8,7 +8,6 @@ import {
   createExpenseNote,
   getExpenseAuditLog,
 } from '../../api/expenses';
-import { printExpenseReceipt } from '../../utils/sunmiPrinter';
 import {
   Expense,
   ExpenseCategory,
@@ -213,21 +212,8 @@ export default function SupervisorExpenseManagement() {
     }
   };
 
-  const handleGenerateReceipt = async (expenseId: string) => {
-    try {
-      setLoading(true);
-      const expenseToPrint = expenses.find(e => e.id === expenseId) || selectedExpense;
-      if (expenseToPrint) {
-        const companyName = localStorage.getItem('restaurantName') || 'Company';
-        await printExpenseReceipt({ ...(expenseToPrint as any), companyName });
-      }
-      setError(null);
-    } catch (err) {
-      setError('Failed to print receipt');
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
+  const handleGenerateReceipt = (_expenseId: string) => {
+    window.print();
   };
 
   const handleAddNote = async (expenseId: string) => {

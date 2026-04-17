@@ -1,7 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
 import { ClockIcon, ChefHatIcon, UtensilsIcon, RefreshCwIcon, CheckCircleIcon, FlameIcon, AlertTriangleIcon, BarChart3Icon, ListOrderedIcon, TrendingUpIcon, LogOutIcon, PrinterIcon } from 'lucide-react';
-import { orderToReceiptData } from '../../utils/receipt';
-import { printOrderReceipt } from '../../utils/sunmiPrinter';
 import { useSocket } from '../../hooks/useSocket';
 import { useStaffKPIs } from '../../hooks/useKPIs';
 import { KPICard } from '../../components/supervisor/KPICard';
@@ -369,35 +367,8 @@ export function KitchenDisplay({ onLogout, restaurantId, restaurantName }: { onL
     }
   };
 
-  const handlePrintCustomerReceipt = async (order: KitchenOrder) => {
-    const fakeOrder = {
-      id: order.id,
-      orderNumber: order.orderNumber,
-      tableNumber: order.tableNumber,
-      status: order.status,
-      total: order.items.reduce((s, i) => s + (i as any).unit_price * i.quantity || 0, 0),
-      items: order.items.map((i: any) => ({
-        quantity: i.quantity,
-        menuItemName: i.name || i.menu_item_name,
-        unitPrice: i.unit_price ?? i.unitPrice ?? 0,
-        totalPrice: (i.unit_price ?? i.unitPrice ?? 0) * i.quantity,
-        specialInstructions: i.notes,
-      })),
-      notes: order.notes,
-      createdAt: new Date(order.createdAt),
-      updatedAt: new Date(),
-    } as any;
-
-    await printOrderReceipt(
-      orderToReceiptData(fakeOrder, {
-        restaurantName: resolvedRestaurantName || 'Company',
-        restaurantAddress: '',
-        restaurantPhone: '',
-        taxRate: 0,
-        serverName: 'Kitchen',
-        paymentStatus: 'pending',
-      })
-    );
+  const handlePrintCustomerReceipt = (_order: KitchenOrder) => {
+    window.print();
   };
 
   // Use analytics from backend when available, otherwise calculate from orders
