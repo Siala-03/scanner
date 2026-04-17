@@ -349,20 +349,51 @@ export async function createExpense(data: ExpenseFormData): Promise<Expense> {
   ];
 
   let lastError: any = null;
-  for (const payload of attempts) {
-    const { data: result, error } = await supabaseAdmin
-      .from('expenses')
-      .insert(payload)
-      .select()
-      .single();
+  const missingColumnRegex = /Could not find the '([^']+)' column/i;
 
-    if (!error && result) {
-      return normalizeExpense(result);
+  const stripMissingColumn = (
+    payload: Record<string, unknown>,
+    error: any
+  ): Record<string, unknown> | null => {
+    const message = String(error?.message || '');
+    const match = message.match(missingColumnRegex);
+    const missingColumn = match?.[1];
+    if (!missingColumn || !(missingColumn in payload)) {
+      return null;
     }
 
-    lastError = error;
-    if (error?.code !== 'PGRST204') {
-      break;
+    const { [missingColumn]: _removed, ...rest } = payload;
+    return rest;
+  };
+
+  for (const payload of attempts) {
+    let currentPayload = payload;
+    let guard = 0;
+
+    while (guard < 20) {
+      guard += 1;
+
+      const { data: result, error } = await supabaseAdmin
+        .from('expenses')
+        .insert(currentPayload)
+        .select()
+        .single();
+
+      if (!error && result) {
+        return normalizeExpense(result);
+      }
+
+      lastError = error;
+      if (error?.code !== 'PGRST204') {
+        break;
+      }
+
+      const strippedPayload = stripMissingColumn(currentPayload, error);
+      if (!strippedPayload) {
+        break;
+      }
+
+      currentPayload = strippedPayload;
     }
   }
 
