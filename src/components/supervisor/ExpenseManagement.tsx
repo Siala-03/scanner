@@ -108,7 +108,7 @@ export default function SupervisorExpenseManagement() {
   const summary = useMemo(() => {
     const totalAmount = filteredExpenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
     const draftCount = filteredExpenses.filter((e) => e.approvalStatus === 'draft').length;
-    const pendingCount = filteredExpenses.filter((e) => e.approvalStatus === 'pending_approval').length;
+    const pendingCount = filteredExpenses.filter((e) => e.approvalStatus === 'pending' || e.approvalStatus === 'pending_approval').length;
     const approvedCount = filteredExpenses.filter((e) => e.approvalStatus === 'approved').length;
     return {
       totalAmount,
@@ -183,6 +183,7 @@ export default function SupervisorExpenseManagement() {
         amount: normalizedAmount,
         taxRate: normalizedTaxRate,
         taxAmount: computedTaxAmount,
+        approvalStatus: 'pending',
         createdByRole: 'supervisor',
       });
       setExpenses([newExpense, ...expenses]);
@@ -283,6 +284,7 @@ export default function SupervisorExpenseManagement() {
       case 'draft':
         return 'bg-slate-700 text-slate-100';
       case 'pending_approval':
+      case 'pending':
         return 'bg-amber-900/40 text-amber-300';
       case 'approved':
         return 'bg-emerald-900/40 text-emerald-300';
@@ -367,6 +369,7 @@ export default function SupervisorExpenseManagement() {
         >
           <option value="all">All Statuses</option>
           <option value="draft">Draft</option>
+          <option value="pending">Pending Approval</option>
           <option value="pending_approval">Pending Approval</option>
           <option value="approved">Approved</option>
           <option value="rejected">Rejected</option>
@@ -637,7 +640,7 @@ export default function SupervisorExpenseManagement() {
                   >
                     View
                   </button>
-                  {expense.approvalStatus === 'draft' && (
+                  {(expense.approvalStatus === 'draft' || expense.approvalStatus === 'pending_approval') && (
                     <button
                       onClick={() => handleSubmitForApproval(expense.id)}
                       disabled={loading}

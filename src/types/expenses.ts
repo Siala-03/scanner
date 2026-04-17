@@ -43,11 +43,13 @@ export type RecurringFrequency =
 
 // ── Approval Status ─────────────────────────────────────────────────────────
 export type ApprovalStatus = 
+  | 'pending'
   | 'draft'
   | 'pending_approval'
   | 'approved'
   | 'rejected'
-  | 'recalled';
+  | 'recalled'
+  | 'reimbursed';
 
 // ── User Role ───────────────────────────────────────────────────────────────
 export type UserRole = 

@@ -87,6 +87,16 @@ function normalizeExpenseCategory(raw: any): ExpenseCategory {
 }
 
 function normalizeExpense(raw: any): Expense {
+  const normalizedStatus = (() => {
+    const source = String(raw.status ?? raw.approval_status ?? '').toLowerCase();
+    if (source === 'pending_approval') return 'pending';
+    if (source === 'draft' || source === 'recalled') return 'pending';
+    if (source === 'approved' || source === 'rejected' || source === 'reimbursed' || source === 'pending') {
+      return source;
+    }
+    return 'pending';
+  })();
+
   return {
     id: raw.id,
     restaurantId: raw.restaurant_id,
@@ -105,11 +115,11 @@ function normalizeExpense(raw: any): Expense {
     taxAmount: raw.tax_amount || 0,
     taxRate: raw.tax_rate || 0,
     isTaxDeductible: raw.is_tax_deductible ?? false,
-    approvalStatus: (raw.status as ApprovalStatus) || 'draft',
+    approvalStatus: normalizedStatus as ApprovalStatus,
     rejectionReason: raw.rejection_reason,
     approvedBy: raw.approved_by,
     approvedAt: raw.approved_at,
-    createdBy: raw.created_by,
+    createdBy: raw.created_by || raw.submitted_by || 'system',
     createdAt: raw.created_at,
     updatedAt: raw.updated_at,
   };
@@ -264,7 +274,11 @@ export async function fetchExpenses(filters?: ExpenseFilters): Promise<Expense[]
     query = query.eq('category_id', filters.categoryId);
   }
   if (filters?.approvalStatus) {
-    query = query.eq('status', filters.approvalStatus);
+    const requested = String(filters.approvalStatus).toLowerCase();
+    const mapped = requested === 'pending_approval' || requested === 'draft' || requested === 'recalled'
+      ? 'pending'
+      : requested;
+    query = query.eq('status', mapped);
   }
   if (filters?.startDate) {
     query = query.gte('expense_date', filters.startDate);
@@ -301,6 +315,10 @@ export async function createExpense(data: ExpenseFormData): Promise<Expense> {
 
   const staffId = getStaffId();
   const id = `exp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  const requestedStatus = String(data.approvalStatus || '').toLowerCase();
+  const normalizedStatus = requestedStatus === 'approved' || requestedStatus === 'rejected' || requestedStatus === 'reimbursed'
+    ? requestedStatus
+    : 'pending';
 
   const basePayload: Record<string, unknown> = {
     id,
@@ -322,8 +340,10 @@ export async function createExpense(data: ExpenseFormData): Promise<Expense> {
   };
 
   const attempts: Array<Record<string, unknown>> = [
-    { ...basePayload, status: data.approvalStatus || 'draft', created_by: staffId },
-    { ...basePayload, status: data.approvalStatus || 'draft' },
+    { ...basePayload, status: normalizedStatus, submitted_by: staffId },
+    { ...basePayload, status: normalizedStatus, created_by: staffId },
+    { ...basePayload, status: normalizedStatus },
+    { ...basePayload, submitted_by: staffId },
     { ...basePayload, created_by: staffId },
     { ...basePayload },
   ];

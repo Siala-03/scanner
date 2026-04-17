@@ -651,7 +651,7 @@ export default function ManagerExpenseApproval() {
               </div>
 
               {/* Approval Section - Only show if pending */}
-              {selectedExpense.approvalStatus === 'pending_approval' && (
+              {(selectedExpense.approvalStatus === 'pending_approval' || selectedExpense.approvalStatus === 'pending') && (
                 <div className="border-t border-slate-700 pt-4 space-y-3">
                   <h3 className="font-bold text-slate-100">Approval Actions</h3>
                   <div>
