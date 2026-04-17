@@ -347,7 +347,7 @@ export default function ManagerExpenseApproval() {
   );
 
   return (
-    <div className="dark min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+    <div className="supervisor-surface min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 transition-colors">
       {/* Header */}
       <div className="border-b border-slate-700/50 bg-slate-900/80 backdrop-blur sticky top-0 z-10">
         <div className="max-w-full mx-auto px-4 md:px-6 py-4">

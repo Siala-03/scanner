@@ -676,7 +676,7 @@ export function App() {
                   { id: 'history', label: 'Order History' },
                   { id: 'analytics', label: 'Analytics' },
                   { id: 'staff', label: 'Staff' },
-                  { id: 'expenses', label: 'Expenses' },
+                      <div className="flex flex-col gap-2 px-4 py-3">
                   { id: 'credit', label: 'Credit' },
                   { id: 'loyalty', label: 'Loyalty & SMS' },
                   { id: 'settings', label: 'Settings' },
