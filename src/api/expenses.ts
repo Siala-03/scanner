@@ -54,7 +54,10 @@ function seedCategoryId(restaurantId: string, name: string): string {
 }
 
 async function ensureDefaultExpenseCategories(restaurantId: string): Promise<void> {
-  const seedRows = DEFAULT_EXPENSE_CATEGORIES.map((cat) => ({
+  const missingColRegex = /Could not find the '([^']+)' column/i;
+
+  // Build rows; strip columns the DB schema doesn't have (retry loop).
+  let rows: Record<string, unknown>[] = DEFAULT_EXPENSE_CATEGORIES.map((cat) => ({
     id: seedCategoryId(restaurantId, cat.name),
     name: cat.name,
     description: cat.description,
@@ -64,13 +67,19 @@ async function ensureDefaultExpenseCategories(restaurantId: string): Promise<voi
     restaurant_id: restaurantId,
   }));
 
-  // Try best-effort seeding when no categories exist for this restaurant.
-  const { error } = await supabaseAdmin
-    .from('expense_categories')
-    .upsert(seedRows, { onConflict: 'id' });
+  for (let guard = 0; guard < 10; guard++) {
+    const { error } = await supabaseAdmin
+      .from('expense_categories')
+      .upsert(rows, { onConflict: 'id' });
 
-  if (error) {
-    console.warn('ensureDefaultExpenseCategories failed:', error.message);
+    if (!error) return;
+
+    const col = String(error.message || '').match(missingColRegex)?.[1];
+    if (!col) {
+      console.warn('ensureDefaultExpenseCategories failed:', error.message);
+      return;
+    }
+    rows = rows.map(({ [col]: _dropped, ...rest }) => rest);
   }
 }
 
@@ -269,7 +278,7 @@ export async function fetchExpenses(filters?: ExpenseFilters): Promise<Expense[]
   const restaurantId = getRestaurantId();
   if (!restaurantId) return [];
 
-  let query = supabase
+  let query = supabaseAdmin
     .from('expenses')
     .select('*')
     .eq('restaurant_id', restaurantId)
@@ -304,7 +313,7 @@ export async function fetchExpenses(filters?: ExpenseFilters): Promise<Expense[]
 }
 
 export async function fetchExpense(id: string): Promise<Expense> {
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from('expenses')
     .select('*')
     .eq('id', id)
@@ -538,7 +547,7 @@ export async function fetchRecurringExpenses(): Promise<RecurringExpense[]> {
   const restaurantId = getRestaurantId();
   if (!restaurantId) return [];
 
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from('expenses')
     .select('*')
     .eq('restaurant_id', restaurantId)
@@ -638,7 +647,7 @@ export async function getExpenseAnalytics(startDate?: string, endDate?: string):
     taxDeductibleTotal: 0,
   };
 
-  let query = supabase
+  let query = supabaseAdmin
     .from('expenses')
     .select('amount, category_id, payment_status, expense_date, vendor_name, is_recurring, is_tax_deductible')
     .eq('restaurant_id', restaurantId);
@@ -675,7 +684,7 @@ export async function getPendingApprovals(): Promise<Expense[]> {
   const restaurantId = getRestaurantId();
   if (!restaurantId) return [];
 
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from('expenses')
     .select('*')
     .eq('restaurant_id', restaurantId)
@@ -696,7 +705,7 @@ export async function getApprovalSummary(): Promise<any> {
   const restaurantId = getRestaurantId();
   if (!restaurantId) return { pending: 0, approved: 0, rejected: 0, total: 0 };
 
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from('expenses')
     .select('status, amount')
     .eq('restaurant_id', restaurantId);

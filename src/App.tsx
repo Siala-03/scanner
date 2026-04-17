@@ -503,7 +503,7 @@ export function App() {
   // Waiter portal
   if (selectedRole === 'waiter' && authUser) {
     return (
-      <WaiterDashboard
+       <div className="supervisor-surface min-h-screen bg-slate-900 text-slate-100 transition-colors">
         waiter={authUser}
         orders={orders}
         restaurantName={restaurantName}
