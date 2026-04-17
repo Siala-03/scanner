@@ -1023,6 +1023,7 @@ export async function createLocation(payload: {
     });
     return normalizeLocation(created);
   } catch (apiErr) {
+    const apiMessage = apiErr instanceof Error ? apiErr.message : (apiErr && typeof apiErr === 'object' && 'message' in apiErr ? String((apiErr as any).message) : 'Backend location endpoint failed');
     const restaurantId = getRestaurantId();
     if (!restaurantId) throw new Error('No company selected');
 
@@ -1042,7 +1043,9 @@ export async function createLocation(payload: {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      throw new Error(`Location create failed. API: ${apiMessage}. Fallback: ${error.message || 'Unknown database error'}`);
+    }
     return normalizeLocation(data);
   }
 }

@@ -153,7 +153,8 @@ export default function ManagerExpenseApproval() {
       setTab('approved');
       setError(null);
     } catch (err) {
-      setError('Failed to create expense');
+      const message = err instanceof Error && err.message ? err.message : 'Failed to create expense';
+      setError(`Failed to create expense: ${message}`);
       console.error(err);
     } finally {
       setLoading(false);

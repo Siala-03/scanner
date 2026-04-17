@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   PackageIcon,
@@ -63,6 +63,8 @@ const PO_STATUS_CONFIG: Record<PurchaseOrderStatus, { label: string; color: stri
 };
 
 const WASTE_REASONS: WasteReason[] = ['expired', 'spoiled', 'damaged', 'overproduction', 'spillage', 'other'];
+const ALERT_INTERVAL_MS = 10 * 60 * 1000;
+const ALERT_VISIBLE_MS = 30 * 1000;
 
 // ── Small reusable components ────────────────────────────────────────────────
 
@@ -574,7 +576,7 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
       alert('Location created successfully');
     } catch (err) {
       console.error('Failed to create location', err);
-      alert(`Failed to create location: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      alert(`Failed to create location: ${getErrorMessage(err)}`);
     }
   };
 
@@ -589,6 +591,29 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
   const [portalPassword, setPortalPassword] = useState('');
   const [provisioningPortal, setProvisioningPortal] = useState(false);
   const [provisionedAccess, setProvisionedAccess] = useState<SupplierPortalAccessProvisionResult | null>(null);
+  const [showInventoryAlerts, setShowInventoryAlerts] = useState(false);
+
+  useEffect(() => {
+    if (inventoryAlerts.length === 0) {
+      setShowInventoryAlerts(false);
+      return;
+    }
+
+    let hideTimer: ReturnType<typeof setTimeout> | null = null;
+    const showWindow = () => {
+      setShowInventoryAlerts(true);
+      if (hideTimer) clearTimeout(hideTimer);
+      hideTimer = setTimeout(() => setShowInventoryAlerts(false), ALERT_VISIBLE_MS);
+    };
+
+    showWindow();
+    const intervalId = setInterval(showWindow, ALERT_INTERVAL_MS);
+
+    return () => {
+      clearInterval(intervalId);
+      if (hideTimer) clearTimeout(hideTimer);
+    };
+  }, [inventoryAlerts]);
 
   const handleSaveSupplier = async () => {
     if (!supplierForm.name) return;
@@ -702,7 +727,7 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
     <div className="dark min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
       {/* Header */}
       <div className="border-b border-slate-700/50 bg-slate-900/80 backdrop-blur sticky top-0 z-10">
-        <div className="max-w-[96rem] 2xl:max-w-[110rem] mx-auto px-4 md:px-6 py-4">
+        <div className="max-w-6xl mx-auto px-4 md:px-6 py-4">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h1 className="text-2xl font-bold text-white flex items-center gap-2">
@@ -788,7 +813,7 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
         </div>
       </div>
 
-      <div className="max-w-[96rem] 2xl:max-w-[110rem] mx-auto px-4 md:px-6 py-6">
+      <div className="max-w-6xl mx-auto px-4 md:px-6 py-6">
         {isLoading && (
           <div className="mb-4 rounded-xl border border-amber-400/30 bg-amber-500/10 p-3 text-amber-100">
             Loading inventory data from server. Please wait...
@@ -824,7 +849,7 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
           </motion.div>
         )}
 
-        {inventoryAlerts.length > 0 && (
+        {inventoryAlerts.length > 0 && showInventoryAlerts && (
           <div className="mb-4 rounded-xl border border-amber-300/30 bg-amber-500/10 p-3">
             <p className="text-xs font-semibold uppercase tracking-wider text-amber-700">Inventory Alerts</p>
             <ul className="mt-1 list-disc list-inside text-xs text-amber-900">

@@ -204,7 +204,7 @@ export function RevenueReports() {
 
   return (
     <div className="dark min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4 md:p-8">
-      <div className="max-w-[96rem] 2xl:max-w-[110rem] mx-auto">
+      <div className="max-w-6xl mx-auto">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
