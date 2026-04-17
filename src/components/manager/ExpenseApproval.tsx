@@ -7,12 +7,11 @@ import {
   getExpensesPendingApproval,
   getExpenseApprovalSummary,
   fetchExpenseCategories,
-  generateReceipt,
   getExpenseNotes,
   createExpenseNote,
   getExpenseAuditLog,
 } from '../../api/expenses';
-import { buildExpenseReceiptHtml, downloadExpenseReceiptHtml } from '../../utils/receipt';
+import { printExpenseReceipt } from '../../utils/sunmiPrinter';
 import {
   Expense,
   ExpenseCategory,
@@ -225,34 +224,18 @@ export default function ManagerExpenseApproval() {
   const handleGenerateReceipt = async (expenseId: string) => {
     try {
       setLoading(true);
-      const receipt = await generateReceipt(expenseId);
       const expenseToPrint = [
         ...pendingExpenses,
         ...approvedExpenses,
         ...rejectedExpenses,
       ].find(e => e.id === expenseId) || selectedExpense;
       if (expenseToPrint) {
-        const html = buildExpenseReceiptHtml(expenseToPrint as any);
-        downloadExpenseReceiptHtml(
-          html,
-          `expense-receipt-${(expenseToPrint.referenceNumber || expenseToPrint.id).replace(/\s+/g, '_')}.html`
-        );
-      }
-      if (receipt && expenseToPrint) {
-        const updateReceipt = (expense: typeof pendingExpenses[number]) =>
-          expense.id === expenseId ? { ...expense, receipt } : expense;
-
-        setPendingExpenses(pendingExpenses.map(updateReceipt));
-        setApprovedExpenses(approvedExpenses.map(updateReceipt));
-        setRejectedExpenses(rejectedExpenses.map(updateReceipt));
-
-        if (selectedExpense?.id === expenseId) {
-          setSelectedExpense({ ...selectedExpense, receipt });
-        }
+        const companyName = localStorage.getItem('restaurantName') || 'Company';
+        await printExpenseReceipt({ ...(expenseToPrint as any), companyName });
       }
       setError(null);
     } catch (err) {
-      setError('Failed to generate receipt');
+      setError('Failed to print receipt');
       console.error(err);
     } finally {
       setLoading(false);

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { ClockIcon, ChefHatIcon, UtensilsIcon, RefreshCwIcon, CheckCircleIcon, FlameIcon, AlertTriangleIcon, BarChart3Icon, ListOrderedIcon, TrendingUpIcon, LogOutIcon, PrinterIcon } from 'lucide-react';
-import { buildReceiptHtml, orderToReceiptData } from '../../utils/receipt';
+import { orderToReceiptData } from '../../utils/receipt';
+import { printOrderReceipt } from '../../utils/sunmiPrinter';
 import { useSocket } from '../../hooks/useSocket';
 import { useStaffKPIs } from '../../hooks/useKPIs';
 import { KPICard } from '../../components/supervisor/KPICard';
@@ -368,7 +369,7 @@ export function KitchenDisplay({ onLogout, restaurantId, restaurantName }: { onL
     }
   };
 
-  const handlePrintCustomerReceipt = (order: KitchenOrder) => {
+  const handlePrintCustomerReceipt = async (order: KitchenOrder) => {
     const fakeOrder = {
       id: order.id,
       orderNumber: order.orderNumber,
@@ -387,7 +388,7 @@ export function KitchenDisplay({ onLogout, restaurantId, restaurantName }: { onL
       updatedAt: new Date(),
     } as any;
 
-    const html = buildReceiptHtml(
+    await printOrderReceipt(
       orderToReceiptData(fakeOrder, {
         restaurantName: resolvedRestaurantName || 'Company',
         restaurantAddress: '',
@@ -397,8 +398,6 @@ export function KitchenDisplay({ onLogout, restaurantId, restaurantName }: { onL
         paymentStatus: 'pending',
       })
     );
-    const win = window.open('', '_blank', 'width=450,height=900');
-    if (win) { win.document.open(); win.document.write(html); win.document.close(); }
   };
 
   // Use analytics from backend when available, otherwise calculate from orders

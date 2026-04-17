@@ -21,8 +21,11 @@ import { ProgressBar } from '../../components/ui/ProgressBar';
 import { formatPrice } from '../../utils/currency';
 import { downloadCsv, buildOrdersCsv } from '../../utils/csv';
 import type { Order } from '../../types/orders';
+import { useTheme } from '../../contexts/ThemeContext';
 
 export function RevenueReports() {
+  const { theme } = useTheme();
+  const isLight = theme === 'light';
     const normalizeOrderItems = (rawItems: any): any[] => {
       if (Array.isArray(rawItems)) return rawItems;
       if (typeof rawItems === 'string') {
@@ -203,7 +206,7 @@ export function RevenueReports() {
   const peakDayRevenue = peakDayData?.revenue || 0;
 
   return (
-    <div className="dark min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4 md:p-8">
+    <div className="supervisor-surface min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4 md:p-8 transition-colors">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <motion.div
@@ -211,7 +214,7 @@ export function RevenueReports() {
           animate={{ opacity: 1, y: 0 }}
           className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-3xl md:text-4xl font-bold text-gray-100 mb-2">
+            <h1 className="text-3xl md:text-4xl font-bold text-slate-100 mb-2">
               {activeView === 'orders' ? 'Orders' : 'Revenue Reports'}
             </h1>
             <p className="text-slate-400">
@@ -262,7 +265,7 @@ export function RevenueReports() {
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
             <Card className="bg-gradient-to-br from-slate-800 to-slate-800/50 border border-slate-700/50 hover:border-slate-600/50 transition">
               <p className="text-sm text-slate-400 font-medium mb-2">Total Revenue</p>
-              <p className="text-2xl font-bold text-white">
+              <p className="text-2xl font-bold text-slate-100">
                 {formatPrice(totalRevenue)}
               </p>
               <div className="flex items-center gap-1 text-green-400 text-xs mt-2">
@@ -275,7 +278,7 @@ export function RevenueReports() {
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
             <Card className="bg-gradient-to-br from-slate-800 to-slate-800/50 border border-slate-700/50 hover:border-slate-600/50 transition">
               <p className="text-sm text-slate-400 font-medium mb-2">Total Orders</p>
-              <p className="text-2xl font-bold text-white">{totalOrders}</p>
+              <p className="text-2xl font-bold text-slate-100">{totalOrders}</p>
               <div className="flex items-center gap-1 text-green-400 text-xs mt-2">
                 <TrendingUpIcon className="w-3.5 h-3.5" />
                 <span className="font-medium">{formattedOrderChange}</span>
@@ -286,7 +289,7 @@ export function RevenueReports() {
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}>
             <Card className="bg-gradient-to-br from-slate-800 to-slate-800/50 border border-slate-700/50 hover:border-slate-600/50 transition">
               <p className="text-sm text-slate-400 font-medium mb-2">Avg Order Value</p>
-              <p className="text-2xl font-bold text-white">
+              <p className="text-2xl font-bold text-slate-100">
                 {formatPrice(servedCount > 0 ? totalRevenue / servedCount : 0)}
               </p>
               <p className="text-xs text-slate-400 mt-2">Per served order</p>
@@ -296,7 +299,7 @@ export function RevenueReports() {
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
             <Card className="bg-gradient-to-br from-slate-800 to-slate-800/50 border border-slate-700/50 hover:border-slate-600/50 transition">
               <p className="text-sm text-slate-400 font-medium mb-2">Peak Day</p>
-              <p className="text-2xl font-bold text-white">{peakDayLabel}</p>
+              <p className="text-2xl font-bold text-slate-100">{peakDayLabel}</p>
               <p className="text-xs text-amber-300 font-medium mt-2">
                 {peakDayRevenue > 0 ? `${formatPrice(peakDayRevenue)} revenue` : 'No revenue data'}
               </p>
@@ -308,7 +311,7 @@ export function RevenueReports() {
           {/* Revenue by Day */}
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}>
             <Card className="bg-slate-800/50 backdrop-blur border border-slate-700/50">
-              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+              <h3 className="text-lg font-semibold text-slate-100 mb-4 flex items-center gap-2">
                 <TrendingUpIcon className="w-5 h-5 text-amber-400" />
                 Daily Revenue
               </h3>
@@ -322,19 +325,19 @@ export function RevenueReports() {
                       })
                     }))}>
 
-                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.3} />
-                    <XAxis dataKey="date" stroke="#64748b" fontSize={12} />
+                    <CartesianGrid strokeDasharray="3 3" stroke={isLight ? '#CBD5E1' : '#334155'} opacity={0.3} />
+                    <XAxis dataKey="date" stroke={isLight ? '#334155' : '#64748b'} fontSize={12} />
                     <YAxis
-                      stroke="#64748b"
+                      stroke={isLight ? '#334155' : '#64748b'}
                       fontSize={12}
                       tickFormatter={(v) => `${(v / 1000000).toFixed(1)}M`} />
 
                     <Tooltip
                       contentStyle={{
-                        backgroundColor: '#1e293b',
-                        border: '2px solid #f59e0b',
+                        backgroundColor: isLight ? '#ffffff' : '#1e293b',
+                        border: `2px solid ${isLight ? '#d97706' : '#f59e0b'}`,
                         borderRadius: '12px',
-                        color: '#fff'
+                        color: isLight ? '#0f172a' : '#fff'
                       }}
                       formatter={(value: number) => [
                       formatPrice(value),
@@ -351,7 +354,7 @@ export function RevenueReports() {
           {/* Revenue by Category */}
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
             <Card className="bg-slate-800/50 backdrop-blur border border-slate-700/50">
-              <h3 className="text-lg font-semibold text-white mb-4">
+              <h3 className="text-lg font-semibold text-slate-100 mb-4">
                 Revenue by Category
               </h3>
               <div className="h-64 flex items-center">
@@ -372,8 +375,9 @@ export function RevenueReports() {
                     </Pie>
                     <Tooltip
                       contentStyle={{
-                        backgroundColor: '#1e293b',
-                        border: '2px solid #f59e0b',
+                        backgroundColor: isLight ? '#ffffff' : '#1e293b',
+                        border: `2px solid ${isLight ? '#d97706' : '#f59e0b'}`,
+                        color: isLight ? '#0f172a' : '#f1f5f9',
                         borderRadius: '12px'
                       }}
                       formatter={(value: number) => [
@@ -395,7 +399,7 @@ export function RevenueReports() {
                       <span className="text-sm text-slate-300 flex-1">
                         {cat.category}
                       </span>
-                      <span className="text-sm font-medium text-gray-100">
+                      <span className="text-sm font-medium text-slate-100">
                         {cat.percentage}%
                       </span>
                     </motion.div>
@@ -409,7 +413,7 @@ export function RevenueReports() {
         {/* Top Selling Items */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}>
           <Card className="bg-slate-800/50 backdrop-blur border border-slate-700/50 mb-6">
-            <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+            <h3 className="text-lg font-semibold text-slate-100 mb-4 flex items-center gap-2">
               <TrendingUpIcon className="w-5 h-5 text-amber-400" />
               Top Selling Items
             </h3>
@@ -420,7 +424,7 @@ export function RevenueReports() {
               <motion.div key={`${item.item.name}-${index}`} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.55 + index * 0.05 }} className="flex items-center gap-4 p-3 rounded-lg hover:bg-slate-700/30 transition">
                   <div className="flex-1">
                     <div className="flex items-center justify-between mb-1">
-                      <span className="font-medium text-gray-100">
+                      <span className="font-medium text-slate-100">
                         {item.item.name}
                       </span>
                       <span className="text-amber-400 font-bold">
@@ -448,7 +452,7 @@ export function RevenueReports() {
         {/* Table Performance */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.55 }}>
           <Card className="bg-slate-800/50 backdrop-blur border border-slate-700/50">
-            <h3 className="text-lg font-semibold text-white mb-4">
+            <h3 className="text-lg font-semibold text-slate-100 mb-4">
               Table Performance
             </h3>
             <div className="overflow-x-auto">
@@ -481,7 +485,7 @@ export function RevenueReports() {
                     </tr>
                   ) : tablePerformance.slice(0, 10).map((table, idx) =>
                   <motion.tr key={table.tableNumber} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.6 + idx * 0.02 }} className="hover:bg-slate-700/30 transition">
-                      <td className="px-4 py-3 text-sm font-bold text-white">
+                      <td className="px-4 py-3 text-sm font-bold text-slate-100">
                         Table {table.tableNumber}
                       </td>
                       <td className="px-4 py-3 text-sm text-slate-300">
@@ -524,8 +528,8 @@ export function RevenueReports() {
                     onClick={() => setStatusFilter(status)}
                     className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
                       statusFilter === status
-                        ? 'bg-amber-500 text-white'
-                        : 'bg-slate-800 text-slate-400 hover:text-white'
+                        ? 'bg-amber-500 text-slate-950'
+                        : 'bg-slate-800 text-slate-400 hover:text-slate-100'
                     }`}
                   >
                     {status === 'all' ? 'All' : status.charAt(0).toUpperCase() + status.slice(1)}
@@ -571,7 +575,7 @@ export function RevenueReports() {
                           transition={{ delay: idx * 0.03 }}
                           className="hover:bg-slate-700/30 transition"
                         >
-                          <td className="px-4 py-3 text-sm font-bold text-white">
+                          <td className="px-4 py-3 text-sm font-bold text-slate-100">
                             {order.orderNumber}
                           </td>
                           <td className="px-4 py-3 text-sm text-slate-300">
@@ -609,7 +613,7 @@ export function RevenueReports() {
               {/* Summary */}
               <div className="border-t border-slate-700 p-4 flex items-center justify-between">
                 <div className="text-sm text-slate-400">
-                  Showing <span className="text-gray-100 font-bold">{filteredOrders.length}</span> orders
+                  Showing <span className="text-slate-100 font-bold">{filteredOrders.length}</span> orders
                 </div>
                 <div className="text-sm text-slate-400">
                   Total: <span className="text-amber-400 font-bold">{formatPrice(filteredOrders.reduce((sum, o) => sum + o.total, 0))}</span>

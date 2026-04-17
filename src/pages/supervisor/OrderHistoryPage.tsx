@@ -7,7 +7,8 @@ import { OrdersHistoryTable } from '../../components/supervisor/OrdersHistoryTab
 import { OrderDetailModal } from '../../components/waiter/OrderDetailModal';
 import { fetchOrders } from '../../api/orders';
 import { downloadCsv, buildOrdersCsv } from '../../utils/csv';
-import { orderToReceiptData, buildReceiptHtml } from '../../utils/receipt';
+import { orderToReceiptData } from '../../utils/receipt';
+import { printOrderReceipt } from '../../utils/sunmiPrinter';
 
 // Type alias to handle both API and local Order types
 type Order = OrderType & {
@@ -126,38 +127,28 @@ export function OrderHistoryPage({ onBack, existingOrders }: OrderHistoryPagePro
     };
 
     try {
-      // Use the new comprehensive receipt system
       const receiptData = orderToReceiptData(order, receiptOptions);
-      const html = buildReceiptHtml(receiptData);
-      const printWindow = window.open('', '_blank', 'width=450,height=900');
-      if (printWindow) {
-        printWindow.document.open();
-        printWindow.document.write(html);
-        printWindow.document.close();
-      } else {
-        console.warn('Unable to open print window');
-      }
+      await printOrderReceipt(receiptData);
     } catch (error) {
       console.error('Error generating receipt:', error);
-      // Fallback to browser print
       window.print();
     }
   };
 
   return (
-    <div className="dark min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+    <div className="supervisor-surface min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 transition-colors">
       {/* Fixed Header with Back Button */}
       <div className="sticky top-0 z-50 bg-slate-800/90 backdrop-blur-sm border-b border-slate-700">
         <div className="flex items-center gap-3 px-4 py-3">
           <button
             onClick={onBack}
-            className="p-2 rounded-lg bg-slate-700/50 hover:bg-slate-700 text-slate-300 hover:text-white transition-all duration-200 active:scale-95"
+            className="p-2 rounded-lg bg-slate-700/50 hover:bg-slate-700 text-slate-300 hover:text-slate-100 transition-all duration-200 active:scale-95"
             aria-label="Go back"
           >
             <ArrowLeftIcon className="w-5 h-5" />
           </button>
           <div className="flex-1">
-            <h1 className="text-xl font-bold text-gray-100">
+            <h1 className="text-xl font-bold text-slate-100">
               Order History
             </h1>
             <p className="text-sm text-slate-400">
@@ -182,7 +173,7 @@ export function OrderHistoryPage({ onBack, existingOrders }: OrderHistoryPagePro
                 <ShoppingCartIcon className="w-4 h-4 text-amber-400" />
                 <span className="text-xs text-slate-400 uppercase">Total Orders</span>
               </div>
-              <p className="text-2xl font-bold text-gray-100">{stats.totalOrders}</p>
+              <p className="text-2xl font-bold text-slate-100">{stats.totalOrders}</p>
             </Card>
           </motion.div>
 
@@ -254,7 +245,7 @@ export function OrderHistoryPage({ onBack, existingOrders }: OrderHistoryPagePro
           <Card className="bg-slate-800/50 backdrop-blur border border-slate-700/50" padding="none">
             <div className="p-6 border-b border-slate-700">
               <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-gray-100 flex items-center gap-2">
+                <h2 className="text-lg font-semibold text-slate-100 flex items-center gap-2">
                   <ShoppingCartIcon className="w-5 h-5" />
                   All Orders
                 </h2>

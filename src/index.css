@@ -98,6 +98,24 @@
 [data-theme="light"] .border-\[\#3a2e20\] { border-color: rgb(203 213 225); }
 [data-theme="light"] .text-\[\#a89f91\]  { color: rgb(100 116 139); }
 
+/* Supervisor portal: restore visual hierarchy in light mode */
+[data-theme="light"] .supervisor-surface .bg-slate-800,
+[data-theme="light"] .supervisor-surface .bg-slate-800\/70,
+[data-theme="light"] .supervisor-surface .bg-slate-800\/50 {
+  border-color: rgb(203 213 225);
+  box-shadow: 0 10px 24px -18px rgba(15, 23, 42, 0.38), 0 1px 2px rgba(15, 23, 42, 0.08);
+}
+
+[data-theme="light"] .supervisor-surface .bg-slate-700\/50,
+[data-theme="light"] .supervisor-surface .bg-slate-700\/30 {
+  background-color: rgba(226, 232, 240, 0.9);
+}
+
+[data-theme="light"] .supervisor-surface .border-slate-700,
+[data-theme="light"] .supervisor-surface .border-slate-700\/50 {
+  border-color: rgb(203 213 225);
+}
+
 /* Scrollbar */
 [data-theme="light"] * { scrollbar-color: rgb(203 213 225) rgb(241 245 249); }
 

@@ -15,12 +15,15 @@ import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { ProgressBar } from '../../components/ui/ProgressBar';
 import { formatPrice } from '../../utils/currency';
+import { useTheme } from '../../contexts/ThemeContext';
 
 interface StaffPerformanceProps {
   onBack?: () => void;
 }
 
 export function StaffPerformance({ onBack }: StaffPerformanceProps) {
+  const { theme } = useTheme();
+  const isLight = theme === 'light';
   const { waiters, isLoading } = useWaiters();
   const { orders } = useOrdersContext();
 
@@ -66,8 +69,8 @@ export function StaffPerformance({ onBack }: StaffPerformanceProps) {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-        <div className="text-white text-lg">Loading staff performance...</div>
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center transition-colors">
+        <div className="text-slate-100 text-lg">Loading staff performance...</div>
       </div>
     );
   }
@@ -85,20 +88,20 @@ export function StaffPerformance({ onBack }: StaffPerformanceProps) {
     rating: w.performance?.rating || 0,
   }));
   return (
-    <div className="dark min-h-screen bg-slate-900 p-4 md:p-6">
+    <div className="supervisor-surface min-h-screen bg-slate-900 p-4 md:p-6 transition-colors">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="mb-6">
           {onBack && (
             <button
               onClick={onBack}
-              className="mb-3 inline-flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition"
+              className="mb-3 inline-flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-300 hover:bg-slate-700 hover:text-slate-100 transition"
             >
               <ArrowLeftIcon className="w-4 h-4" />
               Back
             </button>
           )}
-          <h1 className="text-2xl font-bold text-gray-100">Staff Performance</h1>
+          <h1 className="text-2xl font-bold text-slate-100">Staff Performance</h1>
           <p className="text-slate-400">Track and compare team performance</p>
         </div>
 
@@ -106,7 +109,7 @@ export function StaffPerformance({ onBack }: StaffPerformanceProps) {
         <Card className="bg-slate-800 mb-6">
           <div className="flex items-center gap-2 mb-4">
             <TrophyIcon className="w-5 h-5 text-amber-400" />
-            <h3 className="text-lg font-semibold text-gray-100">Leaderboard</h3>
+            <h3 className="text-lg font-semibold text-slate-100">Leaderboard</h3>
           </div>
           <div className="space-y-3">
             {sortedByOrders.map((waiter, index) => {
@@ -116,14 +119,14 @@ export function StaffPerformance({ onBack }: StaffPerformanceProps) {
                   key={waiter.id}
                   className={`flex items-center gap-4 p-3 rounded-lg ${index === 0 ? 'bg-amber-500/10 border border-amber-500/30' : 'bg-slate-700/30'}`}
                 >
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${index === 0 ? 'bg-amber-500 text-white' : index === 1 ? 'bg-slate-400 text-white' : index === 2 ? 'bg-orange-700 text-white' : 'bg-slate-600 text-slate-300'}`}>
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${index === 0 ? 'bg-amber-500 text-slate-950' : index === 1 ? 'bg-slate-400 text-slate-950' : index === 2 ? 'bg-orange-700 text-slate-100' : 'bg-slate-600 text-slate-300'}`}>
                     {index + 1}
                   </div>
-                  <div className="w-10 h-10 rounded-full bg-slate-600 flex items-center justify-center text-white font-medium">
+                  <div className="w-10 h-10 rounded-full bg-slate-600 flex items-center justify-center text-slate-100 font-medium">
                     {waiter.name.split(' ').map((n: string) => n[0]).join('')}
                   </div>
                   <div className="flex-1">
-                    <p className="font-medium text-gray-100">{waiter.name}</p>
+                    <p className="font-medium text-slate-100">{waiter.name}</p>
                     <div className="flex items-center gap-1">
                       {Array.from({ length: 5 }).map((_, i) => (
                         <StarIcon key={i} className={`w-3 h-3 ${i < Math.floor(waiter.performance?.rating || 0) ? 'text-amber-400 fill-amber-400' : 'text-slate-600'}`} />
@@ -144,25 +147,26 @@ export function StaffPerformance({ onBack }: StaffPerformanceProps) {
         {/* Performance Charts */}
         <div className="grid md:grid-cols-2 gap-6 mb-6">
           <Card className="bg-slate-800">
-            <h3 className="text-lg font-semibold text-gray-100 mb-4">
+            <h3 className="text-lg font-semibold text-slate-100 mb-4">
               Orders Served
             </h3>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={chartData} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                  <XAxis type="number" stroke="#64748b" fontSize={12} />
+                  <CartesianGrid strokeDasharray="3 3" stroke={isLight ? '#CBD5E1' : '#334155'} />
+                  <XAxis type="number" stroke={isLight ? '#334155' : '#64748b'} fontSize={12} />
                   <YAxis
                     dataKey="name"
                     type="category"
-                    stroke="#64748b"
+                    stroke={isLight ? '#334155' : '#64748b'}
                     fontSize={12}
                     width={60} />
 
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: '#1e293b',
-                      border: '1px solid #334155',
+                      backgroundColor: isLight ? '#ffffff' : '#1e293b',
+                      border: `1px solid ${isLight ? '#cbd5e1' : '#334155'}`,
+                      color: isLight ? '#0f172a' : '#f1f5f9',
                       borderRadius: '8px'
                     }} />
 
@@ -173,30 +177,31 @@ export function StaffPerformance({ onBack }: StaffPerformanceProps) {
           </Card>
 
           <Card className="bg-slate-800">
-            <h3 className="text-lg font-semibold text-gray-100 mb-4">
+            <h3 className="text-lg font-semibold text-slate-100 mb-4">
               Revenue Generated
             </h3>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={chartData} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                  <CartesianGrid strokeDasharray="3 3" stroke={isLight ? '#CBD5E1' : '#334155'} />
                   <XAxis
                     type="number"
-                    stroke="#64748b"
+                    stroke={isLight ? '#334155' : '#64748b'}
                     fontSize={12}
                     tickFormatter={(v) => `${(v / 1000000).toFixed(1)}M`} />
 
                   <YAxis
                     dataKey="name"
                     type="category"
-                    stroke="#64748b"
+                    stroke={isLight ? '#334155' : '#64748b'}
                     fontSize={12}
                     width={60} />
 
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: '#1e293b',
-                      border: '1px solid #334155',
+                      backgroundColor: isLight ? '#ffffff' : '#1e293b',
+                      border: `1px solid ${isLight ? '#cbd5e1' : '#334155'}`,
+                      color: isLight ? '#0f172a' : '#f1f5f9',
                       borderRadius: '8px'
                     }}
                     formatter={(value: number) => [
@@ -212,7 +217,7 @@ export function StaffPerformance({ onBack }: StaffPerformanceProps) {
         </div>
 
         {/* Staff Cards */}
-        <h3 className="text-lg font-semibold text-gray-100 mb-4">
+        <h3 className="text-lg font-semibold text-slate-100 mb-4">
           Individual Performance
         </h3>
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -225,7 +230,7 @@ export function StaffPerformance({ onBack }: StaffPerformanceProps) {
                     {waiter.name.split(' ').map((n: string) => n[0]).join('')}
                   </div>
                   <div>
-                    <p className="font-semibold text-gray-100">{waiter.name}</p>
+                    <p className="font-semibold text-slate-100">{waiter.name}</p>
                     <Badge variant={waiter.isOnDuty ? 'verified' : 'default'} size="sm">
                       {waiter.isOnDuty ? 'On Duty' : 'Off Duty'}
                     </Badge>
@@ -250,7 +255,7 @@ export function StaffPerformance({ onBack }: StaffPerformanceProps) {
                       <ClockIcon className="w-4 h-4" />
                       <span className="text-sm">Avg Service Time</span>
                     </div>
-                    <span className="text-gray-100 font-medium">
+                    <span className="text-slate-100 font-medium">
                       {waiter.performance?.avgServiceTime ?? '—'} min
                     </span>
                   </div>
@@ -268,7 +273,7 @@ export function StaffPerformance({ onBack }: StaffPerformanceProps) {
                   <div className="pt-2 border-t border-slate-700">
                     <div className="flex justify-between text-sm mb-1">
                       <span className="text-slate-400">Orders Served</span>
-                      <span className="text-gray-100">{perf.ordersServed}</span>
+                      <span className="text-slate-100">{perf.ordersServed}</span>
                     </div>
                     <ProgressBar value={perf.ordersServed} max={Math.max(maxOrders, 1)} size="sm" />
                   </div>

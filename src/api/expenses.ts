@@ -90,8 +90,7 @@ function normalizeExpense(raw: any): Expense {
   const normalizedStatus = (() => {
     const source = String(raw.status ?? raw.approval_status ?? '').toLowerCase();
     if (source === 'pending_approval') return 'pending';
-    if (source === 'draft' || source === 'recalled') return 'pending';
-    if (source === 'approved' || source === 'rejected' || source === 'reimbursed' || source === 'pending') {
+    if (source === 'approved' || source === 'rejected' || source === 'reimbursed' || source === 'pending' || source === 'draft' || source === 'recalled') {
       return source;
     }
     return 'pending';
@@ -384,10 +383,9 @@ export async function createExpense(data: ExpenseFormData): Promise<Expense> {
       }
 
       lastError = error;
-      if (error?.code !== 'PGRST204') {
-        break;
-      }
 
+      // Only keep retrying if the error is about a missing column we can strip.
+      // Any other error (constraint violation, auth, etc.) should move to the next attempt.
       const strippedPayload = stripMissingColumn(currentPayload, error);
       if (!strippedPayload) {
         break;
@@ -455,13 +453,15 @@ export async function submitExpenseForApproval(expenseId: string): Promise<Expen
 
 export async function approveExpense(expenseId: string, notes?: string): Promise<Expense> {
   const staffId = getStaffId();
+  const updatePayload: Record<string, unknown> = {
+    status: 'approved',
+    approved_by: staffId,
+    approved_at: new Date().toISOString(),
+  };
+  if (notes) updatePayload.notes = notes;
   const { data, error } = await supabaseAdmin
     .from('expenses')
-    .update({
-      status: 'approved',
-      approved_by: staffId,
-      approved_at: new Date().toISOString(),
-    })
+    .update(updatePayload)
     .eq('id', expenseId)
     .select()
     .single();

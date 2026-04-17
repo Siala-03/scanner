@@ -4,12 +4,11 @@ import {
   createExpense,
   submitExpenseForApproval,
   fetchExpenseCategories,
-  generateReceipt,
   getExpenseNotes,
   createExpenseNote,
   getExpenseAuditLog,
 } from '../../api/expenses';
-import { buildExpenseReceiptHtml, downloadExpenseReceiptHtml } from '../../utils/receipt';
+import { printExpenseReceipt } from '../../utils/sunmiPrinter';
 import {
   Expense,
   ExpenseCategory,
@@ -217,24 +216,14 @@ export default function SupervisorExpenseManagement() {
   const handleGenerateReceipt = async (expenseId: string) => {
     try {
       setLoading(true);
-      const receipt = await generateReceipt(expenseId);
       const expenseToPrint = expenses.find(e => e.id === expenseId) || selectedExpense;
       if (expenseToPrint) {
-        const html = buildExpenseReceiptHtml(expenseToPrint as any);
-        downloadExpenseReceiptHtml(
-          html,
-          `expense-receipt-${(expenseToPrint.referenceNumber || expenseToPrint.id).replace(/\s+/g, '_')}.html`
-        );
-      }
-      if (receipt && expenseToPrint) {
-        setExpenses(expenses.map((e) => (e.id === expenseId ? { ...e, receipt } : e)));
-        if (selectedExpense?.id === expenseId) {
-          setSelectedExpense({ ...selectedExpense, receipt });
-        }
+        const companyName = localStorage.getItem('restaurantName') || 'Company';
+        await printExpenseReceipt({ ...(expenseToPrint as any), companyName });
       }
       setError(null);
     } catch (err) {
-      setError('Failed to generate receipt');
+      setError('Failed to print receipt');
       console.error(err);
     } finally {
       setLoading(false);
@@ -298,7 +287,7 @@ export default function SupervisorExpenseManagement() {
   };
 
   return (
-    <div className="space-y-6 bg-slate-900 text-slate-100 p-6 rounded-lg">
+    <div className="supervisor-surface space-y-6 bg-slate-900 text-slate-100 p-6 rounded-lg transition-colors">
       {/* Header */}
       <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4">
         <div>
@@ -583,7 +572,7 @@ export default function SupervisorExpenseManagement() {
               <button
                 type="button"
                 onClick={() => setShowForm(false)}
-                className="bg-gray-300 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-400"
+                className="bg-slate-700 text-slate-100 px-4 py-2 rounded-lg hover:bg-slate-600"
               >
                 Cancel
               </button>

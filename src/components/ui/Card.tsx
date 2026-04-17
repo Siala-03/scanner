@@ -15,7 +15,7 @@ export function Card({
   onClick,
   padding = 'md'
 }: CardProps) {
-  const baseStyles = 'rounded-xl border border-slate-700 bg-slate-800/70 overflow-hidden';
+  const baseStyles = 'rounded-xl border border-slate-700 bg-slate-800/70 overflow-hidden shadow-[0_8px_24px_-16px_rgba(15,23,42,0.45)]';
   const variantStyles = {
     default: '',
     elevated: 'shadow-lg',

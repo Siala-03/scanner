@@ -520,7 +520,7 @@ export function App() {
   // Supervisor portal
   if (selectedRole === 'supervisor' && authUser) {
     return (
-      <div className="min-h-screen bg-slate-900">
+      <div className="supervisor-surface min-h-screen bg-slate-900 text-slate-100 transition-colors">
         {/* Fixed Header with Back Button */}
         <div className="sticky top-0 z-50 bg-slate-800/90 backdrop-blur-sm border-b border-slate-700">
           <div className="flex flex-col gap-2 px-4 py-3">
@@ -535,7 +535,7 @@ export function App() {
               {receiptSettings.logo && (
                 <img src={receiptSettings.logo} alt="logo" className="h-8 w-auto object-contain rounded" />
               )}
-              <span className="text-white font-medium">Supervisor Dashboard</span>
+              <span className="text-slate-100 font-medium">Supervisor Dashboard</span>
               <div className="ml-auto">
                 <ThemeToggle />
               </div>

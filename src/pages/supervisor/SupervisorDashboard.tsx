@@ -54,7 +54,7 @@ export function SupervisorDashboard({ onManageMenu, onLogout }: SupervisorDashbo
   }, [deliveryOrders, staff, onDutyIds]);
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white p-4">
+    <div className="supervisor-surface min-h-screen bg-slate-900 text-slate-100 p-4 transition-colors">
       <div className="max-w-6xl mx-auto">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
           <div>
@@ -74,17 +74,17 @@ export function SupervisorDashboard({ onManageMenu, onLogout }: SupervisorDashbo
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
           <div className="rounded-xl border border-slate-700 p-3 bg-slate-800/70">
             <div className="text-xs uppercase tracking-wide text-slate-400">Total Staff</div>
-            <div className="mt-2 text-2xl font-semibold text-gray-100">{staffLoading ? '—' : totalStaff}</div>
+            <div className="mt-2 text-2xl font-semibold text-slate-100">{staffLoading ? '—' : totalStaff}</div>
             <div className="text-xs text-slate-300 mt-1">All staff members</div>
           </div>
           <div className="rounded-xl border border-slate-700 p-3 bg-slate-800/70">
             <div className="text-xs uppercase tracking-wide text-slate-400">On-Duty Staff</div>
-            <div className="mt-2 text-2xl font-semibold text-gray-100">{onDutyLoading ? '—' : peopleOnDuty}</div>
+            <div className="mt-2 text-2xl font-semibold text-slate-100">{onDutyLoading ? '—' : peopleOnDuty}</div>
             <div className="text-xs text-slate-300 mt-1">Currently working</div>
           </div>
           <div className="rounded-xl border border-slate-700 p-3 bg-slate-800/70">
             <div className="text-xs uppercase tracking-wide text-slate-400">Menu Items</div>
-            <div className="mt-2 text-2xl font-semibold text-gray-100">{menuItems.length}</div>
+            <div className="mt-2 text-2xl font-semibold text-slate-100">{menuItems.length}</div>
             <div className="text-xs text-slate-300 mt-1">Available items</div>
           </div>
         </div>
@@ -183,7 +183,7 @@ export function SupervisorDashboard({ onManageMenu, onLogout }: SupervisorDashbo
                 onClick={() => setDeliveryStatusFilter(status)}
                 className={`px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
                   deliveryStatusFilter === status
-                    ? 'bg-amber-500 text-white'
+                    ? 'bg-amber-500 text-slate-950'
                     : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
                 }`}
               >
@@ -223,7 +223,7 @@ export function SupervisorDashboard({ onManageMenu, onLogout }: SupervisorDashbo
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="font-medium text-white">
+                          <span className="font-medium text-slate-100">
                             {order.orderNumber || `Order #${order.id.slice(-4)}`}
                           </span>
                           <span
