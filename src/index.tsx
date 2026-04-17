@@ -4,6 +4,7 @@ import { render } from "react-dom";
 import { App } from "./App";
 import { MenuProvider } from "./contexts/MenuContext";
 import { OrdersProvider } from "./contexts/OrdersContext";
+import { ThemeProvider } from "./contexts/ThemeContext";
 
 // Error boundary to catch unhandled errors
 class ErrorBoundary extends React.Component<
@@ -49,11 +50,13 @@ class ErrorBoundary extends React.Component<
 
 render(
   <ErrorBoundary>
-    <MenuProvider>
-      <OrdersProvider>
-        <App />
-      </OrdersProvider>
-    </MenuProvider>
+    <ThemeProvider>
+      <MenuProvider>
+        <OrdersProvider>
+          <App />
+        </OrdersProvider>
+      </MenuProvider>
+    </ThemeProvider>
   </ErrorBoundary>,
   document.getElementById("root")
 );

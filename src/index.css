@@ -7,6 +7,78 @@
 
 /* END TAILWIND IMPORTS — ALL OTHER CSS MUST GO BELOW THIS LINE */
 
+/* ─── LIGHT MODE OVERRIDES ─────────────────────────────────────────────────
+   Applied when html[data-theme="light"] is set by ThemeContext.
+   Maps the app's dark slate palette → clean light equivalents.
+   No component files need changing — all overrides live here.
+─────────────────────────────────────────────────────────────────────────── */
+
+/* ── Backgrounds ── */
+[data-theme="light"] .bg-slate-900  { background-color: rgb(248 250 252); }
+[data-theme="light"] .bg-slate-800  { background-color: rgb(255 255 255); }
+[data-theme="light"] .bg-slate-700  { background-color: rgb(226 232 240); }
+[data-theme="light"] .bg-slate-600  { background-color: rgb(203 213 225); }
+
+/* opacity variants */
+[data-theme="light"] .bg-slate-900\/50  { background-color: rgb(248 250 252 / 0.5); }
+[data-theme="light"] .bg-slate-800\/90  { background-color: rgb(255 255 255 / 0.95); }
+[data-theme="light"] .bg-slate-800\/95  { background-color: rgb(255 255 255 / 0.97); }
+[data-theme="light"] .bg-slate-700\/50  { background-color: rgb(226 232 240 / 0.5); }
+[data-theme="light"] .bg-slate-700\/60  { background-color: rgb(226 232 240 / 0.6); }
+
+/* login page custom hex backgrounds */
+[data-theme="light"] .bg-\[\#1a1410\]  { background-color: #f1f5f9; }
+[data-theme="light"] .bg-\[\#2a2018\]  { background-color: #ffffff; }
+
+/* gradient (login card) */
+[data-theme="light"] .from-\[\#2a2018\] { --tw-gradient-from: #ffffff; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
+[data-theme="light"] .to-\[\#1a1410\]  { --tw-gradient-to: #f1f5f9; }
+
+/* ── Text ── */
+[data-theme="light"] .text-slate-100 { color: rgb(15 23 42); }
+[data-theme="light"] .text-slate-200 { color: rgb(30 41 59); }
+[data-theme="light"] .text-slate-300 { color: rgb(71 85 105); }
+[data-theme="light"] .text-slate-400 { color: rgb(100 116 139); }
+[data-theme="light"] .text-slate-500 { color: rgb(100 116 139); }
+[data-theme="light"] .text-white      { color: rgb(15 23 42); }
+
+/* login page muted text */
+[data-theme="light"] .text-\[\#a89f91\] { color: rgb(100 116 139); }
+
+/* status/accent text — lighten for dark-on-light readability */
+[data-theme="light"] .text-emerald-300 { color: rgb(4 120 87); }
+[data-theme="light"] .text-rose-300    { color: rgb(190 18 60); }
+[data-theme="light"] .text-amber-300   { color: rgb(180 83 9); }
+[data-theme="light"] .text-red-200     { color: rgb(153 27 27); }
+
+/* ── Borders ── */
+[data-theme="light"] .border-slate-700 { border-color: rgb(203 213 225); }
+[data-theme="light"] .border-slate-600 { border-color: rgb(203 213 225); }
+[data-theme="light"] .border-slate-500 { border-color: rgb(148 163 184); }
+[data-theme="light"] .border-\[\#3a2e20\] { border-color: rgb(203 213 225); }
+
+/* ── Dividers (tables) ── */
+[data-theme="light"] .divide-slate-700 > :not([hidden]) ~ :not([hidden]) { border-color: rgb(203 213 225); }
+[data-theme="light"] .divide-slate-800 > :not([hidden]) ~ :not([hidden]) { border-color: rgb(226 232 240); }
+
+/* ── Hover states ── */
+[data-theme="light"] .hover\:bg-slate-900:hover { background-color: rgb(226 232 240); }
+[data-theme="light"] .hover\:bg-slate-800:hover { background-color: rgb(241 245 249); }
+[data-theme="light"] .hover\:bg-slate-700:hover { background-color: rgb(203 213 225); }
+[data-theme="light"] .hover\:bg-slate-600:hover { background-color: rgb(148 163 184); }
+
+/* ── Focus ring offset in light mode ── */
+[data-theme="light"] .focus\:ring-offset-slate-800:focus { --tw-ring-offset-color: #ffffff; }
+
+/* ── Backdrop blur header variant ── */
+[data-theme="light"] .bg-slate-800\/90.backdrop-blur-sm { background-color: rgb(255 255 255 / 0.95); }
+
+/* ── Amber accent stays bright — keep amber-500 bg as-is ──
+   (text-slate-950 on amber buttons is already readable in both modes) */
+
+/* ── Scrollbar in light mode ── */
+[data-theme="light"] * { scrollbar-color: rgb(203 213 225) rgb(241 245 249); }
+
 /* Custom utilities for responsive design */
 .scrollbar-hide {
   -ms-overflow-style: none;  /* Internet Explorer 10+ */

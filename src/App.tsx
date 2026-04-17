@@ -1,6 +1,7 @@
 import { useCallback, useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowLeftIcon, QrCodeIcon, LogOutIcon } from 'lucide-react';
+import { ThemeToggle } from './components/ui/ThemeToggle';
 import { CartItem, OrderStatus, Customer } from './types';
 import { setCurrency, CurrencyCode } from './utils/currency';
 import { OrdersProvider, useOrdersContext } from './contexts/OrdersContext';
@@ -535,6 +536,9 @@ export function App() {
                 <img src={receiptSettings.logo} alt="logo" className="h-8 w-auto object-contain rounded" />
               )}
               <span className="text-white font-medium">Supervisor Dashboard</span>
+              <div className="ml-auto">
+                <ThemeToggle />
+              </div>
             </div>
             <div className="text-sm text-slate-400">{restaurantName || 'Company'}</div>
           </div>
@@ -645,13 +649,16 @@ export function App() {
                 <div className="text-xs sm:text-sm text-slate-400">{restaurantName || 'Company'}</div>
               </div>
             </div>
-            <button
-              onClick={handleBack}
-              className="p-2 rounded-lg bg-slate-700/60 hover:bg-red-600 text-slate-200 hover:text-white transition-colors"
-              aria-label="Logout"
-            >
-              <LogOutIcon className="w-5 h-5" />
-            </button>
+            <div className="flex items-center gap-2">
+              <ThemeToggle />
+              <button
+                onClick={handleBack}
+                className="p-2 rounded-lg bg-slate-700/60 hover:bg-red-600 text-slate-200 hover:text-white transition-colors"
+                aria-label="Logout"
+              >
+                <LogOutIcon className="w-5 h-5" />
+              </button>
+            </div>
           </div>
         </div>
 
@@ -753,6 +760,9 @@ export function App() {
                 <img src={receiptSettings.logo} alt="logo" className="h-8 w-auto object-contain rounded" />
               )}
               <span className="text-white font-medium">Kitchen Display</span>
+              <div className="ml-auto">
+                <ThemeToggle />
+              </div>
             </div>
             <div className="text-sm text-slate-400">{restaurantName || 'Company'}</div>
           </div>
@@ -782,6 +792,9 @@ export function App() {
                 <ArrowLeftIcon className="w-5 h-5" />
               </button>
               <span className="text-white font-medium">Superadmin Dashboard</span>
+              <div className="ml-auto">
+                <ThemeToggle />
+              </div>
             </div>
           </div>
         </div>
@@ -875,6 +888,10 @@ export function App() {
             >
               Supplier Portal
             </Button>
+            <div className="flex items-center gap-2 mt-2">
+              <span className="text-xs text-[#a89f91]">Theme</span>
+              <ThemeToggle />
+            </div>
           </div>
         </motion.div>
       </div>
