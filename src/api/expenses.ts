@@ -324,8 +324,8 @@ export async function createExpense(data: ExpenseFormData): Promise<Expense> {
   const attempts: Array<Record<string, unknown>> = [
     { ...basePayload, status: data.approvalStatus || 'draft', created_by: staffId },
     { ...basePayload, status: data.approvalStatus || 'draft' },
-    { ...basePayload, approval_status: data.approvalStatus || 'draft', created_by: staffId },
-    { ...basePayload, approval_status: data.approvalStatus || 'draft' },
+    { ...basePayload, created_by: staffId },
+    { ...basePayload },
   ];
 
   let lastError: any = null;
