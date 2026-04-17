@@ -544,7 +544,7 @@ export function App() {
           </div>
         </div>
 
-        <div className="dark bg-slate-900 px-4 pb-4">
+        <div className="bg-slate-900 px-4 pb-4">
           <div className="max-w-6xl mx-auto flex gap-2 py-4 overflow-x-auto">
             <Button
               variant={supervisorPage === 'dashboard' ? 'primary' : 'ghost'}

@@ -7,88 +7,110 @@
 
 /* END TAILWIND IMPORTS — ALL OTHER CSS MUST GO BELOW THIS LINE */
 
-/* ─── LIGHT MODE OVERRIDES ─────────────────────────────────────────────────
-   Applied when html[data-theme="light"] is set by ThemeContext.
-   Maps the app's dark slate palette → clean light equivalents.
-   No component files need changing — all overrides live here.
+/* ─── SLATE COLOR VARIABLES ────────────────────────────────────────────────
+   Tailwind slate utilities now resolve to these CSS variables (see
+   tailwind.config.js). Changing the variables here changes every bg-slate-*,
+   text-slate-*, border-slate-*, divide-slate-*, ring-slate-* class site-wide —
+   including opacity modifiers like bg-slate-800/90, hover:bg-slate-700, etc.
 ─────────────────────────────────────────────────────────────────────────── */
 
-/* ── Backgrounds ── */
-[data-theme="light"] .bg-slate-900  { background-color: rgb(248 250 252); }
-[data-theme="light"] .bg-slate-800  { background-color: rgb(255 255 255); }
-[data-theme="light"] .bg-slate-700  { background-color: rgb(226 232 240); }
-[data-theme="light"] .bg-slate-600  { background-color: rgb(203 213 225); }
+/* Dark mode — original Tailwind slate values */
+:root {
+  --slate-50:  248 250 252;
+  --slate-100: 241 245 249;
+  --slate-200: 226 232 240;
+  --slate-300: 203 213 225;
+  --slate-400: 148 163 184;
+  --slate-500: 100 116 139;
+  --slate-600:  71  85 105;
+  --slate-700:  51  65  85;
+  --slate-800:  30  41  59;
+  --slate-900:  15  23  42;
+  --slate-950:   2   6  23;
+}
 
-/* opacity variants */
-[data-theme="light"] .bg-slate-900\/50  { background-color: rgb(248 250 252 / 0.5); }
-[data-theme="light"] .bg-slate-800\/90  { background-color: rgb(255 255 255 / 0.95); }
-[data-theme="light"] .bg-slate-800\/95  { background-color: rgb(255 255 255 / 0.97); }
-[data-theme="light"] .bg-slate-700\/50  { background-color: rgb(226 232 240 / 0.5); }
-[data-theme="light"] .bg-slate-700\/60  { background-color: rgb(226 232 240 / 0.6); }
+/* Light mode — remap so dark-UI classes produce light-UI colors.
+   bg-slate-900 (page bg) → near-white.  text-slate-100 (body text) → near-black.  */
+[data-theme="light"] {
+  --slate-50:  241 245 249;   /* stays light for rarely-used bg-slate-50        */
+  --slate-100:  15  23  42;   /* text-slate-100 → very dark body text           */
+  --slate-200:  30  41  59;   /* text-slate-200 → dark                          */
+  --slate-300:  71  85 105;   /* text-slate-300 → medium-dark                   */
+  --slate-400: 100 116 139;   /* text-slate-400 → muted (same mid-tone)         */
+  --slate-500: 100 116 139;   /* text-slate-500 → muted                         */
+  --slate-600: 203 213 225;   /* border-slate-600 / bg-slate-600 → light border */
+  --slate-700: 209 213 219;   /* bg-slate-700 inputs → light input bg           */
+  --slate-800: 255 255 255;   /* bg-slate-800 cards → white                     */
+  --slate-900: 241 245 249;   /* bg-slate-900 page → very light gray            */
+  --slate-950: 248 250 252;   /* bg-slate-950 → lightest                        */
+}
 
-/* login page custom hex backgrounds */
-[data-theme="light"] .bg-\[\#1a1410\]  { background-color: #f1f5f9; }
-[data-theme="light"] .bg-\[\#2a2018\]  { background-color: #ffffff; }
+/* ─── TARGETED LIGHT-MODE OVERRIDES ────────────────────────────────────────
+   Cover the handful of things the slate variable swap can't reach:
+   hard-coded white text, gray-* classes, coloured accent text, and the
+   login page's custom hex colours.
+─────────────────────────────────────────────────────────────────────────── */
 
-/* gradient (login card) */
-[data-theme="light"] .from-\[\#2a2018\] { --tw-gradient-from: #ffffff; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
-[data-theme="light"] .to-\[\#1a1410\]  { --tw-gradient-to: #f1f5f9; }
+/* text-white is hard-coded rgb(255,255,255) — would vanish on white cards  */
+[data-theme="light"] .text-white { color: rgb(15 23 42); }
 
-/* ── Text ── */
-[data-theme="light"] .text-slate-100 { color: rgb(15 23 42); }
-[data-theme="light"] .text-slate-200 { color: rgb(30 41 59); }
-[data-theme="light"] .text-slate-300 { color: rgb(71 85 105); }
-[data-theme="light"] .text-slate-400 { color: rgb(100 116 139); }
-[data-theme="light"] .text-slate-500 { color: rgb(100 116 139); }
-[data-theme="light"] .text-white      { color: rgb(15 23 42); }
+/* gray-* classes (some dashboard components use gray instead of slate) */
+[data-theme="light"] .text-gray-100  { color: rgb(17  24  39); }
+[data-theme="light"] .text-gray-200  { color: rgb(31  41  55); }
+[data-theme="light"] .text-gray-300  { color: rgb(55  65  81); }
+[data-theme="light"] .text-gray-400  { color: rgb(75  85  99); }
+[data-theme="light"] .bg-gray-900    { background-color: rgb(249 250 251); }
+[data-theme="light"] .bg-gray-800    { background-color: rgb(255 255 255); }
+[data-theme="light"] .bg-gray-700    { background-color: rgb(229 231 235); }
+[data-theme="light"] .border-gray-700 { border-color: rgb(209 213 219); }
 
-/* login page muted text */
-[data-theme="light"] .text-\[\#a89f91\] { color: rgb(100 116 139); }
+/* Accent text colours — their light variants are often invisible on white */
+[data-theme="light"] .text-amber-300  { color: rgb(180  83   9); }
+[data-theme="light"] .text-amber-400  { color: rgb(180  83   9); }
+[data-theme="light"] .text-emerald-300 { color: rgb(  6  95  70); }
+[data-theme="light"] .text-emerald-400 { color: rgb(  6  95  70); }
+[data-theme="light"] .text-rose-300   { color: rgb(159  18  57); }
+[data-theme="light"] .text-rose-400   { color: rgb(159  18  57); }
+[data-theme="light"] .text-red-200    { color: rgb(153  27  27); }
+[data-theme="light"] .text-red-300    { color: rgb(153  27  27); }
+[data-theme="light"] .text-red-400    { color: rgb(185  28  28); }
+[data-theme="light"] .text-sky-300    { color: rgb(  3 105 161); }
+[data-theme="light"] .text-sky-400    { color: rgb(  3 105 161); }
+[data-theme="light"] .text-blue-300   { color: rgb( 29  78 216); }
+[data-theme="light"] .text-blue-400   { color: rgb( 29  78 216); }
+[data-theme="light"] .text-green-300  { color: rgb( 21 128  61); }
+[data-theme="light"] .text-green-400  { color: rgb( 21 128  61); }
+[data-theme="light"] .text-purple-300 { color: rgb(109  40 217); }
+[data-theme="light"] .text-purple-400 { color: rgb(109  40 217); }
+[data-theme="light"] .text-yellow-300 { color: rgb(161  98   7); }
+[data-theme="light"] .text-yellow-400 { color: rgb(161  98   7); }
+[data-theme="light"] .text-orange-300 { color: rgb(194  65   12); }
+[data-theme="light"] .text-orange-400 { color: rgb(194  65   12); }
 
-/* status/accent text — lighten for dark-on-light readability */
-[data-theme="light"] .text-emerald-300 { color: rgb(4 120 87); }
-[data-theme="light"] .text-rose-300    { color: rgb(190 18 60); }
-[data-theme="light"] .text-amber-300   { color: rgb(180 83 9); }
-[data-theme="light"] .text-red-200     { color: rgb(153 27 27); }
-
-/* ── Borders ── */
-[data-theme="light"] .border-slate-700 { border-color: rgb(203 213 225); }
-[data-theme="light"] .border-slate-600 { border-color: rgb(203 213 225); }
-[data-theme="light"] .border-slate-500 { border-color: rgb(148 163 184); }
+/* Login page custom hex colours */
+[data-theme="light"] .bg-\[\#1a1410\]    { background-color: #f1f5f9; }
+[data-theme="light"] .bg-\[\#2a2018\]    { background-color: #ffffff; }
+[data-theme="light"] .from-\[\#2a2018\]  {
+  --tw-gradient-from: #ffffff;
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+}
+[data-theme="light"] .to-\[\#1a1410\]   { --tw-gradient-to: #f1f5f9; }
 [data-theme="light"] .border-\[\#3a2e20\] { border-color: rgb(203 213 225); }
+[data-theme="light"] .text-\[\#a89f91\]  { color: rgb(100 116 139); }
 
-/* ── Dividers (tables) ── */
-[data-theme="light"] .divide-slate-700 > :not([hidden]) ~ :not([hidden]) { border-color: rgb(203 213 225); }
-[data-theme="light"] .divide-slate-800 > :not([hidden]) ~ :not([hidden]) { border-color: rgb(226 232 240); }
-
-/* ── Hover states ── */
-[data-theme="light"] .hover\:bg-slate-900:hover { background-color: rgb(226 232 240); }
-[data-theme="light"] .hover\:bg-slate-800:hover { background-color: rgb(241 245 249); }
-[data-theme="light"] .hover\:bg-slate-700:hover { background-color: rgb(203 213 225); }
-[data-theme="light"] .hover\:bg-slate-600:hover { background-color: rgb(148 163 184); }
-
-/* ── Focus ring offset in light mode ── */
-[data-theme="light"] .focus\:ring-offset-slate-800:focus { --tw-ring-offset-color: #ffffff; }
-
-/* ── Backdrop blur header variant ── */
-[data-theme="light"] .bg-slate-800\/90.backdrop-blur-sm { background-color: rgb(255 255 255 / 0.95); }
-
-/* ── Amber accent stays bright — keep amber-500 bg as-is ──
-   (text-slate-950 on amber buttons is already readable in both modes) */
-
-/* ── Scrollbar in light mode ── */
+/* Scrollbar */
 [data-theme="light"] * { scrollbar-color: rgb(203 213 225) rgb(241 245 249); }
 
-/* Custom utilities for responsive design */
+/* ─── UTILITY CLASSES ───────────────────────────────────────────────────── */
+
 .scrollbar-hide {
-  -ms-overflow-style: none;  /* Internet Explorer 10+ */
-  scrollbar-width: none;  /* Firefox */
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 .scrollbar-hide::-webkit-scrollbar {
-  display: none;  /* Safari and Chrome */
+  display: none;
 }
 
-/* Improve touch targets on mobile */
 @media (max-width: 640px) {
   .touch-manipulation {
     touch-action: manipulation;
@@ -96,7 +118,6 @@
   }
 }
 
-/* Line clamp utility for text truncation */
 .line-clamp-2 {
   display: -webkit-box;
   -webkit-line-clamp: 2;
