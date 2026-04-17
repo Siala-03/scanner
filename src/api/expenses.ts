@@ -49,9 +49,13 @@ const DEFAULT_EXPENSE_CATEGORIES = [
   { name: 'Other', description: 'Miscellaneous business expenses', color: '#64748B', icon: 'tag' },
 ];
 
+function seedCategoryId(restaurantId: string, name: string): string {
+  return `cat-${restaurantId}-${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+}
+
 async function ensureDefaultExpenseCategories(restaurantId: string): Promise<void> {
   const seedRows = DEFAULT_EXPENSE_CATEGORIES.map((cat) => ({
-    id: `cat-${restaurantId}-${cat.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+    id: seedCategoryId(restaurantId, cat.name),
     name: cat.name,
     description: cat.description,
     color: cat.color,
@@ -141,8 +145,8 @@ export async function fetchExpenseCategories(): Promise<ExpenseCategory[]> {
   }
 
   if (!restaurantId) {
-    return DEFAULT_EXPENSE_CATEGORIES.map((cat, idx) => ({
-      id: `default-cat-${idx}`,
+    return DEFAULT_EXPENSE_CATEGORIES.map((cat) => ({
+      id: seedCategoryId('global', cat.name),
       restaurantId: 'global',
       name: cat.name,
       description: cat.description,
@@ -190,8 +194,10 @@ export async function fetchExpenseCategories(): Promise<ExpenseCategory[]> {
   const deduped = Array.from(byName.values());
   if (deduped.length > 0) return deduped;
 
-  return DEFAULT_EXPENSE_CATEGORIES.map((cat, idx) => ({
-    id: `default-cat-${restaurantId}-${idx}`,
+  // Seed once more before returning so the IDs are actually in the DB.
+  await ensureDefaultExpenseCategories(restaurantId);
+  return DEFAULT_EXPENSE_CATEGORIES.map((cat) => ({
+    id: seedCategoryId(restaurantId, cat.name),
     restaurantId,
     name: cat.name,
     description: cat.description,
@@ -349,6 +355,7 @@ export async function createExpense(data: ExpenseFormData): Promise<Expense> {
 
   let lastError: any = null;
   const missingColumnRegex = /Could not find the '([^']+)' column/i;
+  let categorySeeded = false;
 
   const stripMissingColumn = (
     payload: Record<string, unknown>,
@@ -363,6 +370,10 @@ export async function createExpense(data: ExpenseFormData): Promise<Expense> {
 
     const { [missingColumn]: _removed, ...rest } = payload;
     return rest;
+  };
+
+  const isCategoryFkError = (error: any): boolean => {
+    return error?.code === '23503' && String(error?.details || '').includes('category_id');
   };
 
   for (const payload of attempts) {
@@ -383,6 +394,13 @@ export async function createExpense(data: ExpenseFormData): Promise<Expense> {
       }
 
       lastError = error;
+
+      // If the category doesn't exist yet, seed defaults and retry once.
+      if (isCategoryFkError(error) && !categorySeeded) {
+        categorySeeded = true;
+        await ensureDefaultExpenseCategories(restaurantId);
+        continue;
+      }
 
       // Only keep retrying if the error is about a missing column we can strip.
       // Any other error (constraint violation, auth, etc.) should move to the next attempt.
