@@ -1,5 +1,4 @@
 import { supabase, supabaseAdmin } from '../lib/supabase';
-import { apiRequest } from './http';
 import type {
   Expense,
   ExpenseCategory,
@@ -131,15 +130,6 @@ function normalizeExpense(raw: any): Expense {
 
 export async function fetchExpenseCategories(): Promise<ExpenseCategory[]> {
   const restaurantId = getRestaurantId();
-
-  try {
-    const apiCategories = await apiRequest<any[]>('/api/expenses/categories');
-    if (Array.isArray(apiCategories) && apiCategories.length > 0) {
-      return apiCategories.map(normalizeExpenseCategory);
-    }
-  } catch {
-    // Fall through to direct Supabase access.
-  }
 
   if (!restaurantId) {
     return DEFAULT_EXPENSE_CATEGORIES.map((cat, idx) => ({
