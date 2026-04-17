@@ -301,33 +301,53 @@ export async function createExpense(data: ExpenseFormData): Promise<Expense> {
 
   const staffId = getStaffId();
   const id = `exp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  const { data: result, error } = await supabaseAdmin
-    .from('expenses')
-    .insert({
-      id,
-      category_id: data.categoryId,
-      vendor_name: data.vendorName || '',
-      description: data.description,
-      amount: data.amount,
-      expense_date: data.expenseDate,
-      payment_method: data.paymentMethod,
-      payment_status: data.paymentStatus,
-      reference_number: data.referenceNumber,
-      notes: data.notes,
-      is_recurring: data.isRecurring,
-      recurring_frequency: data.recurringFrequency,
-      tax_amount: data.taxAmount,
-      tax_rate: data.taxRate,
-      is_tax_deductible: data.isTaxDeductible,
-      status: data.approvalStatus || 'draft',
-      created_by: staffId,
-      restaurant_id: restaurantId,
-    })
-    .select()
-    .single();
 
-  if (error) { console.error('createExpense error:', error); throw error; }
-  return normalizeExpense(result);
+  const basePayload: Record<string, unknown> = {
+    id,
+    category_id: data.categoryId,
+    vendor_name: data.vendorName || '',
+    description: data.description,
+    amount: data.amount,
+    expense_date: data.expenseDate,
+    payment_method: data.paymentMethod,
+    payment_status: data.paymentStatus,
+    reference_number: data.referenceNumber,
+    notes: data.notes,
+    is_recurring: data.isRecurring,
+    recurring_frequency: data.recurringFrequency,
+    tax_amount: data.taxAmount,
+    tax_rate: data.taxRate,
+    is_tax_deductible: data.isTaxDeductible,
+    restaurant_id: restaurantId,
+  };
+
+  const attempts: Array<Record<string, unknown>> = [
+    { ...basePayload, status: data.approvalStatus || 'draft', created_by: staffId },
+    { ...basePayload, status: data.approvalStatus || 'draft' },
+    { ...basePayload, approval_status: data.approvalStatus || 'draft', created_by: staffId },
+    { ...basePayload, approval_status: data.approvalStatus || 'draft' },
+  ];
+
+  let lastError: any = null;
+  for (const payload of attempts) {
+    const { data: result, error } = await supabaseAdmin
+      .from('expenses')
+      .insert(payload)
+      .select()
+      .single();
+
+    if (!error && result) {
+      return normalizeExpense(result);
+    }
+
+    lastError = error;
+    if (error?.code !== 'PGRST204') {
+      break;
+    }
+  }
+
+  console.error('createExpense error:', lastError);
+  throw lastError;
 }
 
 export async function updateExpense(
