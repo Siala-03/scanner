@@ -23,8 +23,7 @@ import { QRScanner } from '../../components/waiter/QRScanner';
 import { WaiterOrderEntry } from '../../components/waiter/WaiterOrderEntry';
 import { loadReviews } from '../../utils/reviewsStorage';
 import { useStaffKPIs } from '../../hooks/useKPIs';
-import { orderToReceiptData } from '../../utils/receipt';
-import { printReceiptNetwork } from '../../api/printer';
+import { buildReceiptHtml, orderToReceiptData } from '../../utils/receipt';
 import { ReceiptShareModal } from '../../components/ui/ReceiptShareModal';
 import { supabaseAdmin } from '../../lib/supabase';
 
@@ -690,8 +689,27 @@ export function WaiterDashboard({
   };
 
   const handlePrintReceipt = async (order: Order) => {
-    try { await printReceiptNetwork(order, waiter.name); } catch (_e) { /* continue to local print */ }
-    window.print();
+    try {
+      const html = buildReceiptHtml(
+        orderToReceiptData(order, {
+          restaurantName: restaurantName || 'Company',
+          restaurantAddress: restaurantInfo?.address || '',
+          restaurantPhone: restaurantInfo?.phone || '',
+          restaurantEmail: restaurantInfo?.email || '',
+          restaurantLogo: restaurantInfo?.logo,
+          restaurantCity: restaurantInfo?.city,
+          restaurantCountry: restaurantInfo?.country,
+          taxRate: 18,
+          serverName: waiter.name,
+          orderType: order.deliveryAddress ? 'delivery' : 'dine-in',
+          paymentMethod: 'Cash',
+          paymentStatus: 'paid',
+          amountPaid: order.total,
+        })
+      );
+      const win = window.open('', '_blank', 'width=450,height=900');
+      if (win) { win.document.open(); win.document.write(html); win.document.close(); }
+    } catch (_e) { window.print(); }
   };
 
   const handleShare = (order: Order) => {
