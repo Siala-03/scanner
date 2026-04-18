@@ -1,51 +1,80 @@
-import React, { useEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ClockIcon, ReceiptIcon } from 'lucide-react';
 import { Order, OrderStatus } from '../../types';
 import { OrderTracker } from '../../components/customer/OrderTracker';
 import { ServiceReviewModal } from '../../components/customer/ServiceReviewModal';
 import { Card } from '../../components/ui/Card';
-import { StatusBadge } from '../../components/ui/Badge';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { formatPrice } from '../../utils/currency';
 import { hasReviewForOrder } from '../../utils/reviewsStorage';
+import {
+  closeExpiredTableSessions,
+  getActiveTableSession,
+  isOrderInTableSession,
+  type TableServiceSession,
+} from '../../utils/tableSessions';
 interface OrderStatusPageProps {
   orders: Order[];
   tableNumber: number;
 }
 export function OrderStatusPage({ orders, tableNumber }: OrderStatusPageProps) {
+  const REVIEW_WINDOW_MS = 2 * 60 * 60 * 1000;
+
   const tableOrders = orders.filter(
     (order) => order.tableNumber === tableNumber
   );
-  const activeOrder = tableOrders.find((order) =>
-  ['pending', 'verified', 'preparing', 'ready'].includes(order.status)
-  );
-  const pastOrders = tableOrders.filter((order) =>
-  ['served', 'cancelled'].includes(order.status)
-  );
-  const [reviewingOrder, setReviewingOrder] = useState<Order | null>(null);
-  // Simulate order progression for demo
-  const [simulatedStatus, setSimulatedStatus] = useState<OrderStatus>(
-    activeOrder?.status || 'pending'
-  );
-  useEffect(() => {
-    if (!activeOrder) return;
-    const statuses: OrderStatus[] = [
-    'pending',
-    'verified',
-    'preparing',
-    'ready',
-    'served'];
 
-    const currentIndex = statuses.indexOf(simulatedStatus);
-    if (currentIndex < statuses.length - 1) {
-      const timer = setTimeout(() => {
-        setSimulatedStatus(statuses[currentIndex + 1]);
-      }, 5000); // Progress every 5 seconds for demo
-      return () => clearTimeout(timer);
+  const [activeSession, setActiveSession] = useState<TableServiceSession | null>(null);
+
+  useEffect(() => {
+    const refreshSession = () => {
+      closeExpiredTableSessions(tableNumber)
+        .then(() => getActiveTableSession(tableNumber))
+        .then((session) => setActiveSession(session))
+        .catch(() => setActiveSession(null));
+    };
+
+    refreshSession();
+    const intervalId = window.setInterval(refreshSession, 30_000);
+    window.addEventListener('tableSessionsUpdated', refreshSession);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener('tableSessionsUpdated', refreshSession);
+    };
+  }, [tableNumber]);
+
+  const scopedOrders = useMemo(() => {
+    if (!activeSession) {
+      // Fallback for legacy data: keep only active orders to avoid exposing old guests.
+      return tableOrders.filter((order) => ['pending', 'verified', 'preparing', 'ready'].includes(order.status));
     }
-  }, [simulatedStatus, activeOrder]);
-  if (tableOrders.length === 0) {
+
+    return tableOrders.filter((order) => isOrderInTableSession(order, activeSession));
+  }, [tableOrders, activeSession]);
+
+  const activeOrder = scopedOrders.find((order) =>
+    ['pending', 'verified', 'preparing', 'ready'].includes(order.status)
+  );
+
+  const latestServedOrder = scopedOrders
+    .filter((order) => order.status === 'served')
+    .sort((a, b) => new Date(b.servedAt ?? b.updatedAt ?? b.createdAt).getTime() - new Date(a.servedAt ?? a.updatedAt ?? a.createdAt).getTime())[0] || null;
+
+  const latestServedTime = latestServedOrder
+    ? new Date(latestServedOrder.servedAt ?? latestServedOrder.updatedAt ?? latestServedOrder.createdAt).getTime()
+    : null;
+
+  const canRateLatestServed =
+    !!latestServedOrder &&
+    latestServedTime != null &&
+    !Number.isNaN(latestServedTime) &&
+    Date.now() - latestServedTime <= REVIEW_WINDOW_MS &&
+    !hasReviewForOrder(latestServedOrder.id);
+
+  const [reviewingOrder, setReviewingOrder] = useState<Order | null>(null);
+
+  if (scopedOrders.length === 0) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white flex items-center justify-center p-4">
         <EmptyState
@@ -117,71 +146,44 @@ export function OrderStatusPage({ orders, tableNumber }: OrderStatusPageProps) {
           </div>
         }
 
-        {/* Past orders */}
-        {pastOrders.length > 0 &&
+        {/* Latest served order in this table session */}
+        {latestServedOrder &&
         <div>
-            <h2 className="font-semibold text-slate-700 mb-3">Past Orders</h2>
-            <div className="space-y-3">
-              <AnimatePresence>
-                {pastOrders.map((order, index) =>
-              <motion.div
-                key={order.id}
-                initial={{
-                  opacity: 0,
-                  y: 20
-                }}
-                animate={{
-                  opacity: 1,
-                  y: 0
-                }}
-                transition={{
-                  delay: index * 0.1
-                }}>
+            <h2 className="font-semibold text-slate-700 mb-3">Service Feedback</h2>
+            <Card className="bg-white rounded-2xl shadow-sm border border-slate-100">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <span className="font-medium text-slate-900">Latest served order</span>
+                  <p className="text-sm text-slate-500">
+                    {new Date(latestServedOrder.servedAt ?? latestServedOrder.updatedAt ?? latestServedOrder.createdAt).toLocaleDateString()} at{' '}
+                    {new Date(latestServedOrder.servedAt ?? latestServedOrder.updatedAt ?? latestServedOrder.createdAt).toLocaleTimeString([], {
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-slate-500">Total</p>
+                  <p className="font-semibold text-slate-900">{formatPrice(latestServedOrder.total)}</p>
+                </div>
+              </div>
 
-                    <Card className="bg-white rounded-2xl shadow-sm border border-slate-100">
-                      <div className="flex items-center justify-between mb-3">
-                        <div>
-                          <span className="font-medium text-slate-900">
-                            {order.id}
-                          </span>
-                          <p className="text-sm text-slate-500">
-                            {new Date(order.createdAt).toLocaleDateString()} at{' '}
-                            {new Date(order.createdAt).toLocaleTimeString([], {
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        })}
-                          </p>
-                        </div>
-                        <StatusBadge status={order.status} />
-                      </div>
-
-                      <div className="text-sm text-slate-600 mb-2">
-                        {order.items.length} item
-                        {order.items.length > 1 ? 's' : ''}
-                      </div>
-
-                      <div className="flex items-center justify-between mt-2">
-                        <div className="flex flex-col">
-                          <span className="text-slate-500">Total</span>
-                          <span className="font-semibold text-slate-900">
-                            {formatPrice(order.total)}
-                          </span>
-                        </div>
-                        {order.status === 'served' && !hasReviewForOrder(order.id) && (
-                          <button
-                            type="button"
-                            onClick={() => setReviewingOrder(order)}
-                            className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-white text-sm font-semibold shadow-md shadow-amber-500/25 hover:from-amber-600 hover:to-amber-700 transition-all"
-                          >
-                            Rate service
-                          </button>
-                        )}
-                      </div>
-                    </Card>
-                  </motion.div>
+              {canRateLatestServed ? (
+                <button
+                  type="button"
+                  onClick={() => setReviewingOrder(latestServedOrder)}
+                  className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-white text-sm font-semibold shadow-md shadow-amber-500/25 hover:from-amber-600 hover:to-amber-700 transition-all"
+                >
+                  Rate service
+                </button>
+              ) : (
+                <p className="text-sm text-slate-500">
+                  {hasReviewForOrder(latestServedOrder.id)
+                    ? 'Thanks! You already rated this service session.'
+                    : 'Review window has expired for this session.'}
+                </p>
               )}
-              </AnimatePresence>
-            </div>
+            </Card>
           </div>
         }
       </div>

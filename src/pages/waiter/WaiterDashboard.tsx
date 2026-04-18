@@ -26,6 +26,7 @@ import { useStaffKPIs } from '../../hooks/useKPIs';
 import { buildReceiptHtml, orderToReceiptData } from '../../utils/receipt';
 import { ReceiptShareModal } from '../../components/ui/ReceiptShareModal';
 import { supabaseAdmin } from '../../lib/supabase';
+import { markTableSessionPendingCloseFromReceipt } from '../../utils/tableSessions';
 
 // ─── Kitchen detection ────────────────────────────────────────────────────────
 // Blacklist: these categories are bar/beverage only — everything else goes to kitchen.
@@ -847,7 +848,15 @@ export function WaiterDashboard({
       );
       const win = window.open('', '_blank', 'width=450,height=900');
       if (win) { win.document.open(); win.document.write(html); win.document.close(); }
-    } catch (_e) { window.print(); }
+      if (order.tableNumber != null) {
+        await markTableSessionPendingCloseFromReceipt(order.tableNumber);
+      }
+    } catch (_e) {
+      if (order.tableNumber != null) {
+        await markTableSessionPendingCloseFromReceipt(order.tableNumber);
+      }
+      window.print();
+    }
   };
 
   const handleShare = (order: Order) => {

@@ -29,65 +29,49 @@
   --slate-950:   2   6  23;
 }
 
-/* ─── LIGHT MODE — Microsoft Fluent Design ──────────────────────────────────
-   Warm white surfaces · near-black text · refined neutrals
-   Primary accent: #0078d4 (Microsoft Blue) replaces amber throughout.
+/* ─── LIGHT MODE ─────────────────────────────────────────────────────────────
+   Page bg is visibly gray so white cards pop.
+   Text values are dark enough to pass WCAG AA on white.
 ─────────────────────────────────────────────────────────────────────────── */
 [data-theme="light"] {
-  --slate-50:  245 245 245;   /* #f5f5f5  lightest tint                          */
-  --slate-100:  36  36  36;   /* #242424  primary text                           */
-  --slate-200:  50  49  48;   /* #323130  strong secondary                       */
-  --slate-300:  96  94  92;   /* #605e5c  body / label text                      */
-  --slate-400: 138 136 134;   /* #8a8886  muted / helper                         */
-  --slate-500: 161 159 157;   /* #a19f9d  placeholder / disabled                 */
-  --slate-600: 209 209 209;   /* #d1d1d1  default border                         */
-  --slate-700: 237 235 233;   /* #edebe9  subtle hover bg / divider              */
+  --slate-50:  229 229 229;   /* #e5e5e5  deepest tint (rarely used)             */
+  --slate-100:  17  17  17;   /* #111111  primary headings / strong text         */
+  --slate-200:  38  38  38;   /* #262626  secondary headings                     */
+  --slate-300:  64  64  64;   /* #404040  body text — solid contrast             */
+  --slate-400:  90  90  90;   /* #5a5a5a  labels / captions — still readable     */
+  --slate-500: 115 115 115;   /* #737373  muted info — passes 4.5:1 on white     */
+  --slate-600: 200 200 200;   /* #c8c8c8  borders                                */
+  --slate-700: 235 235 235;   /* #ebebeb  hover bg / dividers                    */
   --slate-800: 255 255 255;   /* #ffffff  card / panel surface                   */
-  --slate-900: 250 249 248;   /* #faf9f8  page background (warm white)           */
+  --slate-900: 228 228 231;   /* #e4e4e7  page background — clearly gray         */
   --slate-950: 255 255 255;   /* #ffffff  elevated surface                       */
 
-  /* Segoe UI — Microsoft's signature typeface */
   font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
 }
 
 /* ── text-white would vanish on white cards ──────────────────────────────── */
-[data-theme="light"] .text-white { color: rgb(36 36 36); }
+[data-theme="light"] .text-white { color: rgb(17 17 17); }
 
 /* ── gray-* classes ─────────────────────────────────────────────────────── */
-[data-theme="light"] .text-gray-100  { color: rgb(36  36  36); }
-[data-theme="light"] .text-gray-200  { color: rgb(50  49  48); }
-[data-theme="light"] .text-gray-300  { color: rgb(96  94  92); }
-[data-theme="light"] .text-gray-400  { color: rgb(138 136 134); }
-[data-theme="light"] .bg-gray-900    { background-color: rgb(250 249 248); }
+[data-theme="light"] .text-gray-100  { color: rgb(17  17  17); }
+[data-theme="light"] .text-gray-200  { color: rgb(38  38  38); }
+[data-theme="light"] .text-gray-300  { color: rgb(64  64  64); }
+[data-theme="light"] .text-gray-400  { color: rgb(90  90  90); }
+[data-theme="light"] .bg-gray-900    { background-color: rgb(228 228 231); }
 [data-theme="light"] .bg-gray-800    { background-color: rgb(255 255 255); }
-[data-theme="light"] .bg-gray-700    { background-color: rgb(237 235 233); }
-[data-theme="light"] .border-gray-700 { border-color: rgb(209 209 209); }
+[data-theme="light"] .bg-gray-700    { background-color: rgb(235 235 235); }
+[data-theme="light"] .border-gray-700 { border-color: rgb(200 200 200); }
 
-/* ── Amber → Microsoft Blue (#0078d4) ────────────────────────────────────── */
+/* ── Amber — darkened for legibility on white surfaces ──────────────────── */
 [data-theme="light"] .text-amber-300,
-[data-theme="light"] .text-amber-400,
+[data-theme="light"] .text-amber-400  { color: #b45309; }   /* amber-700 — readable on white */
 [data-theme="light"] .text-amber-500,
-[data-theme="light"] .text-amber-600  { color: #0078d4; }
+[data-theme="light"] .text-amber-600  { color: #92400e; }   /* amber-800 — deeper            */
 
-[data-theme="light"] .bg-amber-400,
-[data-theme="light"] .bg-amber-500    { background-color: #0078d4; }
+/* amber bg stays amber; no remap needed — colour is intentional */
 
-[data-theme="light"] .hover\:bg-amber-500:hover,
-[data-theme="light"] .hover\:bg-amber-600:hover,
-[data-theme="light"] .hover\:bg-amber-700:hover { background-color: #106ebe; }
-
-[data-theme="light"] .border-amber-400,
-[data-theme="light"] .border-amber-500 { border-color: #0078d4; }
-
-[data-theme="light"] .ring-amber-500,
-[data-theme="light"] .focus-visible\:ring-amber-500:focus-visible { --tw-ring-color: #0078d4; }
-
-[data-theme="light"] .from-amber-400,
-[data-theme="light"] .from-amber-500  { --tw-gradient-from: #0078d4; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
-[data-theme="light"] .to-amber-400,
-[data-theme="light"] .to-amber-500    { --tw-gradient-to: #0078d4; }
-
-/* Button text on blue bg — slate-900 maps to near-white, which is perfect ✓ */
+/* Button text: bg-amber-500 uses text-slate-900 which maps to near-white in
+   light mode — amber button + light text is intentional and readable ✓ */
 
 /* ── Status / semantic accent colours ───────────────────────────────────── */
 [data-theme="light"] .text-emerald-300,
@@ -136,16 +120,16 @@
 [data-theme="light"] input:focus,
 [data-theme="light"] select:focus,
 [data-theme="light"] textarea:focus {
-  border-color: #0078d4 !important;
+  border-color: #d97706 !important;
   outline: none;
-  box-shadow: 0 0 0 1px rgba(0,120,212,.25) !important;
+  box-shadow: 0 0 0 1px rgba(217,119,6,.2) !important;
 }
 
 /* ── Sidebar nav active state (manager portal) ───────────────────────────── */
 [data-theme="light"] aside nav button.bg-amber-500 {
-  background-color: #eff6ff !important;   /* very light blue tint */
-  color: #0078d4 !important;
-  border-left: 3px solid #0078d4;
+  background-color: #fffbeb !important;   /* amber-50 tint */
+  color: #b45309 !important;              /* amber-700     */
+  border-left: 3px solid #d97706;         /* amber-600     */
   font-weight: 600;
   box-shadow: none;
 }
@@ -156,19 +140,19 @@
 }
 
 /* ── Login page custom hex colours ──────────────────────────────────────── */
-[data-theme="light"] .bg-\[\#1a1410\]    { background-color: #faf9f8; }
+[data-theme="light"] .bg-\[\#1a1410\]    { background-color: #e4e4e7; }
 [data-theme="light"] .bg-\[\#2a2018\]    { background-color: #ffffff; }
 [data-theme="light"] .from-\[\#2a2018\]  {
   --tw-gradient-from: #ffffff;
   --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
 }
-[data-theme="light"] .to-\[\#1a1410\]   { --tw-gradient-to: #faf9f8; }
-[data-theme="light"] .border-\[\#3a2e20\] { border-color: #d1d1d1; }
-[data-theme="light"] .text-\[\#a89f91\]  { color: #8a8886; }
+[data-theme="light"] .to-\[\#1a1410\]   { --tw-gradient-to: #e4e4e7; }
+[data-theme="light"] .border-\[\#3a2e20\] { border-color: #c8c8c8; }
+[data-theme="light"] .text-\[\#a89f91\]  { color: #5a5a5a; }
 
 /* ── Supervisor portal — Fluent premium finish ───────────────────────────── */
 [data-theme="light"] .supervisor-surface {
-  background: linear-gradient(180deg, #faf9f8 0%, #f5f5f5 100%);
+  background: #e4e4e7;
 }
 
 [data-theme="light"] .supervisor-surface .bg-slate-800,
@@ -223,13 +207,13 @@
 
 [data-theme="light"] .supervisor-surface .bg-amber-500,
 [data-theme="light"] .supervisor-surface .hover\:bg-amber-600:hover {
-  background-color: #0078d4 !important;
-  box-shadow: 0 2px 8px rgba(0,120,212,.24);
+  background-color: #f59e0b !important;
+  box-shadow: 0 2px 8px rgba(217,119,6,.22);
 }
 
 [data-theme="light"] .supervisor-surface .bg-blue-600,
 [data-theme="light"] .supervisor-surface .hover\:bg-blue-700:hover {
-  background-color: #0078d4 !important;
+  background-color: #2563eb !important;
   color: #fff !important;
 }
 
@@ -248,8 +232,8 @@
 [data-theme="light"] .supervisor-surface input:focus,
 [data-theme="light"] .supervisor-surface select:focus,
 [data-theme="light"] .supervisor-surface textarea:focus {
-  border-color: #0078d4 !important;
-  box-shadow: 0 0 0 1px rgba(0,120,212,.25) !important;
+  border-color: #d97706 !important;
+  box-shadow: 0 0 0 1px rgba(217,119,6,.2) !important;
 }
 
 [data-theme="light"] .supervisor-surface .fixed.inset-0.bg-black {

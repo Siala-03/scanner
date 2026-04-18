@@ -3,6 +3,7 @@ import { supabaseAdmin } from '../lib/supabase';
 import { Order, OrderStatus, CartItem, Customer } from '../types';
 import { getEffectivePrice } from '../utils/pricing';
 import { createOrder as apiCreateOrder, updateOrderStatus as apiUpdateOrderStatus, fetchOrders as apiFetchOrders } from '../api/orders';
+import { recordTableSessionActivity } from '../utils/tableSessions';
 
 const normalizeOrderPayload = (rawOrder: any): Order | undefined => {
   if (!rawOrder) return undefined;
@@ -284,6 +285,7 @@ export function useOrders(): UseOrdersReturn {
       } as Order;
 
       setOrders((prev) => [localOrder, ...prev]);
+      void recordTableSessionActivity(tableNumber);
 
       let savedOrder: Order = localOrder;
       try {
@@ -332,9 +334,11 @@ export function useOrders(): UseOrdersReturn {
       }
 
       // Always update local state
+      let affectedTableNumber: number | undefined;
       setOrders((prev) =>
         prev.map((order) => {
           if (order.id !== orderId) return order;
+          affectedTableNumber = order.tableNumber;
 
           const now = new Date();
 
@@ -357,6 +361,11 @@ export function useOrders(): UseOrdersReturn {
           return { ...order, ...updates };
         })
       );
+
+      if (affectedTableNumber != null) {
+        void recordTableSessionActivity(affectedTableNumber);
+      }
+
       window.dispatchEvent(new Event('ordersUpdated'));
     },
     []

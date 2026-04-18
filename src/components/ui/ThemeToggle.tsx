@@ -12,13 +12,13 @@ export const ThemeToggle: React.FC = () => {
       aria-label={isLight ? 'Switch to dark mode' : 'Switch to light mode'}
       title={isLight ? 'Switch to dark mode' : 'Switch to light mode'}
       style={{ outline: 'none' }}
-      className={`relative inline-flex h-7 w-14 flex-shrink-0 items-center rounded-full transition-colors duration-300 focus-visible:ring-2 focus-visible:ring-blue-400 ${
-        isLight ? 'bg-blue-500' : 'bg-slate-600'
+      className={`relative inline-flex h-7 w-14 flex-shrink-0 items-center rounded-full transition-colors duration-300 focus-visible:ring-2 focus-visible:ring-amber-500 ${
+        isLight ? 'bg-amber-400' : 'bg-slate-600'
       }`}
     >
       {/* track icons */}
       <SunIcon  className={`absolute right-1.5 w-3 h-3 transition-opacity ${isLight ? 'opacity-0' : 'opacity-40 text-slate-300'}`} />
-      <MoonIcon className={`absolute left-1.5  w-3 h-3 transition-opacity ${isLight ? 'opacity-40 text-blue-200' : 'opacity-0'}`} />
+      <MoonIcon className={`absolute left-1.5  w-3 h-3 transition-opacity ${isLight ? 'opacity-40 text-amber-700' : 'opacity-0'}`} />
 
       {/* sliding thumb */}
       <span
@@ -27,7 +27,7 @@ export const ThemeToggle: React.FC = () => {
         }`}
       >
         {isLight ? (
-          <SunIcon  className="w-3 h-3 text-blue-500" />
+          <SunIcon  className="w-3 h-3 text-amber-500" />
         ) : (
           <MoonIcon className="w-3 h-3 text-slate-500" />
         )}
