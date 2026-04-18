@@ -29,81 +29,146 @@
   --slate-950:   2   6  23;
 }
 
-/* Light mode — remap so dark-UI classes produce light-UI colors.
-   bg-slate-900 (page bg) → near-white.  text-slate-100 (body text) → near-black.  */
+/* ─── LIGHT MODE — Microsoft Fluent Design ──────────────────────────────────
+   Warm white surfaces · near-black text · refined neutrals
+   Primary accent: #0078d4 (Microsoft Blue) replaces amber throughout.
+─────────────────────────────────────────────────────────────────────────── */
 [data-theme="light"] {
-  --slate-50:  241 245 249;   /* stays light for rarely-used bg-slate-50        */
-  --slate-100:  15  23  42;   /* text-slate-100 → very dark body text           */
-  --slate-200:  30  41  59;   /* text-slate-200 → dark                          */
-  --slate-300:  71  85 105;   /* text-slate-300 → medium-dark                   */
-  --slate-400: 100 116 139;   /* text-slate-400 → muted (same mid-tone)         */
-  --slate-500: 100 116 139;   /* text-slate-500 → muted                         */
-  --slate-600: 203 213 225;   /* border-slate-600 / bg-slate-600 → light border */
-  --slate-700: 209 213 219;   /* bg-slate-700 inputs → light input bg           */
-  --slate-800: 255 255 255;   /* bg-slate-800 cards → white                     */
-  --slate-900: 241 245 249;   /* bg-slate-900 page → very light gray            */
-  --slate-950: 248 250 252;   /* bg-slate-950 → lightest                        */
+  --slate-50:  245 245 245;   /* #f5f5f5  lightest tint                          */
+  --slate-100:  36  36  36;   /* #242424  primary text                           */
+  --slate-200:  50  49  48;   /* #323130  strong secondary                       */
+  --slate-300:  96  94  92;   /* #605e5c  body / label text                      */
+  --slate-400: 138 136 134;   /* #8a8886  muted / helper                         */
+  --slate-500: 161 159 157;   /* #a19f9d  placeholder / disabled                 */
+  --slate-600: 209 209 209;   /* #d1d1d1  default border                         */
+  --slate-700: 237 235 233;   /* #edebe9  subtle hover bg / divider              */
+  --slate-800: 255 255 255;   /* #ffffff  card / panel surface                   */
+  --slate-900: 250 249 248;   /* #faf9f8  page background (warm white)           */
+  --slate-950: 255 255 255;   /* #ffffff  elevated surface                       */
+
+  /* Segoe UI — Microsoft's signature typeface */
+  font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
 }
 
-/* ─── TARGETED LIGHT-MODE OVERRIDES ────────────────────────────────────────
-   Cover the handful of things the slate variable swap can't reach:
-   hard-coded white text, gray-* classes, coloured accent text, and the
-   login page's custom hex colours.
-─────────────────────────────────────────────────────────────────────────── */
+/* ── text-white would vanish on white cards ──────────────────────────────── */
+[data-theme="light"] .text-white { color: rgb(36 36 36); }
 
-/* text-white is hard-coded rgb(255,255,255) — would vanish on white cards  */
-[data-theme="light"] .text-white { color: rgb(15 23 42); }
-
-/* gray-* classes (some dashboard components use gray instead of slate) */
-[data-theme="light"] .text-gray-100  { color: rgb(17  24  39); }
-[data-theme="light"] .text-gray-200  { color: rgb(31  41  55); }
-[data-theme="light"] .text-gray-300  { color: rgb(55  65  81); }
-[data-theme="light"] .text-gray-400  { color: rgb(75  85  99); }
-[data-theme="light"] .bg-gray-900    { background-color: rgb(249 250 251); }
+/* ── gray-* classes ─────────────────────────────────────────────────────── */
+[data-theme="light"] .text-gray-100  { color: rgb(36  36  36); }
+[data-theme="light"] .text-gray-200  { color: rgb(50  49  48); }
+[data-theme="light"] .text-gray-300  { color: rgb(96  94  92); }
+[data-theme="light"] .text-gray-400  { color: rgb(138 136 134); }
+[data-theme="light"] .bg-gray-900    { background-color: rgb(250 249 248); }
 [data-theme="light"] .bg-gray-800    { background-color: rgb(255 255 255); }
-[data-theme="light"] .bg-gray-700    { background-color: rgb(229 231 235); }
-[data-theme="light"] .border-gray-700 { border-color: rgb(209 213 219); }
+[data-theme="light"] .bg-gray-700    { background-color: rgb(237 235 233); }
+[data-theme="light"] .border-gray-700 { border-color: rgb(209 209 209); }
 
-/* Accent text colours — their light variants are often invisible on white */
-[data-theme="light"] .text-amber-300  { color: rgb(180  83   9); }
-[data-theme="light"] .text-amber-400  { color: rgb(180  83   9); }
-[data-theme="light"] .text-emerald-300 { color: rgb(  6  95  70); }
-[data-theme="light"] .text-emerald-400 { color: rgb(  6  95  70); }
-[data-theme="light"] .text-rose-300   { color: rgb(159  18  57); }
-[data-theme="light"] .text-rose-400   { color: rgb(159  18  57); }
-[data-theme="light"] .text-red-200    { color: rgb(153  27  27); }
-[data-theme="light"] .text-red-300    { color: rgb(153  27  27); }
-[data-theme="light"] .text-red-400    { color: rgb(185  28  28); }
-[data-theme="light"] .text-sky-300    { color: rgb(  3 105 161); }
-[data-theme="light"] .text-sky-400    { color: rgb(  3 105 161); }
-[data-theme="light"] .text-blue-300   { color: rgb( 29  78 216); }
-[data-theme="light"] .text-blue-400   { color: rgb( 29  78 216); }
-[data-theme="light"] .text-green-300  { color: rgb( 21 128  61); }
-[data-theme="light"] .text-green-400  { color: rgb( 21 128  61); }
-[data-theme="light"] .text-purple-300 { color: rgb(109  40 217); }
-[data-theme="light"] .text-purple-400 { color: rgb(109  40 217); }
-[data-theme="light"] .text-yellow-300 { color: rgb(161  98   7); }
-[data-theme="light"] .text-yellow-400 { color: rgb(161  98   7); }
-[data-theme="light"] .text-orange-300 { color: rgb(194  65   12); }
-[data-theme="light"] .text-orange-400 { color: rgb(194  65   12); }
+/* ── Amber → Microsoft Blue (#0078d4) ────────────────────────────────────── */
+[data-theme="light"] .text-amber-300,
+[data-theme="light"] .text-amber-400,
+[data-theme="light"] .text-amber-500,
+[data-theme="light"] .text-amber-600  { color: #0078d4; }
 
-/* Login page custom hex colours */
-[data-theme="light"] .bg-\[\#1a1410\]    { background-color: #f1f5f9; }
+[data-theme="light"] .bg-amber-400,
+[data-theme="light"] .bg-amber-500    { background-color: #0078d4; }
+
+[data-theme="light"] .hover\:bg-amber-500:hover,
+[data-theme="light"] .hover\:bg-amber-600:hover,
+[data-theme="light"] .hover\:bg-amber-700:hover { background-color: #106ebe; }
+
+[data-theme="light"] .border-amber-400,
+[data-theme="light"] .border-amber-500 { border-color: #0078d4; }
+
+[data-theme="light"] .ring-amber-500,
+[data-theme="light"] .focus-visible\:ring-amber-500:focus-visible { --tw-ring-color: #0078d4; }
+
+[data-theme="light"] .from-amber-400,
+[data-theme="light"] .from-amber-500  { --tw-gradient-from: #0078d4; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
+[data-theme="light"] .to-amber-400,
+[data-theme="light"] .to-amber-500    { --tw-gradient-to: #0078d4; }
+
+/* Button text on blue bg — slate-900 maps to near-white, which is perfect ✓ */
+
+/* ── Status / semantic accent colours ───────────────────────────────────── */
+[data-theme="light"] .text-emerald-300,
+[data-theme="light"] .text-emerald-400 { color: #107c10; }   /* MS green    */
+[data-theme="light"] .text-rose-300,
+[data-theme="light"] .text-rose-400   { color: #d13438; }   /* MS red      */
+[data-theme="light"] .text-red-200,
+[data-theme="light"] .text-red-300,
+[data-theme="light"] .text-red-400    { color: #d13438; }
+[data-theme="light"] .text-sky-300,
+[data-theme="light"] .text-sky-400    { color: #0078d4; }
+[data-theme="light"] .text-blue-300,
+[data-theme="light"] .text-blue-400   { color: #0078d4; }
+[data-theme="light"] .text-green-300,
+[data-theme="light"] .text-green-400  { color: #107c10; }
+[data-theme="light"] .text-purple-300,
+[data-theme="light"] .text-purple-400 { color: #5c2d91; }   /* MS purple   */
+[data-theme="light"] .text-yellow-300,
+[data-theme="light"] .text-yellow-400 { color: #986f0b; }
+[data-theme="light"] .text-orange-300,
+[data-theme="light"] .text-orange-400 { color: #c43501; }
+
+/* ── Card elevation — subtle depth on white surfaces ────────────────────── */
+[data-theme="light"] .bg-slate-800 {
+  box-shadow: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+}
+
+/* Sticky headers stay crisp */
+[data-theme="light"] .sticky.top-0.bg-slate-800\/90,
+[data-theme="light"] .sticky.top-0.bg-slate-800\/95 {
+  box-shadow: 0 1px 0 rgb(209 209 209), 0 2px 8px rgba(0,0,0,.06);
+}
+
+/* ── Input / form controls — Microsoft precision ─────────────────────────── */
+[data-theme="light"] input,
+[data-theme="light"] select,
+[data-theme="light"] textarea {
+  border-color: #d1d1d1 !important;
+  background-color: #ffffff !important;
+  color: #242424 !important;
+}
+
+[data-theme="light"] input::placeholder,
+[data-theme="light"] textarea::placeholder { color: #a19f9d !important; }
+
+[data-theme="light"] input:focus,
+[data-theme="light"] select:focus,
+[data-theme="light"] textarea:focus {
+  border-color: #0078d4 !important;
+  outline: none;
+  box-shadow: 0 0 0 1px rgba(0,120,212,.25) !important;
+}
+
+/* ── Sidebar nav active state (manager portal) ───────────────────────────── */
+[data-theme="light"] aside nav button.bg-amber-500 {
+  background-color: #eff6ff !important;   /* very light blue tint */
+  color: #0078d4 !important;
+  border-left: 3px solid #0078d4;
+  font-weight: 600;
+  box-shadow: none;
+}
+
+[data-theme="light"] aside nav button:not(.bg-amber-500):hover {
+  background-color: #f3f2f1 !important;
+  color: #242424 !important;
+}
+
+/* ── Login page custom hex colours ──────────────────────────────────────── */
+[data-theme="light"] .bg-\[\#1a1410\]    { background-color: #faf9f8; }
 [data-theme="light"] .bg-\[\#2a2018\]    { background-color: #ffffff; }
 [data-theme="light"] .from-\[\#2a2018\]  {
   --tw-gradient-from: #ffffff;
   --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
 }
-[data-theme="light"] .to-\[\#1a1410\]   { --tw-gradient-to: #f1f5f9; }
-[data-theme="light"] .border-\[\#3a2e20\] { border-color: rgb(203 213 225); }
-[data-theme="light"] .text-\[\#a89f91\]  { color: rgb(100 116 139); }
+[data-theme="light"] .to-\[\#1a1410\]   { --tw-gradient-to: #faf9f8; }
+[data-theme="light"] .border-\[\#3a2e20\] { border-color: #d1d1d1; }
+[data-theme="light"] .text-\[\#a89f91\]  { color: #8a8886; }
 
-/* Supervisor portal: premium light-mode finish */
+/* ── Supervisor portal — Fluent premium finish ───────────────────────────── */
 [data-theme="light"] .supervisor-surface {
-  background:
-    radial-gradient(1200px 420px at 0% -10%, rgba(245, 208, 120, 0.15), transparent 52%),
-    radial-gradient(980px 360px at 100% -15%, rgba(147, 197, 253, 0.12), transparent 50%),
-    linear-gradient(180deg, #f8fafc 0%, #edf2f7 100%);
+  background: linear-gradient(180deg, #faf9f8 0%, #f5f5f5 100%);
 }
 
 [data-theme="light"] .supervisor-surface .bg-slate-800,
@@ -112,135 +177,87 @@
 [data-theme="light"] .supervisor-surface .bg-slate-800\/80,
 [data-theme="light"] .supervisor-surface .bg-slate-800\/70,
 [data-theme="light"] .supervisor-surface .bg-slate-800\/50 {
-  background: linear-gradient(160deg, rgba(255, 255, 255, 0.96), rgba(249, 251, 255, 0.93)) !important;
-  border-color: rgba(193, 169, 118, 0.26) !important;
-  border-radius: 14px;
-  box-shadow:
-    0 24px 44px -34px rgba(15, 23, 42, 0.3),
-    0 4px 10px rgba(15, 23, 42, 0.06),
-    inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  background: #ffffff !important;
+  border-color: #d1d1d1 !important;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
 }
 
 [data-theme="light"] .supervisor-surface .sticky.top-0 {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(250, 252, 255, 0.9)) !important;
-  border-color: rgba(203, 213, 225, 0.9) !important;
-  box-shadow: 0 8px 24px -20px rgba(15, 23, 42, 0.25);
+  background: rgba(255,255,255,0.96) !important;
+  border-color: #d1d1d1 !important;
+  box-shadow: 0 1px 0 #d1d1d1, 0 2px 8px rgba(0,0,0,.05);
+  backdrop-filter: saturate(180%) blur(8px);
 }
 
 [data-theme="light"] .supervisor-surface .bg-slate-900\/80,
 [data-theme="light"] .supervisor-surface .bg-slate-900\/90,
 [data-theme="light"] .supervisor-surface .bg-slate-900\/95 {
-  background-color: rgba(248, 250, 252, 0.92) !important;
+  background-color: rgba(250,249,248,.95) !important;
 }
 
 [data-theme="light"] .supervisor-surface .bg-slate-700,
 [data-theme="light"] .supervisor-surface .bg-slate-700\/50,
 [data-theme="light"] .supervisor-surface .bg-slate-700\/30 {
-  background-color: rgba(241, 245, 249, 0.94) !important;
-  border-color: rgba(203, 213, 225, 0.95) !important;
+  background-color: #f5f5f5 !important;
+  border-color: #e0e0e0 !important;
 }
 
 [data-theme="light"] .supervisor-surface .hover\:bg-slate-700:hover,
-[data-theme="light"] .supervisor-surface .hover\:bg-slate-700\/50:hover,
-[data-theme="light"] .supervisor-surface .hover\:bg-slate-700\/30:hover,
 [data-theme="light"] .supervisor-surface .hover\:bg-slate-600:hover {
-  background-color: rgba(226, 232, 240, 0.86) !important;
+  background-color: #edebe9 !important;
 }
 
 [data-theme="light"] .supervisor-surface .border-slate-700,
-[data-theme="light"] .supervisor-surface .border-slate-700\/50,
 [data-theme="light"] .supervisor-surface .border-slate-600 {
-  border-color: rgba(203, 213, 225, 0.95) !important;
-}
-
-[data-theme="light"] .supervisor-surface .text-slate-400 {
-  color: rgb(71 85 105) !important;
-}
-
-[data-theme="light"] .supervisor-surface .text-slate-300 {
-  color: rgb(51 65 85) !important;
-}
-
-[data-theme="light"] .supervisor-surface .text-slate-100 {
-  color: rgb(15 23 42) !important;
+  border-color: #d1d1d1 !important;
 }
 
 [data-theme="light"] .supervisor-surface table thead {
-  background: linear-gradient(180deg, rgba(241, 245, 249, 0.92), rgba(226, 232, 240, 0.82)) !important;
-}
-
-[data-theme="light"] .supervisor-surface table tbody tr {
-  transition: background-color 0.2s ease;
+  background-color: #f5f5f5 !important;
 }
 
 [data-theme="light"] .supervisor-surface table tbody tr:hover {
-  background-color: rgba(239, 246, 255, 0.62) !important;
+  background-color: #f0f6ff !important;
 }
 
-[data-theme="light"] .supervisor-surface input,
-[data-theme="light"] .supervisor-surface select,
-[data-theme="light"] .supervisor-surface textarea {
-  background-color: rgba(248, 250, 252, 0.96) !important;
-  border-color: rgba(203, 213, 225, 0.95) !important;
-  color: rgb(15 23 42) !important;
-  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.05);
-}
-
-[data-theme="light"] .supervisor-surface input::placeholder,
-[data-theme="light"] .supervisor-surface textarea::placeholder {
-  color: rgb(100 116 139) !important;
-}
-
-[data-theme="light"] .supervisor-surface input:focus,
-[data-theme="light"] .supervisor-surface select:focus,
-[data-theme="light"] .supervisor-surface textarea:focus {
-  border-color: rgba(217, 119, 6, 0.6) !important;
-  box-shadow:
-    0 0 0 2px rgba(245, 158, 11, 0.18),
-    inset 0 1px 2px rgba(15, 23, 42, 0.04) !important;
-}
-
-[data-theme="light"] .supervisor-surface .bg-amber-500 {
-  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%) !important;
-  box-shadow: 0 12px 24px -16px rgba(180, 83, 9, 0.5);
-}
-
-[data-theme="light"] .supervisor-surface .bg-amber-600,
-[data-theme="light"] .supervisor-surface .hover\:bg-amber-700:hover {
-  background: linear-gradient(135deg, #f59e0b 0%, #b45309 100%) !important;
-  color: #fff !important;
-  box-shadow: 0 14px 24px -18px rgba(180, 83, 9, 0.52);
+[data-theme="light"] .supervisor-surface .bg-amber-500,
+[data-theme="light"] .supervisor-surface .hover\:bg-amber-600:hover {
+  background-color: #0078d4 !important;
+  box-shadow: 0 2px 8px rgba(0,120,212,.24);
 }
 
 [data-theme="light"] .supervisor-surface .bg-blue-600,
 [data-theme="light"] .supervisor-surface .hover\:bg-blue-700:hover {
-  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%) !important;
+  background-color: #0078d4 !important;
   color: #fff !important;
 }
 
 [data-theme="light"] .supervisor-surface .bg-green-700,
 [data-theme="light"] .supervisor-surface .hover\:bg-green-800:hover {
-  background: linear-gradient(135deg, #15803d 0%, #166534 100%) !important;
+  background-color: #107c10 !important;
   color: #fff !important;
 }
 
 [data-theme="light"] .supervisor-surface .bg-red-700,
 [data-theme="light"] .supervisor-surface .hover\:bg-red-800:hover {
-  background: linear-gradient(135deg, #b91c1c 0%, #991b1b 100%) !important;
+  background-color: #d13438 !important;
   color: #fff !important;
 }
 
-[data-theme="light"] .supervisor-surface .bg-gray-50 {
-  background-color: rgba(248, 250, 252, 0.96) !important;
-  border: 1px solid rgba(226, 232, 240, 0.9);
+[data-theme="light"] .supervisor-surface input:focus,
+[data-theme="light"] .supervisor-surface select:focus,
+[data-theme="light"] .supervisor-surface textarea:focus {
+  border-color: #0078d4 !important;
+  box-shadow: 0 0 0 1px rgba(0,120,212,.25) !important;
 }
 
 [data-theme="light"] .supervisor-surface .fixed.inset-0.bg-black {
-  background-color: rgba(15, 23, 42, 0.35) !important;
+  background-color: rgba(0,0,0,.24) !important;
 }
 
-/* Scrollbar */
-[data-theme="light"] * { scrollbar-color: rgb(203 213 225) rgb(241 245 249); }
+/* ── Scrollbar ───────────────────────────────────────────────────────────── */
+[data-theme="light"] * { scrollbar-color: #d1d1d1 #f5f5f5; }
 
 /* ─── UTILITY CLASSES ───────────────────────────────────────────────────── */
 
