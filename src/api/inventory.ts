@@ -1080,7 +1080,7 @@ function computeClientSideForecasts(
       return {
         id: `local_${r.menuItemId}`,
         menuItemId: r.menuItemId,
-        menuItemName: r.menuItemId,
+        menuItemName: menuById.get(r.menuItemId) || r.menuItemId,
         forecastDate: today,
         predictedConsumption: estimatedDailyConsumption,
         confidenceLevel: 0.5,

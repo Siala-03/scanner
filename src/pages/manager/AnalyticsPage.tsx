@@ -418,7 +418,7 @@ export function AnalyticsPage() {
         );
 
         const stat = itemStats.get(key) ?? {
-          name: menuItem?.name ?? menuItemName || key,
+          name: menuItem?.name ?? (menuItemName || key),
           revenue: 0,
           orders: 0,
         };
