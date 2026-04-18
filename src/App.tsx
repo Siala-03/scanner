@@ -40,6 +40,11 @@ import { RestaurantSettings } from './pages/manager/RestaurantSettings';
 type UserRole = 'customer' | 'waiter' | 'supervisor' | 'manager' | 'kitchen' | 'superadmin' | 'supplier' | null;
 type ManagerPage = 'dashboard' | 'menu' | 'staff' | 'analytics' | 'performance' | 'qrcodes' | 'inventory' | 'history' | 'expenses' | 'credit' | 'loyalty' | 'settings';
 type SupervisorPage = 'dashboard' | 'revenue' | 'staff' | 'qrcodes' | 'inventory' | 'menu' | 'history' | 'expenses';
+
+function getThemeStorageKeyForRole(role: UserRole): string {
+  return `theme:${role ?? 'default'}`;
+}
+
 export function App() {
   const [selectedRole, setSelectedRole] = useState<UserRole>(null);
   const [authUser, setAuthUser] = useState<Staff | null>(null);
@@ -68,13 +73,24 @@ export function App() {
       return;
     }
 
-    const storedTheme = localStorage.getItem('theme');
+    const storedTheme =
+      localStorage.getItem(getThemeStorageKeyForRole(selectedRole)) ??
+      localStorage.getItem('theme');
     if (storedTheme === 'light') {
       root.setAttribute('data-theme', 'light');
     } else {
       root.removeAttribute('data-theme');
     }
   }, [selectedRole, tableNumber]);
+
+  useEffect(() => {
+    if (selectedRole) {
+      localStorage.setItem('selectedRole', selectedRole);
+    } else {
+      localStorage.removeItem('selectedRole');
+    }
+    window.dispatchEvent(new Event('portal-role-changed'));
+  }, [selectedRole]);
 
   const restoreStaffContextFromAuthUser = useCallback((user: Staff | null) => {
     if (!user) {
