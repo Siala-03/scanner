@@ -155,7 +155,14 @@ export async function getCustomers(): Promise<Customer[]> {
     const result = await query;
 
     if (result.error?.code === '42703') {
-      const legacy = await db.from('customers').select('*').order('last_visit', { ascending: false });
+      // Older schemas may not include `last_visit` and/or `restaurant_id`.
+      const legacy = await db.from('customers').select('*').order('join_date', { ascending: false });
+      if (legacy.error?.code === '42703') {
+        // Final fallback for very old schemas without `join_date`.
+        const oldest = await db.from('customers').select('*').order('created_at', { ascending: false });
+        if (oldest.error) throw oldest.error;
+        return (oldest.data || []).map(mapCustomer);
+      }
       if (legacy.error) throw legacy.error;
       return (legacy.data || []).map(mapCustomer);
     }
