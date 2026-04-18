@@ -40,9 +40,20 @@ export const analyzeRestaurantData = async (restaurantId: string, userPrompt: st
 
   const result = await model.generateContent([systemInstruction, userPrompt]);
   const response = await result.response;
-  
+
+  let answerText: string;
+  try {
+    answerText = response.text();
+  } catch {
+    const finishReason = response.candidates?.[0]?.finishReason;
+    if (finishReason && finishReason !== 'STOP') {
+      throw new Error(`The AI response was blocked (${finishReason}). Please rephrase your question.`);
+    }
+    throw new Error('The AI returned an empty response. Please rephrase your question and try again.');
+  }
+
   return {
-    answer: response.text(),
+    answer: answerText,
     suggestedActions: deriveActionsFromContext(inventory, waste),
     timestamp: new Date()
   };
