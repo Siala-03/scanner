@@ -137,7 +137,10 @@ export async function createCreditAccount(data: {
   const restaurantId = getRestaurantId();
   if (!restaurantId) throw new Error('No company selected');
 
+  const id = `ca-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
   const fullPayload = {
+    id,
     customer_name: data.customerName,
     customer_phone: data.customerPhone,
     credit_limit: data.creditLimit,
@@ -158,6 +161,7 @@ export async function createCreditAccount(data: {
     ({ data: result, error } = await supabaseAdmin
       .from('credit_accounts')
       .insert({
+        id,
         customer_name: data.customerName,
         customer_phone: data.customerPhone,
         credit_limit: data.creditLimit,

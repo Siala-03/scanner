@@ -27,6 +27,7 @@ import { buildReceiptHtml, orderToReceiptData } from '../../utils/receipt';
 import { ReceiptShareModal } from '../../components/ui/ReceiptShareModal';
 import { supabaseAdmin } from '../../lib/supabase';
 import { markTableSessionPendingCloseFromReceipt } from '../../utils/tableSessions';
+import { ThemeToggle } from '../../components/ui/ThemeToggle';
 
 // ─── Kitchen detection ────────────────────────────────────────────────────────
 // Blacklist: these categories are bar/beverage only — everything else goes to kitchen.
@@ -988,6 +989,7 @@ export function WaiterDashboard({
                 <QrCodeIcon className="w-4 h-4" />
                 <span>Take Order</span>
               </button>
+              <ThemeToggle />
               <button
                 onClick={onLogout}
                 className="p-2 rounded-lg bg-slate-700/60 text-slate-200 hover:bg-red-600 hover:text-white transition-colors"

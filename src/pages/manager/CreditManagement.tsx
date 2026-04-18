@@ -71,6 +71,7 @@ const CreditManagement: React.FC = () => {
   // Create account modal state (lifted to avoid component-inside-component re-mount issues)
   const [createModalFormData, setCreateModalFormData] = useState({
     customerName: '',
+    idNumber: '',
     customerPhone: '',
     creditLimit: '',
     notes: '',
@@ -120,6 +121,7 @@ const CreditManagement: React.FC = () => {
     }
     setCreateModalFormData({
       customerName: customerNameInput || (orderData as any)?.customerName || '',
+      idNumber: customerIdNumber || '',
       customerPhone: customerPhoneInput || getOrderCustomerPhone(orderData) || '',
       creditLimit: creditLimit || creditAmount || (orderData?.total != null ? String(orderData.total) : ''),
       notes: quickNotes || (orderData ? `Account opened from order ${getOrderNumberSafe(orderData)}` : ''),
@@ -297,24 +299,30 @@ const CreditManagement: React.FC = () => {
     e.preventDefault();
     setCreateModalSubmitError('');
     const parsedLimit = parseFloat(createModalFormData.creditLimit);
-    if (
-      !createModalFormData.customerName.trim() ||
-      !createModalFormData.customerPhone.trim() ||
-      Number.isNaN(parsedLimit) ||
-      parsedLimit < 0
-    ) {
-      setCreateModalSubmitError('Please enter a valid name, phone number, and credit limit.');
+    if (!createModalFormData.customerName.trim()) {
+      setCreateModalSubmitError('Customer name is required.');
+      return;
+    }
+    if (!createModalFormData.idNumber.trim()) {
+      setCreateModalSubmitError('ID / Passport number is required.');
+      return;
+    }
+    if (Number.isNaN(parsedLimit) || parsedLimit < 0) {
+      setCreateModalSubmitError('Please enter a valid credit limit.');
       return;
     }
     try {
+      const idNote = createModalFormData.idNumber.trim() ? `ID/Passport: ${createModalFormData.idNumber.trim()}` : '';
+      const baseNote = createModalFormData.notes.trim();
+      const combinedNotes = [idNote, baseNote].filter(Boolean).join(' | ') || undefined;
       await createAccount({
         customerName: createModalFormData.customerName.trim(),
         customerPhone: createModalFormData.customerPhone.trim(),
         creditLimit: parsedLimit,
-        notes: createModalFormData.notes.trim() || undefined,
+        notes: combinedNotes,
       });
       setShowCreateModal(false);
-      setCreateModalFormData({ customerName: '', customerPhone: '', creditLimit: '', notes: '' });
+      setCreateModalFormData({ customerName: '', idNumber: '', customerPhone: '', creditLimit: '', notes: '' });
       loadCreditData();
     } catch (err: any) {
       console.error('Failed to create account:', err);
@@ -933,45 +941,64 @@ const CreditManagement: React.FC = () => {
             )}
             <form onSubmit={handleCreateAccountSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-slate-300">Customer Name</label>
+                <label className="block text-sm font-medium text-slate-300">Customer Name <span className="text-red-400">*</span></label>
                 <input
                   type="text"
                   required
+                  autoFocus
+                  placeholder="Full name"
                   value={createModalFormData.customerName}
                   onChange={(e) => setCreateModalFormData({ ...createModalFormData, customerName: e.target.value })}
                   className="mt-1 block w-full rounded-md border border-slate-700 bg-slate-700 px-3 py-2 text-slate-100 focus:outline-none focus:ring-amber-500 focus:border-amber-500"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-300">Phone Number</label>
+                <label className="block text-sm font-medium text-slate-300">ID / Passport Number <span className="text-red-400">*</span></label>
                 <input
-                  type="tel"
+                  type="text"
                   required
-                  value={createModalFormData.customerPhone}
-                  onChange={(e) => setCreateModalFormData({ ...createModalFormData, customerPhone: e.target.value })}
+                  placeholder="National ID or passport"
+                  value={createModalFormData.idNumber}
+                  onChange={(e) => setCreateModalFormData({ ...createModalFormData, idNumber: e.target.value })}
                   className="mt-1 block w-full rounded-md border border-slate-700 bg-slate-700 px-3 py-2 text-slate-100 focus:outline-none focus:ring-amber-500 focus:border-amber-500"
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-300">Credit Limit (RWF)</label>
-                <input
-                  type="number"
-                  required
-                  min="0"
-                  step="0.01"
-                  value={createModalFormData.creditLimit}
-                  onChange={(e) => setCreateModalFormData({ ...createModalFormData, creditLimit: e.target.value })}
-                  className="mt-1 block w-full rounded-md border border-slate-700 bg-slate-700 px-3 py-2 text-slate-100 focus:outline-none focus:ring-amber-500 focus:border-amber-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-300">Notes (Optional)</label>
-                <textarea
-                  value={createModalFormData.notes}
-                  onChange={(e) => setCreateModalFormData({ ...createModalFormData, notes: e.target.value })}
-                  rows={3}
-                  className="mt-1 block w-full rounded-md border border-slate-700 bg-slate-700 px-3 py-2 text-slate-100 focus:outline-none focus:ring-amber-500 focus:border-amber-500"
-                />
+              <div className="border-t border-slate-700 pt-3">
+                <p className="text-xs text-slate-400 mb-3">Pre-filled from order lookup — edit if needed</p>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300">Phone Number</label>
+                    <input
+                      type="tel"
+                      placeholder="Phone number"
+                      value={createModalFormData.customerPhone}
+                      onChange={(e) => setCreateModalFormData({ ...createModalFormData, customerPhone: e.target.value })}
+                      className="mt-1 block w-full rounded-md border border-slate-700 bg-slate-700 px-3 py-2 text-slate-100 focus:outline-none focus:ring-amber-500 focus:border-amber-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300">Credit Limit (RWF)</label>
+                    <input
+                      type="number"
+                      required
+                      min="0"
+                      step="0.01"
+                      placeholder="0"
+                      value={createModalFormData.creditLimit}
+                      onChange={(e) => setCreateModalFormData({ ...createModalFormData, creditLimit: e.target.value })}
+                      className="mt-1 block w-full rounded-md border border-slate-700 bg-slate-700 px-3 py-2 text-slate-100 focus:outline-none focus:ring-amber-500 focus:border-amber-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300">Notes (Optional)</label>
+                    <textarea
+                      value={createModalFormData.notes}
+                      onChange={(e) => setCreateModalFormData({ ...createModalFormData, notes: e.target.value })}
+                      rows={2}
+                      className="mt-1 block w-full rounded-md border border-slate-700 bg-slate-700 px-3 py-2 text-slate-100 focus:outline-none focus:ring-amber-500 focus:border-amber-500"
+                    />
+                  </div>
+                </div>
               </div>
               <div className="flex justify-end space-x-3">
                 <button

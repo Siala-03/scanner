@@ -42,7 +42,7 @@ export function Modal({
   return (
     <AnimatePresence>
       {isOpen &&
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4">
           <motion.div
           initial={{
             opacity: 0
@@ -85,11 +85,12 @@ export function Modal({
                 ? 'bg-white rounded-2xl shadow-2xl border border-slate-100' 
                 : 'bg-slate-700 rounded-2xl shadow-2xl border border-slate-600'
               }
-              max-h-[90vh] overflow-hidden flex flex-col
+              rounded-b-none sm:rounded-2xl
+              max-h-[92dvh] sm:max-h-[90vh] overflow-hidden flex flex-col
             `}>
 
             {title &&
-          <div className={`flex items-center justify-between px-6 py-4 border-b ${isLight ? 'border-slate-100' : 'border-[#3a2e20]'}`}>
+          <div className={`flex items-center justify-between px-4 py-3 sm:px-6 sm:py-4 border-b ${isLight ? 'border-slate-100' : 'border-[#3a2e20]'}`}>
                 <h2 className={`text-xl font-semibold ${isLight ? 'text-slate-900' : 'text-white'}`}>
                   {title}
                 </h2>
@@ -102,7 +103,7 @@ export function Modal({
                 </button>
               </div>
             }
-            <div className={`flex-1 overflow-y-auto p-6 ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>{children}</div>
+            <div className={`flex-1 overflow-y-auto p-4 sm:p-6 ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>{children}</div>
           </motion.div>
         </div>
       }

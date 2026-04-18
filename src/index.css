@@ -289,3 +289,53 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+
+/* ─── RESPONSIVE FOUNDATION ─────────────────────────────────────────────── */
+
+html,
+body,
+#root {
+  width: 100%;
+  min-height: 100%;
+}
+
+body {
+  overflow-x: hidden;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+img,
+svg,
+video,
+canvas {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Improve horizontal scrolling behavior on touch devices */
+.overflow-x-auto,
+.overflow-y-auto,
+.overflow-auto {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Utility hooks for iOS/Android safe-area devices */
+.safe-area-pb {
+  padding-bottom: max(env(safe-area-inset-bottom), 0px);
+}
+
+.safe-area-pt {
+  padding-top: max(env(safe-area-inset-top), 0px);
+}
+
+/* Keep tap targets comfortable on phones */
+@media (max-width: 640px) {
+  button,
+  [role="button"],
+  input,
+  select,
+  textarea {
+    min-height: 40px;
+  }
+}
