@@ -62,34 +62,99 @@ export function AnalyticsPage() {
     return () => { active = false; };
   }, []);
 
-  const now = new Date();
-  const last7Days = useMemo(() => {
-    const days: string[] = [];
-    for (let i = 6; i >= 0; i -= 1) {
-      const d = new Date(now);
-      d.setDate(now.getDate() - i);
-      days.push(d.toISOString().slice(0, 10));
-    }
-    return days;
-  }, [now]);
+  const parseOrderDate = (order: any) => {
+    const parsed = new Date(order.createdAt ?? order.created_at);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  };
 
   const weeklyRevenue = useMemo(() => {
-    const map = new Map<string, { date: string; revenue: number; orders: number; avgOrderValue: number }>();
-    last7Days.forEach((d) => map.set(d, { date: d, revenue: 0, orders: 0, avgOrderValue: 0 }));
-    orders.forEach((order) => {
-      const d = new Date(order.createdAt ?? order.created_at);
-      if (Number.isNaN(d.getTime())) return;
-      const key = d.toISOString().slice(0, 10);
-      if (!map.has(key)) return;
-      const row = map.get(key)!;
-      row.orders += 1;
-      // Only realised (served) orders count as revenue
-      if (order.status === 'served') {
-        row.revenue += order.total ?? order.total_price ?? 0;
+    const now = new Date();
+    const rows: Array<{ date: string; label: string; revenue: number; orders: number; avgOrderValue: number }> = [];
+
+    if (dateWindow === '7d' || dateWindow === '30d') {
+      const days = dateWindow === '7d' ? 7 : 30;
+      for (let i = days - 1; i >= 0; i -= 1) {
+        const dayStart = new Date(now);
+        dayStart.setHours(0, 0, 0, 0);
+        dayStart.setDate(dayStart.getDate() - i);
+        const dayEnd = new Date(dayStart);
+        dayEnd.setDate(dayEnd.getDate() + 1);
+
+        const inBucket = orders.filter((order) => {
+          const d = parseOrderDate(order);
+          return d ? d >= dayStart && d < dayEnd : false;
+        });
+
+        const ordersCount = inBucket.length;
+        const revenue = inBucket
+          .filter((order) => order.status === 'served')
+          .reduce((sum, order) => sum + (order.total ?? order.total_price ?? 0), 0);
+
+        rows.push({
+          date: dayStart.toISOString().slice(0, 10),
+          label: dayStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+          revenue,
+          orders: ordersCount,
+          avgOrderValue: ordersCount ? revenue / ordersCount : 0,
+        });
       }
-    });
-    return Array.from(map.values()).map((r) => ({ ...r, avgOrderValue: r.orders ? r.revenue / r.orders : 0 }));
-  }, [last7Days, orders]);
+      return rows;
+    }
+
+    if (dateWindow === '90d') {
+      // 13 weekly buckets (~90 days)
+      for (let i = 12; i >= 0; i -= 1) {
+        const weekStart = new Date(now);
+        weekStart.setHours(0, 0, 0, 0);
+        weekStart.setDate(weekStart.getDate() - (i * 7 + 6));
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekEnd.getDate() + 7);
+
+        const inBucket = orders.filter((order) => {
+          const d = parseOrderDate(order);
+          return d ? d >= weekStart && d < weekEnd : false;
+        });
+
+        const ordersCount = inBucket.length;
+        const revenue = inBucket
+          .filter((order) => order.status === 'served')
+          .reduce((sum, order) => sum + (order.total ?? order.total_price ?? 0), 0);
+
+        rows.push({
+          date: weekStart.toISOString().slice(0, 10),
+          label: `W${13 - i}`,
+          revenue,
+          orders: ordersCount,
+          avgOrderValue: ordersCount ? revenue / ordersCount : 0,
+        });
+      }
+      return rows;
+    }
+
+    // 1y -> 12 monthly buckets
+    for (let i = 11; i >= 0; i -= 1) {
+      const monthStart = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const monthEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 1);
+      const inBucket = orders.filter((order) => {
+        const d = parseOrderDate(order);
+        return d ? d >= monthStart && d < monthEnd : false;
+      });
+
+      const ordersCount = inBucket.length;
+      const revenue = inBucket
+        .filter((order) => order.status === 'served')
+        .reduce((sum, order) => sum + (order.total ?? order.total_price ?? 0), 0);
+
+      rows.push({
+        date: monthStart.toISOString().slice(0, 10),
+        label: monthStart.toLocaleDateString('en-US', { month: 'short' }),
+        revenue,
+        orders: ordersCount,
+        avgOrderValue: ordersCount ? revenue / ordersCount : 0,
+      });
+    }
+    return rows;
+  }, [orders, dateWindow]);
 
   const monthlyComparison = useMemo(() => {
     const current = { revenue: 0, orders: 0, avgOrderValue: 0, newCustomers: 0 };
@@ -124,6 +189,7 @@ export function AnalyticsPage() {
   }, [orders]);
 
   const hourlyOrders = useMemo(() => {
+    const now = new Date();
     const hours = Array.from({ length: 24 }, (_, i) => ({ hour: i, orders: 0, revenue: 0 }));
     const todayKey = now.toISOString().slice(0, 10);
     orders.forEach((order) => {
@@ -253,7 +319,7 @@ export function AnalyticsPage() {
     : 0;
 
   const predictedRevenueData = weeklyRevenue.map((d, index) => ({
-    date: new Date(d.date).toLocaleDateString('en-US', { weekday: 'short' }),
+    date: d.label,
     actual: d.revenue,
     predicted: d.revenue + avgDailyGrowth * (index + 1),
     orders: d.orders
@@ -262,6 +328,15 @@ export function AnalyticsPage() {
   const predictedNextWeekRevenue = weeklyRevenue.length
     ? weeklyRevenue[weeklyRevenue.length - 1].revenue + avgDailyGrowth * 7
     : 0;
+
+  const selectedWindowLabel =
+    dateWindow === '7d'
+      ? '7D'
+      : dateWindow === '30d'
+      ? '30D'
+      : dateWindow === '90d'
+      ? '90D'
+      : '1Y';
 
   const [kpiTargets, setKpiTargets] = useState({
     revenue: 150000,
@@ -609,12 +684,7 @@ export function AnalyticsPage() {
             <div className="h-72">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart
-                  data={weeklyRevenue.map((d) => ({
-                    ...d,
-                    date: new Date(d.date).toLocaleDateString('en-US', {
-                      weekday: 'short'
-                    })
-                  }))}>
+                  data={weeklyRevenue}>
 
                   <defs>
                     <linearGradient
@@ -629,7 +699,7 @@ export function AnalyticsPage() {
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                  <XAxis dataKey="date" stroke="#64748b" fontSize={12} />
+                  <XAxis dataKey="label" stroke="#64748b" fontSize={12} />
                   <YAxis
                     stroke="#64748b"
                     fontSize={12}
@@ -825,15 +895,10 @@ export function AnalyticsPage() {
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart
-                data={weeklyRevenue.map((d) => ({
-                  ...d,
-                  date: new Date(d.date).toLocaleDateString('en-US', {
-                    weekday: 'short'
-                  })
-                }))}>
+                data={weeklyRevenue}>
 
                 <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                <XAxis dataKey="date" stroke="#64748b" fontSize={12} />
+                <XAxis dataKey="label" stroke="#64748b" fontSize={12} />
                 <YAxis yAxisId="left" stroke="#64748b" fontSize={12} />
                 <YAxis
                   yAxisId="right"
@@ -878,7 +943,7 @@ export function AnalyticsPage() {
 
         {/* Predicted vs Actual Revenue */}
         <Card className="bg-slate-800 mt-6">
-          <h3 className="text-lg font-semibold text-gray-100 mb-4">Predicted vs Actual Weekly Revenue</h3>
+          <h3 className="text-lg font-semibold text-gray-100 mb-4">Predicted vs Actual Revenue ({selectedWindowLabel})</h3>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={predictedRevenueData}>
