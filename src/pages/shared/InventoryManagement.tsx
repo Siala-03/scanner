@@ -63,7 +63,7 @@ const PO_STATUS_CONFIG: Record<PurchaseOrderStatus, { label: string; color: stri
 };
 
 const WASTE_REASONS: WasteReason[] = ['expired', 'spoiled', 'damaged', 'overproduction', 'spillage', 'other'];
-const ALERT_INTERVAL_MS = 10 * 60 * 1000;
+const ALERT_HIDDEN_MS = 10 * 60 * 1000;
 const ALERT_VISIBLE_MS = 30 * 1000;
 
 // ── Small reusable components ────────────────────────────────────────────────
@@ -599,19 +599,26 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
       return;
     }
 
-    let hideTimer: ReturnType<typeof setTimeout> | null = null;
-    const showWindow = () => {
-      setShowInventoryAlerts(true);
-      if (hideTimer) clearTimeout(hideTimer);
-      hideTimer = setTimeout(() => setShowInventoryAlerts(false), ALERT_VISIBLE_MS);
+    let cycleTimer: ReturnType<typeof setTimeout> | null = null;
+    let disposed = false;
+
+    const startHiddenPhase = () => {
+      if (disposed) return;
+      setShowInventoryAlerts(false);
+      cycleTimer = setTimeout(() => {
+        if (disposed) return;
+        setShowInventoryAlerts(true);
+        cycleTimer = setTimeout(startHiddenPhase, ALERT_VISIBLE_MS);
+      }, ALERT_HIDDEN_MS);
     };
 
-    showWindow();
-    const intervalId = setInterval(showWindow, ALERT_INTERVAL_MS);
+    // Start by showing the alert immediately, then alternate phases.
+    setShowInventoryAlerts(true);
+    cycleTimer = setTimeout(startHiddenPhase, ALERT_VISIBLE_MS);
 
     return () => {
-      clearInterval(intervalId);
-      if (hideTimer) clearTimeout(hideTimer);
+      disposed = true;
+      if (cycleTimer) clearTimeout(cycleTimer);
     };
   }, [inventoryAlerts]);
 
@@ -850,7 +857,7 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
         )}
 
         {inventoryAlerts.length > 0 && showInventoryAlerts && (
-          <div className="mb-4 rounded-xl border border-amber-300/30 bg-amber-500/10 p-3">
+          <div className="mb-4 rounded-xl border border-amber-300/30 bg-amber-500/10 p-3 animate-pulse">
             <p className="text-xs font-semibold uppercase tracking-wider text-amber-700">Inventory Alerts</p>
             <ul className="mt-1 list-disc list-inside text-xs text-amber-900">
               {inventoryAlerts.map((msg, index) => (

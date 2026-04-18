@@ -168,7 +168,7 @@ export function KitchenDisplay({ onLogout, restaurantId, restaurantName }: { onL
   const [analytics, setAnalytics] = useState<any>(null);
   const [resolvedRestaurantName, setResolvedRestaurantName] = useState<string>(restaurantName || '');
   const { socket, joinOrders, joinRestaurant } = useSocket();
-  const { kpis: staffKPIs } = useStaffKPIs();
+  const { kpis: staffKPIs, refetch: refetchStaffKPIs } = useStaffKPIs();
 
   useEffect(() => {
     setResolvedRestaurantName(restaurantName || '');
@@ -410,6 +410,8 @@ export function KitchenDisplay({ onLogout, restaurantId, restaurantName }: { onL
       setCompletedToday(prev => [...prev, Date.now()]);
     }
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
+    window.dispatchEvent(new Event('ordersUpdated'));
+    refetchStaffKPIs();
   };
 
   const handleComplete = async (orderId: string) => {
@@ -420,6 +422,8 @@ export function KitchenDisplay({ onLogout, restaurantId, restaurantName }: { onL
     }
     setCompletedToday(prev => [...prev, Date.now()]);
     setOrders(prev => prev.filter(o => o.id !== orderId));
+    window.dispatchEvent(new Event('ordersUpdated'));
+    refetchStaffKPIs();
   };
 
   // Group orders by status

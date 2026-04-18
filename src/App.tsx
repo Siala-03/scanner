@@ -58,14 +58,23 @@ export function App() {
   const [showQRGrid, setShowQRGrid] = useState(false);
   const { tables, addTable, removeTable } = useTables();
 
-  const restoreStaffIdFromAuthUser = useCallback((user: Staff | null) => {
-    if (!user?.id) {
+  const restoreStaffContextFromAuthUser = useCallback((user: Staff | null) => {
+    if (!user) {
       return;
     }
 
-    const storedStaffId = localStorage.getItem('staffId');
-    if (!storedStaffId) {
-      localStorage.setItem('staffId', user.id);
+    if (user.id) {
+      const storedStaffId = localStorage.getItem('staffId');
+      if (!storedStaffId) {
+        localStorage.setItem('staffId', user.id);
+      }
+    }
+
+    if (user.role) {
+      const storedStaffRole = localStorage.getItem('staffRole');
+      if (!storedStaffRole) {
+        localStorage.setItem('staffRole', user.role);
+      }
     }
   }, []);
 
@@ -82,7 +91,7 @@ export function App() {
           user.restaurantId = restoredRestaurantId;
         }
         setAuthUser(user);
-        restoreStaffIdFromAuthUser(user);
+        restoreStaffContextFromAuthUser(user);
         if (restoredRestaurantId) {
           setCurrentRestaurantId(restoredRestaurantId);
           localStorage.setItem('restaurantId', restoredRestaurantId);
@@ -101,7 +110,7 @@ export function App() {
       setSelectedRole(savedSelectedRole as UserRole);
     }
     setRouteResolved(true);
-  }, [restoreStaffIdFromAuthUser]);
+  }, [restoreStaffContextFromAuthUser]);
 
   const [waiterCalls, setWaiterCalls] = useState<
     {
@@ -461,6 +470,8 @@ export function App() {
           // Save to localStorage and update state immediately
           localStorage.setItem('authUser', JSON.stringify(user));
           localStorage.setItem('selectedRole', user.role);
+          localStorage.setItem('staffId', user.id);
+          localStorage.setItem('staffRole', user.role);
           const loginRestaurantId = user.restaurantId || (user as any).restaurant_id;
           if (loginRestaurantId) {
             localStorage.setItem('restaurantId', loginRestaurantId);
@@ -851,6 +862,8 @@ export function App() {
                 // Save to localStorage
                 localStorage.setItem('authUser', JSON.stringify(user));
                 localStorage.setItem('selectedRole', user.role);
+                localStorage.setItem('staffId', user.id);
+                localStorage.setItem('staffRole', user.role);
                 if (user.restaurantId) {
                   localStorage.setItem('restaurantId', user.restaurantId);
                   setCurrentRestaurantId(user.restaurantId);

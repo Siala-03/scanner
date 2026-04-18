@@ -28,6 +28,10 @@ function normalizeRole(value: unknown): string {
   return String(value || '').trim().toLowerCase();
 }
 
+function isSameStaff(value: unknown, staffId: string): boolean {
+  return String(value ?? '').trim() === String(staffId).trim();
+}
+
 function getCurrentStaff(): { id: string; role: string } | null {
   try {
     const raw = localStorage.getItem('authUser');
@@ -107,7 +111,9 @@ async function computeProgress(
           const assignedWaiter = o.assigned_waiter_id ?? o.assignedWaiterId;
           const assignedTo = o.assigned_to ?? o.assignedTo;
           const createdBy = o.created_by ?? o.createdBy;
-          return assignedWaiter === staffId || assignedTo === staffId || createdBy === staffId;
+          return isSameStaff(assignedWaiter, staffId)
+            || isSameStaff(assignedTo, staffId)
+            || isSameStaff(createdBy, staffId);
         })
       : orders;
 

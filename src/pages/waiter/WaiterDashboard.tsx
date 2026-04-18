@@ -151,6 +151,48 @@ function PortalSectionHeader({
   );
 }
 
+function ComparisonBars({
+  title,
+  items,
+  valueFormatter,
+  emptyLabel,
+  barColorClass,
+}: {
+  title: string;
+  items: Array<{ label: string; value: number }>;
+  valueFormatter: (value: number) => string;
+  emptyLabel: string;
+  barColorClass: string;
+}) {
+  const maxValue = Math.max(1, ...items.map((item) => item.value));
+
+  return (
+    <div className="rounded-lg border border-slate-700 bg-slate-800 p-4">
+      <p className="mb-3 text-xs uppercase tracking-widest text-slate-500">{title}</p>
+      {items.length === 0 ? (
+        <p className="text-sm text-slate-400">{emptyLabel}</p>
+      ) : (
+        <div className="space-y-3">
+          {items.map((item) => {
+            const width = Math.round((item.value / maxValue) * 100);
+            return (
+              <div key={item.label}>
+                <div className="mb-1 flex items-center justify-between text-xs">
+                  <span className="text-slate-400">{item.label}</span>
+                  <span className="font-semibold text-white">{valueFormatter(item.value)}</span>
+                </div>
+                <div className="h-2 rounded-full bg-slate-700 overflow-hidden">
+                  <div className={`h-full rounded-full transition-all ${barColorClass}`} style={{ width: `${width}%` }} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Inline Order Verification Card ──────────────────────────────────────────
 function IncomingOrderCard({
   order,
@@ -553,7 +595,10 @@ export function WaiterDashboard({
   onDismissWaiterCall,
   onLogout,
 }: WaiterDashboardProps) {
+  type AnalyticsRange = 'weekly' | 'monthly' | 'quarterly' | 'yearly';
+
   const [portalPage, setPortalPage] = useState<'orders' | 'analytics'>('orders');
+  const [analyticsRange, setAnalyticsRange] = useState<AnalyticsRange>('weekly');
   const [activeTab, setActiveTab] = useState<'incoming' | 'kitchen' | 'ready' | 'served'>('incoming');
   const [showQRScanner, setShowQRScanner] = useState(false);
   const [showOrderEntry, setShowOrderEntry] = useState(false);
@@ -655,6 +700,99 @@ export function WaiterDashboard({
     waiterReviews.length > 0
       ? Math.round((waiterReviews.reduce((s, r) => s + r.rating, 0) / waiterReviews.length) * 10) / 10
       : null;
+
+  const analyticsComparison = useMemo(() => {
+    const servedOnly = orders.filter((o) => o.status === 'served');
+    const now = new Date();
+
+    const normalizeDate = (value: Date | string | undefined): Date => {
+      const parsed = value ? new Date(value) : new Date();
+      return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+    };
+
+    const sumRevenue = (rows: Order[]) =>
+      rows.reduce((sum, row) => sum + Number(row.total ?? 0), 0);
+
+    const startOfDay = (date: Date) => {
+      const d = new Date(date);
+      d.setHours(0, 0, 0, 0);
+      return d;
+    };
+
+    const ordersChart: Array<{ label: string; value: number }> = [];
+    const revenueChart: Array<{ label: string; value: number }> = [];
+
+    if (analyticsRange === 'weekly') {
+      for (let i = 6; i >= 0; i -= 1) {
+        const day = startOfDay(new Date(now));
+        day.setDate(day.getDate() - i);
+        const dayEnd = new Date(day);
+        dayEnd.setDate(dayEnd.getDate() + 1);
+        const rows = servedOnly.filter((o) => {
+          const when = normalizeDate(o.servedAt ?? o.updatedAt ?? o.createdAt);
+          return when >= day && when < dayEnd;
+        });
+        const label = day.toLocaleDateString(undefined, { weekday: 'short' });
+        ordersChart.push({ label, value: rows.length });
+        revenueChart.push({ label, value: sumRevenue(rows) });
+      }
+    } else if (analyticsRange === 'monthly') {
+      for (let i = 3; i >= 0; i -= 1) {
+        const periodStart = startOfDay(new Date(now));
+        periodStart.setDate(periodStart.getDate() - (i * 7 + 6));
+        const periodEnd = startOfDay(new Date(now));
+        periodEnd.setDate(periodEnd.getDate() - i * 7 + 1);
+        const rows = servedOnly.filter((o) => {
+          const when = normalizeDate(o.servedAt ?? o.updatedAt ?? o.createdAt);
+          return when >= periodStart && when < periodEnd;
+        });
+        const label = `Week ${4 - i}`;
+        ordersChart.push({ label, value: rows.length });
+        revenueChart.push({ label, value: sumRevenue(rows) });
+      }
+    } else if (analyticsRange === 'quarterly') {
+      for (let i = 2; i >= 0; i -= 1) {
+        const monthStart = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const monthEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 1);
+        const rows = servedOnly.filter((o) => {
+          const when = normalizeDate(o.servedAt ?? o.updatedAt ?? o.createdAt);
+          return when >= monthStart && when < monthEnd;
+        });
+        const label = monthStart.toLocaleDateString(undefined, { month: 'short' });
+        ordersChart.push({ label, value: rows.length });
+        revenueChart.push({ label, value: sumRevenue(rows) });
+      }
+    } else {
+      for (let i = 11; i >= 0; i -= 1) {
+        const monthStart = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const monthEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 1);
+        const rows = servedOnly.filter((o) => {
+          const when = normalizeDate(o.servedAt ?? o.updatedAt ?? o.createdAt);
+          return when >= monthStart && when < monthEnd;
+        });
+        const label = monthStart.toLocaleDateString(undefined, { month: 'short' });
+        ordersChart.push({ label, value: rows.length });
+        revenueChart.push({ label, value: sumRevenue(rows) });
+      }
+    }
+
+    return { ordersChart, revenueChart };
+  }, [orders, analyticsRange]);
+
+  const periodBarColorClass = useMemo(() => {
+    switch (analyticsRange) {
+      case 'weekly':
+        return 'bg-sky-400';
+      case 'monthly':
+        return 'bg-emerald-400';
+      case 'quarterly':
+        return 'bg-violet-400';
+      case 'yearly':
+        return 'bg-amber-400';
+      default:
+        return 'bg-amber-400';
+    }
+  }, [analyticsRange]);
 
   // Merge waiter calls
   const allWaiterCalls = useMemo(() => {
@@ -779,12 +917,6 @@ export function WaiterDashboard({
                 <LogOutIcon className="w-4 h-4" />
               </button>
             </div>
-          </div>
-
-          {/* Connection status */}
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-400" />
-            <span className="text-xs text-emerald-400">Live — receiving customer orders</span>
           </div>
 
           {/* Primary pages */}
@@ -1018,6 +1150,51 @@ export function WaiterDashboard({
                 <div className="flex justify-between text-sm"><span className="text-slate-400">Ready to Serve</span><span className="font-semibold text-white">{readyOrders.length}</span></div>
                 <div className="flex justify-between text-sm"><span className="text-slate-400">Avg Service Time</span><span className="font-semibold text-white">{waiter.performance?.avgServiceTime ?? 15} min</span></div>
                 <div className="flex justify-between text-sm"><span className="text-slate-400">Revenue</span><span className="font-semibold text-emerald-300">{formatPrice(todaysRevenue)}</span></div>
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-slate-700 bg-slate-800 p-4 md:col-span-2">
+              <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-xs uppercase tracking-widest text-slate-500">Simple Comparison</p>
+                <div className="flex flex-wrap gap-2">
+                  {(
+                    [
+                      { key: 'weekly', label: 'Weekly' },
+                      { key: 'monthly', label: 'Monthly' },
+                      { key: 'quarterly', label: 'Quarterly' },
+                      { key: 'yearly', label: 'Yearly' },
+                    ] as Array<{ key: AnalyticsRange; label: string }>
+                  ).map((option) => (
+                    <button
+                      key={option.key}
+                      onClick={() => setAnalyticsRange(option.key)}
+                      className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+                        analyticsRange === option.key
+                          ? 'bg-amber-500 text-slate-900'
+                          : 'bg-slate-700 text-slate-300 hover:bg-slate-600 hover:text-white'
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <p className="mb-4 text-sm text-slate-400">Bars make it easy to compare performance at a glance.</p>
+              <div className="grid gap-4 md:grid-cols-2">
+                <ComparisonBars
+                  title="Orders Served"
+                  items={analyticsComparison.ordersChart}
+                  valueFormatter={(value) => String(value)}
+                  emptyLabel="No served orders yet."
+                  barColorClass={periodBarColorClass}
+                />
+                <ComparisonBars
+                  title="Revenue"
+                  items={analyticsComparison.revenueChart}
+                  valueFormatter={(value) => formatPrice(value)}
+                  emptyLabel="No revenue data yet."
+                  barColorClass={periodBarColorClass}
+                />
               </div>
             </div>
 
