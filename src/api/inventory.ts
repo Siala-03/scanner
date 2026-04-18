@@ -1056,27 +1056,71 @@ type ForecastGenerateResponse = {
   forecasts: any[];
 };
 
+function computeClientSideForecasts(
+  inventoryRecords: InventoryRecord[],
+  menuById: Map<string, string> = new Map()
+): InventoryForecast[] {
+  const today = new Date().toISOString().split('T')[0];
+  return inventoryRecords
+    .filter((r) => r.menuItemId)
+    .map((r): InventoryForecast => {
+      // Estimate daily consumption: assume stock turns over in ~14 days from reorder point
+      const estimatedDailyConsumption = Math.max(1, Math.round(r.reorderPoint / 14));
+      const daysUntilStockout =
+        r.stock > 0 ? Math.floor(r.stock / estimatedDailyConsumption) : 0;
+      const recommendedReorderQty = Math.max(r.reorderQty, estimatedDailyConsumption * 14);
+
+      let alertStatus: 'none' | 'warning' | 'critical' = 'none';
+      if (daysUntilStockout <= 2 || r.stock === 0) {
+        alertStatus = 'critical';
+      } else if (daysUntilStockout <= 5 || r.stock <= r.lowStockThreshold) {
+        alertStatus = 'warning';
+      }
+
+      return {
+        id: `local_${r.menuItemId}`,
+        menuItemId: r.menuItemId,
+        menuItemName: r.menuItemId,
+        forecastDate: today,
+        predictedConsumption: estimatedDailyConsumption,
+        confidenceLevel: 0.5,
+        recommendedReorderQty,
+        leadTimeDays: 3,
+        seasonalityFactor: 1,
+        trendFactor: 1,
+        lastStockLevel: r.stock,
+        daysUntilStockout,
+        alertStatus,
+      };
+    })
+    .sort((a, b) => a.daysUntilStockout - b.daysUntilStockout);
+}
+
 export async function fetchForecasts(): Promise<InventoryForecast[]> {
   try {
     const forecasts = await apiRequest<any[]>('/forecasting');
     return Array.isArray(forecasts) ? forecasts.map(normalizeForecast) : [];
-  } catch (error) {
-    console.warn('fetchForecasts backend endpoint unavailable, using Supabase fallback.');
+  } catch {
+    // Backend unavailable — fall through to client-side computation
   }
 
   try {
-    const restaurantId = getRestaurantId();
-    if (!restaurantId) return [];
+    if (!getRestaurantId()) return [];
 
-    const { data, error } = await supabase
-      .from('inventory_forecasts')
-      .select('*')
-      .order('days_until_stockout', { ascending: true });
+    const [inventoryRecords, menuItems] = await Promise.allSettled([
+      fetchInventory(),
+      import('./menu').then((m) => m.fetchMenu()),
+    ]);
 
-    if (error) throw error;
-    return (data || []).map(normalizeForecast);
-  } catch (fallbackErr) {
-    console.warn('fetchForecasts fallback unavailable, returning empty list.');
+    const inv = inventoryRecords.status === 'fulfilled' ? inventoryRecords.value : [];
+    const menuById = new Map<string, string>(
+      menuItems.status === 'fulfilled'
+        ? menuItems.value.map((mi: any) => [mi.id, mi.name] as [string, string])
+        : []
+    );
+
+    return computeClientSideForecasts(inv, menuById);
+  } catch {
     return [];
   }
 }
