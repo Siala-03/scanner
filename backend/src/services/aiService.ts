@@ -18,7 +18,7 @@ export const analyzeRestaurantData = async (restaurantId: string, userPrompt: st
     getExpenseContext(restaurantId)
   ]);
 
-  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+  const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
   const systemInstruction = `
     You are 'Servv Insights Assistant', an elite restaurant operations analyst.
@@ -38,6 +38,9 @@ export const analyzeRestaurantData = async (restaurantId: string, userPrompt: st
     5. Only use the data provided. If you don't know, suggest where the manager can look in the app.
   `;
 
+  if (!userPrompt || typeof userPrompt !== 'string') {
+    throw new Error('A valid prompt is required.');
+  }
   const result = await model.generateContent([systemInstruction, userPrompt]);
   const response = await result.response;
 

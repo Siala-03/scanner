@@ -145,7 +145,7 @@ export async function fetchExpenseCategories(): Promise<ExpenseCategory[]> {
   const restaurantId = getRestaurantId();
 
   try {
-    const apiCategories = await apiRequest<any[]>('/api/expenses/categories');
+    const apiCategories = await apiRequest<any[]>('/expenses/categories');
     if (Array.isArray(apiCategories) && apiCategories.length > 0) {
       return apiCategories.map(normalizeExpenseCategory);
     }

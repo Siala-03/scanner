@@ -11,7 +11,7 @@ export interface AIResponse {
  */
 export async function askAIAnalyst(prompt: string): Promise<AIResponse> {
   try {
-    return await apiRequest<AIResponse>('/api/ai/analyze', {
+    return await apiRequest<AIResponse>('/ai/analyze', {
       method: 'POST',
       json: { prompt },
     });

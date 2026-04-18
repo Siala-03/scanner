@@ -2,7 +2,7 @@ import { apiRequest, ApiError } from './http';
 import { supabaseAdmin } from '../lib/supabase';
 import type { Customer, LoyaltyTransaction, Reward, RewardRedemption, LoyaltySummary } from '../types';
 
-const LOYALTY_BASE = '/api/loyalty';
+const LOYALTY_BASE = '/loyalty';
 const db = supabaseAdmin;
 
 function toDate(value: unknown): Date {

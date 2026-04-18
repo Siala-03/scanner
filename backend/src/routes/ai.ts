@@ -16,7 +16,10 @@ router.post('/analyze', authenticate, async (req: AuthenticatedRequest, res: Res
     }
 
     const { prompt } = req.body;
-    const result = await analyzeRestaurantData(req.restaurantId!, prompt);
+    if (!prompt || typeof prompt !== 'string' || !prompt.trim()) {
+      return res.status(400).json({ error: 'A prompt is required.' });
+    }
+    const result = await analyzeRestaurantData(req.restaurantId!, prompt.trim());
     res.json(result);
   } catch (error: any) {
     res.status(error.status || 500).json({ error: error.message });

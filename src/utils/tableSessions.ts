@@ -64,7 +64,7 @@ export async function getActiveTableSession(tableNumber: number): Promise<TableS
     tableNumber: String(tableNumber),
   });
 
-  const response = await apiRequest<{ session: any | null }>(`/api/table-sessions/current?${params.toString()}`);
+  const response = await apiRequest<{ session: any | null }>(`/table-sessions/current?${params.toString()}`);
   const session = response.session ? toClientSession(response.session) : null;
   emitSessionEvent();
   return session;
@@ -74,7 +74,7 @@ export async function recordTableSessionActivity(tableNumber: number): Promise<T
   const restaurantId = getRestaurantId();
   if (!restaurantId) return null;
 
-  const response = await apiRequest<{ session: any }>('/api/table-sessions/activity', {
+  const response = await apiRequest<{ session: any }>('/table-sessions/activity', {
     method: 'POST',
     json: {
       restaurantId,
@@ -94,7 +94,7 @@ export async function markTableSessionPendingCloseFromReceipt(
   if (!restaurantId) return null;
 
   const pendingCloseMinutes = Math.max(1, Math.round(pendingMs / 60000));
-  const response = await apiRequest<{ session: any }>('/api/table-sessions/receipt-printed', {
+  const response = await apiRequest<{ session: any }>('/table-sessions/receipt-printed', {
     method: 'POST',
     json: {
       restaurantId,

@@ -960,7 +960,7 @@ export async function fetchLocations(): Promise<InventoryLocation[]> {
   if (!restaurantId) return [];
 
   try {
-    const payload = await apiRequest<any[]>('/api/locations');
+    const payload = await apiRequest<any[]>('/locations');
     if (Array.isArray(payload)) {
       return payload.map(normalizeLocation);
     }
@@ -1017,7 +1017,7 @@ export async function createLocation(payload: {
   temperatureRange?: string;
 }): Promise<InventoryLocation> {
   try {
-    const created = await apiRequest<any>('/api/locations', {
+    const created = await apiRequest<any>('/locations', {
       method: 'POST',
       json: payload,
     });
@@ -1058,7 +1058,7 @@ type ForecastGenerateResponse = {
 
 export async function fetchForecasts(): Promise<InventoryForecast[]> {
   try {
-    const forecasts = await apiRequest<any[]>('/api/forecasting');
+    const forecasts = await apiRequest<any[]>('/forecasting');
     return Array.isArray(forecasts) ? forecasts.map(normalizeForecast) : [];
   } catch (error) {
     console.warn('fetchForecasts backend endpoint unavailable, using Supabase fallback.');
@@ -1083,7 +1083,7 @@ export async function fetchForecasts(): Promise<InventoryForecast[]> {
 
 export async function generateForecasts() {
   try {
-    const payload = await apiRequest<ForecastGenerateResponse>('/api/forecasting/generate', {
+    const payload = await apiRequest<ForecastGenerateResponse>('/forecasting/generate', {
       method: 'POST',
     });
 
@@ -1104,7 +1104,7 @@ export async function generateForecasts() {
 
 export async function fetchForecastAlerts(): Promise<InventoryForecast[]> {
   try {
-    const alerts = await apiRequest<any[]>('/api/forecasting/alerts');
+    const alerts = await apiRequest<any[]>('/forecasting/alerts');
     return Array.isArray(alerts) ? alerts.map(normalizeForecast) : [];
   } catch (error) {
     const forecasts = await fetchForecasts();

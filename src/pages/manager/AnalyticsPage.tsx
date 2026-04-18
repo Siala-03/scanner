@@ -311,6 +311,41 @@ export function AnalyticsPage() {
       ? yearlyTotals.orders
       : monthlyComparison.currentMonth.orders;
 
+  const attributionHealth = useMemo(() => {
+    const now = new Date();
+    const start = new Date(now);
+
+    if (dateWindow === '7d') {
+      start.setDate(start.getDate() - 7);
+    } else if (dateWindow === '30d') {
+      start.setDate(start.getDate() - 30);
+    } else if (dateWindow === '90d') {
+      start.setDate(start.getDate() - 90);
+    } else {
+      start.setFullYear(start.getFullYear() - 1);
+    }
+    start.setHours(0, 0, 0, 0);
+
+    const servedInWindow = orders.filter((order) => {
+      if (order.status !== 'served') return false;
+      const createdAt = new Date(order.createdAt ?? order.created_at);
+      if (Number.isNaN(createdAt.getTime())) return false;
+      return createdAt >= start && createdAt <= now;
+    });
+
+    const missingCount = servedInWindow.filter((order) => {
+      const assignedWaiter = String(order.assignedWaiterId ?? order.assigned_waiter_id ?? '').trim();
+      const assignedTo = String(order.assignedTo ?? order.assigned_to ?? '').trim();
+      const createdBy = String(order.createdBy ?? order.created_by ?? '').trim();
+      return !assignedWaiter && !assignedTo && !createdBy;
+    }).length;
+
+    const servedCount = servedInWindow.length;
+    const healthPct = servedCount > 0 ? Math.round(((servedCount - missingCount) / servedCount) * 100) : 100;
+
+    return { servedCount, missingCount, healthPct };
+  }, [orders, dateWindow]);
+
   const totalWeeklyRevenue = weeklyRevenue.reduce((sum, d) => sum + d.revenue, 0);
   const avgDailyRevenue = weeklyRevenue.length ? totalWeeklyRevenue / weeklyRevenue.length : 0;
   const dailyRevenueChanges = weeklyRevenue.slice(1).map((d, i) => d.revenue - weeklyRevenue[i].revenue);
@@ -360,13 +395,35 @@ export function AnalyticsPage() {
   const topItems = useMemo(() => {
     const itemStats = new Map<string, { name: string; revenue: number; orders: number }>();
     orders.forEach((order) => {
-      (order.items ?? []).forEach((item: any) => {
-        const menuItem = menuById[item.menuItemId];
-        const key = item.menuItemId || item.menuItemName || 'unknown';
-        const price = item.totalPrice ?? (item.unitPrice ?? 0) * (item.quantity ?? 1);
-        const stat = itemStats.get(key) ?? { name: menuItem?.name ?? item.menuItemName ?? key, revenue: 0, orders: 0 };
-        stat.revenue += price;
-        stat.orders += item.quantity ?? 1;
+      const items = normalizeOrderItems(order.items);
+      items.forEach((item: any) => {
+        const menuItemId = String(item.menuItemId ?? item.menu_item_id ?? item.id ?? '').trim();
+        const menuItemName = String(
+          item.menuItemName ?? item.menu_item_name ?? item.menuItem?.name ?? item.menu_item?.name ?? ''
+        ).trim();
+        const key = menuItemId || menuItemName || 'unknown';
+        const menuItem = menuItemId ? menuById[menuItemId] : undefined;
+
+        const quantity = Number(item.quantity ?? 1) || 1;
+        const unitPrice = Number(
+          item.unitPrice ??
+            item.unit_price ??
+            item.menuItem?.price ??
+            item.menu_item?.price ??
+            menuItem?.price ??
+            0
+        );
+        const totalPrice = Number(
+          item.totalPrice ?? item.total_price ?? (Number.isFinite(unitPrice) ? unitPrice * quantity : 0)
+        );
+
+        const stat = itemStats.get(key) ?? {
+          name: menuItem?.name ?? menuItemName || key,
+          revenue: 0,
+          orders: 0,
+        };
+        stat.revenue += Number.isFinite(totalPrice) ? totalPrice : 0;
+        stat.orders += quantity;
         itemStats.set(key, stat);
       });
     });
@@ -374,6 +431,11 @@ export function AnalyticsPage() {
       .sort((a, b) => b.revenue - a.revenue)
       .slice(0, 5);
   }, [orders, menuById]);
+
+  const highDemandItems = useMemo(
+    () => topItems.filter((item) => item.orders >= 3).slice(0, 5),
+    [topItems]
+  );
 
   const inventoryRiskItems = menuItems
     .filter((item) => !item.isAvailable)
@@ -405,7 +467,9 @@ export function AnalyticsPage() {
         ? 'Optimize labor schedule for lower demand'
         : 'Maintain current staffing levels',
     inventory:
-      avgDailyGrowthPct > 20
+      highDemandItems.length > 0
+        ? `High demand items: ${highDemandItems.slice(0, 3).map((item) => item.name).join(', ')}. Order additional stock for these items.`
+        : avgDailyGrowthPct > 20
         ? 'Order additional stock for high-demand items'
         : 'Continue regular inventory refresh cycle',
     marketing:
@@ -536,7 +600,7 @@ export function AnalyticsPage() {
         </div>
 
         {/* Month Comparison */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
           <Card className="bg-slate-800">
             <p className="text-sm text-slate-400 mb-1">
               {timeRange === 'today'
@@ -593,6 +657,13 @@ export function AnalyticsPage() {
               {monthlyComparison.currentMonth.newCustomers}
             </p>
           </Card>
+          <Card className="bg-slate-800">
+            <p className="text-sm text-slate-400 mb-1">Attribution Health</p>
+            <p className="text-2xl font-bold text-white">{attributionHealth.healthPct}%</p>
+            <p className="text-xs text-slate-400 mt-1">
+              Missing: {attributionHealth.missingCount}/{attributionHealth.servedCount} served
+            </p>
+          </Card>
         </div>
 
         {/* BI improved analytics: predictions and recommendations */}
@@ -642,6 +713,12 @@ export function AnalyticsPage() {
               <ul className="text-sm text-slate-300 space-y-1">
                 {inventoryRiskItems.map((item) => (
                   <li key={item.id}>{item.name} (unavailable)</li>
+                ))}
+              </ul>
+            ) : highDemandItems.length ? (
+              <ul className="text-sm text-amber-300 space-y-1">
+                {highDemandItems.map((item) => (
+                  <li key={item.name}>{item.name} ({item.orders} orders)</li>
                 ))}
               </ul>
             ) : (
