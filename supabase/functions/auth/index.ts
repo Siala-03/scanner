@@ -1,5 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import bcrypt from 'https://esm.sh/bcryptjs@2.4.3';
+import { compareSync, hashSync } from 'https://deno.land/x/bcrypt@v0.4.1/mod.ts';
 import { cors, err, optionsResponse } from '../_shared/cors.ts';
 import { authenticate, requireRole } from '../_shared/auth.ts';
 
@@ -47,7 +47,7 @@ Deno.serve(async (req: Request) => {
 
       if (credErr || !creds) return err('Invalid username or password', 401);
 
-      const valid = await bcrypt.compare(password, creds.password_hash);
+      const valid = compareSync(password, creds.password_hash);
       if (!valid) return err('Invalid username or password', 401);
 
       const { data: staff } = await db
@@ -111,7 +111,7 @@ Deno.serve(async (req: Request) => {
         .maybeSingle();
       if (existingEmail) return err('Email already registered in this restaurant', 409);
 
-      const hash = await bcrypt.hash(password, 10);
+      const hash = hashSync(password, 10);
       const id = `staff-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
       const { data: newStaff, error: staffErr } = await db
@@ -273,10 +273,10 @@ Deno.serve(async (req: Request) => {
         .single();
 
       if (!cred) return err('Credentials not found', 404);
-      const valid = await bcrypt.compare(currentPassword, cred.password_hash);
+      const valid = compareSync(currentPassword, cred.password_hash);
       if (!valid) return err('Current password is incorrect', 401);
 
-      const newHash = await bcrypt.hash(newPassword, 10);
+      const newHash = hashSync(newPassword, 10);
       await db
         .from('staff_credentials')
         .update({ password_hash: newHash })

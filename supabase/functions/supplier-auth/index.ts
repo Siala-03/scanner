@@ -1,5 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import bcrypt from 'https://esm.sh/bcryptjs@2.4.3';
+import { compareSync, hashSync } from 'https://deno.land/x/bcrypt@v0.4.1/mod.ts';
 import { cors, err, optionsResponse } from '../_shared/cors.ts';
 import { authenticate } from '../_shared/auth.ts';
 
@@ -42,7 +42,7 @@ Deno.serve(async (req: Request) => {
         .maybeSingle();
 
       if (!user) return err('Invalid email or password', 401);
-      const valid = await bcrypt.compare(password, user.password_hash);
+      const valid = compareSync(password, user.password_hash);
       if (!valid) return err('Invalid email or password', 401);
 
       const token = `${user.id}:${user.supplier_id}`;
@@ -61,7 +61,7 @@ Deno.serve(async (req: Request) => {
         .maybeSingle();
       if (existing) return err('Email already registered', 409);
 
-      const hash = await bcrypt.hash(password, 10);
+      const hash = hashSync(password, 10);
       const id = `su-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       const { data, error } = await db
         .from('supplier_users')
@@ -88,7 +88,7 @@ Deno.serve(async (req: Request) => {
       if (!supplierId || !email || !name) return err('supplierId, email, name required', 400);
 
       const generatedPassword = password || Math.random().toString(36).slice(2, 14);
-      const hash = await bcrypt.hash(generatedPassword, 10);
+      const hash = hashSync(generatedPassword, 10);
       const id = `su-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
       const { data: existing } = await db
