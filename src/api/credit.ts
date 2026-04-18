@@ -137,7 +137,7 @@ export async function createCreditAccount(data: {
   const restaurantId = getRestaurantId();
   if (!restaurantId) throw new Error('No company selected');
 
-  const id = `ca-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  const id = crypto.randomUUID();
 
   const fullPayload = {
     id,
