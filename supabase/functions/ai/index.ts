@@ -1,5 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { GoogleGenerativeAI } from 'https://esm.sh/@google/generative-ai@0.24.0';
+import { GoogleGenerativeAI } from 'https://esm.sh/@google/generative-ai@0.24.1';
 import { cors, err, optionsResponse } from '../_shared/cors.ts';
 import { authenticate, requireRole } from '../_shared/auth.ts';
 
