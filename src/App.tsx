@@ -58,6 +58,24 @@ export function App() {
   const [showQRGrid, setShowQRGrid] = useState(false);
   const { tables, addTable, removeTable } = useTables();
 
+  useEffect(() => {
+    const root = document.documentElement;
+    const isCustomerPortal = selectedRole === 'customer' && tableNumber !== null;
+
+    if (isCustomerPortal) {
+      // Customer menu has its own visual design; skip global light-mode remaps here.
+      root.removeAttribute('data-theme');
+      return;
+    }
+
+    const storedTheme = localStorage.getItem('theme');
+    if (storedTheme === 'light') {
+      root.setAttribute('data-theme', 'light');
+    } else {
+      root.removeAttribute('data-theme');
+    }
+  }, [selectedRole, tableNumber]);
+
   const restoreStaffContextFromAuthUser = useCallback((user: Staff | null) => {
     if (!user) {
       return;

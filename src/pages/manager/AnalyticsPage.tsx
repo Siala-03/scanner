@@ -275,11 +275,11 @@ export function AnalyticsPage() {
     color: COLORS[i % COLORS.length]
   }));
   const revenueChange = monthlyComparison.previousMonth.revenue > 0
-    ? ((monthlyComparison.currentMonth.revenue - monthlyComparison.previousMonth.revenue) / monthlyComparison.previousMonth.revenue * 100).toFixed(1)
-    : '0';
+    ? Math.round((monthlyComparison.currentMonth.revenue - monthlyComparison.previousMonth.revenue) / monthlyComparison.previousMonth.revenue * 100)
+    : 0;
   const ordersChange = monthlyComparison.previousMonth.orders > 0
-    ? ((monthlyComparison.currentMonth.orders - monthlyComparison.previousMonth.orders) / monthlyComparison.previousMonth.orders * 100).toFixed(1)
-    : '0';
+    ? Math.round((monthlyComparison.currentMonth.orders - monthlyComparison.previousMonth.orders) / monthlyComparison.previousMonth.orders * 100)
+    : 0;
   const yearlyTotals = useMemo(() => {
     const currentYear = new Date().getFullYear();
     return orders.reduce(
@@ -442,8 +442,8 @@ export function AnalyticsPage() {
     .slice(0, 5);
 
   const alerts = [] as string[];
-  if (parseFloat(revenueChange) <= -10) alerts.push('Revenue is down over 10% vs last month.');
-  if (parseFloat(ordersChange) <= -10) alerts.push('Orders are down over 10% vs last month.');
+  if (revenueChange <= -10) alerts.push('Revenue is down over 10% vs last month.');
+  if (ordersChange <= -10) alerts.push('Orders are down over 10% vs last month.');
   if (salesFunnel.cancelled > 5) alerts.push(`${salesFunnel.cancelled} cancelled orders this period. Review process.`);
   const avgDailyGrowthPct = avgDailyRevenue > 0 ? (avgDailyGrowth / avgDailyRevenue) * 100 : 0;
   if (avgDailyGrowthPct > 20) alerts.push('High growth: consider expanding staffing and inventory.');
@@ -582,7 +582,7 @@ export function AnalyticsPage() {
               <input
                 type="number"
                 min={0}
-                step={0.1}
+                step={1}
                 value={kpiTargets.avgOrderValue}
                 onChange={(e) => setKpiTargets((prev) => ({ ...prev, avgOrderValue: Number(e.target.value) }))}
                 className="w-16 md:w-20 bg-slate-700 text-white px-2 py-1 rounded text-xs"
@@ -613,9 +613,9 @@ export function AnalyticsPage() {
               {formatPrice(currentRevenue)}
             </p>
             <div
-              className={`flex items-center gap-1 text-sm mt-1 ${parseFloat(revenueChange) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+              className={`flex items-center gap-1 text-sm mt-1 ${revenueChange >= 0 ? 'text-green-400' : 'text-red-400'}`}>
 
-              {parseFloat(revenueChange) >= 0 ?
+              {revenueChange >= 0 ?
               <TrendingUpIcon className="w-4 h-4" /> :
 
               <TrendingDownIcon className="w-4 h-4" />
@@ -635,9 +635,9 @@ export function AnalyticsPage() {
               {currentOrders.toLocaleString()}
             </p>
             <div
-              className={`flex items-center gap-1 text-sm mt-1 ${parseFloat(ordersChange) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+              className={`flex items-center gap-1 text-sm mt-1 ${ordersChange >= 0 ? 'text-green-400' : 'text-red-400'}`}>
 
-              {parseFloat(ordersChange) >= 0 ?
+              {ordersChange >= 0 ?
               <TrendingUpIcon className="w-4 h-4" /> :
 
               <TrendingDownIcon className="w-4 h-4" />
@@ -780,7 +780,7 @@ export function AnalyticsPage() {
                   <YAxis
                     stroke="#64748b"
                     fontSize={12}
-                    tickFormatter={(v) => `${(v / 1000000).toFixed(1)}M`} />
+                    tickFormatter={(v) => `${Math.round(v / 1000000)}M`} />
 
                   <Tooltip
                     contentStyle={{
@@ -982,7 +982,7 @@ export function AnalyticsPage() {
                   orientation="right"
                   stroke="#64748b"
                   fontSize={12}
-                  tickFormatter={(v) => `${(v / 1000000).toFixed(1)}M`} />
+                  tickFormatter={(v) => `${Math.round(v / 1000000)}M`} />
 
                 <Tooltip
                   contentStyle={{

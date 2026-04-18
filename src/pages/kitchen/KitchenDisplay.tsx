@@ -6,9 +6,6 @@ import { KPICard } from '../../components/supervisor/KPICard';
 import { fetchKitchenOrders as fetchKitchenOrdersFromDb, updateOrderStatus as updateOrderStatusApi } from '../../api/orders';
 import { fetchRestaurantPublic } from '../../api/restaurants';
 
-// Backend API
-const API_BASE = import.meta.env.VITE_API_URL || '';
-
 interface KitchenOrder {
   id: string;
   orderNumber: string;
@@ -104,17 +101,6 @@ async function fetchKitchenOrders(restaurantId?: string): Promise<KitchenOrder[]
   }
 }
 
-async function fetchKitchenAnalytics(restaurantId?: string): Promise<any> {
-  try {
-    const query = restaurantId ? `?restaurantId=${encodeURIComponent(restaurantId)}` : '';
-    const res = await fetch(`${API_BASE}/api/orders/kitchen/analytics${query}`);
-    if (!res.ok) throw new Error('Failed to fetch analytics');
-    return await res.json();
-  } catch (e) {
-    console.error('Failed to fetch analytics:', e);
-    return null;
-  }
-}
 
 async function updateOrderStatus(orderId: string, status: string): Promise<void> {
   await updateOrderStatusApi(orderId, { status: status as any });
@@ -165,7 +151,6 @@ export function KitchenDisplay({ onLogout, restaurantId, restaurantName }: { onL
   const [loading, setLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState(new Date());
   const [viewMode, setViewMode] = useState<'orders' | 'analytics'>('orders');
-  const [analytics, setAnalytics] = useState<any>(null);
   const [resolvedRestaurantName, setResolvedRestaurantName] = useState<string>(restaurantName || '');
   const { socket, joinOrders, joinRestaurant } = useSocket();
   const { kpis: staffKPIs, refetch: refetchStaffKPIs } = useStaffKPIs();
@@ -371,25 +356,11 @@ export function KitchenDisplay({ onLogout, restaurantId, restaurantName }: { onL
     window.print();
   };
 
-  // Use analytics from backend when available, otherwise calculate from orders
-  const stats: KitchenStats = analytics ? {
-    totalOrders: analytics.totalOrders || 0,
-    completedOrders: analytics.completedOrders || 0,
-    avgPrepTime: analytics.avgPrepTime || 0,
-    pendingOrders: analytics.pendingOrders || orders.filter(o => o.status === 'pending').length,
-    preparingOrders: analytics.preparingOrders || orders.filter(o => o.status === 'preparing').length,
-    readyOrders: analytics.readyOrders || orders.filter(o => o.status === 'ready').length,
-    itemCounts: analytics.popularItems || []
-  } : calculateStats(orders, completedToday);
+  const stats: KitchenStats = calculateStats(orders, completedToday);
 
   const loadOrders = useCallback(async () => {
-    const [data, analyticsData] = await Promise.all([
-      fetchKitchenOrders(restaurantId),
-      fetchKitchenAnalytics(restaurantId)
-    ]);
-    
+    const data = await fetchKitchenOrders(restaurantId);
     setOrders(data);
-    setAnalytics(analyticsData);
     setLastUpdate(new Date());
     setLoading(false);
   }, [restaurantId]);
@@ -666,7 +637,7 @@ function OrderCard({
       <div className="px-3 py-2 flex items-center justify-between border-b border-slate-700 bg-slate-900/70">
         <div className="flex items-center gap-2">
           <span className="text-base font-bold">{order.orderNumber}</span>
-          <span className="text-sm text-slate-300">T{order.tableNumber}</span>
+          <span className="text-sm font-bold text-slate-200">T{order.tableNumber}</span>
         </div>
         <div className="flex items-center gap-1.5">
           {config.pulse && <div className="w-2 h-2 bg-amber-400 rounded-full animate-pulse"></div>}

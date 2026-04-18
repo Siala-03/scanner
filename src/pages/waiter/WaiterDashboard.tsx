@@ -612,14 +612,29 @@ export function WaiterDashboard({
 
   const { kpis } = useStaffKPIs();
 
+  // ── Orders scoped to this waiter's assigned tables ──
+  // If a waiter has no assigned tables, they can see all orders (manager/supervisor mode).
+  const myOrders = useMemo(() => {
+    const assigned = waiter.assignedTables ?? [];
+    if (assigned.length === 0) return orders;
+    return orders.filter(
+      (o) => o.tableNumber != null && assigned.includes(o.tableNumber)
+    );
+  }, [orders, waiter.assignedTables]);
+
   // ── Derive waiter-call notifications from new pending orders (polling-safe) ──
+  // Only notify about orders from this waiter's assigned tables.
+  // (The "Call Waiter" broadcast below is separate and goes to ALL waiters.)
   useEffect(() => {
     const now = Date.now();
+    const assigned = waiter.assignedTables ?? [];
     orders
       .filter((o) => o.status === 'pending')
       .forEach((order) => {
         if (knownOrderIdsRef.current.has(order.id)) return;
         if (order.tableNumber == null) return;
+        // Skip if this table isn't assigned to us (unless we have no assignments)
+        if (assigned.length > 0 && !assigned.includes(order.tableNumber)) return;
         const tableNumber = order.tableNumber;
         // Only notify for orders placed in the last 90 seconds so the initial
         // load of old pending orders doesn't spam the waiter with stale alerts.
@@ -634,7 +649,7 @@ export function WaiterDashboard({
       });
     // Mark every order ID as seen regardless of status/age
     orders.forEach((o) => knownOrderIdsRef.current.add(o.id));
-  }, [orders]);
+  }, [orders, waiter.assignedTables]);
 
   // ── Supabase Realtime broadcast: "Call Waiter" button (explicit, no order) ──
   useEffect(() => {
@@ -656,35 +671,35 @@ export function WaiterDashboard({
     return () => { supabaseAdmin.removeChannel(channel); };
   }, []);
 
-  // ── Order buckets ──
+  // ── Order buckets (scoped to this waiter's tables via myOrders) ──
   const incomingOrders = useMemo(
-    () => orders.filter((o) => o.status === 'pending').sort(
+    () => myOrders.filter((o) => o.status === 'pending').sort(
       (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
     ),
-    [orders]
+    [myOrders]
   );
   const kitchenOrders = useMemo(
-    () => orders.filter((o) => o.status === 'verified' || o.status === 'preparing'),
-    [orders]
+    () => myOrders.filter((o) => o.status === 'verified' || o.status === 'preparing'),
+    [myOrders]
   );
   const readyOrders = useMemo(
-    () => orders.filter((o) => o.status === 'ready'),
-    [orders]
+    () => myOrders.filter((o) => o.status === 'ready'),
+    [myOrders]
   );
   const servedOrders = useMemo(
-    () => orders.filter((o) => o.status === 'served').sort(
+    () => myOrders.filter((o) => o.status === 'served').sort(
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     ),
-    [orders]
+    [myOrders]
   );
 
   const todayServedOrders = useMemo(() => {
     const today = new Date();
-    return orders.filter((o) =>
+    return myOrders.filter((o) =>
       o.status === 'served' &&
       (isSameDay(o.servedAt as any, today) || isSameDay(o.updatedAt as any, today) || isSameDay(o.createdAt as any, today))
     );
-  }, [orders]);
+  }, [myOrders]);
 
   // Stats
   const todaysRevenue = useMemo(
@@ -699,7 +714,7 @@ export function WaiterDashboard({
   );
   const avgRating =
     waiterReviews.length > 0
-      ? Math.round((waiterReviews.reduce((s, r) => s + r.rating, 0) / waiterReviews.length) * 10) / 10
+      ? Math.round(waiterReviews.reduce((s, r) => s + r.rating, 0) / waiterReviews.length)
       : null;
 
   const localWaiterKpiCurrent = useMemo(() => {
@@ -758,7 +773,7 @@ export function WaiterDashboard({
   }, [orders, waiter.id, kpis]);
 
   const analyticsComparison = useMemo(() => {
-    const servedOnly = orders.filter((o) => o.status === 'served');
+    const servedOnly = myOrders.filter((o) => o.status === 'served');
     const now = new Date();
 
     const normalizeDate = (value: Date | string | undefined): Date => {

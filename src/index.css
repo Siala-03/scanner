@@ -217,6 +217,29 @@
   color: #fff !important;
 }
 
+/* Aggressive blink for critical restocking banner */
+@keyframes hard-alert-blink {
+  0%,
+  100% {
+    opacity: 1;
+    filter: saturate(1);
+  }
+  50% {
+    opacity: 0.18;
+    filter: saturate(1.45);
+  }
+}
+
+.hard-alert-blink {
+  animation: hard-alert-blink 0.55s steps(2, end) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hard-alert-blink {
+    animation: none;
+  }
+}
+
 [data-theme="light"] .supervisor-surface .bg-green-700,
 [data-theme="light"] .supervisor-surface .hover\:bg-green-800:hover {
   background-color: #107c10 !important;

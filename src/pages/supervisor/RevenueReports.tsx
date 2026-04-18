@@ -189,14 +189,14 @@ export function RevenueReports() {
     .reduce((sum, order) => sum + order.total, 0);
 
   const revenueChange = revenuePrevious > 0 ? ((revenueInRange - revenuePrevious) / revenuePrevious) * 100 : 0;
-  const formattedChange = revenuePrevious > 0 ? `${revenueChange >= 0 ? '+' : ''}${revenueChange.toFixed(1)}% vs last period` : 'No prior period data';
+  const formattedChange = revenuePrevious > 0 ? `${revenueChange >= 0 ? '+' : ''}${Math.round(revenueChange)}% vs last period` : 'No prior period data';
 
   const ordersPrevious = orders.filter((order) => {
     const createdAt = new Date((order as any).created_at || order.createdAt);
     return createdAt >= previousStart && createdAt < rangeStart;
   }).length;
   const orderChange = ordersPrevious > 0 ? ((filteredByRange.length - ordersPrevious) / ordersPrevious) * 100 : 0;
-  const formattedOrderChange = ordersPrevious > 0 ? `${orderChange >= 0 ? '+' : ''}${orderChange.toFixed(1)}% vs last period` : 'No prior period data';
+  const formattedOrderChange = ordersPrevious > 0 ? `${orderChange >= 0 ? '+' : ''}${Math.round(orderChange)}% vs last period` : 'No prior period data';
 
   const peakDayData = dailyRevenue.reduce(
     (best, day) => (day.revenue > best.revenue ? day : best),
@@ -330,7 +330,7 @@ export function RevenueReports() {
                     <YAxis
                       stroke={isLight ? '#334155' : '#64748b'}
                       fontSize={12}
-                      tickFormatter={(v) => `${(v / 1000000).toFixed(1)}M`} />
+                      tickFormatter={(v) => `${Math.round(v / 1000000)}M`} />
 
                     <Tooltip
                       contentStyle={{

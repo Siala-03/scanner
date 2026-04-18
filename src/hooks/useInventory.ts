@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabaseAdmin as supabase } from '../lib/supabase';
 import {
   fetchInventory,
-  fetchLowStockItems,
   fetchSuppliers,
   fetchPurchaseOrders,
   fetchMovements,
@@ -71,7 +70,6 @@ export function useInventoryData() {
 
     const results = await Promise.allSettled([
       fetchInventory(),
-      fetchLowStockItems(),
       fetchSuppliers(),
       fetchPurchaseOrders(),
       fetchMovements({ limit: 200 }),
@@ -82,7 +80,7 @@ export function useInventoryData() {
       fetchForecastAlerts(),
     ]);
 
-    const [invR, lowR, supR, poR, movR, wasteR, analyticsR, locR, fcR, fcAlertsR] = results;
+    const [invR, supR, poR, movR, wasteR, analyticsR, locR, fcR, fcAlertsR] = results;
 
     if (invR.status === 'fulfilled') {
       setInventory(invR.value);
@@ -90,6 +88,7 @@ export function useInventoryData() {
 
       // Check for low-stock alerts
       const critical = invR.value.filter(r => r.stock === 0 || r.stock <= r.lowStockThreshold);
+      setLowStockItems(critical);
       if (critical.length > 0) {
         const msgs = critical.slice(0, 3).map(r =>
           r.stock === 0
@@ -97,6 +96,8 @@ export function useInventoryData() {
             : `${r.menuItemId} is low (${r.stock} left)`
         );
         setAlerts(msgs);
+      } else {
+        setAlerts([]);
       }
     } else {
       if (inventoryRef.current.length === 0) {
@@ -104,7 +105,6 @@ export function useInventoryData() {
       }
     }
 
-    if (lowR.status === 'fulfilled')      setLowStockItems(lowR.value);
     if (supR.status === 'fulfilled')      setSuppliers(supR.value);
     if (poR.status === 'fulfilled')       setPurchaseOrders(poR.value);
     if (movR.status === 'fulfilled')      setMovements(movR.value);

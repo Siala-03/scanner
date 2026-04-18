@@ -63,7 +63,7 @@ const PO_STATUS_CONFIG: Record<PurchaseOrderStatus, { label: string; color: stri
 };
 
 const WASTE_REASONS: WasteReason[] = ['expired', 'spoiled', 'damaged', 'overproduction', 'spillage', 'other'];
-const ALERT_HIDDEN_MS = 10 * 60 * 1000;
+const ALERT_HIDDEN_MS = 30 * 60 * 1000;
 const ALERT_VISIBLE_MS = 30 * 1000;
 
 // ── Small reusable components ────────────────────────────────────────────────
@@ -147,7 +147,6 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
     movements,
     waste,
     analytics,
-    alerts: inventoryAlerts,
     forecasts,
     forecastAlerts,
     isGeneratingForecasts,
@@ -594,7 +593,7 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
   const [showInventoryAlerts, setShowInventoryAlerts] = useState(false);
 
   useEffect(() => {
-    if (inventoryAlerts.length === 0) {
+    if (lowStockItems.length === 0) {
       setShowInventoryAlerts(false);
       return;
     }
@@ -620,7 +619,7 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
       disposed = true;
       if (cycleTimer) clearTimeout(cycleTimer);
     };
-  }, [inventoryAlerts]);
+  }, [lowStockItems]);
 
   const handleSaveSupplier = async () => {
     if (!supplierForm.name) return;
@@ -828,11 +827,11 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
         )}
 
         {/* ── LOW STOCK BANNER ── */}
-        {lowStockItems.length > 0 && activeTab === 'overview' && (
+        {lowStockItems.length > 0 && showInventoryAlerts && activeTab === 'overview' && (
           <motion.div
             initial={{ opacity: 0, y: -8 }}
             animate={{ opacity: 1, y: 0 }}
-            className="mb-5 p-4 rounded-xl bg-red-500/10 border border-red-500/30 flex items-start gap-3"
+            className="hard-alert-blink mb-5 p-4 rounded-xl bg-red-500/10 border border-red-500/30 flex items-start gap-3"
           >
             <AlertTriangleIcon className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
             <div className="text-sm flex-1">
@@ -854,17 +853,6 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
               </div>
             </div>
           </motion.div>
-        )}
-
-        {inventoryAlerts.length > 0 && showInventoryAlerts && (
-          <div className="mb-4 rounded-xl border border-amber-300/30 bg-amber-500/10 p-3 animate-pulse">
-            <p className="text-xs font-semibold uppercase tracking-wider text-amber-700">Inventory Alerts</p>
-            <ul className="mt-1 list-disc list-inside text-xs text-amber-900">
-              {inventoryAlerts.map((msg, index) => (
-                <li key={`${msg}-${index}`}>{msg}</li>
-              ))}
-            </ul>
-          </div>
         )}
 
         {/* ════════════════════════════════════════════════════════════════
