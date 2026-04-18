@@ -201,7 +201,7 @@ export function AnalyticsPage() {
       if (order.status === 'served') row.revenue += order.total ?? order.total_price ?? 0;
     });
     return hours.slice(8, 23);
-  }, [orders, now]);
+  }, [orders]);
 
   const categoryRevenue = useMemo(() => {
     const map = new Map<string, { category: string; revenue: number; orders: number; percentage: number }>();

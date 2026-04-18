@@ -13,7 +13,7 @@ export async function askAIAnalyst(prompt: string): Promise<AIResponse> {
   try {
     return await apiRequest<AIResponse>('/api/ai/analyze', {
       method: 'POST',
-      body: JSON.stringify({ prompt }),
+      json: { prompt },
     });
   } catch (error) {
     console.error('AI Analyst Error:', error);

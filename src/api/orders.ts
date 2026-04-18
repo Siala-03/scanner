@@ -213,6 +213,7 @@ export async function createOrder(order: CreateOrderInput): Promise<Order> {
       total,
       notes: order.notes || null,
       requires_kitchen: order.requiresKitchen ?? true,
+      created_by: staffId,
       payment_status: 'unpaid',
       restaurant_id: restaurantId,
     };
@@ -232,6 +233,7 @@ export async function createOrder(order: CreateOrderInput): Promise<Order> {
       items,
       total,
       notes: order.notes || null,
+      created_by: staffId,
       restaurant_id: restaurantId,
     };
     result = await db.from('orders').insert(payload3).select().single();
@@ -246,6 +248,7 @@ export async function createOrder(order: CreateOrderInput): Promise<Order> {
       status: 'pending',
       items,
       total,
+      created_by: staffId,
       restaurant_id: restaurantId,
     };
     result = await db.from('orders').insert(corePayload).select().single();
@@ -281,15 +284,44 @@ export async function updateOrderStatus(
 
   let result = await db.from('orders').update(fullUpdates).eq('id', id).select().single();
 
-  // If the full update fails (e.g. a column doesn't exist), retry with just status
+  // If full update fails, try assignment-only variants before dropping waiter linkage.
   if (result.error) {
-    console.warn('[updateOrderStatus] Full update failed, retrying with minimal fields:', result.error.message);
-    result = await db
-      .from('orders')
-      .update({ status: statusUpdate.status, updated_at: new Date().toISOString() })
-      .eq('id', id)
-      .select()
-      .single();
+    console.warn('[updateOrderStatus] Full update failed, retrying with fallback variants:', result.error.message);
+
+    if (statusUpdate.assignedTo !== undefined) {
+      result = await db
+        .from('orders')
+        .update({
+          status: statusUpdate.status,
+          assigned_waiter_id: statusUpdate.assignedTo,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', id)
+        .select()
+        .single();
+    }
+
+    if (result.error && statusUpdate.assignedTo !== undefined) {
+      result = await db
+        .from('orders')
+        .update({
+          status: statusUpdate.status,
+          assigned_to: statusUpdate.assignedTo,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', id)
+        .select()
+        .single();
+    }
+
+    if (result.error) {
+      result = await db
+        .from('orders')
+        .update({ status: statusUpdate.status, updated_at: new Date().toISOString() })
+        .eq('id', id)
+        .select()
+        .single();
+    }
   }
 
   if (result.error) throw result.error;

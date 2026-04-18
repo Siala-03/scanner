@@ -702,6 +702,61 @@ export function WaiterDashboard({
       ? Math.round((waiterReviews.reduce((s, r) => s + r.rating, 0) / waiterReviews.length) * 10) / 10
       : null;
 
+  const localWaiterKpiCurrent = useMemo(() => {
+    const now = new Date();
+    const servedRows = orders.filter((order) => {
+      if (order.status !== 'served') return false;
+      const assigned = (order.assignedWaiterId ?? '').trim();
+      return assigned === waiter.id;
+    });
+
+    const getBounds = (period: 'daily' | 'weekly' | 'monthly') => {
+      const start = new Date(now);
+      const end = new Date(now);
+      if (period === 'daily') {
+        start.setHours(0, 0, 0, 0);
+        end.setHours(23, 59, 59, 999);
+      } else if (period === 'weekly') {
+        const day = start.getDay();
+        start.setDate(start.getDate() - day);
+        start.setHours(0, 0, 0, 0);
+        end.setTime(start.getTime());
+        end.setDate(end.getDate() + 6);
+        end.setHours(23, 59, 59, 999);
+      } else {
+        start.setDate(1);
+        start.setHours(0, 0, 0, 0);
+        end.setMonth(end.getMonth() + 1, 0);
+        end.setHours(23, 59, 59, 999);
+      }
+      return { start, end };
+    };
+
+    const result = new Map<number, number>();
+    kpis.forEach((kpi) => {
+      if (String(kpi.staff_role).toLowerCase() !== 'waiter') return;
+      const period = (kpi.period as 'daily' | 'weekly' | 'monthly') || 'daily';
+      const { start, end } = getBounds(period);
+      const rows = servedRows.filter((order) => {
+        const when = new Date(order.servedAt ?? order.updatedAt ?? order.createdAt);
+        if (Number.isNaN(when.getTime())) return false;
+        return when >= start && when <= end;
+      });
+
+      let value = 0;
+      if (kpi.metric === 'orders_served') {
+        value = rows.length;
+      } else if (kpi.metric === 'revenue') {
+        value = rows.reduce((sum, order) => sum + Number(order.total ?? 0), 0);
+      } else if (kpi.metric === 'tables_served') {
+        value = new Set(rows.map((order) => order.tableNumber)).size;
+      }
+      result.set(kpi.id, value);
+    });
+
+    return result;
+  }, [orders, waiter.id, kpis]);
+
   const analyticsComparison = useMemo(() => {
     const servedOnly = orders.filter((o) => o.status === 'served');
     const now = new Date();
@@ -1215,7 +1270,9 @@ export function WaiterDashboard({
                 </div>
                 <div className="grid gap-4 md:grid-cols-2">
                   {kpis.map((kpi) => {
-                    const current = kpi.progress?.currentValue ?? 0;
+                    const apiCurrent = kpi.progress?.currentValue ?? 0;
+                    const localCurrent = localWaiterKpiCurrent.get(kpi.id) ?? 0;
+                    const current = Math.max(apiCurrent, localCurrent);
                     const target = kpi.target_value || 1;
                     const pct = Math.min(100, Math.round((current / target) * 100));
                     return (
