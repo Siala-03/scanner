@@ -464,7 +464,7 @@ export async function adjustStock(
 
   if (error) throw error;
 
-  await supabaseAdmin.from('stock_movements').insert({
+  const { error: movementError } = await supabaseAdmin.from('stock_movements').insert({
     id:            `mov-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
     menu_item_id:  menuItemId,
     menu_item_name: menuItemId,
@@ -475,7 +475,10 @@ export async function adjustStock(
     performed_by:  performedBy,
     notes:         reason,
     restaurant_id: restaurantId,
-  }).then(() => {}).catch(console.warn);
+  });
+  if (movementError) {
+    console.warn('Failed to record stock movement:', movementError);
+  }
 
   return normalizeInventoryRecord(data);
 }
@@ -722,7 +725,7 @@ export async function receivePurchaseOrder(
     }
 
     // Record the movement
-    await supabaseAdmin.from('stock_movements').insert({
+    const { error: movementError } = await supabaseAdmin.from('stock_movements').insert({
       id:            `mov-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       menu_item_id:  item.menu_item_id,
       menu_item_name: item.menu_item_id,
@@ -733,7 +736,10 @@ export async function receivePurchaseOrder(
       performed_by:  receivedBy,
       reference:     `PO:${id}`,
       restaurant_id: restaurantId,
-    }).then(() => {}).catch(console.warn);
+    });
+    if (movementError) {
+      console.warn('Failed to record stock movement for received PO item:', movementError);
+    }
   }
 
   // Mark PO as received
@@ -937,6 +943,76 @@ function normalizeLocation(raw: any): InventoryLocation {
   };
 }
 
+function isMissingLocationsTableError(error: unknown): boolean {
+  const message = error instanceof Error
+    ? error.message
+    : String((error as any)?.message ?? error ?? '');
+  const msg = message.toLowerCase();
+  return (
+    msg.includes('inventory_locations') &&
+    (msg.includes('schema cache') || msg.includes('does not exist') || msg.includes('42p01'))
+  );
+}
+
+function locationFallbackStorageKey(restaurantId: string): string {
+  return `inventory_locations_fallback:${restaurantId}`;
+}
+
+function getFallbackLocationsFromStorage(restaurantId: string): InventoryLocation[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(locationFallbackStorageKey(restaurantId));
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.map(normalizeLocation) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveFallbackLocationToStorage(restaurantId: string, location: InventoryLocation): void {
+  if (typeof window === 'undefined') return;
+  const existing = getFallbackLocationsFromStorage(restaurantId);
+  const next = [
+    ...existing.filter((l) => l.id !== location.id && l.name.toLowerCase() !== location.name.toLowerCase()),
+    location,
+  ];
+  localStorage.setItem(locationFallbackStorageKey(restaurantId), JSON.stringify(next));
+}
+
+function inferLocationsFromInventoryRecords(
+  inventory: InventoryRecord[],
+  restaurantId: string
+): InventoryLocation[] {
+  const byName = new Map<string, { name: string; totalItems: number; totalStock: number; lowStockItems: number }>();
+  for (const rec of inventory) {
+    const name = String(rec.location || '').trim();
+    if (!name) continue;
+    const key = name.toLowerCase();
+    const current = byName.get(key) || { name, totalItems: 0, totalStock: 0, lowStockItems: 0 };
+    current.totalItems += 1;
+    current.totalStock += Number(rec.stock || 0);
+    if (rec.stock <= rec.lowStockThreshold) current.lowStockItems += 1;
+    byName.set(key, current);
+  }
+
+  return Array.from(byName.values()).map((entry) => {
+    const slug = entry.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'location';
+    return normalizeLocation({
+      id: `loc-fallback-${slug}`,
+      restaurant_id: restaurantId,
+      name: entry.name,
+      type: 'other',
+      is_active: true,
+      total_items: entry.totalItems,
+      total_stock: entry.totalStock,
+      low_stock_items: entry.lowStockItems,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
+  });
+}
+
 function normalizeForecast(raw: any): InventoryForecast {
   return {
     id: raw.id,
@@ -1004,8 +1080,19 @@ export async function fetchLocations(): Promise<InventoryLocation[]> {
       });
     });
   } catch (error) {
-    console.warn('fetchLocations fallback unavailable, returning empty list.');
-    return [];
+    const inventory = await fetchInventory().catch(() => [] as InventoryRecord[]);
+    const inferred = inferLocationsFromInventoryRecords(inventory, restaurantId);
+    const stored = getFallbackLocationsFromStorage(restaurantId);
+    const merged = new Map<string, InventoryLocation>();
+    [...inferred, ...stored].forEach((loc) => merged.set(`${loc.id}:${loc.name.toLowerCase()}`, loc));
+
+    if (isMissingLocationsTableError(error)) {
+      console.warn('inventory_locations table missing; using derived fallback locations.');
+      return Array.from(merged.values()).sort((a, b) => a.name.localeCompare(b.name));
+    }
+
+    console.warn('fetchLocations fallback unavailable, returning derived list only.');
+    return Array.from(merged.values()).sort((a, b) => a.name.localeCompare(b.name));
   }
 }
 
@@ -1044,6 +1131,26 @@ export async function createLocation(payload: {
       .single();
 
     if (error) {
+      if (isMissingLocationsTableError(error)) {
+        const now = new Date().toISOString();
+        const location = normalizeLocation({
+          id,
+          restaurant_id: restaurantId,
+          name: payload.name,
+          type: payload.type,
+          description: payload.description ?? null,
+          capacity: payload.capacity ?? null,
+          temperature_range: payload.temperatureRange ?? null,
+          is_active: true,
+          total_items: 0,
+          total_stock: 0,
+          low_stock_items: 0,
+          created_at: now,
+          updated_at: now,
+        });
+        saveFallbackLocationToStorage(restaurantId, location);
+        return location;
+      }
       throw new Error(`Location create failed. API: ${apiMessage}. Fallback: ${error.message || 'Unknown database error'}`);
     }
     return normalizeLocation(data);

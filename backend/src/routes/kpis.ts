@@ -2,7 +2,9 @@ import { Router, Request, Response } from 'express';
 import { pool } from '../db.js';
 import { HttpError } from '../http.js';
 import { authenticate, AuthenticatedRequest } from '../middleware/auth.js';
-import { KPI, StaffKPIProgress, KPIPeriod, KPIMetric } from '../../types/index.js';
+
+type KPIPeriod = 'daily' | 'weekly' | 'monthly';
+type KPIMetric = 'orders_served' | 'revenue' | 'rating' | 'tables_served' | 'prep_time';
 
 const router = Router();
 
@@ -102,7 +104,8 @@ router.put('/progress/:kpiId', authenticate, async (req: AuthenticatedRequest, r
 
     // Calculate period dates
     const now = new Date();
-    let periodStart: Date, periodEnd: Date;
+    let periodStart = new Date(now);
+    let periodEnd = new Date(now);
 
     switch (kpi.period) {
       case 'daily':
@@ -119,6 +122,10 @@ router.put('/progress/:kpiId', authenticate, async (req: AuthenticatedRequest, r
       case 'monthly':
         periodStart = new Date(now.getFullYear(), now.getMonth(), 1);
         periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+        break;
+      default:
+        periodStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        periodEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
         break;
     }
 

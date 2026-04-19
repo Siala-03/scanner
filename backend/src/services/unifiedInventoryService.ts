@@ -296,7 +296,7 @@ export async function adjustStockAtLocation(
 async function createAlert(
   client: any,
   restaurantId: string,
-  alertType: string,
+  alertType: 'low_stock' | 'out_of_stock',
   itemId: string,
   itemName: string,
   locationId: string,
@@ -321,7 +321,7 @@ async function createAlert(
   ]);
 
   emitInventoryAlert({
-    type: alertType,
+    type: alertType === 'out_of_stock' ? 'out-of-stock' : 'low-stock',
     itemId,
     itemName,
     locationId,

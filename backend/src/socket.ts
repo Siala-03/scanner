@@ -65,9 +65,14 @@ export function getIO(): SocketServer | null {
 
 // Emit events to specific rooms
 export function emitInventoryUpdate(data: {
-  type: 'create' | 'update' | 'delete';
+  type: 'create' | 'update' | 'delete' | 'recipe_change' | 'cycle_count_created' | 'cycle_count_completed' | 'cycle_count_cancelled';
   record?: unknown;
+  item?: unknown;
+  itemId?: string;
   menuItemId?: string;
+  locationId?: string;
+  quantity?: number;
+  cycleCountId?: string;
 }) {
   if (io) {
     io.to('inventory').emit('inventory:update', data);
@@ -140,9 +145,12 @@ export function emitOrderUpdate(data: {
 }
 
 export function emitInventoryAlert(data: {
-  type: 'low-stock' | 'out-of-stock';
-  menuItemId: string;
-  menuItemName: string;
+  type: 'low-stock' | 'out-of-stock' | 'low_stock' | 'out_of_stock';
+  menuItemId?: string;
+  menuItemName?: string;
+  itemId?: string;
+  itemName?: string;
+  locationId?: string;
   stock: number;
   threshold: number;
 }) {

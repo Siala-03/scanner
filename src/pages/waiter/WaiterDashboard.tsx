@@ -720,10 +720,14 @@ export function WaiterDashboard({
 
   const localWaiterKpiCurrent = useMemo(() => {
     const now = new Date();
+    const waiterIdStr = String(waiter.id).trim();
     const servedRows = orders.filter((order) => {
       if (order.status !== 'served') return false;
-      const assigned = (order.assignedWaiterId ?? '').trim();
-      return assigned === waiter.id;
+      return (
+        String(order.assignedWaiterId ?? '').trim() === waiterIdStr ||
+        String((order as any).assigned_to ?? '').trim() === waiterIdStr ||
+        String((order as any).created_by ?? '').trim() === waiterIdStr
+      );
     });
 
     const getBounds = (period: 'daily' | 'weekly' | 'monthly') => {

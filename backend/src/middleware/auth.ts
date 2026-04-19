@@ -3,6 +3,7 @@ import { HttpError } from '../http.js';
 
 export interface AuthenticatedRequest extends Request {
   staffId?: string;
+  userId?: string;
   staffRole?: string;
   restaurantId?: string;
 }
@@ -52,6 +53,7 @@ export async function authenticate(
     }
 
     req.staffId = rows[0].id;
+    req.userId = rows[0].id;
     req.staffRole = rows[0].role;
     req.restaurantId = rows[0].restaurant_id;
 

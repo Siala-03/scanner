@@ -185,10 +185,14 @@ router.post('/', async (req: Request, res: Response) => {
     console.log('Purchase order created successfully:', { id, supplierId: final_supplier_id });
     res.status(201).json(normalizedPO);
   } catch (error) {
+    const requestBody = req.body as { supplierId?: string; supplier_id?: string; items?: unknown[] };
     console.error('Error creating purchase order:', {
       error: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error ? error.stack : undefined,
-      request: { supplier_id: final_supplier_id, items_count: items?.length ?? 0 }
+      request: {
+        supplier_id: requestBody?.supplierId ?? requestBody?.supplier_id,
+        items_count: Array.isArray(requestBody?.items) ? requestBody.items.length : 0,
+      }
     });
     res.status(500).json({ error: 'Failed to create purchase order', details: error instanceof Error ? error.message : 'Unknown error' });
   }

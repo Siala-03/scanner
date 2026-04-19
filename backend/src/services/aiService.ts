@@ -1,6 +1,10 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { pool } from '../db.js';
 
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 export const analyzeRestaurantData = async (restaurantId: string, userPrompt: string) => {
   const apiKey = process.env.GEMINI_API_KEY;
 
@@ -74,7 +78,7 @@ const getLowStockContext = async (restaurantId: string) => {
     `, [restaurantId]);
     return res.rows;
   } catch (e) {
-    console.warn('AI Context Warning (Inventory):', e.message);
+    console.warn('AI Context Warning (Inventory):', getErrorMessage(e));
     return [];
   }
 };
@@ -98,7 +102,7 @@ const getTopSalesContext = async (restaurantId: string) => {
     `, [restaurantId]);
     return res.rows;
   } catch (e) {
-    console.warn('AI Context Warning (Sales Query Failed):', e.message);
+    console.warn('AI Context Warning (Sales Query Failed):', getErrorMessage(e));
     return [];
   }
 };
@@ -115,7 +119,7 @@ const getWasteContext = async (restaurantId: string) => {
     `, [restaurantId]); 
     return res.rows;
   } catch (e) {
-    console.warn('AI Context Warning (Waste Query Failed):', e.message);
+    console.warn('AI Context Warning (Waste Query Failed):', getErrorMessage(e));
     return [];
   }
 };
@@ -131,7 +135,7 @@ const getExpenseContext = async (restaurantId: string) => {
     `, [restaurantId]);
     return res.rows;
   } catch (e) {
-    console.warn('AI Context Warning (Expenses):', e.message);
+    console.warn('AI Context Warning (Expenses):', getErrorMessage(e));
     return [];
   }
 };
