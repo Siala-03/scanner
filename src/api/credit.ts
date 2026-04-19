@@ -248,8 +248,6 @@ export async function addCreditCharge(data: {
   performedBy: string;
   performedByName: string;
 }): Promise<{ transaction: CreditTransaction; account: CustomerCreditAccount }> {
-  const staffId = getStaffId();
-
   const { data: txResult, error: txError } = await supabaseAdmin
     .from('credit_transactions')
     .insert({
@@ -258,8 +256,6 @@ export async function addCreditCharge(data: {
       amount: data.amount,
       type: 'charge',
       notes: data.description,
-      performed_by: staffId,
-      performed_by_name: data.performedByName,
     })
     .select()
     .single();
@@ -294,8 +290,6 @@ export async function addCreditPayment(data: {
   paidByName: string;
   notes?: string;
 }): Promise<{ transaction: CreditTransaction; payment: CreditPayment; account: CustomerCreditAccount }> {
-  const staffId = getStaffId();
-
   const { data: txResult, error: txError } = await supabaseAdmin
     .from('credit_transactions')
     .insert({
@@ -303,8 +297,6 @@ export async function addCreditPayment(data: {
       amount: data.amount,
       type: 'payment',
       notes: data.notes || '',
-      performed_by: staffId,
-      performed_by_name: data.paidByName,
     })
     .select()
     .single();
@@ -346,8 +338,6 @@ export async function addCreditAdjustment(data: {
   performedBy: string;
   performedByName: string;
 }): Promise<{ transaction: CreditTransaction; account: CustomerCreditAccount }> {
-  const staffId = getStaffId();
-
   const { data: txResult, error } = await supabaseAdmin
     .from('credit_transactions')
     .insert({
@@ -355,8 +345,6 @@ export async function addCreditAdjustment(data: {
       amount: data.amount,
       type: 'adjustment',
       notes: `${data.reason}`,
-      performed_by: staffId,
-      performed_by_name: data.performedByName,
     })
     .select()
     .single();
