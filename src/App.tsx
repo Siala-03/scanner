@@ -489,18 +489,8 @@ export function App() {
         onLogin={(user) => {
           setAuthUser(user);
           restoreStaffIdFromAuthUser(user);
-          // Set selectedRole based on user's role
-          if (user.role === 'superadmin') {
-            setSelectedRole('superadmin');
-          } else if (user.role === 'manager') {
-            setSelectedRole('manager');
-          } else if (user.role === 'supervisor') {
-            setSelectedRole('supervisor');
-          } else if (user.role === 'waiter') {
-            setSelectedRole('waiter');
-          } else if (user.role === 'kitchen') {
-            setSelectedRole('kitchen');
-          }
+          // Route directly using authenticated user role.
+          setSelectedRole(user.role as UserRole);
           // Save to localStorage and update state immediately
           localStorage.setItem('authUser', JSON.stringify(user));
           localStorage.setItem('selectedRole', user.role);
@@ -881,18 +871,8 @@ export function App() {
             <LoginPage
               onLogin={(user) => {
                 setAuthUser(user);
-                // Set selectedRole based on user's role
-                if (user.role === 'superadmin') {
-                  setSelectedRole('superadmin');
-                } else if (user.role === 'manager') {
-                  setSelectedRole('manager');
-                } else if (user.role === 'supervisor') {
-                  setSelectedRole('supervisor');
-                } else if (user.role === 'waiter') {
-                  setSelectedRole('waiter');
-                } else if (user.role === 'kitchen') {
-                  setSelectedRole('kitchen');
-                }
+                // Route directly using authenticated user role.
+                setSelectedRole(user.role as UserRole);
                 // Save to localStorage
                 localStorage.setItem('authUser', JSON.stringify(user));
                 localStorage.setItem('selectedRole', user.role);

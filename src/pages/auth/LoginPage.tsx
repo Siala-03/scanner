@@ -172,7 +172,7 @@ export function LoginPage({ onLogin, onBack }: LoginPageProps) {
           </Button>
 
           <p className="text-xs text-slate-300 text-center mt-3">
-            Need an account? Ask your manager or superadmin to create your login credentials.
+            Need an account? Ask your manager to create your login credentials.
           </p>
         </form>
       </motion.div>

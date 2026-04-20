@@ -30,6 +30,43 @@ function getStaffName(): string {
   return localStorage.getItem('staffName') || 'Manager';
 }
 
+function extractMissingColumn(error: unknown): string | null {
+  const message = error instanceof Error
+    ? error.message
+    : String((error as any)?.message ?? '');
+  const match = message.match(/'([^']+)' column/);
+  return match?.[1] ?? null;
+}
+
+async function insertWithSchemaFallback(
+  table: string,
+  payload: Record<string, unknown>
+): Promise<any> {
+  const insertPayload: Record<string, unknown> = { ...payload };
+
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const { data, error } = await supabaseAdmin
+      .from(table)
+      .insert(insertPayload)
+      .select()
+      .single();
+
+    if (!error) return data;
+
+    if (error.code === 'PGRST204') {
+      const missingColumn = extractMissingColumn(error);
+      if (missingColumn && missingColumn !== 'id' && missingColumn in insertPayload) {
+        delete insertPayload[missingColumn];
+        continue;
+      }
+    }
+
+    throw error;
+  }
+
+  throw new Error(`Insert into ${table} failed after schema fallback attempts`);
+}
+
 // ── Normalizers ──────────────────────────────────────────────────────────────
 
 function normalizeCreditAccount(raw: any): CustomerCreditAccount {
@@ -248,31 +285,43 @@ export async function addCreditCharge(data: {
   performedBy: string;
   performedByName: string;
 }): Promise<{ transaction: CreditTransaction; account: CustomerCreditAccount }> {
-  const { data: txResult, error: txError } = await supabaseAdmin
-    .from('credit_transactions')
-    .insert({
-      account_id: data.accountId,
-      order_id: data.orderId,
-      amount: data.amount,
-      type: 'charge',
-      notes: data.description,
-    })
-    .select()
-    .single();
-
-  if (txError) { console.error('addCreditCharge error:', txError); throw txError; }
-
-  // Update account balance directly
   const { data: account, error: accError } = await supabaseAdmin
     .from('credit_accounts')
     .select('current_balance')
     .eq('id', data.accountId)
     .single();
 
+  const currentBalance = !accError && account ? Number(account.current_balance || 0) : 0;
+  const balanceAfter = currentBalance + data.amount;
+
+  let txResult: any;
+  try {
+    txResult = await insertWithSchemaFallback('credit_transactions', {
+      id: crypto.randomUUID(),
+      account_id: data.accountId,
+      customer_id: data.customerId,
+      order_id: data.orderId ?? null,
+      type: 'charge',
+      amount: data.amount,
+      balance_after: balanceAfter,
+      description: data.description,
+      notes: data.description,
+      performed_by: data.performedBy,
+      performed_by_name: data.performedByName,
+      timestamp: new Date().toISOString(),
+      created_at: new Date().toISOString(),
+      restaurant_id: getRestaurantId() || 'default_restaurant',
+      metadata: data.orderId ? { orderId: data.orderId } : null,
+    });
+  } catch (txError) {
+    console.error('addCreditCharge error:', txError);
+    throw txError;
+  }
+
   if (!accError && account) {
     await supabaseAdmin
       .from('credit_accounts')
-      .update({ current_balance: (account.current_balance || 0) + data.amount })
+      .update({ current_balance: balanceAfter })
       .eq('id', data.accountId);
   }
 
@@ -290,28 +339,42 @@ export async function addCreditPayment(data: {
   paidByName: string;
   notes?: string;
 }): Promise<{ transaction: CreditTransaction; payment: CreditPayment; account: CustomerCreditAccount }> {
-  const { data: txResult, error: txError } = await supabaseAdmin
-    .from('credit_transactions')
-    .insert({
-      account_id: data.accountId,
-      amount: data.amount,
-      type: 'payment',
-      notes: data.notes || '',
-    })
-    .select()
-    .single();
-
-  if (txError) { console.error('addCreditPayment error:', txError); throw txError; }
-
-  // Update account balance (subtract payment from balance)
   const { data: account, error: accError } = await supabaseAdmin
     .from('credit_accounts')
     .select('current_balance')
     .eq('id', data.accountId)
     .single();
 
+  const currentBalance = !accError && account ? Number(account.current_balance || 0) : 0;
+  const newBalance = Math.max(0, currentBalance - data.amount);
+
+  let txResult: any;
+  try {
+    txResult = await insertWithSchemaFallback('credit_transactions', {
+      id: crypto.randomUUID(),
+      account_id: data.accountId,
+      customer_id: data.customerId,
+      type: 'payment',
+      amount: data.amount,
+      balance_after: newBalance,
+      description: data.notes || `Payment (${data.paymentMethod})`,
+      notes: data.notes || '',
+      performed_by: data.paidBy,
+      performed_by_name: data.paidByName,
+      timestamp: new Date().toISOString(),
+      created_at: new Date().toISOString(),
+      restaurant_id: getRestaurantId() || 'default_restaurant',
+      metadata: {
+        paymentMethod: data.paymentMethod,
+        reference: data.reference || null,
+      },
+    });
+  } catch (txError) {
+    console.error('addCreditPayment error:', txError);
+    throw txError;
+  }
+
   if (!accError && account) {
-    const newBalance = Math.max(0, (account.current_balance || 0) - data.amount);
     await supabaseAdmin
       .from('credit_accounts')
       .update({ current_balance: newBalance })
@@ -338,18 +401,44 @@ export async function addCreditAdjustment(data: {
   performedBy: string;
   performedByName: string;
 }): Promise<{ transaction: CreditTransaction; account: CustomerCreditAccount }> {
-  const { data: txResult, error } = await supabaseAdmin
-    .from('credit_transactions')
-    .insert({
-      account_id: data.accountId,
-      amount: data.amount,
-      type: 'adjustment',
-      notes: `${data.reason}`,
-    })
-    .select()
+  const { data: account, error: accError } = await supabaseAdmin
+    .from('credit_accounts')
+    .select('current_balance')
+    .eq('id', data.accountId)
     .single();
 
-  if (error) { console.error('addCreditAdjustment error:', error); throw error; }
+  const currentBalance = !accError && account ? Number(account.current_balance || 0) : 0;
+  const balanceAfter = currentBalance + data.amount;
+
+  let txResult: any;
+  try {
+    txResult = await insertWithSchemaFallback('credit_transactions', {
+      id: crypto.randomUUID(),
+      account_id: data.accountId,
+      customer_id: data.customerId,
+      type: 'adjustment',
+      amount: data.amount,
+      balance_after: balanceAfter,
+      description: `${data.reason}`,
+      notes: `${data.reason}`,
+      performed_by: data.performedBy,
+      performed_by_name: data.performedByName,
+      timestamp: new Date().toISOString(),
+      created_at: new Date().toISOString(),
+      restaurant_id: getRestaurantId() || 'default_restaurant',
+      metadata: { reason: data.reason },
+    });
+  } catch (error) {
+    console.error('addCreditAdjustment error:', error);
+    throw error;
+  }
+
+  if (!accError && account) {
+    await supabaseAdmin
+      .from('credit_accounts')
+      .update({ current_balance: balanceAfter })
+      .eq('id', data.accountId);
+  }
 
   const updatedAccount = await getCreditAccount(data.accountId);
   return { transaction: normalizeTransaction(txResult), account: updatedAccount };
@@ -387,20 +476,25 @@ export async function submitCreditApplication(data: {
   const restaurantId = getRestaurantId();
   if (!restaurantId) throw new Error('No company selected');
 
-  const { data: result, error } = await supabaseAdmin
-    .from('credit_applications')
-    .insert({
+  let result: any;
+  try {
+    result = await insertWithSchemaFallback('credit_applications', {
+      id: crypto.randomUUID(),
       customer_name: data.customerName,
       customer_phone: data.customerPhone,
       requested_limit: data.requestedLimit,
       notes: data.notes || '',
+      requested_by: data.requestedBy,
+      requested_by_name: data.requestedByName,
       status: 'pending',
       restaurant_id: restaurantId,
-    })
-    .select()
-    .single();
-
-  if (error) { console.error('submitCreditApplication error:', error); throw error; }
+      created_at: new Date().toISOString(),
+      requested_at: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error('submitCreditApplication error:', error);
+    throw error;
+  }
   return normalizeApplication(result);
 }
 
