@@ -298,6 +298,29 @@ export function App() {
       window.history.pushState({}, '', '/');
     }
   };
+
+  const handleLogout = () => {
+    if (selectedRole === 'supplier') {
+      clearSupplierToken();
+      setSupplierUser(null);
+    } else {
+      logoutStaff();
+    }
+
+    setSelectedRole(null);
+    setAuthUser(null);
+    localStorage.removeItem('authUser');
+    localStorage.removeItem('selectedRole');
+    localStorage.removeItem('restaurantId');
+    setRestaurantName('');
+    setTableNumber(null);
+    setManagerPage('dashboard');
+    setSupervisorPage('dashboard');
+    setIsScanning(false);
+    setDetectedTable(null);
+    window.history.pushState({}, '', '/');
+  };
+
   const handleScanQR = (tableNum?: number) => {
     // if explicit table number provided use it, else pick random from known tables or fall back to 1..20 range
     let targetTable: number;
@@ -481,32 +504,8 @@ export function App() {
     };
   }, [currentRestaurantId]);
 
-  // Auth flow for staff roles - single login page
   if (!routeResolved) {
     return null;
-  }
-
-  if (!authUser && selectedRole !== 'customer') {
-    return (
-      <LoginPage
-        onLogin={(user) => {
-          setAuthUser(user);
-          restoreStaffIdFromAuthUser(user);
-          // Route directly using authenticated user role.
-          setSelectedRole(user.role as UserRole);
-          // Save to localStorage and update state immediately
-          localStorage.setItem('authUser', JSON.stringify(user));
-          localStorage.setItem('selectedRole', user.role);
-          localStorage.setItem('staffId', user.id);
-          localStorage.setItem('staffRole', user.role);
-          const loginRestaurantId = user.restaurantId || (user as any).restaurant_id;
-          if (loginRestaurantId) {
-            localStorage.setItem('restaurantId', loginRestaurantId);
-            setCurrentRestaurantId(loginRestaurantId);
-            window.dispatchEvent(new Event('restaurantIdChanged'));
-          }
-        }}
-        onBack={() => {}} />); // No back needed for main login
   }
   // Customer portal (table already assigned via QR scan)
   if (selectedRole === 'customer' && tableNumber !== null) {
@@ -690,7 +689,7 @@ export function App() {
             <div className="flex items-center gap-2">
               <ThemeToggle />
               <button
-                onClick={handleBack}
+                onClick={handleLogout}
                 className="p-2 rounded-lg bg-slate-700/60 hover:bg-red-600 text-slate-200 hover:text-white transition-colors"
                 aria-label="Logout"
               >
@@ -869,16 +868,17 @@ export function App() {
             <LoginPage
               onLogin={(user) => {
                 setAuthUser(user);
-                // Route directly using authenticated user role.
+                restoreStaffContextFromAuthUser(user);
                 setSelectedRole(user.role as UserRole);
-                // Save to localStorage
                 localStorage.setItem('authUser', JSON.stringify(user));
                 localStorage.setItem('selectedRole', user.role);
                 localStorage.setItem('staffId', user.id);
                 localStorage.setItem('staffRole', user.role);
-                if (user.restaurantId) {
-                  localStorage.setItem('restaurantId', user.restaurantId);
-                  setCurrentRestaurantId(user.restaurantId);
+                const loginRestaurantId = user.restaurantId || (user as any).restaurant_id;
+                if (loginRestaurantId) {
+                  localStorage.setItem('restaurantId', loginRestaurantId);
+                  setCurrentRestaurantId(loginRestaurantId);
+                  window.dispatchEvent(new Event('restaurantIdChanged'));
                 }
               }}
               onBack={() => {}} />
