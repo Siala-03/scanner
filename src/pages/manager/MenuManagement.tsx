@@ -86,7 +86,7 @@ export function MenuManagement() {
   const tabs: TabOption[] = useMemo(() => {
     const uniqueCategories = Array.from(new Set(menuItemsState.map(item => item.category)));
     // Start with 'All Items' tab
-    const allTab: TabOption = { id: 'all', label: 'All Items', icon: '📋' };
+    const allTab: TabOption = { id: 'all', label: 'All Items' };
     // Add categories from default that exist in menu
     const categoryTabs = defaultCategories
       .filter(c => uniqueCategories.includes(c.id))
