@@ -729,129 +729,213 @@ export interface ExpenseReceiptData {
 }
 
 /**
- * Build HTML receipt for an expense
+ * Build HTML receipt for an expense — matches the order receipt thermal-paper style.
  */
 export function buildExpenseReceiptHtml(
   expense: ExpenseReceiptData,
-  restaurantName = 'Company Name',
-  restaurantAddress = '123 Main St',
-  restaurantPhone = '(555) 123-4567'
+  restaurantName = 'Company',
+  restaurantAddress = '',
+  restaurantPhone = '',
+  restaurantLogo = ''
 ): string {
-  const taxAmount = expense.taxAmount !== undefined ? expense.taxAmount : (expense.amount * expense.taxRate) / 100;
+  const taxAmount = expense.taxAmount !== undefined
+    ? expense.taxAmount
+    : (expense.amount * expense.taxRate) / 100;
   const total = expense.amount + taxAmount;
-  const receiptDate = new Date(expense.expenseDate).toLocaleDateString();
+  const receiptRef = expense.referenceNumber || expense.id.slice(0, 8).toUpperCase();
+  const paymentMethod = (expense.paymentMethod || 'cash').replace(/_/g, ' ');
+  const approvalStatus = expense.approvalStatus;
 
-  return `
-<!DOCTYPE html>
+  return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Expense Receipt - ${expense.referenceNumber || expense.id}</title>
+  <title>Expense Receipt #${receiptRef}</title>
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: Arial, sans-serif; background: #f8fafc; color: #1a1a1a; }
-    .receipt { max-width: 600px; margin: 20px auto; background: white; padding: 24px; border-radius: 8px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); }
-    .header { text-align: center; margin-bottom: 24px; border-bottom: 2px solid #e2e8f0; padding-bottom: 16px; }
-    .header h1 { font-size: 1.5rem; margin-bottom: 8px; }
-    .header p { font-size: 0.9rem; color: #64748b; }
-    .title { text-align: center; font-size: 1.1rem; font-weight: bold; margin: 20px 0; text-transform: uppercase; }
-    .section { margin-bottom: 20px; }
-    .row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #e2e8f0; }
-    .row:last-child { border-bottom: none; }
-    .label { font-weight: 600; color: #64748b; }
-    .value { color: #1a1a1a; }
-    .total-section { margin-top: 16px; padding-top: 16px; border-top: 2px solid #1a1a1a; }
-    .total-row { display: flex; justify-content: space-between; font-size: 1.1rem; font-weight: 700; padding: 8px 0; }
-    .footer { text-align: center; margin-top: 24px; padding-top: 16px; border-top: 1px solid #e2e8f0; font-size: 0.9rem; color: #64748b; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 13px;
+      background: #f0f0f0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 12px 40px;
+      color: #111;
+    }
+    .receipt {
+      width: 100%;
+      max-width: 380px;
+      background: #fff;
+      padding: 28px 24px 24px;
+      box-shadow: 0 4px 24px rgba(0,0,0,.12);
+      border-radius: 4px;
+    }
+    .header { text-align: center; padding-bottom: 16px; }
+    .logo { max-height: 72px; max-width: 180px; object-fit: contain; margin: 0 auto 10px; display: block; }
+    .brand { font-size: 22px; font-weight: 900; letter-spacing: 3px; text-transform: uppercase; }
+    .sub { font-size: 11px; color: #555; margin-top: 4px; line-height: 1.5; }
+    .badge {
+      display: inline-block;
+      margin-top: 10px;
+      padding: 3px 12px;
+      border: 1px solid #111;
+      font-size: 10px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+    .line-solid  { border: none; border-top: 2px solid #111; margin: 14px 0; }
+    .line-dashed { border: none; border-top: 1px dashed #999; margin: 12px 0; }
+    .meta { width: 100%; font-size: 12px; border-collapse: collapse; }
+    .meta td { padding: 3px 0; vertical-align: top; }
+    .meta td:first-child { color: #555; width: 45%; }
+    .meta td:last-child  { font-weight: 600; text-align: right; }
+    .desc-box {
+      font-size: 12px;
+      line-height: 1.5;
+      color: #333;
+      border-top: 1px dotted #ddd;
+      border-bottom: 1px dotted #ddd;
+      padding: 8px 0;
+      margin: 4px 0;
+    }
+    .desc-label { font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; color: #555; margin-bottom: 4px; }
+    .totals { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .totals td { padding: 4px 0; }
+    .totals td:last-child { text-align: right; }
+    .totals .grand td {
+      font-size: 16px; font-weight: 900;
+      border-top: 2px solid #111; padding-top: 10px;
+    }
+    .payment-row { display: flex; justify-content: space-between; align-items: center; font-size: 12px; padding: 3px 0; }
+    .status-badge {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 20px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+    .status-paid     { background: #d1fae5; color: #065f46; }
+    .status-pending  { background: #fef3c7; color: #92400e; }
+    .status-approved { background: #d1fae5; color: #065f46; }
+    .status-rejected { background: #fee2e2; color: #991b1b; }
+    .status-draft    { background: #f1f5f9; color: #475569; }
+    .notes-box {
+      background: #fafafa;
+      border: 1px dashed #ccc;
+      border-radius: 4px;
+      padding: 8px 10px;
+      font-size: 11px;
+      color: #555;
+      font-style: italic;
+      line-height: 1.5;
+    }
+    .footer { text-align: center; font-size: 11px; color: #555; line-height: 1.7; }
+    .footer .thanks { font-size: 14px; font-weight: 800; color: #111; letter-spacing: 1px; margin-bottom: 4px; }
+    .powered { font-size: 10px; color: #bbb; margin-top: 8px; letter-spacing: 1px; }
+    .print-btn {
+      margin-top: 20px;
+      padding: 10px 32px;
+      background: #111;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      font-family: inherit;
+      font-size: 13px;
+      cursor: pointer;
+      letter-spacing: 1px;
+    }
+    .print-btn:hover { background: #333; }
     @media print {
-      body { background: white; }
-      .receipt { box-shadow: none; border: none; }
+      body { background: #fff; padding: 0; }
+      .receipt { box-shadow: none; max-width: 100%; padding: 8px; border-radius: 0; }
+      .no-print { display: none !important; }
     }
   </style>
 </head>
 <body>
-  <div class="receipt">
-    <div class="header">
-      <h1>${restaurantName}</h1>
-      <p>${restaurantAddress}</p>
-      <p>${restaurantPhone}</p>
-    </div>
+<div class="receipt">
 
-    <div class="title">EXPENSE RECEIPT</div>
-
-    <div class="section">
-      <div class="row">
-        <span class="label">Receipt #:</span>
-        <span class="value">${expense.referenceNumber || expense.id}</span>
-      </div>
-      <div class="row">
-        <span class="label">Date:</span>
-        <span class="value">${receiptDate}</span>
-      </div>
-      <div class="row">
-        <span class="label">Category:</span>
-        <span class="value">${expense.category?.name || 'N/A'}</span>
-      </div>
-      <div class="row">
-        <span class="label">Vendor:</span>
-        <span class="value">${expense.vendorName || 'N/A'}</span>
-      </div>
-    </div>
-
-    <div class="section">
-      <div class="label" style="margin-bottom: 8px;">Description:</div>
-      <div style="padding: 8px 0;">${expense.description}</div>
-    </div>
-
-    <div class="total-section">
-      <div class="row">
-        <span class="label">Subtotal:</span>
-        <span class="value">${expense.currency} ${Number(expense.amount).toFixed(2)}</span>
-      </div>
-      ${expense.taxRate > 0 || (expense.taxAmount !== undefined && expense.taxAmount > 0) ? `
-      <div class="row">
-        <span class="label">Tax (${expense.taxRate}%):</span>
-        <span class="value">${expense.currency} ${Number(taxAmount).toFixed(2)}</span>
-      </div>
-      ` : ''}
-      <div class="total-row" style="margin-top: 8px;">
-        <span>TOTAL:</span>
-        <span>${expense.currency} ${Number(total).toFixed(2)}</span>
-      </div>
-    </div>
-
-    <div class="section">
-      <div class="row">
-        <span class="label">Payment Method:</span>
-        <span class="value">${(expense.paymentMethod || 'cash').replace(/_/g, ' ').toUpperCase()}</span>
-      </div>
-      <div class="row">
-        <span class="label">Payment Status:</span>
-        <span class="value">${expense.paymentStatus.toUpperCase()}</span>
-      </div>
-    </div>
-
-    ${expense.notes ? `
-    <div class="section">
-      <div class="label" style="margin-bottom: 8px;">Notes:</div>
-      <div style="padding: 8px 0; background: #f1f5f9; border-radius: 4px; padding: 8px;">${expense.notes}</div>
-    </div>
-    ` : ''}
-
-    <div class="footer">
-      <p>Thank you for your business!</p>
-      <p>Generated on ${new Date().toLocaleString()}</p>
-    </div>
+  <!-- HEADER -->
+  <div class="header">
+    ${restaurantLogo ? `<img src="${restaurantLogo}" alt="${restaurantName}" class="logo">` : ''}
+    <div class="brand">${restaurantName}</div>
+    ${restaurantAddress || restaurantPhone ? `<div class="sub">${[restaurantAddress, restaurantPhone].filter(Boolean).join('<br>')}</div>` : ''}
+    <div class="badge">Expense Receipt</div>
   </div>
-  <script>
-    window.onload = function() {
-      window.print();
-    };
-  </script>
+
+  <hr class="line-solid">
+
+  <!-- META -->
+  <table class="meta">
+    <tr><td>Receipt #</td>  <td>${receiptRef}</td></tr>
+    <tr><td>Date</td>       <td>${new Date(expense.expenseDate).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</td></tr>
+    <tr><td>Generated</td>  <td>${new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</td></tr>
+    ${expense.category?.name ? `<tr><td>Category</td><td>${expense.category.name}</td></tr>` : ''}
+    ${expense.vendorName ? `<tr><td>Vendor</td><td>${expense.vendorName}</td></tr>` : ''}
+  </table>
+
+  <hr class="line-dashed">
+
+  <!-- DESCRIPTION -->
+  <div class="desc-label">Description</div>
+  <div class="desc-box">${expense.description}</div>
+
+  <hr class="line-dashed">
+
+  <!-- TOTALS -->
+  <table class="totals">
+    <tr>
+      <td style="color:#555">Subtotal</td>
+      <td>${expense.currency} ${Number(expense.amount).toFixed(2)}</td>
+    </tr>
+    ${taxAmount > 0 ? `
+    <tr>
+      <td style="color:#555">Tax (${expense.taxRate}%)</td>
+      <td>${expense.currency} ${Number(taxAmount).toFixed(2)}</td>
+    </tr>` : ''}
+    <tr class="grand">
+      <td>TOTAL</td>
+      <td>${expense.currency} ${Number(total).toFixed(2)}</td>
+    </tr>
+  </table>
+
+  <hr class="line-dashed">
+
+  <!-- PAYMENT -->
+  <div class="payment-row">
+    <span style="color:#555">Payment</span>
+    <span style="text-transform:capitalize">${paymentMethod}</span>
+  </div>
+  <div class="payment-row">
+    <span style="color:#555">Payment Status</span>
+    <span class="status-badge status-${expense.paymentStatus}">${expense.paymentStatus}</span>
+  </div>
+  <div class="payment-row">
+    <span style="color:#555">Approval</span>
+    <span class="status-badge status-${approvalStatus}">${approvalStatus.replace(/_/g, ' ')}</span>
+  </div>
+
+  ${expense.notes ? `
+  <hr class="line-dashed">
+  <div class="notes-box"><strong>Note:</strong> ${expense.notes}</div>` : ''}
+
+  <hr class="line-solid">
+
+  <!-- FOOTER -->
+  <div class="footer">
+    <div class="thanks">Thank you!</div>
+    <span style="font-size:10px;color:#aaa">${receiptRef} · ${new Date().toLocaleString()}</span>
+    <div class="powered">Powered by SERVV IQ</div>
+  </div>
+
+</div>
+<button class="print-btn no-print" onclick="window.print()">Print Receipt</button>
 </body>
-</html>
-  `;
+</html>`;
 }
 
 /**

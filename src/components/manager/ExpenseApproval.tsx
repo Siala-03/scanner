@@ -25,6 +25,7 @@ import {
   History,
   AlertCircle,
 } from 'lucide-react';
+import { buildExpenseReceiptHtml, printExpenseReceipt } from '../../utils/receipt';
 
 interface ExpenseWithDetails extends Omit<Expense, 'notes'> {
   notes_?: any[];
@@ -220,8 +221,13 @@ export default function ManagerExpenseApproval() {
     }
   };
 
-  const handleGenerateReceipt = (_expenseId: string) => {
-    window.print();
+  const handleGenerateReceipt = (expenseId: string) => {
+    const allExpenses = [...pendingExpenses, ...approvedExpenses, ...rejectedExpenses];
+    const expense = allExpenses.find(e => e.id === expenseId);
+    if (!expense) return;
+    const restaurantName = localStorage.getItem('restaurantName') || 'Company';
+    const html = buildExpenseReceiptHtml(expense as any, restaurantName);
+    printExpenseReceipt(html);
   };
 
   const handleAddNote = async (expenseId: string) => {
@@ -310,16 +316,12 @@ export default function ManagerExpenseApproval() {
                 >
                   View
                 </button>
-                {showActions && (
-                  !expense.receipt && (
-                    <button
-                      onClick={() => handleGenerateReceipt(expense.id)}
-                      className="text-purple-600 hover:text-purple-800 text-sm"
-                    >
-                      Receipt
-                    </button>
-                  )
-                )}
+                <button
+                  onClick={() => handleGenerateReceipt(expense.id)}
+                  className="text-purple-400 hover:text-purple-300 text-sm"
+                >
+                  Receipt
+                </button>
               </td>
             </tr>
           ))}
