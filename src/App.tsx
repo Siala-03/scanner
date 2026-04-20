@@ -854,7 +854,7 @@ export function App() {
             <img src="/logo_servv_white.PNG" alt="Servv IQ" className="h-14 w-auto object-contain" />
           </div>
           <p className="text-lg text-[#a89f91] max-w-sm mx-auto font-light">
-            Smart tools for restaurant teams
+            The operating system for hospitality
           </p>
         </motion.div>
 
