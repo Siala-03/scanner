@@ -9,8 +9,9 @@ import { Button } from '../../components/ui/Button';
 interface LoginPageProps {
   onLogin: (user: Staff) => void;
   onBack: () => void;
+  embedded?: boolean;
 }
-export function LoginPage({ onLogin, onBack }: LoginPageProps) {
+export function LoginPage({ onLogin, onBack, embedded = false }: LoginPageProps) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -53,24 +54,10 @@ export function LoginPage({ onLogin, onBack }: LoginPageProps) {
     }
   };
 
-  return (
-    <div className="min-h-screen bg-[#1a1410] flex items-center justify-center p-4">
-      <button
-        onClick={onBack}
-        className="absolute top-4 left-4 md:top-6 md:left-6 z-50 p-2 rounded-full bg-[#2a2018] text-[#a89f91] hover:text-amber-500 transition-colors"
-        aria-label="Back">
-        <ArrowLeftIcon className="w-5 h-5" />
-      </button>
-
-      <motion.div
-        initial={{
-          opacity: 0,
-          y: 20
-        }}
-        animate={{
-          opacity: 1,
-          y: 0
-        }}
+  const form = (
+    <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
         className="w-full max-w-md bg-[#2a2018] border border-[#3a2e20] rounded-2xl p-8 shadow-2xl">
 
         <div className="text-center mb-8">
@@ -176,6 +163,19 @@ export function LoginPage({ onLogin, onBack }: LoginPageProps) {
           </p>
         </form>
       </motion.div>
-    </div>);
+  );
 
+  if (embedded) return form;
+
+  return (
+    <div className="min-h-screen bg-[#1a1410] flex items-center justify-center p-4">
+      <button
+        onClick={onBack}
+        className="absolute top-4 left-4 md:top-6 md:left-6 z-50 p-2 rounded-full bg-[#2a2018] text-[#a89f91] hover:text-amber-500 transition-colors"
+        aria-label="Back">
+        <ArrowLeftIcon className="w-5 h-5" />
+      </button>
+      {form}
+    </div>
+  );
 }

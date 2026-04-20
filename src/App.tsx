@@ -864,8 +864,8 @@ export function App() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
         >
-          <Card className="bg-gradient-to-br from-[#2a2018] to-[#1a1410] border border-[#3a2e20] p-8">
-            <LoginPage
+          <LoginPage
+              embedded
               onLogin={(user) => {
                 setAuthUser(user);
                 restoreStaffContextFromAuthUser(user);
@@ -882,7 +882,6 @@ export function App() {
                 }
               }}
               onBack={() => {}} />
-          </Card>
         </motion.div>
 
         {/* Customer QR Scan Section */}
