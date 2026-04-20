@@ -1,4 +1,5 @@
 import { useCallback, useState, useEffect } from 'react';
+import { useTheme } from './contexts/ThemeContext';
 import { motion } from 'framer-motion';
 import { ArrowLeftIcon, QrCodeIcon, LogOutIcon } from 'lucide-react';
 import { ThemeToggle } from './components/ui/ThemeToggle';
@@ -46,6 +47,8 @@ function getThemeStorageKeyForRole(role: UserRole): string {
 }
 
 export function App() {
+  const { theme } = useTheme();
+  const servvLogo = theme === 'light' ? '/logo_servv_black.PNG' : '/logo_servv_white.PNG';
   const [selectedRole, setSelectedRole] = useState<UserRole>(null);
   const [authUser, setAuthUser] = useState<Staff | null>(null);
   const [supplierUser, setSupplierUser] = useState<SupplierUser | null>(null);
@@ -848,16 +851,11 @@ export function App() {
           animate={{ opacity: 1, y: 0 }}
           className="text-center mb-8"
         >
-          <div className="flex items-center justify-center gap-3 mb-4">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center shadow-lg shadow-amber-500/20">
-              <span className="text-2xl font-serif text-white font-bold">S</span>
-            </div>
-            <h1 className="text-3xl md:text-4xl font-serif text-amber-500 tracking-tight">
-              SERVV IQ
-            </h1>
+          <div className="flex items-center justify-center mb-4">
+            <img src="/logo_servv_white.PNG" alt="Servv IQ" className="h-14 w-auto object-contain" />
           </div>
           <p className="text-lg text-[#a89f91] max-w-sm mx-auto font-light">
-            The Intelligence Layer of Servv
+            Smart tools for restaurant teams
           </p>
         </motion.div>
 
