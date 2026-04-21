@@ -7,12 +7,12 @@
   "theme_color": "#111111",
   "icons": [
     {
-      "src": "/logo_servv_black.PNG",
+      "src": "/assets/logo_servv_black.PNG",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "/logo_servv_black.PNG",
+      "src": "/assets/logo_servv_black.PNG",
       "sizes": "512x512",
       "type": "image/png"
     }
