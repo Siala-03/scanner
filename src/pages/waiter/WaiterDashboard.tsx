@@ -614,13 +614,23 @@ export function WaiterDashboard({
 
   const { kpis } = useStaffKPIs();
 
-  // ── Orders scoped to this waiter's assigned tables ──
-  // If a waiter has no assigned tables, they can see all orders (manager/supervisor mode).
+  // fetchOrders returns raw DB rows — check both camelCase and snake_case
+  const isOnline = (o: Order) =>
+    o.isOnlineOrder === true ||
+    (o as any).is_online_order === true ||
+    o.tableNumber === 999 ||
+    (o as any).table_number === 999;
+
+  // ── Orders scoped to this waiter's assigned tables, excluding online (table 999) ──
   const myOrders = useMemo(() => {
     const assigned = waiter.assignedTables ?? [];
-    if (assigned.length === 0) return orders;
-    return orders.filter(
-      (o) => o.tableNumber != null && assigned.includes(o.tableNumber)
+    const tableOrders = orders.filter((o) => !isOnline(o));
+    if (assigned.length === 0) return tableOrders;
+    return tableOrders.filter(
+      (o) => {
+        const tNum = o.tableNumber ?? (o as any).table_number;
+        return tNum != null && assigned.includes(tNum);
+      }
     );
   }, [orders, waiter.assignedTables]);
 
@@ -696,7 +706,7 @@ export function WaiterDashboard({
   );
 
   const onlineOrders = useMemo(
-    () => orders.filter((o) => o.isOnlineOrder && o.status !== 'served' && o.status !== 'cancelled'),
+    () => orders.filter((o) => isOnline(o) && o.status !== 'served' && o.status !== 'cancelled'),
     [orders]
   );
 

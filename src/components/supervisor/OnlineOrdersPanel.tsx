@@ -10,9 +10,12 @@ interface OnlineOrdersPanel {
 }
 
 export function OnlineOrdersPanel({ orders, onStatusChange }: OnlineOrdersPanel) {
-  // Filter only online orders
+  const isOnline = (o: Order) =>
+    o.isOnlineOrder === true || (o as any).is_online_order === true ||
+    o.tableNumber === 999 || (o as any).table_number === 999;
+
   const onlineOrders = useMemo(
-    () => orders.filter((order) => order.isOnlineOrder),
+    () => orders.filter(isOnline),
     [orders]
   );
 
