@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { Button } from '../../components/ui/Button';
-import { MenuIcon, AlertCircleIcon, TruckIcon, MapPinIcon, PhoneIcon, LogOutIcon } from 'lucide-react';
+import { MenuIcon, TruckIcon, PhoneIcon, LogOutIcon } from 'lucide-react';
 import { formatPrice } from '../../utils/currency';
 import { useMenu } from '../../hooks/useMenu';
 import { useStaff, useStaffOnDuty } from '../../hooks/useStaff';
@@ -30,29 +30,18 @@ export function SupervisorDashboard({ onManageMenu, onLogout }: SupervisorDashbo
   const peopleOnDuty = onDutyStaff.length;
   const onDutyIds = new Set(onDutyStaff.map((s) => s.id));
 
-  // Filter delivery orders
+  const isOnline = (o: any) =>
+    o.isOnlineOrder === true || o.is_online_order === true ||
+    o.tableNumber === 999 || o.table_number === 999;
+
+  // Online delivery orders (table 999), filtered by order status
   const deliveryOrders = useMemo(() => {
     return orders.filter(
       (order) =>
-        order.deliveryProvider?.toLowerCase() === 'vubavuba' &&
-        (deliveryStatusFilter === 'all' || order.deliveryStatus === deliveryStatusFilter)
+        isOnline(order) &&
+        (deliveryStatusFilter === 'all' || order.status === deliveryStatusFilter)
     );
   }, [orders, deliveryStatusFilter]);
-
-  // Check for orders assigned to off-duty staff or upcoming issues
-  const riskOrders = useMemo(() => {
-    return deliveryOrders
-      .filter(
-        (order) =>
-          order.deliveryStatus === 'pending' || order.deliveryStatus === 'assigned'
-      )
-      .map((order) => {
-        const assignedStaff = order.assignedWaiterId ? staff.find((s) => s.id === order.assignedWaiterId) : null;
-        const isOffDuty = assignedStaff && !onDutyIds.has(assignedStaff.id);
-        return { order, assignedStaff, isOffDuty };
-      })
-      .filter((item) => item.isOffDuty);
-  }, [deliveryOrders, staff, onDutyIds]);
 
   return (
     <div className="supervisor-surface min-h-screen bg-slate-900 text-slate-100 p-4 transition-colors">
@@ -146,7 +135,7 @@ export function SupervisorDashboard({ onManageMenu, onLogout }: SupervisorDashbo
             <span className="text-lg">🌐</span>
             <h2 className="text-lg font-semibold">Online Orders</h2>
             <span className="px-2 py-1 bg-blue-500/20 text-blue-400 rounded text-xs font-medium">
-              {orders.filter((o) => o.isOnlineOrder && o.status === 'pending').length} pending
+              {orders.filter((o) => isOnline(o) && o.status === 'pending').length} pending
             </span>
           </div>
           <OnlineOrdersPanel
@@ -157,132 +146,81 @@ export function SupervisorDashboard({ onManageMenu, onLogout }: SupervisorDashbo
           />
         </div>
 
-        {/* Delivery Orders Section */}
+        {/* Online Deliveries Section */}
         <div className="rounded-xl bg-slate-800 p-4 border border-slate-600 mt-4">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <TruckIcon className="w-5 h-5 text-amber-500" />
-              <h2 className="text-lg font-semibold">VubaVuba Deliveries</h2>
-              <span className="px-2 py-1 bg-amber-500/20 text-amber-400 rounded text-xs font-medium">
-                {deliveryOrders.length}
-              </span>
-            </div>
+          <div className="flex items-center gap-2 mb-4">
+            <TruckIcon className="w-5 h-5 text-blue-400" />
+            <h2 className="text-lg font-semibold">Online Deliveries</h2>
+            <span className="px-2 py-1 bg-blue-500/20 text-blue-400 rounded text-xs font-medium">
+              {deliveryOrders.length}
+            </span>
           </div>
 
-          {/* Off-Duty Staff Alerts */}
-          {riskOrders.length > 0 && (
-            <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
-              <div className="flex items-start gap-2">
-                <AlertCircleIcon className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="font-medium text-red-400">⚠️ {riskOrders.length} Delivery Order(s) at Risk</p>
-                  <p className="text-sm text-red-300 mt-1">
-                    {riskOrders.length === 1
-                      ? `Order assigned to ${riskOrders[0].assignedStaff?.name} who is off-duty. Reassign or contact staff.`
-                      : `${riskOrders.length} orders assigned to off-duty staff. Please reassign or contact them.`}
-                  </p>
-                  <div className="mt-2 space-y-1">
-                    {riskOrders.map(({ order, assignedStaff }) => (
-                      <div key={order.id} className="text-xs text-red-300 bg-red-500/5 p-2 rounded">
-                        Order #{order.orderNumber} → {assignedStaff?.name} (📞 {assignedStaff?.phone || 'N/A'})
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Delivery Status Filter */}
+          {/* Status Filter */}
           <div className="flex gap-2 mb-4 overflow-x-auto">
-            {['all', 'pending', 'assigned', 'picked_up', 'delivered'].map((status) => (
+            {['all', 'pending', 'verified', 'preparing', 'ready', 'served'].map((status) => (
               <button
                 key={status}
                 onClick={() => setDeliveryStatusFilter(status)}
                 className={`px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
                   deliveryStatusFilter === status
-                    ? 'bg-amber-500 text-slate-950'
+                    ? 'bg-blue-500 text-white'
                     : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
                 }`}
               >
-                {status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ')}
+                {status.charAt(0).toUpperCase() + status.slice(1)}
               </button>
             ))}
           </div>
 
-          {/* Delivery Orders List */}
           {deliveryOrders.length === 0 ? (
             <div className="text-center py-6 text-slate-400">
               <TruckIcon className="w-8 h-8 mx-auto mb-2 opacity-50" />
-              <p>No {deliveryStatusFilter !== 'all' ? deliveryStatusFilter : ''} delivery orders</p>
+              <p>No {deliveryStatusFilter !== 'all' ? deliveryStatusFilter : ''} online deliveries</p>
             </div>
           ) : (
             <div className="space-y-2">
               {deliveryOrders.map((order) => {
-                const assignedStaff = order.assignedWaiterId
-                  ? staff.find((s) => s.id === order.assignedWaiterId)
-                  : null;
-                const isOffDuty = assignedStaff && !onDutyIds.has(assignedStaff.id);
                 const statusColors: Record<string, string> = {
-                  pending: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
-                  assigned: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-                  picked_up: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
-                  delivered: 'bg-green-500/20 text-green-400 border-green-500/30',
-                  cancelled: 'bg-red-500/20 text-red-400 border-red-500/30'
+                  pending:   'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
+                  verified:  'bg-blue-500/20 text-blue-400 border-blue-500/30',
+                  preparing: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
+                  ready:     'bg-green-500/20 text-green-400 border-green-500/30',
+                  served:    'bg-slate-500/20 text-slate-400 border-slate-500/30',
+                  cancelled: 'bg-red-500/20 text-red-400 border-red-500/30',
                 };
+                const orderNum = (order as any).order_number || order.orderNumber || `#${order.id.slice(-4)}`;
+                const customer = (order as any).customer_name || order.customerName;
+                const phone = (order as any).customer_phone || order.customerPhone;
+                const status = order.status || 'pending';
 
                 return (
-                  <div
-                    key={order.id}
-                    className={`p-3 rounded-lg border ${
-                      isOffDuty ? 'border-red-500/50 bg-slate-700/50' : 'border-slate-600 bg-slate-700/30'
-                    } hover:bg-slate-700/50 transition-colors`}
-                  >
+                  <div key={order.id} className="p-3 rounded-lg border border-slate-600 bg-slate-700/30 hover:bg-slate-700/50 transition-colors">
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="font-medium text-slate-100">
-                            {order.orderNumber || `Order #${order.id.slice(-4)}`}
+                          <span className="font-medium text-slate-100">{orderNum}</span>
+                          <span className={`px-2 py-0.5 text-xs font-medium rounded border ${statusColors[status] || 'bg-slate-600 text-slate-300'}`}>
+                            {status.toUpperCase()}
                           </span>
-                          <span
-                            className={`px-2 py-0.5 text-xs font-medium rounded border ${
-                              statusColors[order.deliveryStatus || 'pending'] ||
-                              'bg-slate-600 text-slate-300'
-                            }`}
-                          >
-                            {order.deliveryStatus?.replace('_', ' ').toUpperCase() || 'PENDING'}
-                          </span>
-                          {isOffDuty && (
-                            <span className="px-2 py-0.5 text-xs font-medium rounded bg-red-500/20 text-red-400 border border-red-500/30">
-                              OFF-DUTY
-                            </span>
-                          )}
                         </div>
-                        <div className="text-sm text-slate-300">
-                          <div className="flex items-center gap-1 mb-1">
-                            <MapPinIcon className="w-3.5 h-3.5 flex-shrink-0 text-slate-400" />
-                            <span className="truncate">{order.deliveryAddress || 'No address'}</span>
+                        {customer && (
+                          <p className="text-sm text-slate-300">👤 {customer}</p>
+                        )}
+                        {phone && (
+                          <div className="flex items-center gap-1 text-sm text-slate-400">
+                            <PhoneIcon className="w-3.5 h-3.5 flex-shrink-0" />
+                            <span>{phone}</span>
                           </div>
-                          {assignedStaff && (
-                            <div className="flex items-center gap-1">
-                              <PhoneIcon className="w-3.5 h-3.5 flex-shrink-0 text-slate-400" />
-                              <span>
-                                {assignedStaff.name} · {assignedStaff.phone || 'N/A'}
-                              </span>
-                            </div>
-                          )}
-                        </div>
+                        )}
                       </div>
                       <div className="text-right flex-shrink-0">
-                        <div className="text-sm font-semibold text-amber-400">
-                          {formatPrice(order.total)}
+                        <div className="text-sm font-semibold text-blue-400">
+                          {formatPrice((order as any).total || 0)}
                         </div>
                         <div className="text-xs text-slate-400 mt-1">
-                          {order.createdAt
-                            ? new Date(order.createdAt).toLocaleTimeString('en-US', {
-                                hour: '2-digit',
-                                minute: '2-digit'
-                              })
+                          {(order as any).created_at || order.createdAt
+                            ? new Date((order as any).created_at || order.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
                             : '—'}
                         </div>
                       </div>
