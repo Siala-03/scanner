@@ -20,6 +20,7 @@ import { MenuManagement } from './pages/manager/MenuManagement';
 import { StaffManagement } from './pages/manager/StaffManagement';
 import { AnalyticsPage } from './pages/manager/AnalyticsPage';
 import { QRCodeGenerator } from './pages/manager/QRCodeGenerator';
+import { OnlineOrderingQRManager } from './pages/manager/OnlineOrderingQRManager';
 import CreditManagement from './pages/manager/CreditManagement';
 import { LoyaltyManagement } from './pages/manager/LoyaltyManagement';
 import ExpenseApproval from './components/manager/ExpenseApproval';
@@ -37,9 +38,10 @@ import { SupplierUser, getSupplierMe, clearSupplierToken } from './api/supplier'
 import { fetchRestaurantPublic, fetchReceiptSettings } from './api/restaurants';
 import type { RestaurantReceiptSettings } from './api/restaurants';
 import { RestaurantSettings } from './pages/manager/RestaurantSettings';
+import { OnlineOrderingPage } from './pages/customer/OnlineOrderingPage';
 
 type UserRole = 'customer' | 'waiter' | 'supervisor' | 'manager' | 'kitchen' | 'superadmin' | 'supplier' | null;
-type ManagerPage = 'dashboard' | 'menu' | 'staff' | 'analytics' | 'performance' | 'qrcodes' | 'inventory' | 'history' | 'expenses' | 'credit' | 'loyalty' | 'settings';
+type ManagerPage = 'dashboard' | 'menu' | 'staff' | 'analytics' | 'performance' | 'qrcodes' | 'online-ordering' | 'inventory' | 'history' | 'expenses' | 'credit' | 'loyalty' | 'settings';
 type SupervisorPage = 'dashboard' | 'revenue' | 'staff' | 'qrcodes' | 'inventory' | 'menu' | 'history' | 'expenses';
 
 function getThemeStorageKeyForRole(role: UserRole): string {
@@ -56,6 +58,7 @@ export function App() {
   const [receiptSettings, setReceiptSettings] = useState<RestaurantReceiptSettings>({});
   const [currentRestaurantId, setCurrentRestaurantId] = useState<string | null>(null);
   const [tableNumber, setTableNumber] = useState<number | null>(null);
+  const [onlineOrderToken, setOnlineOrderToken] = useState<string | null>(null);
   const [managerPage, setManagerPage] = useState<ManagerPage>('dashboard');
   const [supervisorPage, setSupervisorPage] =
   useState<SupervisorPage>('dashboard');
@@ -266,6 +269,12 @@ export function App() {
   ];
 
   const handleBack = () => {
+    if (onlineOrderToken) {
+      setOnlineOrderToken(null);
+      window.history.pushState({}, '', '/');
+      return;
+    }
+
     if (selectedRole === 'customer') {
       // Go to home page (root)
       window.history.pushState({}, '', '/');
@@ -355,6 +364,16 @@ export function App() {
   useEffect(() => {
     const path = window.location.pathname;
     const query = new URLSearchParams(window.location.search);
+
+    // Public online ordering URL: /order/:qrCodeToken
+    const onlineOrderMatch = path.match(/^\/order\/([^/]+)/);
+    if (onlineOrderMatch) {
+      const token = decodeURIComponent(onlineOrderMatch[1]);
+      setOnlineOrderToken(token);
+      setRouteResolved(true);
+      return;
+    }
+    setOnlineOrderToken(null);
 
     // Check for restaurant-specific table QR code path: /r/:restaurantId/t/:table
     const restaurantTableMatch = path.match(/^\/r\/([^/]+)\/t\/(\d+)/);
@@ -507,6 +526,22 @@ export function App() {
   if (!routeResolved) {
     return null;
   }
+
+  if (onlineOrderToken) {
+    return (
+      <div className="relative">
+        <button
+          onClick={handleBack}
+          className="absolute top-4 left-4 md:top-6 md:left-6 z-50 p-2 rounded-full bg-white/90 shadow-md text-slate-600"
+          aria-label="Back"
+        >
+          <ArrowLeftIcon className="w-5 h-5" />
+        </button>
+        <OnlineOrderingPage qrCodeToken={onlineOrderToken} restaurantName={restaurantName} />
+      </div>
+    );
+  }
+
   // Customer portal (table already assigned via QR scan)
   if (selectedRole === 'customer' && tableNumber !== null) {
     return (
@@ -710,6 +745,7 @@ export function App() {
                   { id: 'inventory', label: 'Inventory' },
                   { id: 'menu', label: 'Manage Menu' },
                   { id: 'qrcodes', label: 'QR Codes' },
+                  { id: 'online-ordering', label: 'Online Ordering QR' },
                   { id: 'history', label: 'Order History' },
                   { id: 'analytics', label: 'Analytics' },
                   { id: 'staff', label: 'Staff' },
@@ -758,6 +794,12 @@ export function App() {
                 restaurantName={restaurantName}
                 onAddTable={addTable}
                 onDeleteTable={removeTable}
+              />
+            )}
+            {managerPage === 'online-ordering' && currentRestaurantId && (
+              <OnlineOrderingQRManager
+                restaurantId={currentRestaurantId}
+                restaurantName={restaurantName}
               />
             )}
             {managerPage === 'expenses' && <ExpenseApproval />}
