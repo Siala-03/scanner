@@ -143,15 +143,6 @@ export function CustomerApp({
   const [showToast, setShowToast] = useState(false);
   const [onlineCustomerInfo, setOnlineCustomerInfo] = useState<OnlineCustomerInfo | null>(null);
 
-  // Gate: online orders must fill in info first
-  if (tableNumber === 999 && !onlineCustomerInfo) {
-    return (
-      <OnlineCustomerGate
-        restaurantName={restaurantName}
-        onSubmit={setOnlineCustomerInfo}
-      />
-    );
-  }
   const handleAddToCart = useCallback((item: MenuItem, quantity: number) => {
     setCartItems((prev) => {
       const itemKey = getMenuItemCartKey(item as any);
@@ -262,6 +253,16 @@ export function CustomerApp({
     label: 'Orders',
     icon: ClipboardListIcon
   }];
+
+  // Gate: all hooks above are always called; gate is in the render path, not before hooks
+  if (tableNumber === 999 && !onlineCustomerInfo) {
+    return (
+      <OnlineCustomerGate
+        restaurantName={restaurantName}
+        onSubmit={setOnlineCustomerInfo}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-slate-100">
