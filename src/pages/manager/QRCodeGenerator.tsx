@@ -1,7 +1,9 @@
 import { useState } from 'react';
-import { PrinterIcon, DownloadIcon, PlusIcon, Trash2 } from 'lucide-react';
+import { PrinterIcon, DownloadIcon, PlusIcon, Trash2, GlobeIcon } from 'lucide-react';
 import QRCode from 'react-qr-code';
 import { Button } from '../../components/ui/Button';
+
+const ONLINE_TABLE = 999;
 
 interface QRCodeGeneratorProps {
   tables: number[];
@@ -58,6 +60,74 @@ export function QRCodeGenerator({
   };
 
   const resolvedBaseUrl = baseUrl || window.location.origin;
+
+  const handleDownloadOnlineQR = () => {
+    if (!restaurantId) return;
+    const onlineLink = `${resolvedBaseUrl}/r/${encodeURIComponent(restaurantId)}/t/${ONLINE_TABLE}`;
+    const container = document.getElementById('qr-container-online') as HTMLDivElement | null;
+    if (!container) return;
+    const svg = container.querySelector('svg') as SVGSVGElement | null;
+    if (!svg) return;
+
+    const serializer = new XMLSerializer();
+    const source = serializer.serializeToString(svg);
+    const svgBlob = new Blob([source], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(svgBlob);
+
+    const img = new Image();
+    img.onload = () => {
+      const width = 420;
+      const height = 560;
+      const qrSize = 300;
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      ctx.fillStyle = '#f0fdf4';
+      ctx.fillRect(0, 0, width, height);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(16, 16, width - 32, height - 32);
+      ctx.strokeStyle = '#16a34a';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(16, 16, width - 32, height - 32);
+
+      ctx.fillStyle = '#15803d';
+      ctx.font = '700 22px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('Order Online', width / 2, 56);
+
+      ctx.fillStyle = '#166534';
+      ctx.font = '600 15px Inter, sans-serif';
+      ctx.fillText(restaurantName || 'Restaurant', width / 2, 80);
+
+      const qrX = (width - qrSize) / 2;
+      const qrY = 100;
+      ctx.drawImage(img, qrX, qrY, qrSize, qrSize);
+
+      ctx.fillStyle = '#15803d';
+      ctx.font = '600 13px Inter, sans-serif';
+      ctx.fillText('Scan to browse menu & place your order', width / 2, qrY + qrSize + 28);
+
+      ctx.fillStyle = '#16a34a';
+      ctx.font = '500 11px monospace';
+      const maxW = width - 68;
+      let linkText = onlineLink;
+      while (ctx.measureText(linkText).width > maxW && linkText.length > 0) {
+        linkText = linkText.slice(0, -1);
+      }
+      if (linkText !== onlineLink) linkText += '…';
+      ctx.fillText(linkText, width / 2, qrY + qrSize + 50);
+
+      URL.revokeObjectURL(url);
+      const link = document.createElement('a');
+      link.href = canvas.toDataURL('image/png');
+      link.download = `${(restaurantName || 'restaurant').replace(/\s+/g, '_').toLowerCase()}_online-order-qr.png`;
+      link.click();
+    };
+    img.src = url;
+  };
   const validTables = tables.filter((tableNum) => typeof tableNum === 'number' && Number.isFinite(tableNum));
   const qrTitle = restaurantName ? `${restaurantName} QR Codes` : 'Table QR Codes';
 
@@ -167,6 +237,43 @@ export function QRCodeGenerator({
             </Button>
           </div>
         </div>
+
+        {/* Online Ordering QR — Table 999 */}
+        {restaurantId && (
+          <div className="mb-6 p-4 rounded-xl border-2 border-green-500/40 bg-green-500/10">
+            <div className="flex flex-col sm:flex-row items-center gap-6">
+              <div id="qr-container-online" className="p-3 bg-white rounded-lg border border-green-200 flex-shrink-0">
+                <QRCode
+                  value={`${resolvedBaseUrl}/r/${encodeURIComponent(restaurantId)}/t/${ONLINE_TABLE}`}
+                  size={160}
+                  level="H"
+                />
+              </div>
+              <div className="flex-1 text-center sm:text-left">
+                <div className="flex items-center justify-center sm:justify-start gap-2 mb-1">
+                  <GlobeIcon className="w-5 h-5 text-green-400" />
+                  <h2 className="text-lg font-bold text-green-300">Online Ordering QR</h2>
+                  <span className="px-2 py-0.5 text-xs font-semibold rounded bg-green-500/20 text-green-300 border border-green-500/30">
+                    Table {ONLINE_TABLE}
+                  </span>
+                </div>
+                <p className="text-slate-400 text-sm mb-3">
+                  Share this QR code on social media or your website. Customers scan it to browse your menu and place orders online.
+                </p>
+                <div className="mb-4 px-3 py-2 rounded-lg bg-slate-800 border border-slate-600 font-mono text-xs text-green-300 break-all select-all">
+                  {`${resolvedBaseUrl}/r/${encodeURIComponent(restaurantId)}/t/${ONLINE_TABLE}`}
+                </div>
+                <button
+                  onClick={handleDownloadOnlineQR}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 hover:bg-green-500 text-white text-sm font-medium transition-colors"
+                >
+                  <DownloadIcon className="w-4 h-4" />
+                  Download Online QR
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* QR Grid */}
         {validTables.length === 0 ? (
