@@ -291,8 +291,11 @@ export function useOrders(): UseOrdersReturn {
       try {
         const createdOrder = await apiCreateOrder({
           tableNumber,
-          customerName: customer?.name || 'Walk-in',
+          customerName: (customer as any)?.customerName || customer?.name || 'Walk-in',
           customerId: customer?.id,
+          customerPhone: (customer as any)?.customerPhone || null,
+          customerEmail: (customer as any)?.customerEmail || null,
+          customerAddress: (customer as any)?.customerAddress || null,
           restaurantId: currentRestaurantId,
           items: payloadItems,
           notes: specialInstructions,

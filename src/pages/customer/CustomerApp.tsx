@@ -5,13 +5,114 @@ import {
   ShoppingCartIcon,
   ClipboardListIcon,
   BellRingIcon,
-  CheckIcon } from
+  CheckIcon,
+  GlobeIcon } from
 'lucide-react';
 import { CartItem, MenuItem, Order, Customer } from '../../types';
 import { MenuPage } from './MenuPage';
 import { CartPage } from './CartPage';
 import { OrderStatusPage } from './OrderStatusPage';
 import { getMenuItemCartKey } from '../../utils/menuKeys';
+
+interface OnlineCustomerInfo {
+  name: string;
+  phone: string;
+  email: string;
+  address: string;
+}
+
+function OnlineCustomerGate({ restaurantName, onSubmit }: { restaurantName?: string; onSubmit: (info: OnlineCustomerInfo) => void }) {
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
+  const [address, setAddress] = useState('');
+  const [error, setError] = useState('');
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) { setError('Full name is required.'); return; }
+    if (!phone.trim()) { setError('Phone number is required.'); return; }
+    setError('');
+    onSubmit({ name: name.trim(), phone: phone.trim(), email: email.trim(), address: address.trim() });
+  };
+
+  const inputClass = "w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent text-sm";
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-amber-50 via-white to-orange-50 flex flex-col items-center justify-center p-6">
+      <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-6 sm:p-8">
+        <div className="flex items-center justify-center gap-2 mb-2">
+          <GlobeIcon className="w-6 h-6 text-amber-500" />
+          <h1 className="text-xl font-bold text-slate-900">Order Online</h1>
+        </div>
+        {restaurantName && (
+          <p className="text-center text-slate-500 text-sm mb-6">{restaurantName}</p>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1">Full Name <span className="text-red-500">*</span></label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Enter your full name"
+              className={inputClass}
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1">Phone Number <span className="text-red-500">*</span></label>
+            <input
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="+250 7XX XXX XXX"
+              className={inputClass}
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1">Email Address</label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@example.com"
+              className={inputClass}
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1">Delivery / Location Address</label>
+            <input
+              type="text"
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              placeholder="Street, area or landmark"
+              className={inputClass}
+            />
+          </div>
+
+          {error && (
+            <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>
+          )}
+
+          <button
+            type="submit"
+            className="w-full py-3.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-white font-semibold text-sm shadow-lg shadow-amber-500/30 hover:from-amber-600 hover:to-amber-700 transition-all"
+          >
+            Continue to Menu →
+          </button>
+        </form>
+
+        <p className="text-center text-xs text-slate-400 mt-4">
+          Fields marked <span className="text-red-500">*</span> are required
+        </p>
+      </div>
+    </div>
+  );
+}
 interface CustomerAppProps {
   tableNumber: number;
   orders: Order[];
@@ -40,6 +141,17 @@ export function CustomerApp({
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [waiterCalled, setWaiterCalled] = useState(false);
   const [showToast, setShowToast] = useState(false);
+  const [onlineCustomerInfo, setOnlineCustomerInfo] = useState<OnlineCustomerInfo | null>(null);
+
+  // Gate: online orders must fill in info first
+  if (tableNumber === 999 && !onlineCustomerInfo) {
+    return (
+      <OnlineCustomerGate
+        restaurantName={restaurantName}
+        onSubmit={setOnlineCustomerInfo}
+      />
+    );
+  }
   const handleAddToCart = useCallback((item: MenuItem, quantity: number) => {
     setCartItems((prev) => {
       const itemKey = getMenuItemCartKey(item as any);
@@ -102,11 +214,22 @@ export function CustomerApp({
         console.error('onPlaceOrder prop is missing or not a function');
         throw new Error('Order placement is not available. Please refresh and try again.');
       }
-      await onPlaceOrder(tableNumber, cartItems, specialInstructions, customer, delivery, loyaltyRewardId);
+      // For online orders attach the collected customer info
+      const mergedCustomer: any = onlineCustomerInfo
+        ? {
+            ...(customer || {}),
+            name: onlineCustomerInfo.name,
+            customerName: onlineCustomerInfo.name,
+            customerPhone: onlineCustomerInfo.phone,
+            customerEmail: onlineCustomerInfo.email,
+            customerAddress: onlineCustomerInfo.address,
+          }
+        : customer;
+      await onPlaceOrder(tableNumber, cartItems, specialInstructions, mergedCustomer, delivery, loyaltyRewardId);
       setCartItems([]);
       setActiveTab('orders');
     },
-    [tableNumber, cartItems, onPlaceOrder]
+    [tableNumber, cartItems, onPlaceOrder, onlineCustomerInfo]
   );
   const handleCallWaiterClick = () => {
     if (waiterCalled) return;

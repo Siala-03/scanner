@@ -83,9 +83,26 @@ export function OnlineOrdersPanel({ orders, onStatusChange }: OnlineOrdersPanel)
               </span>
             </div>
 
-            <p className="text-sm text-slate-700 dark:text-slate-300 mb-1">
-              👤 {order.customerName || 'Guest'}
-            </p>
+            <div className="space-y-0.5 mb-2">
+              <p className="text-sm text-slate-700 dark:text-slate-300">
+                👤 {(order as any).customer_name || order.customerName || 'Guest'}
+              </p>
+              {((order as any).customer_phone || order.customerPhone) && (
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  📞 {(order as any).customer_phone || order.customerPhone}
+                </p>
+              )}
+              {((order as any).customer_email || order.customerEmail) && (
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  📧 {(order as any).customer_email || order.customerEmail}
+                </p>
+              )}
+              {((order as any).customer_address || order.customerAddress) && (
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  📍 {(order as any).customer_address || order.customerAddress}
+                </p>
+              )}
+            </div>
 
             {order.items && order.items.length > 0 && (
               <div className="text-sm text-slate-600 dark:text-slate-400 mb-2">
@@ -111,15 +128,10 @@ export function OnlineOrdersPanel({ orders, onStatusChange }: OnlineOrdersPanel)
               </div>
             )}
 
-            <div className="flex items-center gap-2 mt-2 pt-2 border-t border-current border-opacity-20">
+            <div className="mt-2 pt-2 border-t border-current border-opacity-20">
               <span className="text-sm font-bold text-slate-900 dark:text-slate-100">
-                {formatPrice(order.total || 0)}
+                {formatPrice((order as any).total || order.total || 0)}
               </span>
-              {order.customerEmail && (
-                <span className="text-xs text-slate-500 dark:text-slate-400">
-                  📧 {order.customerEmail}
-                </span>
-              )}
             </div>
 
             {/* Action Buttons */}

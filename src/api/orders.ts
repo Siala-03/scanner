@@ -182,6 +182,8 @@ export async function createOrder(order: CreateOrderInput): Promise<Order> {
     table_number: order.tableNumber,
     customer_name: order.customerName || null,
     customer_phone: (order as any).customerPhone || null,
+    customer_email: (order as any).customerEmail || null,
+    customer_address: (order as any).customerAddress || null,
     customer_id: order.customerId || null,
     status: 'pending',
     items,
