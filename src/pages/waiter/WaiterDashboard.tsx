@@ -25,7 +25,7 @@ import { loadReviews } from '../../utils/reviewsStorage';
 import { useStaffKPIs } from '../../hooks/useKPIs';
 import { buildReceiptHtml, orderToReceiptData } from '../../utils/receipt';
 import { ReceiptShareModal } from '../../components/ui/ReceiptShareModal';
-import { supabaseAdmin } from '../../lib/supabase';
+import { supabase } from '../../lib/supabase';
 import { markTableSessionPendingCloseFromReceipt } from '../../utils/tableSessions';
 import { ThemeToggle } from '../../components/ui/ThemeToggle';
 import { OnlineOrdersForWaiter } from '../../components/waiter/OnlineOrdersSection';
@@ -668,7 +668,7 @@ export function WaiterDashboard({
     const restaurantId = localStorage.getItem('restaurantId');
     if (!restaurantId) return;
 
-    const channel = supabaseAdmin
+    const channel = supabase
       .channel(`waiter-calls-${restaurantId}`)
       .on('broadcast', { event: 'waiter:call' }, (payload) => {
         const data = payload.payload as { tableNumber: number; timestamp: string };
@@ -680,7 +680,7 @@ export function WaiterDashboard({
       })
       .subscribe();
 
-    return () => { supabaseAdmin.removeChannel(channel); };
+    return () => { supabase.removeChannel(channel); };
   }, []);
 
   // ── Order buckets (scoped to this waiter's tables via myOrders) ──

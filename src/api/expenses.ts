@@ -1,4 +1,4 @@
-import { supabase, supabaseAdmin } from '../lib/supabase';
+﻿import { supabase } from '../lib/supabase';
 import { apiRequest } from './http';
 import type {
   Expense,
@@ -68,7 +68,7 @@ async function ensureDefaultExpenseCategories(restaurantId: string): Promise<voi
   }));
 
   for (let guard = 0; guard < 10; guard++) {
-    const { error } = await supabaseAdmin
+    const { error } = await supabase
       .from('expense_categories')
       .upsert(rows, { onConflict: 'id' });
 
@@ -167,7 +167,7 @@ export async function fetchExpenseCategories(): Promise<ExpenseCategory[]> {
     }));
   }
 
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await supabase
     .from('expense_categories')
     .select('*')
     .or(`restaurant_id.eq.${restaurantId},restaurant_id.is.null`)
@@ -180,7 +180,7 @@ export async function fetchExpenseCategories(): Promise<ExpenseCategory[]> {
 
   if (!data || data.length === 0) {
     await ensureDefaultExpenseCategories(restaurantId);
-    const seeded = await supabaseAdmin
+    const seeded = await supabase
       .from('expense_categories')
       .select('*')
       .eq('restaurant_id', restaurantId)
@@ -223,7 +223,7 @@ export async function createExpenseCategory(data: ExpenseCategoryFormData): Prom
   if (!restaurantId) throw new Error('No company selected');
 
   const id = `cat-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  const { data: result, error } = await supabaseAdmin
+  const { data: result, error } = await supabase
     .from('expense_categories')
     .insert({
       id,
@@ -245,7 +245,7 @@ export async function updateExpenseCategory(
   id: string,
   data: Partial<ExpenseCategoryFormData>
 ): Promise<ExpenseCategory> {
-  const { data: result, error } = await supabaseAdmin
+  const { data: result, error } = await supabase
     .from('expense_categories')
     .update({
       name: data.name,
@@ -262,7 +262,7 @@ export async function updateExpenseCategory(
 }
 
 export async function deleteExpenseCategory(id: string): Promise<void> {
-  const { error } = await supabaseAdmin
+  const { error } = await supabase
     .from('expense_categories')
     .delete()
     .eq('id', id);
@@ -278,7 +278,7 @@ export async function fetchExpenses(filters?: ExpenseFilters): Promise<Expense[]
   const restaurantId = getRestaurantId();
   if (!restaurantId) return [];
 
-  let query = supabaseAdmin
+  let query = supabase
     .from('expenses')
     .select('*')
     .eq('restaurant_id', restaurantId)
@@ -313,7 +313,7 @@ export async function fetchExpenses(filters?: ExpenseFilters): Promise<Expense[]
 }
 
 export async function fetchExpense(id: string): Promise<Expense> {
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await supabase
     .from('expenses')
     .select('*')
     .eq('id', id)
@@ -390,7 +390,7 @@ export async function createExpense(data: ExpenseFormData): Promise<Expense> {
   const resolveValidCategoryId = async (): Promise<string | null> => {
     await ensureDefaultExpenseCategories(restaurantId);
 
-    const { data: existing } = await supabaseAdmin
+    const { data: existing } = await supabase
       .from('expense_categories')
       .select('id')
       .eq('restaurant_id', restaurantId)
@@ -408,7 +408,7 @@ export async function createExpense(data: ExpenseFormData): Promise<Expense> {
       restaurant_id: restaurantId,
     };
     for (let g = 0; g < 8; g++) {
-      const { error: catErr } = await supabaseAdmin
+      const { error: catErr } = await supabase
         .from('expense_categories')
         .upsert(minRow, { onConflict: 'id' });
       if (!catErr) return fallbackId;
@@ -419,7 +419,7 @@ export async function createExpense(data: ExpenseFormData): Promise<Expense> {
     }
 
     // Last resort — any category in the table, regardless of restaurant
-    const { data: any_ } = await supabaseAdmin
+    const { data: any_ } = await supabase
       .from('expense_categories')
       .select('id')
       .limit(1);
@@ -433,7 +433,7 @@ export async function createExpense(data: ExpenseFormData): Promise<Expense> {
     while (guard < 20) {
       guard += 1;
 
-      const { data: result, error } = await supabaseAdmin
+      const { data: result, error } = await supabase
         .from('expenses')
         .insert(currentPayload)
         .select()
@@ -489,7 +489,7 @@ export async function updateExpense(
   if (data.referenceNumber !== undefined) updateData.reference_number = data.referenceNumber;
   if (data.notes !== undefined) updateData.notes = data.notes;
 
-  const { data: result, error } = await supabaseAdmin
+  const { data: result, error } = await supabase
     .from('expenses')
     .update(updateData)
     .eq('id', id)
@@ -501,7 +501,7 @@ export async function updateExpense(
 }
 
 export async function deleteExpense(id: string): Promise<void> {
-  const { error } = await supabaseAdmin
+  const { error } = await supabase
     .from('expenses')
     .delete()
     .eq('id', id);
@@ -515,7 +515,7 @@ export async function deleteExpense(id: string): Promise<void> {
 
 export async function submitExpenseForApproval(expenseId: string): Promise<Expense> {
   const staffId = getStaffId();
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await supabase
     .from('expenses')
     .update({ status: 'pending' })
     .eq('id', expenseId)
@@ -534,7 +534,7 @@ export async function approveExpense(expenseId: string, notes?: string): Promise
     approved_at: new Date().toISOString(),
   };
   if (notes) updatePayload.notes = notes;
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await supabase
     .from('expenses')
     .update(updatePayload)
     .eq('id', expenseId)
@@ -547,7 +547,7 @@ export async function approveExpense(expenseId: string, notes?: string): Promise
 
 export async function rejectExpense(expenseId: string, rejectionReason: string): Promise<Expense> {
   const staffId = getStaffId();
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await supabase
     .from('expenses')
     .update({
       status: 'rejected',
@@ -564,7 +564,7 @@ export async function rejectExpense(expenseId: string, rejectionReason: string):
 }
 
 export async function recallExpense(expenseId: string, reason?: string): Promise<Expense> {
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await supabase
     .from('expenses')
     .update({
       status: 'draft',
@@ -586,7 +586,7 @@ export async function fetchRecurringExpenses(): Promise<RecurringExpense[]> {
   const restaurantId = getRestaurantId();
   if (!restaurantId) return [];
 
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await supabase
     .from('expenses')
     .select('*')
     .eq('restaurant_id', restaurantId)
@@ -627,7 +627,7 @@ export async function updateRecurringExpense(
   if (recData.paymentMethod) updateData.payment_method = recData.paymentMethod;
   if (recData.notes) updateData.notes = recData.notes;
 
-  const { data: result, error } = await supabaseAdmin
+  const { data: result, error } = await supabase
     .from('expenses')
     .update(updateData)
     .eq('id', recId)
@@ -686,7 +686,7 @@ export async function getExpenseAnalytics(startDate?: string, endDate?: string):
     taxDeductibleTotal: 0,
   };
 
-  let query = supabaseAdmin
+  let query = supabase
     .from('expenses')
     .select('amount, category_id, payment_status, expense_date, vendor_name, is_recurring, is_tax_deductible')
     .eq('restaurant_id', restaurantId);
@@ -723,7 +723,7 @@ export async function getPendingApprovals(): Promise<Expense[]> {
   const restaurantId = getRestaurantId();
   if (!restaurantId) return [];
 
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await supabase
     .from('expenses')
     .select('*')
     .eq('restaurant_id', restaurantId)
@@ -744,7 +744,7 @@ export async function getApprovalSummary(): Promise<any> {
   const restaurantId = getRestaurantId();
   if (!restaurantId) return { pending: 0, approved: 0, rejected: 0, total: 0 };
 
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await supabase
     .from('expenses')
     .select('status, amount')
     .eq('restaurant_id', restaurantId);

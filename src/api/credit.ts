@@ -1,4 +1,4 @@
-import { supabase, supabaseAdmin } from '../lib/supabase';
+﻿import { supabase } from '../lib/supabase';
 import type { CustomerCreditAccount, CreditTransaction, CreditApplication, CreditPayment, CreditSummary, CreditAlert } from '../types/credit';
 
 function getRestaurantId(): string | undefined {
@@ -45,7 +45,7 @@ async function insertWithSchemaFallback(
   const insertPayload: Record<string, unknown> = { ...payload };
 
   for (let attempt = 0; attempt < 8; attempt += 1) {
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await supabase
       .from(table)
       .insert(insertPayload)
       .select()
@@ -187,7 +187,7 @@ export async function createCreditAccount(data: {
     restaurant_id: restaurantId,
   };
 
-  let { data: result, error } = await supabaseAdmin
+  let { data: result, error } = await supabase
     .from('credit_accounts')
     .insert(fullPayload)
     .select()
@@ -195,7 +195,7 @@ export async function createCreditAccount(data: {
 
   // Legacy schema compatibility: retry without notes if the column does not exist.
   if (error?.code === 'PGRST204' && String(error?.message || '').includes("'notes'")) {
-    ({ data: result, error } = await supabaseAdmin
+    ({ data: result, error } = await supabase
       .from('credit_accounts')
       .insert({
         id,
@@ -229,7 +229,7 @@ export async function updateCreditAccount(
     updated_at: new Date().toISOString(),
   };
 
-  let { data: result, error } = await supabaseAdmin
+  let { data: result, error } = await supabase
     .from('credit_accounts')
     .update(fullPayload)
     .eq('id', accountId)
@@ -238,7 +238,7 @@ export async function updateCreditAccount(
 
   // Legacy schema compatibility: retry without notes if the column does not exist.
   if (error?.code === 'PGRST204' && String(error?.message || '').includes("'notes'")) {
-    ({ data: result, error } = await supabaseAdmin
+    ({ data: result, error } = await supabase
       .from('credit_accounts')
       .update({
         credit_limit: data.creditLimit,
@@ -255,7 +255,7 @@ export async function updateCreditAccount(
 }
 
 export async function deleteCreditAccount(accountId: string): Promise<void> {
-  const { error } = await supabaseAdmin
+  const { error } = await supabase
     .from('credit_accounts')
     .delete()
     .eq('id', accountId);
@@ -285,7 +285,7 @@ export async function addCreditCharge(data: {
   performedBy: string;
   performedByName: string;
 }): Promise<{ transaction: CreditTransaction; account: CustomerCreditAccount }> {
-  const { data: account, error: accError } = await supabaseAdmin
+  const { data: account, error: accError } = await supabase
     .from('credit_accounts')
     .select('current_balance')
     .eq('id', data.accountId)
@@ -319,7 +319,7 @@ export async function addCreditCharge(data: {
   }
 
   if (!accError && account) {
-    await supabaseAdmin
+    await supabase
       .from('credit_accounts')
       .update({ current_balance: balanceAfter })
       .eq('id', data.accountId);
@@ -339,7 +339,7 @@ export async function addCreditPayment(data: {
   paidByName: string;
   notes?: string;
 }): Promise<{ transaction: CreditTransaction; payment: CreditPayment; account: CustomerCreditAccount }> {
-  const { data: account, error: accError } = await supabaseAdmin
+  const { data: account, error: accError } = await supabase
     .from('credit_accounts')
     .select('current_balance')
     .eq('id', data.accountId)
@@ -375,7 +375,7 @@ export async function addCreditPayment(data: {
   }
 
   if (!accError && account) {
-    await supabaseAdmin
+    await supabase
       .from('credit_accounts')
       .update({ current_balance: newBalance })
       .eq('id', data.accountId);
@@ -401,7 +401,7 @@ export async function addCreditAdjustment(data: {
   performedBy: string;
   performedByName: string;
 }): Promise<{ transaction: CreditTransaction; account: CustomerCreditAccount }> {
-  const { data: account, error: accError } = await supabaseAdmin
+  const { data: account, error: accError } = await supabase
     .from('credit_accounts')
     .select('current_balance')
     .eq('id', data.accountId)
@@ -434,7 +434,7 @@ export async function addCreditAdjustment(data: {
   }
 
   if (!accError && account) {
-    await supabaseAdmin
+    await supabase
       .from('credit_accounts')
       .update({ current_balance: balanceAfter })
       .eq('id', data.accountId);
@@ -526,7 +526,7 @@ export async function reviewCreditApplication(
     updateData.rejection_reason = data.rejectionReason;
   }
 
-  const { data: result, error } = await supabaseAdmin
+  const { data: result, error } = await supabase
     .from('credit_applications')
     .update(updateData)
     .eq('id', applicationId)

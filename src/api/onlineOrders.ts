@@ -1,4 +1,4 @@
-import { supabaseAdmin } from '../lib/supabase';
+import { supabase, callEdgeFn } from '../lib/supabase';
 import { Order, OnlineQRCode } from '../types';
 
 function generateId(): string {
@@ -8,45 +8,35 @@ function generateId(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-/**
- * Generate a unique token for QR code (short, URL-friendly)
- */
 function generateCodeToken(): string {
   return Math.random().toString(36).substring(2, 10).toUpperCase();
 }
 
-/**
- * Create a new online ordering QR code for a restaurant
- */
 export const ONLINE_TABLE_NUMBER = 999;
+
+// ── Staff operations (anon key + RLS) ────────────────────────────────────────
 
 export async function createOnlineQRCode(restaurantId: string): Promise<OnlineQRCode> {
   const id = generateId();
   const codeToken = generateCodeToken();
   const shortLink = `${window.location.origin}/r/${encodeURIComponent(restaurantId)}/t/${ONLINE_TABLE_NUMBER}`;
-  const qrUrl = shortLink;
 
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await supabase
     .from('online_qr_codes')
-    .insert([
-      {
-        id,
-        restaurant_id: restaurantId,
-        code_token: codeToken,
-        qr_url: qrUrl,
-        short_link: shortLink,
-        is_active: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }
-    ])
+    .insert([{
+      id,
+      restaurant_id: restaurantId,
+      code_token: codeToken,
+      qr_url: shortLink,
+      short_link: shortLink,
+      is_active: true,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }])
     .select()
     .single();
 
-  if (error) {
-    console.error('Failed to create online QR code:', error);
-    throw error;
-  }
+  if (error) throw error;
 
   return {
     id: data.id,
@@ -60,14 +50,10 @@ export async function createOnlineQRCode(restaurantId: string): Promise<OnlineQR
   };
 }
 
-/**
- * Get the online QR code for a restaurant (create if doesn't exist)
- */
 export async function getOrCreateOnlineQRCode(restaurantId: string): Promise<OnlineQRCode> {
-  // The link is always deterministic — derived from restaurantId, not stored token
   const correctLink = `${window.location.origin}/r/${encodeURIComponent(restaurantId)}/t/${ONLINE_TABLE_NUMBER}`;
 
-  const { data: existing, error: fetchError } = await supabaseAdmin
+  const { data: existing, error: fetchError } = await supabase
     .from('online_qr_codes')
     .select('*')
     .eq('restaurant_id', restaurantId)
@@ -77,9 +63,8 @@ export async function getOrCreateOnlineQRCode(restaurantId: string): Promise<Onl
     .single();
 
   if (!fetchError && existing) {
-    // Patch the stored link if it still uses the old /order/:token format
     if (existing.short_link !== correctLink) {
-      await supabaseAdmin
+      await supabase
         .from('online_qr_codes')
         .update({ short_link: correctLink, qr_url: correctLink, updated_at: new Date().toISOString() })
         .eq('id', existing.id);
@@ -96,57 +81,74 @@ export async function getOrCreateOnlineQRCode(restaurantId: string): Promise<Onl
     };
   }
 
-  // No existing record — create one
   return createOnlineQRCode(restaurantId);
 }
 
-/**
- * Regenerate a QR code (deactivate old, create new)
- */
 export async function regenerateOnlineQRCode(restaurantId: string): Promise<OnlineQRCode> {
-  // Deactivate all previous codes
-  await supabaseAdmin
+  await supabase
     .from('online_qr_codes')
-    .update({
-      is_active: false,
-      updated_at: new Date().toISOString(),
-    })
+    .update({ is_active: false, updated_at: new Date().toISOString() })
     .eq('restaurant_id', restaurantId);
 
-  // Create new code
   return createOnlineQRCode(restaurantId);
 }
 
+export async function getOnlineOrders(restaurantId: string, status?: string): Promise<Order[]> {
+  let query = supabase
+    .from('orders')
+    .select('*')
+    .eq('restaurant_id', restaurantId)
+    .eq('is_online_order', true)
+    .order('created_at', { ascending: false });
+
+  if (status) query = query.eq('status', status);
+
+  const { data, error } = await query;
+  if (error) return [];
+
+  return (data || []).map(mapOrder);
+}
+
+export async function getPendingOnlineOrders(restaurantId: string): Promise<Order[]> {
+  const { data, error } = await supabase
+    .from('orders')
+    .select('*')
+    .eq('restaurant_id', restaurantId)
+    .eq('is_online_order', true)
+    .in('status', ['pending', 'verified', 'preparing'])
+    .order('created_at', { ascending: true });
+
+  if (error) return [];
+  return (data || []).map(mapOrder);
+}
+
+// ── Customer operations (Edge Functions — service key server-side) ────────────
+
 /**
- * Get online QR code by token
+ * Customer-facing: validate a QR code token.
+ * Calls the `customer-qr` Edge Function — no service key in browser.
  */
 export async function getOnlineQRCodeByToken(codeToken: string): Promise<OnlineQRCode | null> {
-  const { data, error } = await supabaseAdmin
-    .from('online_qr_codes')
-    .select('*')
-    .eq('code_token', codeToken)
-    .eq('is_active', true)
-    .single();
-
-  if (error || !data) {
-    console.error('QR code not found or inactive:', error);
+  try {
+    const data = await callEdgeFn('customer-qr', { params: { token: codeToken } });
+    return {
+      id: data.id,
+      restaurantId: data.restaurant_id,
+      codeToken: data.code_token,
+      qrUrl: data.qr_url,
+      shortLink: data.short_link,
+      isActive: data.is_active,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at,
+    };
+  } catch {
     return null;
   }
-
-  return {
-    id: data.id,
-    restaurantId: data.restaurant_id,
-    codeToken: data.code_token,
-    qrUrl: data.qr_url,
-    shortLink: data.short_link,
-    isActive: data.is_active,
-    createdAt: data.created_at,
-    updatedAt: data.updated_at,
-  };
 }
 
 /**
- * Create an online order from QR code
+ * Customer-facing: place an online order.
+ * Calls the `customer-place-order` Edge Function — prices validated server-side.
  */
 export async function createOnlineOrder(
   restaurantId: string,
@@ -158,149 +160,43 @@ export async function createOnlineOrder(
   items: any[],
   specialInstructions?: string
 ): Promise<Order> {
-  const id = generateId();
-  const orderNumber = `ONLINE-${Date.now().toString().slice(-8)}`;
+  const data = await callEdgeFn('customer-place-order', {
+    method: 'POST',
+    body: {
+      restaurantId,
+      qrCodeId,
+      customerName,
+      customerPhone,
+      customerEmail,
+      customerAddress,
+      items,
+      specialInstructions,
+    },
+  });
 
-  // Calculate totals
-  const subtotal = items.reduce((sum, item) => sum + (item.unitPrice || 0) * (item.quantity || 0), 0);
-  const tax = Math.round(subtotal * 0.1); // 10% tax
-  const total = subtotal + tax;
+  return mapOrder(data);
+}
 
-  const { data, error } = await supabaseAdmin
-    .from('orders')
-    .insert([
-      {
-        id,
-        order_number: orderNumber,
-        customer_name: customerName,
-        customer_phone: customerPhone,
-        customer_email: customerEmail,
-        customer_address: customerAddress,
-        items: items,
-        status: 'pending',
-        subtotal,
-        tax,
-        total,
-        is_online_order: true,
-        online_qr_code_id: qrCodeId,
-        notes: specialInstructions,
-        restaurant_id: restaurantId,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }
-    ])
-    .select()
-    .single();
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
-  if (error) {
-    console.error('Failed to create online order:', error);
-    throw error;
-  }
-
+function mapOrder(o: any): Order {
   return {
-    id: data.id,
-    orderNumber: data.order_number,
-    customerName: data.customer_name,
-    customerEmail: data.customer_email,
-    customerPhone: data.customer_phone,
-    customerAddress: data.customer_address,
-    items: data.items || [],
-    status: data.status,
-    subtotal: data.subtotal,
-    tax: data.tax,
-    total: data.total,
-    isOnlineOrder: data.is_online_order,
-    onlineQRCodeId: data.online_qr_code_id,
-    specialInstructions: data.notes,
-    restaurantId: data.restaurant_id,
-    createdAt: data.created_at,
-    updatedAt: data.updated_at,
-  };
-}
-
-/**
- * Get all online orders for a restaurant
- */
-export async function getOnlineOrders(
-  restaurantId: string,
-  status?: string
-): Promise<Order[]> {
-  let query = supabaseAdmin
-    .from('orders')
-    .select('*')
-    .eq('restaurant_id', restaurantId)
-    .eq('is_online_order', true)
-    .order('created_at', { ascending: false });
-
-  if (status) {
-    query = query.eq('status', status);
-  }
-
-  const { data, error } = await query;
-
-  if (error) {
-    console.error('Failed to fetch online orders:', error);
-    return [];
-  }
-
-  return (data || []).map((order) => ({
-    id: order.id,
-    orderNumber: order.order_number,
-    customerName: order.customer_name,
-    customerEmail: order.customer_email,
-    customerPhone: order.customer_phone,
-    customerAddress: order.customer_address,
-    items: order.items || [],
-    status: order.status,
-    subtotal: order.subtotal,
-    tax: order.tax,
-    total: order.total,
-    isOnlineOrder: order.is_online_order,
-    onlineQRCodeId: order.online_qr_code_id,
-    specialInstructions: order.notes,
-    restaurantId: order.restaurant_id,
-    createdAt: order.created_at,
-    updatedAt: order.updated_at,
-  }));
-}
-
-/**
- * Get pending online orders for display in supervisor/waiter dashboard
- */
-export async function getPendingOnlineOrders(restaurantId: string): Promise<Order[]> {
-  const statuses = ['pending', 'verified', 'preparing'];
-  let query = supabaseAdmin
-    .from('orders')
-    .select('*')
-    .eq('restaurant_id', restaurantId)
-    .eq('is_online_order', true)
-    .in('status', statuses)
-    .order('created_at', { ascending: true });
-
-  const { data, error } = await query;
-
-  if (error) {
-    console.error('Failed to fetch pending online orders:', error);
-    return [];
-  }
-
-  return (data || []).map((order) => ({
-    id: order.id,
-    orderNumber: order.order_number,
-    customerName: order.customer_name,
-    customerEmail: order.customer_email,
-    customerPhone: order.customer_phone,
-    customerAddress: order.customer_address,
-    items: order.items || [],
-    status: order.status,
-    subtotal: order.subtotal,
-    tax: order.tax,
-    total: order.total,
-    isOnlineOrder: order.is_online_order,
-    onlineQRCodeId: order.online_qr_code_id,
-    specialInstructions: order.notes,
-    restaurantId: order.restaurant_id,
-    createdAt: order.created_at,
-    updatedAt: order.updated_at,
-  }));
+    id: o.id,
+    orderNumber: o.order_number,
+    customerName: o.customer_name,
+    customerEmail: o.customer_email,
+    customerPhone: o.customer_phone,
+    customerAddress: o.customer_address,
+    items: o.items || [],
+    status: o.status,
+    subtotal: o.subtotal,
+    tax: o.tax,
+    total: o.total,
+    isOnlineOrder: o.is_online_order,
+    onlineQRCodeId: o.online_qr_code_id,
+    specialInstructions: o.notes,
+    restaurantId: o.restaurant_id,
+    createdAt: o.created_at,
+    updatedAt: o.updated_at,
+  } as any;
 }

@@ -1,9 +1,8 @@
-import { supabaseAdmin } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 import type { Order, CreateOrderInput, UpdateOrderStatusInput } from '../types/orders';
 import { decrementInventoryForOrder } from './inventory';
 
-// Use supabaseAdmin for all order operations so RLS never blocks customers or staff
-const db = supabaseAdmin;
+const db = supabase;
 
 function getRestaurantId(): string | undefined {
   if (typeof window !== 'undefined') {

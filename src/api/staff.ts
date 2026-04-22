@@ -1,4 +1,4 @@
-import { supabase, supabaseAdmin } from '../lib/supabase';
+import { supabase, callEdgeFn } from '../lib/supabase';
 import type { Staff, StaffRole, StaffPerformance } from '../types';
 
 function getRestaurantId(): string | undefined {
@@ -99,7 +99,7 @@ export async function fetchWaiters(): Promise<Staff[]> {
 }
 
 export async function updateStaffStatus(id: string, isOnDuty: boolean): Promise<Staff> {
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await supabase
     .from('staff')
     .update({ is_on_duty: isOnDuty })
     .eq('id', id)
@@ -110,7 +110,7 @@ export async function updateStaffStatus(id: string, isOnDuty: boolean): Promise<
 }
 
 export async function updateStaffAssignments(id: string, assignedTables: number[]): Promise<Staff> {
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await supabase
     .from('staff')
     .update({ assigned_tables: assignedTables })
     .eq('id', id)
@@ -121,7 +121,7 @@ export async function updateStaffAssignments(id: string, assignedTables: number[
 }
 
 export async function updateStaffRole(id: string, role: StaffRole): Promise<Staff> {
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await supabase
     .from('staff')
     .update({ role })
     .eq('id', id)
@@ -132,8 +132,6 @@ export async function updateStaffRole(id: string, role: StaffRole): Promise<Staf
 }
 
 export async function deleteStaff(id: string): Promise<{ success: boolean }> {
-  await supabaseAdmin.from('staff_credentials').delete().eq('staff_id', id);
-  const { error } = await supabaseAdmin.from('staff').delete().eq('id', id);
-  if (error) throw error;
+  await callEdgeFn('admin-staff', { method: 'DELETE', params: { staff_id: id } });
   return { success: true };
 }

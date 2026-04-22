@@ -1,4 +1,4 @@
-import { supabase, supabaseAdmin } from '../lib/supabase';
+﻿import { supabase } from '../lib/supabase';
 
 export interface Restaurant {
   id: string;
@@ -60,7 +60,7 @@ export async function createRestaurant(restaurant: Partial<Restaurant>): Promise
   console.log('Creating restaurant:', restaurant);
   const id = `restaurant-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await supabase
     .from('restaurants')
     .insert({
       id,
@@ -82,7 +82,7 @@ export async function createRestaurant(restaurant: Partial<Restaurant>): Promise
 
 export async function updateRestaurant(id: string, restaurant: Partial<Restaurant>): Promise<Restaurant> {
   console.log('Updating restaurant:', id, restaurant);
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await supabase
     .from('restaurants')
     .update({
       name:    restaurant.name,
@@ -103,7 +103,7 @@ export async function updateRestaurant(id: string, restaurant: Partial<Restauran
 
 export async function deleteRestaurant(id: string): Promise<void> {
   console.log('Deleting restaurant:', id);
-  const { error } = await supabaseAdmin
+  const { error } = await supabase
     .from('restaurants')
     .delete()
     .eq('id', id);
@@ -119,7 +119,7 @@ export async function deleteRestaurant(id: string): Promise<void> {
  * Returns empty object if the restaurant has no settings yet.
  */
 export async function fetchReceiptSettings(restaurantId: string): Promise<RestaurantReceiptSettings> {
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await supabase
     .from('restaurants')
     .select('*')
     .eq('id', restaurantId)
@@ -161,7 +161,7 @@ export async function saveReceiptSettings(
   restaurantName?: string,
 ): Promise<void> {
   // Fetch whole row (schema-safe) so we can merge settings when available.
-  const { data: current } = await supabaseAdmin
+  const { data: current } = await supabase
     .from('restaurants')
     .select('*')
     .eq('id', restaurantId)
@@ -193,7 +193,7 @@ export async function saveReceiptSettings(
 
   let lastError: any = null;
   for (const payload of attempts) {
-    const { error } = await supabaseAdmin
+    const { error } = await supabase
       .from('restaurants')
       .update(payload)
       .eq('id', restaurantId);
@@ -215,7 +215,7 @@ export async function saveReceiptSettings(
   ];
 
   for (const payload of singleFieldAttempts) {
-    const { error } = await supabaseAdmin
+    const { error } = await supabase
       .from('restaurants')
       .update(payload)
       .eq('id', restaurantId);
@@ -250,3 +250,4 @@ export async function fetchRestaurantPublic(restaurantId: string): Promise<Resta
   console.log('Restaurant found:', data);
   return data as Restaurant;
 }
+

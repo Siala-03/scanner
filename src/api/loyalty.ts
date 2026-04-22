@@ -1,9 +1,9 @@
-import { apiRequest, ApiError } from './http';
-import { supabaseAdmin } from '../lib/supabase';
+﻿import { apiRequest, ApiError } from './http';
+import { supabase } from '../lib/supabase';
 import type { Customer, LoyaltyTransaction, Reward, RewardRedemption, LoyaltySummary } from '../types';
 
 const LOYALTY_BASE = '/loyalty';
-const db = supabaseAdmin;
+const db = supabase;
 
 function toDate(value: unknown): Date {
   return value instanceof Date ? value : new Date(String(value ?? Date.now()));

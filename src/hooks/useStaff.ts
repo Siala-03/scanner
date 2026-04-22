@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { Staff } from '../types';
 import { fetchStaff, fetchStaffOnDuty, fetchWaiters, fetchStaffById } from '../api/staff';
-import { supabaseAdmin as supabase } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 
 function resolveRestaurantId(): string | undefined {
   const direct = localStorage.getItem('restaurantId');

@@ -1,4 +1,4 @@
-import { supabase, supabaseAdmin } from '../lib/supabase';
+﻿import { supabase } from '../lib/supabase';
 
 function getRestaurantId(): string | undefined {
   if (typeof window !== 'undefined') {
@@ -72,7 +72,7 @@ export async function callWaiter(tableNumber: number): Promise<{ success: boolea
   if (!restaurantId) return { success: false, message: 'No restaurant context' };
 
   const channelName = `waiter-calls-${restaurantId}`;
-  const channel = supabaseAdmin.channel(channelName);
+  const channel = supabase.channel(channelName);
 
   await new Promise<void>((resolve) => {
     channel.subscribe((status) => {
@@ -86,6 +86,6 @@ export async function callWaiter(tableNumber: number): Promise<{ success: boolea
     payload: { tableNumber, timestamp: new Date().toISOString(), restaurantId },
   });
 
-  supabaseAdmin.removeChannel(channel);
+  supabase.removeChannel(channel);
   return { success: true, message: 'Waiter has been notified' };
 }

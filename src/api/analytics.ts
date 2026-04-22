@@ -1,4 +1,4 @@
-import { supabaseAdmin } from '../lib/supabase';
+﻿import { supabase } from '../lib/supabase';
 
 function getRestaurantId(): string | null {
   if (typeof window === 'undefined') return null;
@@ -52,7 +52,7 @@ export async function fetchTodayKPIs(): Promise<KPIMetrics> {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const { data: orders, error } = await supabaseAdmin
+  const { data: orders, error } = await supabase
     .from('orders')
     .select('*')
     .eq('restaurant_id', restaurantId)
@@ -104,7 +104,7 @@ export async function fetchWeeklyRevenue(): Promise<WeeklyRevenue> {
   const now = new Date();
   const twoWeeksAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
 
-  const { data: orders, error } = await supabaseAdmin
+  const { data: orders, error } = await supabase
     .from('orders')
     .select('total, created_at')
     .eq('restaurant_id', restaurantId)
@@ -155,7 +155,7 @@ export async function fetchRevenueByDateRange(startDate: string, endDate: string
   const restaurantId = getRestaurantId();
   if (!restaurantId) return [];
 
-  const { data: orders, error } = await supabaseAdmin
+  const { data: orders, error } = await supabase
     .from('orders')
     .select('total, created_at')
     .eq('restaurant_id', restaurantId)
@@ -175,3 +175,4 @@ export async function fetchRevenueByDateRange(startDate: string, endDate: string
 
   return Array.from(dayMap.values()).sort((a, b) => a.date.localeCompare(b.date));
 }
+

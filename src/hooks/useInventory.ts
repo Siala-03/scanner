@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { supabaseAdmin as supabase } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 import {
   fetchInventory,
   fetchSuppliers,

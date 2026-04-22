@@ -15,6 +15,7 @@ import { SupervisorDashboard } from './pages/supervisor/SupervisorDashboard';
 import { RevenueReports } from './pages/supervisor/RevenueReports';
 import { StaffPerformance } from './pages/supervisor/StaffPerformance';
 import { OrderHistoryPage } from './pages/supervisor/OrderHistoryPage';
+import { OnlineOrdersPage } from './pages/supervisor/OnlineOrdersPage';
 import { ManagerDashboard } from './pages/manager/ManagerDashboard';
 import { MenuManagement } from './pages/manager/MenuManagement';
 import { StaffManagement } from './pages/manager/StaffManagement';
@@ -40,7 +41,7 @@ import { RestaurantSettings } from './pages/manager/RestaurantSettings';
 
 type UserRole = 'customer' | 'waiter' | 'supervisor' | 'manager' | 'kitchen' | 'superadmin' | 'supplier' | null;
 type ManagerPage = 'dashboard' | 'menu' | 'staff' | 'analytics' | 'performance' | 'qrcodes' | 'inventory' | 'history' | 'expenses' | 'credit' | 'loyalty' | 'settings';
-type SupervisorPage = 'dashboard' | 'revenue' | 'staff' | 'qrcodes' | 'inventory' | 'menu' | 'history' | 'expenses';
+type SupervisorPage = 'dashboard' | 'revenue' | 'staff' | 'qrcodes' | 'inventory' | 'menu' | 'history' | 'expenses' | 'online-orders';
 
 function getThemeStorageKeyForRole(role: UserRole): string {
   return `theme:${role ?? 'default'}`;
@@ -634,6 +635,17 @@ export function App() {
             >
               Expenses
             </Button>
+            <Button
+              variant={supervisorPage === 'online-orders' ? 'primary' : 'ghost'}
+              size="sm"
+              onClick={() => setSupervisorPage('online-orders')}
+              className="relative"
+            >
+              Online Orders
+              {orders.filter((o: any) => (o.isOnlineOrder || o.is_online_order || o.tableNumber === 999 || o.table_number === 999) && o.status === 'pending').length > 0 && (
+                <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full" />
+              )}
+            </Button>
           </div>
         </div>
 
@@ -656,6 +668,7 @@ export function App() {
         {supervisorPage === 'inventory' && <InventoryManagement role="supervisor" />}
         {supervisorPage === 'history' && <OrderHistoryPage onBack={() => setSupervisorPage('dashboard')} existingOrders={orders} />}
         {supervisorPage === 'expenses' && <SupervisorExpenseManagement />}
+        {supervisorPage === 'online-orders' && <OnlineOrdersPage />}
         {supervisorPage === 'menu' && <MenuManagement />}
       </div>
     );

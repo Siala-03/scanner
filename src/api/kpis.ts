@@ -1,4 +1,4 @@
-import { supabaseAdmin } from '../lib/supabase';
+﻿import { supabase } from '../lib/supabase';
 import { KPI, KPIWithProgress, StaffKPIProgress } from '../types';
 
 function getRestaurantId(): string | null {
@@ -90,7 +90,7 @@ async function computeProgress(
 
   if (kpi.metric === 'orders_served' || kpi.metric === 'revenue' || kpi.metric === 'tables_served') {
     // Read whole rows to avoid schema-specific select errors on older deployments.
-    const { data: ordersRaw, error: ordersError } = await supabaseAdmin
+    const { data: ordersRaw, error: ordersError } = await supabase
       .from('orders')
       .select('*')
       .eq('restaurant_id', kpi.restaurant_id)
@@ -145,7 +145,7 @@ export async function getKPIs(): Promise<KPI[]> {
   const restaurantId = getRestaurantId();
   if (!restaurantId) return [];
 
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await supabase
     .from('kpis')
     .select('*')
     .eq('restaurant_id', restaurantId)
@@ -185,7 +185,7 @@ export async function createKPI(kpi: {
   if (!restaurantId) throw new Error('No company selected');
   const staff = getCurrentStaff();
 
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await supabase
     .from('kpis')
     .insert({
       restaurant_id: restaurantId,
@@ -228,7 +228,7 @@ export async function getStaffKPIs(): Promise<KPIWithProgress[]> {
   const staffRole = normalizeRole(staff.role);
 
   // Fetch KPIs where this staff's role matches OR they are in assigned_staff_ids
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await supabase
     .from('kpis')
     .select('*')
     .eq('restaurant_id', restaurantId);
@@ -276,7 +276,7 @@ export async function getStaffKPIs(): Promise<KPIWithProgress[]> {
 }
 
 export async function assignKPI(staffId: string, kpiId: number): Promise<void> {
-  const { data: existing } = await supabaseAdmin
+  const { data: existing } = await supabase
     .from('kpis')
     .select('assigned_staff_ids')
     .eq('id', kpiId)
@@ -286,14 +286,14 @@ export async function assignKPI(staffId: string, kpiId: number): Promise<void> {
   const ids: string[] = existing.assigned_staff_ids || [];
   if (!ids.includes(staffId)) ids.push(staffId);
 
-  await supabaseAdmin
+  await supabase
     .from('kpis')
     .update({ assigned_staff_ids: ids })
     .eq('id', kpiId);
 }
 
 export async function unassignKPI(staffId: string, kpiId: number): Promise<void> {
-  const { data: existing } = await supabaseAdmin
+  const { data: existing } = await supabase
     .from('kpis')
     .select('assigned_staff_ids')
     .eq('id', kpiId)
@@ -302,7 +302,7 @@ export async function unassignKPI(staffId: string, kpiId: number): Promise<void>
   if (!existing) return;
   const ids: string[] = (existing.assigned_staff_ids || []).filter((id: string) => id !== staffId);
 
-  await supabaseAdmin
+  await supabase
     .from('kpis')
     .update({ assigned_staff_ids: ids })
     .eq('id', kpiId);
@@ -329,7 +329,7 @@ export async function updateKPI(
   if (kpi.period !== undefined) payload.period = kpi.period;
   if (kpi.assignedStaffIds !== undefined) payload.assigned_staff_ids = kpi.assignedStaffIds;
 
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await supabase
     .from('kpis')
     .update(payload)
     .eq('id', kpiId)
@@ -358,7 +358,7 @@ export async function updateKPI(
 export async function updateKPIProgress(_kpiId: number, _currentValue: number): Promise<void> {}
 
 export async function deleteKPI(kpiId: number): Promise<{ success: boolean }> {
-  const { error } = await supabaseAdmin
+  const { error } = await supabase
     .from('kpis')
     .delete()
     .eq('id', kpiId);
@@ -366,3 +366,4 @@ export async function deleteKPI(kpiId: number): Promise<{ success: boolean }> {
   if (error) throw error;
   return { success: true };
 }
+

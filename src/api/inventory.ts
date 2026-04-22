@@ -1,4 +1,4 @@
-import { supabase, supabaseAdmin } from '../lib/supabase';
+﻿import { supabase } from '../lib/supabase';
 import type {
   InventoryRecord,
   Supplier,
@@ -177,7 +177,7 @@ export async function createInventoryRecord(record: Partial<InventoryRecord>): P
   const restaurantId = getRestaurantId();
   const id = `inv-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await supabase
     .from('inventory_records')
     .insert({
       id,
@@ -207,7 +207,7 @@ export async function updateInventoryRecord(
     throw new Error('No company selected. Please sign in again or reselect your company.');
   }
 
-  const { data: previous } = await supabaseAdmin
+  const { data: previous } = await supabase
     .from('inventory_records')
     .select('stock,reorder_point,reorder_qty,supplier_id,unit_cost')
     .eq('menu_item_id', menuItemId)
@@ -235,7 +235,7 @@ export async function updateInventoryRecord(
   if (record.location            !== undefined) updateFields.location            = record.location;
 
   // Try UPDATE first (existing record)
-  const { data: updated, error: updateError } = await supabaseAdmin
+  const { data: updated, error: updateError } = await supabase
     .from('inventory_records')
     .update(updateFields)
     .eq('menu_item_id', menuItemId)
@@ -261,7 +261,7 @@ export async function updateInventoryRecord(
 
   // No existing row — INSERT with a generated id
   const id = `inv-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await supabase
     .from('inventory_records')
     .insert({
       id,
@@ -315,7 +315,7 @@ async function maybeAutoReorder(params: {
     : currentStock <= reorderPoint;
   if (!crossedThreshold) return;
 
-  const { data: existingOpen, error: existingError } = await supabaseAdmin
+  const { data: existingOpen, error: existingError } = await supabase
     .from('purchase_orders')
     .select('id, items, status')
     .eq('restaurant_id', params.restaurantId)
@@ -332,12 +332,12 @@ async function maybeAutoReorder(params: {
     if (alreadyQueued) return;
   }
 
-  const { data: supplier } = await supabaseAdmin
+  const { data: supplier } = await supabase
     .from('suppliers')
     .select('name')
     .eq('id', supplierId)
     .maybeSingle();
-  const { data: menuItem } = await supabaseAdmin
+  const { data: menuItem } = await supabase
     .from('menu_items')
     .select('name')
     .eq('id', params.menuItemId)
@@ -371,7 +371,7 @@ async function maybeAutoReorder(params: {
 export async function deleteInventoryRecord(menuItemId: string): Promise<void> {
   const restaurantId = getRestaurantId();
   // Build query — only add restaurant_id filter when it's available (undefined breaks the eq filter)
-  let deleteQuery = supabaseAdmin
+  let deleteQuery = supabase
     .from('inventory_records')
     .delete()
     .eq('menu_item_id', menuItemId);
@@ -397,7 +397,7 @@ export async function decrementInventoryForOrder(
 
   await Promise.allSettled(
     items.map(async ({ menuItemId, quantity }) => {
-      const { data: rec, error: fetchErr } = await supabaseAdmin
+      const { data: rec, error: fetchErr } = await supabase
         .from('inventory_records')
         .select('stock')
         .eq('menu_item_id', menuItemId)
@@ -407,7 +407,7 @@ export async function decrementInventoryForOrder(
       if (fetchErr || !rec) return; // No inventory record for this item — skip silently
 
       const newStock = Math.max(0, (rec.stock ?? 0) - quantity);
-      const { error: updateErr } = await supabaseAdmin
+      const { error: updateErr } = await supabase
         .from('inventory_records')
         .update({ stock: newStock, updated_at: new Date().toISOString() })
         .eq('menu_item_id', menuItemId)
@@ -454,7 +454,7 @@ export async function adjustStock(
   const oldStock = current?.stock ?? 0;
   const newStock = Math.max(0, oldStock + adjustment);
 
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await supabase
     .from('inventory_records')
     .update({ stock: newStock, updated_at: new Date().toISOString() })
     .eq('menu_item_id', menuItemId)
@@ -464,7 +464,7 @@ export async function adjustStock(
 
   if (error) throw error;
 
-  const { error: movementError } = await supabaseAdmin.from('stock_movements').insert({
+  const { error: movementError } = await supabase.from('stock_movements').insert({
     id:            `mov-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
     menu_item_id:  menuItemId,
     menu_item_name: menuItemId,
@@ -508,7 +508,7 @@ export async function createSupplier(supplier: Partial<Supplier>): Promise<Suppl
   const id = `sup-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   console.log('Creating supplier:', supplier, 'restaurant:', restaurantId);
 
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await supabase
     .from('suppliers')
     .insert({
       id,
@@ -537,7 +537,7 @@ export async function createSupplier(supplier: Partial<Supplier>): Promise<Suppl
 }
 
 export async function updateSupplier(id: string, supplier: Partial<Supplier>): Promise<Supplier> {
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await supabase
     .from('suppliers')
     .update({
       name:           supplier.name,
@@ -562,7 +562,7 @@ export async function updateSupplier(id: string, supplier: Partial<Supplier>): P
 }
 
 export async function deleteSupplier(id: string): Promise<void> {
-  const { error } = await supabaseAdmin.from('suppliers').delete().eq('id', id);
+  const { error } = await supabase.from('suppliers').delete().eq('id', id);
   if (error) throw error;
 }
 
@@ -625,7 +625,7 @@ export async function createPurchaseOrder(po: Partial<PurchaseOrder>): Promise<P
   }
 
   const id = `po-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await supabase
     .from('purchase_orders')
     .insert({
       id,
@@ -665,7 +665,7 @@ export async function updatePurchaseOrder(id: string, po: Partial<PurchaseOrder>
   if (po.expectedDelivery  !== undefined) update.expected_delivery = po.expectedDelivery;
   if (po.notes             !== undefined) update.notes             = po.notes;
 
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await supabase
     .from('purchase_orders')
     .update(update)
     .eq('id', id)
@@ -687,8 +687,8 @@ export async function receivePurchaseOrder(
   for (const item of receivedItems) {
     if (!item.received_qty || item.received_qty <= 0) continue;
 
-    // Use supabaseAdmin so RLS never blocks the fetch — same client used for the write below
-    let fetchQuery = supabaseAdmin
+    // Use supabase so RLS never blocks the fetch — same client used for the write below
+    let fetchQuery = supabase
       .from('inventory_records')
       .select('stock')
       .eq('menu_item_id', item.menu_item_id);
@@ -701,7 +701,7 @@ export async function receivePurchaseOrder(
 
     if (inv) {
       // Existing record — update stock in place
-      let updateQuery = supabaseAdmin
+      let updateQuery = supabase
         .from('inventory_records')
         .update({ stock: newStock, updated_at: new Date().toISOString() })
         .eq('menu_item_id', item.menu_item_id);
@@ -709,7 +709,7 @@ export async function receivePurchaseOrder(
       await updateQuery;
     } else {
       // No record yet — insert with generated id
-      await supabaseAdmin
+      await supabase
         .from('inventory_records')
         .insert({
           id:                  `inv-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
@@ -725,7 +725,7 @@ export async function receivePurchaseOrder(
     }
 
     // Record the movement
-    const { error: movementError } = await supabaseAdmin.from('stock_movements').insert({
+    const { error: movementError } = await supabase.from('stock_movements').insert({
       id:            `mov-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       menu_item_id:  item.menu_item_id,
       menu_item_name: item.menu_item_id,
@@ -743,7 +743,7 @@ export async function receivePurchaseOrder(
   }
 
   // Mark PO as received
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await supabase
     .from('purchase_orders')
     .update({
       status:      'received',
@@ -759,7 +759,7 @@ export async function receivePurchaseOrder(
 }
 
 export async function deletePurchaseOrder(id: string): Promise<void> {
-  const { error } = await supabaseAdmin.from('purchase_orders').delete().eq('id', id);
+  const { error } = await supabase.from('purchase_orders').delete().eq('id', id);
   if (error) throw error;
 }
 
@@ -844,13 +844,13 @@ export async function recordWaste(waste: {
   const oldStock = inv?.stock ?? 0;
   const newStock = Math.max(0, oldStock - waste.qty);
 
-  await supabaseAdmin
+  await supabase
     .from('inventory_records')
     .update({ stock: newStock, updated_at: new Date().toISOString() })
     .eq('menu_item_id', waste.menu_item_id)
     .eq('restaurant_id', restaurantId);
 
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await supabase
     .from('waste_entries')
     .insert({
       id,
@@ -1115,7 +1115,7 @@ export async function createLocation(payload: {
     if (!restaurantId) throw new Error('No company selected');
 
     const id = `loc-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await supabase
       .from('inventory_locations')
       .insert({
         id,
@@ -1262,3 +1262,4 @@ export async function fetchForecastAlerts(): Promise<InventoryForecast[]> {
     return forecasts.filter((f) => f.alertStatus === 'critical' || f.alertStatus === 'warning');
   }
 }
+

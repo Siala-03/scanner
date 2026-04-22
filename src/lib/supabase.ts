@@ -2,25 +2,52 @@ import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
-const supabaseServiceKey = import.meta.env.VITE_SUPABASE_SERVICE_KEY || '';
 
-// Standard client — uses anon key, subject to RLS
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// Admin client — uses service role key, bypasses RLS entirely.
-// persistSession/autoRefreshToken disabled to prevent GoTrueClient storage conflicts
-// with the anon client running in the same browser tab.
-const isValidServiceKey = supabaseServiceKey && !supabaseServiceKey.startsWith('your_');
-export const supabaseAdmin = isValidServiceKey
-  ? createClient(supabaseUrl, supabaseServiceKey, {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
-        detectSessionInUrl: false,
-      },
-    })
-  : supabase; // fallback to anon if key not configured
-export const isAdminConfigured = !!isValidServiceKey;
+// Base URL for Supabase Edge Functions (service key lives server-side in each function)
+const edgeFunctionsBase = `${supabaseUrl}/functions/v1`;
+
+/**
+ * Call a Supabase Edge Function. Automatically attaches the anon key and,
+ * when available, the current staff ID for server-side identity verification.
+ */
+export async function callEdgeFn(
+  fnName: string,
+  options: {
+    method?: 'GET' | 'POST' | 'DELETE';
+    body?: unknown;
+    params?: Record<string, string>;
+  } = {}
+): Promise<any> {
+  const url = new URL(`${edgeFunctionsBase}/${fnName}`);
+  if (options.params) {
+    Object.entries(options.params).forEach(([k, v]) => url.searchParams.set(k, v));
+  }
+
+  const staffId =
+    typeof window !== 'undefined' ? localStorage.getItem('staffId') : null;
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    apikey: supabaseAnonKey,
+    Authorization: `Bearer ${supabaseAnonKey}`,
+  };
+  if (staffId) headers['x-staff-id'] = staffId;
+
+  const res = await fetch(url.toString(), {
+    method: options.method ?? 'GET',
+    headers,
+    ...(options.body !== undefined ? { body: JSON.stringify(options.body) } : {}),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || `Edge function ${fnName} failed`);
+  }
+
+  return res.json();
+}
 
 export interface Staff {
   id: string;
