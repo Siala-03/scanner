@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
-import { Package, Clock, AlertCircle, CheckCircle, User, Phone, Mail, MapPin, Globe } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Package, Clock, AlertCircle, CheckCircle, User, Phone, Mail, MapPin, Globe, ChevronUpIcon, ChevronDownIcon, SearchIcon } from 'lucide-react';
 import { Order } from '../../types';
 import { formatPrice } from '../../utils/currency';
 import { Button } from '../ui/Button';
@@ -10,6 +10,10 @@ interface OnlineOrdersPanel {
 }
 
 export function OnlineOrdersPanel({ orders, onStatusChange }: OnlineOrdersPanel) {
+  const [historySearch, setHistorySearch] = useState('');
+  const [historySortField, setHistorySortField] = useState<'id' | 'total' | 'createdAt'>('createdAt');
+  const [historySortDirection, setHistorySortDirection] = useState<'asc' | 'desc'>('desc');
+  
   const isOnline = (o: Order) =>
     o.isOnlineOrder === true || (o as any).is_online_order === true ||
     o.tableNumber === 999 || (o as any).table_number === 999;
@@ -40,6 +44,16 @@ export function OnlineOrdersPanel({ orders, onStatusChange }: OnlineOrdersPanel)
     [onlineOrders]
   );
 
+  // Completed/processed orders (approved and later fulfilled, rejected, or cancelled)
+  const processedOrders = useMemo(
+    () => onlineOrders.filter((o) => 
+      o.status === 'completed' || 
+      o.status === 'served' || 
+      o.status === 'cancelled'
+    ),
+    [onlineOrders]
+  );
+
   const statusCounts = {
     pending: pendingApprovalOrders.length,
     verified: verifiedOrders.length,
@@ -51,6 +65,40 @@ export function OnlineOrdersPanel({ orders, onStatusChange }: OnlineOrdersPanel)
     () => onlineOrders.reduce((sum, order) => sum + ((order as any).total || order.total || 0), 0),
     [onlineOrders]
   );
+
+  // Filter and sort processed orders for history table
+  const filteredProcessedOrders = useMemo(() => {
+    let result = [...processedOrders];
+    
+    if (historySearch) {
+      const query = historySearch.toLowerCase();
+      result = result.filter(order => 
+        (order as any).orderNumber?.toLowerCase().includes(query) ||
+        order.id.toLowerCase().includes(query) ||
+        (order as any).customer_name?.toLowerCase().includes(query) ||
+        (order as any).customerName?.toLowerCase().includes(query)
+      );
+    }
+    
+    return result;
+  }, [processedOrders, historySearch]);
+
+  const sortedProcessedOrders = useMemo(() => {
+    const sorted = [...filteredProcessedOrders].sort((a, b) => {
+      const direction = historySortDirection === 'asc' ? 1 : -1;
+      switch (historySortField) {
+        case 'id':
+          return a.id.localeCompare(b.id) * direction;
+        case 'total':
+          return (((a as any).total || a.total || 0) - ((b as any).total || b.total || 0)) * direction;
+        case 'createdAt':
+          return (new Date((a as any).created_at || a.createdAt).getTime() - new Date((b as any).created_at || b.createdAt).getTime()) * direction;
+        default:
+          return 0;
+      }
+    });
+    return sorted;
+  }, [filteredProcessedOrders, historySortField, historySortDirection]);
 
   const latestOrderTime = useMemo(() => {
     if (onlineOrders.length === 0) return null;
@@ -66,6 +114,20 @@ export function OnlineOrdersPanel({ orders, onStatusChange }: OnlineOrdersPanel)
       ? new Date(createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
       : null;
   }, [onlineOrders]);
+
+  const handleHistorySort = (field: 'id' | 'total' | 'createdAt') => {
+    setHistorySortField(field);
+    setHistorySortDirection(
+      historySortField === field && historySortDirection === 'desc' ? 'asc' : 'desc'
+    );
+  };
+
+  const SortIcon = ({ field }: { field: 'id' | 'total' | 'createdAt' }) => {
+    if (historySortField !== field) return null;
+    return historySortDirection === 'asc' ?
+      <ChevronUpIcon className="w-4 h-4" /> :
+      <ChevronDownIcon className="w-4 h-4" />;
+  };
 
   const sectionStyles: Record<string, { shell: string; badge: string; heading: string; border: string }> = {
     pending: {
@@ -394,6 +456,141 @@ export function OnlineOrdersPanel({ orders, onStatusChange }: OnlineOrdersPanel)
             {readyOrders.map((order) => (
               <OrderCard key={order.id} order={order} variant="compact" />
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Processed Orders History Table */}
+      {processedOrders.length > 0 && (
+        <div className="space-y-4 mt-8 pt-6 border-t border-slate-700">
+          <div className="rounded-2xl border border-slate-700 bg-gradient-to-br from-slate-900 via-slate-900 to-slate-800 p-5 shadow-[0_28px_70px_rgba(15,23,42,0.26)]">
+            <h3 className="text-2xl font-semibold text-slate-50">Order History</h3>
+            <p className="mt-1 text-sm text-slate-400">
+              Completed, served, and cancelled orders
+            </p>
+          </div>
+
+          {/* Search Bar */}
+          <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700/50">
+            <div className="relative">
+              <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search by Order #, ID, or Customer..."
+                value={historySearch}
+                onChange={(e) => setHistorySearch(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 placeholder-slate-400"
+              />
+            </div>
+          </div>
+
+          {/* Results count */}
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-slate-400">
+              Showing <span className="text-white font-medium">{sortedProcessedOrders.length}</span> of{' '}
+              <span className="text-white font-medium">{processedOrders.length}</span> processed orders
+            </p>
+          </div>
+
+          {/* History Table */}
+          <div className="overflow-x-auto rounded-lg border border-slate-700/50">
+            <table className="w-full">
+              <thead className="bg-slate-800/50 border-b border-slate-700">
+                <tr>
+                  <th
+                    className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider cursor-pointer hover:text-white transition-colors"
+                    onClick={() => handleHistorySort('id')}
+                  >
+                    <div className="flex items-center gap-1">
+                      Order #
+                      <SortIcon field="id" />
+                    </div>
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                    Customer
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                    Items
+                  </th>
+                  <th
+                    className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider cursor-pointer hover:text-white transition-colors"
+                    onClick={() => handleHistorySort('total')}
+                  >
+                    <div className="flex items-center gap-1">
+                      Total
+                      <SortIcon field="total" />
+                    </div>
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th
+                    className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider cursor-pointer hover:text-white transition-colors"
+                    onClick={() => handleHistorySort('createdAt')}
+                  >
+                    <div className="flex items-center gap-1">
+                      Date & Time
+                      <SortIcon field="createdAt" />
+                    </div>
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-700">
+                {sortedProcessedOrders.length > 0 ? (
+                  sortedProcessedOrders.map((order) => {
+                    const customerName = (order as any).customer_name || order.customerName || 'Guest';
+                    const createdAt = (order as any).created_at || order.createdAt;
+                    const total = (order as any).total || order.total || 0;
+                    const itemCount = order.items?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0;
+                    const statusColor = 
+                      order.status === 'completed' || order.status === 'served' ? 'text-emerald-300' :
+                      order.status === 'cancelled' ? 'text-red-300' : 'text-slate-400';
+
+                    return (
+                      <tr key={order.id} className="hover:bg-slate-800/30 transition-colors">
+                        <td className="px-4 py-3 text-sm font-medium text-slate-100">
+                          {(order as any).orderNumber || `#${order.id.slice(-6)}`}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-slate-300">
+                          {customerName}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-slate-400">
+                          {itemCount} item{itemCount !== 1 ? 's' : ''}
+                        </td>
+                        <td className="px-4 py-3 text-sm font-medium text-amber-300">
+                          {formatPrice(total)}
+                        </td>
+                        <td className="px-4 py-3 text-sm">
+                          <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${
+                            order.status === 'completed' || order.status === 'served'
+                              ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                              : order.status === 'cancelled'
+                              ? 'bg-red-500/15 text-red-300 border-red-500/30'
+                              : 'bg-slate-700/50 text-slate-300 border-slate-600'
+                          }`}>
+                            {order.status?.charAt(0).toUpperCase() + order.status?.slice(1)}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-slate-400">
+                          {createdAt ? new Date(createdAt).toLocaleString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          }) : '—'}
+                        </td>
+                      </tr>
+                    );
+                  })
+                ) : (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-8 text-center text-slate-400">
+                      No processed orders found
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
