@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { ShoppingCartIcon, CheckCircleIcon, AlertCircleIcon, PhoneIcon } from 'lucide-react';
+import { ShoppingCartIcon, CheckCircleIcon, AlertCircleIcon } from 'lucide-react';
 import { MenuItem, CartItem } from '../../types';
 import { useMenu } from '../../hooks/useMenu';
 import { MenuItemCard } from '../../components/customer/MenuItemCard';
@@ -22,11 +22,14 @@ export function OnlineOrderingPage({ qrCodeToken, restaurantName }: OnlineOrderi
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [customerName, setCustomerName] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
+  const [customerAddress, setCustomerAddress] = useState('');
   const [specialInstructions, setSpecialInstructions] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [qrCodeId, setQrCodeId] = useState<string | null>(null);
+  const [qrRestaurantId, setQrRestaurantId] = useState<string | null>(null);
   const [lastOrderNumber, setLastOrderNumber] = useState<string>('');
 
   // Get restaurant from QR code token
@@ -36,6 +39,7 @@ export function OnlineOrderingPage({ qrCodeToken, restaurantName }: OnlineOrderi
         const code = await getOnlineQRCodeByToken(qrCodeToken);
         if (code) {
           setQrCodeId(code.id);
+          setQrRestaurantId(code.restaurantId);
         } else {
           setError('Invalid or expired QR code. Please try again.');
         }
@@ -93,8 +97,8 @@ export function OnlineOrderingPage({ qrCodeToken, restaurantName }: OnlineOrderi
       setError('Please enter your name');
       return;
     }
-    if (!customerEmail.trim()) {
-      setError('Please enter your email');
+    if (!customerPhone.trim()) {
+      setError('Please enter your phone number');
       return;
     }
     if (cartItems.length === 0) {
@@ -105,16 +109,22 @@ export function OnlineOrderingPage({ qrCodeToken, restaurantName }: OnlineOrderi
       setError('QR code not found. Please try again.');
       return;
     }
+    if (!qrRestaurantId) {
+      setError('Restaurant not found for this QR code. Please try again.');
+      return;
+    }
 
     try {
       setIsSubmitting(true);
       setError(null);
 
       const order = await createOnlineOrder(
-        qrCodeToken, // We'll use the token to identify the restaurant
+        qrRestaurantId,
         qrCodeId,
-        customerName,
-        customerEmail,
+        customerName.trim(),
+        customerPhone.trim(),
+        customerEmail.trim() || null,
+        customerAddress.trim() || null,
         cartItems.map((ci) => ({
           menuItemId: ci.menuItem?.id,
           menuItemName: ci.menuItem?.name,
@@ -129,7 +139,9 @@ export function OnlineOrderingPage({ qrCodeToken, restaurantName }: OnlineOrderi
       setStep('success');
       setCartItems([]);
       setCustomerName('');
+      setCustomerPhone('');
       setCustomerEmail('');
+      setCustomerAddress('');
       setSpecialInstructions('');
     } catch (err) {
       console.error('Failed to place order:', err);
@@ -181,9 +193,15 @@ export function OnlineOrderingPage({ qrCodeToken, restaurantName }: OnlineOrderi
           <p className="text-slate-600 dark:text-slate-300 mb-2">
             Your order has been received and sent to our kitchen.
           </p>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
-            You'll receive updates on your email: <strong>{customerEmail}</strong>
-          </p>
+          {customerEmail ? (
+            <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
+              We'll share updates on your email: <strong>{customerEmail}</strong>
+            </p>
+          ) : (
+            <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
+              Keep your phone close in case the team needs delivery details.
+            </p>
+          )}
 
           <div className="space-y-3">
             <Button
@@ -417,16 +435,44 @@ export function OnlineOrderingPage({ qrCodeToken, restaurantName }: OnlineOrderi
               />
             </div>
 
+            {/* Phone */}
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                Phone Number *
+              </label>
+              <input
+                type="tel"
+                value={customerPhone}
+                onChange={(e) => setCustomerPhone(e.target.value)}
+                placeholder="+250 7XX XXX XXX"
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
             {/* Email */}
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                Email Address *
+                Email Address (Optional)
               </label>
               <input
                 type="email"
                 value={customerEmail}
                 onChange={(e) => setCustomerEmail(e.target.value)}
                 placeholder="your@email.com"
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            {/* Address */}
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                Delivery Address (Optional)
+              </label>
+              <input
+                type="text"
+                value={customerAddress}
+                onChange={(e) => setCustomerAddress(e.target.value)}
+                placeholder="Enter address if needed"
                 className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>

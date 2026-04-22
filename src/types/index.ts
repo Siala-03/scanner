@@ -86,6 +86,8 @@ export interface Order {
   isOnlineOrder?: boolean;
   onlineQRCodeId?: string;
   customerEmail?: string;
+  customerPhone?: string;
+  customerAddress?: string;
 }
 
 // Table Types

@@ -1,6 +1,12 @@
 import { supabaseAdmin } from '../lib/supabase';
 import { Order, OnlineQRCode } from '../types';
-import { v4 as uuidv4 } from 'crypto';
+
+function generateId(): string {
+  if (typeof globalThis !== 'undefined' && globalThis.crypto?.randomUUID) {
+    return globalThis.crypto.randomUUID();
+  }
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
 
 /**
  * Generate a unique token for QR code (short, URL-friendly)
@@ -13,7 +19,7 @@ function generateCodeToken(): string {
  * Create a new online ordering QR code for a restaurant
  */
 export async function createOnlineQRCode(restaurantId: string): Promise<OnlineQRCode> {
-  const id = uuidv4();
+  const id = generateId();
   const codeToken = generateCodeToken();
   const shortLink = `${window.location.origin}/order/${codeToken}`;
   const qrUrl = shortLink; // The QR code will encode this URL
@@ -135,11 +141,13 @@ export async function createOnlineOrder(
   restaurantId: string,
   qrCodeId: string,
   customerName: string,
-  customerEmail: string,
+  customerPhone: string,
+  customerEmail: string | null,
+  customerAddress: string | null,
   items: any[],
   specialInstructions?: string
 ): Promise<Order> {
-  const id = uuidv4();
+  const id = generateId();
   const orderNumber = `ONLINE-${Date.now().toString().slice(-8)}`;
 
   // Calculate totals
@@ -154,7 +162,9 @@ export async function createOnlineOrder(
         id,
         order_number: orderNumber,
         customer_name: customerName,
+        customer_phone: customerPhone,
         customer_email: customerEmail,
+        customer_address: customerAddress,
         items: items,
         status: 'pending',
         subtotal,
@@ -181,6 +191,8 @@ export async function createOnlineOrder(
     orderNumber: data.order_number,
     customerName: data.customer_name,
     customerEmail: data.customer_email,
+    customerPhone: data.customer_phone,
+    customerAddress: data.customer_address,
     items: data.items || [],
     status: data.status,
     subtotal: data.subtotal,
@@ -225,6 +237,8 @@ export async function getOnlineOrders(
     orderNumber: order.order_number,
     customerName: order.customer_name,
     customerEmail: order.customer_email,
+    customerPhone: order.customer_phone,
+    customerAddress: order.customer_address,
     items: order.items || [],
     status: order.status,
     subtotal: order.subtotal,
@@ -264,6 +278,8 @@ export async function getPendingOnlineOrders(restaurantId: string): Promise<Orde
     orderNumber: order.order_number,
     customerName: order.customer_name,
     customerEmail: order.customer_email,
+    customerPhone: order.customer_phone,
+    customerAddress: order.customer_address,
     items: order.items || [],
     status: order.status,
     subtotal: order.subtotal,
