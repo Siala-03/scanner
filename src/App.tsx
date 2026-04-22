@@ -20,7 +20,6 @@ import { MenuManagement } from './pages/manager/MenuManagement';
 import { StaffManagement } from './pages/manager/StaffManagement';
 import { AnalyticsPage } from './pages/manager/AnalyticsPage';
 import { QRCodeGenerator } from './pages/manager/QRCodeGenerator';
-import { OnlineOrderingQRManager } from './pages/manager/OnlineOrderingQRManager';
 import CreditManagement from './pages/manager/CreditManagement';
 import { LoyaltyManagement } from './pages/manager/LoyaltyManagement';
 import ExpenseApproval from './components/manager/ExpenseApproval';
@@ -40,7 +39,7 @@ import type { RestaurantReceiptSettings } from './api/restaurants';
 import { RestaurantSettings } from './pages/manager/RestaurantSettings';
 
 type UserRole = 'customer' | 'waiter' | 'supervisor' | 'manager' | 'kitchen' | 'superadmin' | 'supplier' | null;
-type ManagerPage = 'dashboard' | 'menu' | 'staff' | 'analytics' | 'performance' | 'qrcodes' | 'online-ordering' | 'inventory' | 'history' | 'expenses' | 'credit' | 'loyalty' | 'settings';
+type ManagerPage = 'dashboard' | 'menu' | 'staff' | 'analytics' | 'performance' | 'qrcodes' | 'inventory' | 'history' | 'expenses' | 'credit' | 'loyalty' | 'settings';
 type SupervisorPage = 'dashboard' | 'revenue' | 'staff' | 'qrcodes' | 'inventory' | 'menu' | 'history' | 'expenses';
 
 function getThemeStorageKeyForRole(role: UserRole): string {
@@ -713,7 +712,6 @@ export function App() {
                   { id: 'inventory', label: 'Inventory' },
                   { id: 'menu', label: 'Manage Menu' },
                   { id: 'qrcodes', label: 'QR Codes' },
-                  { id: 'online-ordering', label: 'Online Ordering QR' },
                   { id: 'history', label: 'Order History' },
                   { id: 'analytics', label: 'Analytics' },
                   { id: 'staff', label: 'Staff' },
@@ -762,13 +760,6 @@ export function App() {
                 restaurantName={restaurantName}
                 onAddTable={addTable}
                 onDeleteTable={removeTable}
-              />
-            )}
-            {managerPage === 'online-ordering' && currentRestaurantId && (
-              <OnlineOrderingQRManager
-                restaurantId={currentRestaurantId}
-                restaurantName={restaurantName}
-                orders={orders}
               />
             )}
             {managerPage === 'expenses' && <ExpenseApproval />}

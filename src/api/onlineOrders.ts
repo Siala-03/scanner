@@ -64,7 +64,9 @@ export async function createOnlineQRCode(restaurantId: string): Promise<OnlineQR
  * Get the online QR code for a restaurant (create if doesn't exist)
  */
 export async function getOrCreateOnlineQRCode(restaurantId: string): Promise<OnlineQRCode> {
-  // First, try to get existing active QR code
+  // The link is always deterministic — derived from restaurantId, not stored token
+  const correctLink = `${window.location.origin}/r/${encodeURIComponent(restaurantId)}/t/${ONLINE_TABLE_NUMBER}`;
+
   const { data: existing, error: fetchError } = await supabaseAdmin
     .from('online_qr_codes')
     .select('*')
@@ -75,19 +77,26 @@ export async function getOrCreateOnlineQRCode(restaurantId: string): Promise<Onl
     .single();
 
   if (!fetchError && existing) {
+    // Patch the stored link if it still uses the old /order/:token format
+    if (existing.short_link !== correctLink) {
+      await supabaseAdmin
+        .from('online_qr_codes')
+        .update({ short_link: correctLink, qr_url: correctLink, updated_at: new Date().toISOString() })
+        .eq('id', existing.id);
+    }
     return {
       id: existing.id,
       restaurantId: existing.restaurant_id,
       codeToken: existing.code_token,
-      qrUrl: existing.qr_url,
-      shortLink: existing.short_link,
+      qrUrl: correctLink,
+      shortLink: correctLink,
       isActive: existing.is_active,
       createdAt: existing.created_at,
       updatedAt: existing.updated_at,
     };
   }
 
-  // If not found, create a new one
+  // No existing record — create one
   return createOnlineQRCode(restaurantId);
 }
 
