@@ -83,6 +83,9 @@ export interface Order {
   deliveryAddress?: string;
   deliveryOrderId?: string;
   deliveryStatus?: 'pending' | 'assigned' | 'picked_up' | 'delivered' | 'cancelled';
+  isOnlineOrder?: boolean;
+  onlineQRCodeId?: string;
+  customerEmail?: string;
 }
 
 // Table Types
@@ -119,6 +122,20 @@ export interface Restaurant {
   email?: string;
   timezone?: string;
   currency?: string;
+  onlineOrderingEnabled?: boolean;
+  socialMediaLinks?: Record<string, string>;
+}
+
+export interface OnlineQRCode {
+  id: string;
+  restaurantId: string;
+  codeToken: string;
+  qrUrl: string;
+  shortLink: string;
+  isActive: boolean;
+  regeneratedAt?: Date | string;
+  createdAt: Date | string;
+  updatedAt: Date | string;
 }
 
 export interface StaffPerformance {
