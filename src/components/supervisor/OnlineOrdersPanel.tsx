@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react';
-import { Package, Clock, AlertCircle, CheckCircle } from 'lucide-react';
+import { useMemo } from 'react';
+import { Package, Clock, AlertCircle, CheckCircle, User, Phone, Mail, MapPin, Globe } from 'lucide-react';
 import { Order } from '../../types';
 import { formatPrice } from '../../utils/currency';
 import { Button } from '../ui/Button';
@@ -47,111 +47,199 @@ export function OnlineOrdersPanel({ orders, onStatusChange }: OnlineOrdersPanel)
     ready: readyOrders.length,
   };
 
-  const OrderCard = ({ order, variant = 'default' }: { order: Order; variant?: string }) => {
-    const statusColors: Record<string, string> = {
-      pending: 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800',
-      verified: 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800',
-      preparing: 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800',
-      ready: 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800',
-    };
+  const totalOnlineRevenue = useMemo(
+    () => onlineOrders.reduce((sum, order) => sum + ((order as any).total || order.total || 0), 0),
+    [onlineOrders]
+  );
 
-    const statusBadgeColors: Record<string, string> = {
-      pending: 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-100',
-      verified: 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-100',
-      preparing: 'bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-100',
-      ready: 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-100',
-    };
+  const latestOrderTime = useMemo(() => {
+    if (onlineOrders.length === 0) return null;
+    const newest = [...onlineOrders]
+      .sort(
+        (left, right) =>
+          new Date((right as any).created_at || right.createdAt || 0).getTime() -
+          new Date((left as any).created_at || left.createdAt || 0).getTime()
+      )[0];
+
+    const createdAt = (newest as any).created_at || newest.createdAt;
+    return createdAt
+      ? new Date(createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+      : null;
+  }, [onlineOrders]);
+
+  const sectionStyles: Record<string, { shell: string; badge: string; heading: string; border: string }> = {
+    pending: {
+      shell: 'bg-red-500/10 border-red-500/30',
+      badge: 'bg-red-500/15 text-red-300 border-red-500/30',
+      heading: 'text-red-300',
+      border: 'border-l-red-400',
+    },
+    verified: {
+      shell: 'bg-blue-500/10 border-blue-500/30',
+      badge: 'bg-blue-500/15 text-blue-300 border-blue-500/30',
+      heading: 'text-blue-300',
+      border: 'border-l-blue-400',
+    },
+    preparing: {
+      shell: 'bg-amber-500/10 border-amber-500/30',
+      badge: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
+      heading: 'text-amber-300',
+      border: 'border-l-amber-400',
+    },
+    ready: {
+      shell: 'bg-emerald-500/10 border-emerald-500/30',
+      badge: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
+      heading: 'text-emerald-300',
+      border: 'border-l-emerald-400',
+    },
+  };
+
+  const OrderCard = ({ order, variant = 'default' }: { order: Order; variant?: string }) => {
+    const customerName = (order as any).customer_name || order.customerName || 'Guest';
+    const customerPhone = (order as any).customer_phone || order.customerPhone;
+    const customerEmail = (order as any).customer_email || order.customerEmail;
+    const customerAddress = (order as any).customer_address || order.customerAddress;
+    const createdAt = (order as any).created_at || order.createdAt;
+    const total = (order as any).total || order.total || 0;
+    const itemCount = order.items?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0;
+    const style = sectionStyles[order.status || 'pending'] || sectionStyles.pending;
 
     return (
       <div
-        className={`rounded-lg border p-4 ${statusColors[order.status || 'pending']} ${
+        className={`rounded-2xl border border-slate-700/80 bg-slate-900/70 p-4 shadow-[0_18px_40px_rgba(15,23,42,0.28)] ${style.border} border-l-4 ${
           variant === 'compact' ? 'mb-2' : 'mb-3'
         }`}
       >
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-1">
-              <h4 className="font-semibold text-slate-900 dark:text-slate-100">
-                {order.orderNumber}
-              </h4>
-              <span
-                className={`text-xs font-semibold px-2 py-1 rounded ${
-                  statusBadgeColors[order.status || 'pending']
-                }`}
-              >
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2 mb-3">
+              <span className="inline-flex items-center rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-300">
+                Online Order
+              </span>
+              <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${style.badge}`}>
                 {order.status?.charAt(0).toUpperCase() + order.status?.slice(1)}
               </span>
-            </div>
-
-            <div className="space-y-0.5 mb-2">
-              <p className="text-sm text-slate-700 dark:text-slate-300">
-                👤 {(order as any).customer_name || order.customerName || 'Guest'}
-              </p>
-              {((order as any).customer_phone || order.customerPhone) && (
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  📞 {(order as any).customer_phone || order.customerPhone}
-                </p>
-              )}
-              {((order as any).customer_email || order.customerEmail) && (
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  📧 {(order as any).customer_email || order.customerEmail}
-                </p>
-              )}
-              {((order as any).customer_address || order.customerAddress) && (
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  📍 {(order as any).customer_address || order.customerAddress}
-                </p>
+              {createdAt && (
+                <span className="text-xs text-slate-400">
+                  {new Date(createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                </span>
               )}
             </div>
 
-            {order.items && order.items.length > 0 && (
-              <div className="text-sm text-slate-600 dark:text-slate-400 mb-2">
-                <p className="font-medium">Items ({order.items.length}):</p>
-                <ul className="text-xs mt-1 space-y-0.5">
+            <div className="flex flex-wrap items-end justify-between gap-3 mb-4">
+              <div>
+                <h4 className="text-lg font-semibold text-slate-100">
+                  {order.orderNumber || `#${order.id.slice(-6)}`}
+                </h4>
+                <p className="text-sm text-slate-400">Requires supervisor routing before kitchen starts</p>
+              </div>
+              <div className="rounded-xl border border-slate-700 bg-slate-800/80 px-4 py-3 text-right">
+                <div className="text-[11px] uppercase tracking-[0.16em] text-slate-400">Total</div>
+                <div className="text-lg font-semibold text-amber-300">{formatPrice(total)}</div>
+              </div>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-[minmax(0,1.25fr)_minmax(260px,0.95fr)]">
+              <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+                <div className="flex items-center justify-between gap-3 mb-3">
+                  <div>
+                    <div className="text-[11px] uppercase tracking-[0.16em] text-slate-400">Customer</div>
+                    <div className="mt-1 flex items-center gap-2 text-sm font-medium text-slate-100">
+                      <User className="h-4 w-4 text-amber-300" />
+                      <span>{customerName}</span>
+                    </div>
+                  </div>
+                  <div className="rounded-full bg-slate-800 px-3 py-1 text-xs text-slate-300">
+                    {itemCount} items
+                  </div>
+                </div>
+
+                <div className="grid gap-2 text-sm text-slate-300">
+                  {customerPhone && (
+                    <div className="flex items-start gap-2">
+                      <Phone className="mt-0.5 h-4 w-4 text-slate-500" />
+                      <span>{customerPhone}</span>
+                    </div>
+                  )}
+                  {customerEmail && (
+                    <div className="flex items-start gap-2">
+                      <Mail className="mt-0.5 h-4 w-4 text-slate-500" />
+                      <span className="break-all">{customerEmail}</span>
+                    </div>
+                  )}
+                  {customerAddress && (
+                    <div className="flex items-start gap-2">
+                      <MapPin className="mt-0.5 h-4 w-4 text-slate-500" />
+                      <span>{customerAddress}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+                <div className="flex items-center justify-between gap-2 mb-3">
+                  <div className="text-[11px] uppercase tracking-[0.16em] text-slate-400">Order Items</div>
+                  <div className="text-xs text-slate-500">{order.items?.length || 0} lines</div>
+                </div>
+
+                {order.items && order.items.length > 0 ? (
+                  <ul className="space-y-2 text-sm text-slate-300">
                   {order.items.slice(0, 3).map((item, idx) => (
-                    <li key={idx}>
-                      • {item.quantity}x {item.menuItemName || 'Item'}
+                    <li key={idx} className="flex items-start justify-between gap-3 rounded-lg bg-slate-900/70 px-3 py-2">
+                      <span className="min-w-0 truncate">
+                        <span className="mr-2 text-amber-300">{item.quantity}x</span>
+                        {item.menuItemName || 'Item'}
+                      </span>
+                      <span className="text-slate-500">{formatPrice(item.totalPrice || 0)}</span>
                     </li>
                   ))}
                   {order.items.length > 3 && (
-                    <li className="text-slate-500 dark:text-slate-500">
+                    <li className="text-xs text-slate-500">
                       + {order.items.length - 3} more items
                     </li>
                   )}
                 </ul>
+                ) : (
+                  <div className="text-sm text-slate-500">No line items attached.</div>
+                )}
               </div>
-            )}
-
-            {order.specialInstructions && (
-              <div className="text-xs text-slate-600 dark:text-slate-400 italic">
-                📝 "{order.specialInstructions}"
-              </div>
-            )}
-
-            <div className="mt-2 pt-2 border-t border-current border-opacity-20">
-              <span className="text-sm font-bold text-slate-900 dark:text-slate-100">
-                {formatPrice((order as any).total || order.total || 0)}
-              </span>
             </div>
 
-            {/* Action Buttons */}
+            {order.specialInstructions && (
+              <div className="mt-4 rounded-xl border border-amber-500/20 bg-amber-500/8 p-3 text-sm text-amber-100">
+                <span className="mr-2 text-amber-300">Notes:</span>
+                <span className="italic">{order.specialInstructions}</span>
+              </div>
+            )}
+
             {order.status === 'pending' && onStatusChange && (
-              <div className="flex gap-2 mt-3">
+              <div className="mt-4 flex flex-col gap-2 sm:flex-row">
                 <Button
                   onClick={() => onStatusChange(order.id, 'verified')}
                   variant="primary"
-                  className="flex-1 px-2 py-1 text-xs"
+                  className="flex-1 justify-center"
                 >
-                  <CheckCircle className="w-3 h-3 mr-1" />
-                  Approve
+                  <CheckCircle className="w-4 h-4" />
+                  Approve And Send To Kitchen
                 </Button>
                 <Button
                   onClick={() => onStatusChange(order.id, 'cancelled')}
                   variant="danger"
-                  className="flex-1 px-2 py-1 text-xs"
+                  className="flex-1 justify-center"
                 >
                   Reject
                 </Button>
+              </div>
+            )}
+
+            {order.status !== 'pending' && (
+              <div className="mt-4 flex items-center justify-between rounded-xl border border-slate-800 bg-slate-950/50 px-4 py-3 text-sm">
+                <span className="text-slate-400">Workflow Status</span>
+                <span className={`font-medium ${style.heading}`}>
+                  {order.status === 'verified' && 'Approved and queued for kitchen'}
+                  {order.status === 'preparing' && 'Kitchen is actively preparing this order'}
+                  {order.status === 'ready' && 'Ready for waiter pickup or handoff'}
+                </span>
               </div>
             )}
           </div>
@@ -163,10 +251,12 @@ export function OnlineOrdersPanel({ orders, onStatusChange }: OnlineOrdersPanel)
   // Empty state
   if (onlineOrders.length === 0) {
     return (
-      <div className="rounded-xl border border-slate-200 dark:border-slate-700 p-6 bg-slate-50 dark:bg-slate-800/50 text-center">
-        <Package className="w-12 h-12 text-slate-300 dark:text-slate-600 mx-auto mb-3" />
-        <p className="text-slate-600 dark:text-slate-400">No online orders yet</p>
-        <p className="text-xs text-slate-500 dark:text-slate-500 mt-1">
+      <div className="rounded-2xl border border-slate-700 bg-slate-900/60 p-8 text-center shadow-[0_24px_60px_rgba(15,23,42,0.25)]">
+        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-amber-500/20 bg-amber-500/10">
+          <Globe className="h-8 w-8 text-amber-300" />
+        </div>
+        <p className="text-lg font-semibold text-slate-100">No online orders yet</p>
+        <p className="mt-2 text-sm text-slate-400">
           Share your QR code to start receiving online orders
         </p>
       </div>
@@ -174,49 +264,89 @@ export function OnlineOrdersPanel({ orders, onStatusChange }: OnlineOrdersPanel)
   }
 
   return (
-    <div className="space-y-4">
-      {/* Status Summary - 4 columns */}
-      <div className="grid grid-cols-4 gap-2">
-        <div className="rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-3 text-center">
-          <div className="text-2xl font-bold text-red-700 dark:text-red-400">
-            {statusCounts.pending}
+    <div className="space-y-5">
+      <div className="rounded-2xl border border-slate-700 bg-gradient-to-br from-slate-900 via-slate-900 to-slate-800 p-5 shadow-[0_28px_70px_rgba(15,23,42,0.26)]">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-amber-500/20 bg-amber-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-300">
+              <Globe className="h-3.5 w-3.5" />
+              Online Orders Desk
+            </div>
+            <h3 className="text-2xl font-semibold text-slate-50">Supervisor Review Queue</h3>
+            <p className="mt-1 text-sm text-slate-400">
+              Review incoming web orders, approve them for kitchen, and monitor progress through fulfillment.
+            </p>
           </div>
-          <div className="text-xs text-red-600 dark:text-red-300 font-medium">
-            Awaiting Approval
-          </div>
-        </div>
-        <div className="rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 p-3 text-center">
-          <div className="text-2xl font-bold text-blue-700 dark:text-blue-400">
-            {statusCounts.verified}
-          </div>
-          <div className="text-xs text-blue-600 dark:text-blue-300 font-medium">
-            Approved
-          </div>
-        </div>
-        <div className="rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-3 text-center">
-          <div className="text-2xl font-bold text-amber-700 dark:text-amber-400">
-            {statusCounts.preparing}
-          </div>
-          <div className="text-xs text-amber-600 dark:text-amber-300 font-medium">
-            Preparing
-          </div>
-        </div>
-        <div className="rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 p-3 text-center">
-          <div className="text-2xl font-bold text-green-700 dark:text-green-400">
-            {statusCounts.ready}
-          </div>
-          <div className="text-xs text-green-600 dark:text-green-300 font-medium">
-            Ready
+
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:min-w-[360px]">
+            <div className="rounded-xl border border-slate-700 bg-slate-800/80 p-3">
+              <div className="text-[11px] uppercase tracking-[0.16em] text-slate-500">Active Orders</div>
+              <div className="mt-1 text-2xl font-semibold text-slate-100">{onlineOrders.length}</div>
+            </div>
+            <div className="rounded-xl border border-slate-700 bg-slate-800/80 p-3">
+              <div className="text-[11px] uppercase tracking-[0.16em] text-slate-500">Revenue</div>
+              <div className="mt-1 text-2xl font-semibold text-amber-300">{formatPrice(totalOnlineRevenue)}</div>
+            </div>
+            <div className="rounded-xl border border-slate-700 bg-slate-800/80 p-3 col-span-2 sm:col-span-1">
+              <div className="text-[11px] uppercase tracking-[0.16em] text-slate-500">Latest Activity</div>
+              <div className="mt-1 text-2xl font-semibold text-slate-100">{latestOrderTime || '—'}</div>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Orders by Status */}
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        <div className={`rounded-2xl border p-4 ${sectionStyles.pending.shell}`}>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="text-[11px] uppercase tracking-[0.16em] text-slate-400">Awaiting Approval</div>
+              <div className="mt-2 text-3xl font-semibold text-slate-50">
+            {statusCounts.pending}
+              </div>
+            </div>
+            <AlertCircle className="h-8 w-8 text-red-300" />
+          </div>
+        </div>
+        <div className={`rounded-2xl border p-4 ${sectionStyles.verified.shell}`}>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="text-[11px] uppercase tracking-[0.16em] text-slate-400">Approved</div>
+              <div className="mt-2 text-3xl font-semibold text-slate-50">
+            {statusCounts.verified}
+              </div>
+            </div>
+            <CheckCircle className="h-8 w-8 text-blue-300" />
+          </div>
+        </div>
+        <div className={`rounded-2xl border p-4 ${sectionStyles.preparing.shell}`}>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="text-[11px] uppercase tracking-[0.16em] text-slate-400">Preparing</div>
+              <div className="mt-2 text-3xl font-semibold text-slate-50">
+            {statusCounts.preparing}
+              </div>
+            </div>
+            <Clock className="h-8 w-8 text-amber-300" />
+          </div>
+        </div>
+        <div className={`rounded-2xl border p-4 ${sectionStyles.ready.shell}`}>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="text-[11px] uppercase tracking-[0.16em] text-slate-400">Ready</div>
+              <div className="mt-2 text-3xl font-semibold text-slate-50">
+            {statusCounts.ready}
+              </div>
+            </div>
+            <Package className="h-8 w-8 text-emerald-300" />
+          </div>
+        </div>
+      </div>
+
       {pendingApprovalOrders.length > 0 && (
-        <div>
-          <h4 className="text-sm font-semibold text-red-700 dark:text-red-300 mb-2 flex items-center gap-2">
+        <div className="rounded-2xl border border-slate-700 bg-slate-900/55 p-4">
+          <h4 className="mb-3 flex items-center gap-2 text-sm font-semibold text-red-300">
             <AlertCircle className="w-4 h-4" />
-            ⚠️ Awaiting Supervisor Approval ({pendingApprovalOrders.length})
+            Awaiting Supervisor Approval ({pendingApprovalOrders.length})
           </h4>
           <div className="space-y-2">
             {pendingApprovalOrders.map((order) => (
@@ -227,10 +357,10 @@ export function OnlineOrdersPanel({ orders, onStatusChange }: OnlineOrdersPanel)
       )}
 
       {verifiedOrders.length > 0 && (
-        <div>
-          <h4 className="text-sm font-semibold text-blue-700 dark:text-blue-300 mb-2 flex items-center gap-2">
+        <div className="rounded-2xl border border-slate-700 bg-slate-900/55 p-4">
+          <h4 className="mb-3 flex items-center gap-2 text-sm font-semibold text-blue-300">
             <CheckCircle className="w-4 h-4" />
-            ✅ Approved - Sent to Kitchen ({verifiedOrders.length})
+            Approved And Sent To Kitchen ({verifiedOrders.length})
           </h4>
           <div className="space-y-2">
             {verifiedOrders.map((order) => (
@@ -241,10 +371,10 @@ export function OnlineOrdersPanel({ orders, onStatusChange }: OnlineOrdersPanel)
       )}
 
       {preparingOrders.length > 0 && (
-        <div>
-          <h4 className="text-sm font-semibold text-amber-700 dark:text-amber-300 mb-2 flex items-center gap-2">
+        <div className="rounded-2xl border border-slate-700 bg-slate-900/55 p-4">
+          <h4 className="mb-3 flex items-center gap-2 text-sm font-semibold text-amber-300">
             <Clock className="w-4 h-4" />
-            👨‍🍳 Being Prepared ({preparingOrders.length})
+            Being Prepared ({preparingOrders.length})
           </h4>
           <div className="space-y-2">
             {preparingOrders.map((order) => (
@@ -255,9 +385,10 @@ export function OnlineOrdersPanel({ orders, onStatusChange }: OnlineOrdersPanel)
       )}
 
       {readyOrders.length > 0 && (
-        <div>
-          <h4 className="text-sm font-semibold text-green-700 dark:text-green-300 mb-2 flex items-center gap-2">
-            🎯 Ready for Pickup ({readyOrders.length})
+        <div className="rounded-2xl border border-slate-700 bg-slate-900/55 p-4">
+          <h4 className="mb-3 flex items-center gap-2 text-sm font-semibold text-emerald-300">
+            <Package className="w-4 h-4" />
+            Ready for Pickup ({readyOrders.length})
           </h4>
           <div className="space-y-2">
             {readyOrders.map((order) => (
