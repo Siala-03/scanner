@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useState, FormEvent } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   UtensilsIcon,
@@ -28,7 +28,7 @@ function OnlineCustomerGate({ restaurantName, onSubmit }: { restaurantName?: str
   const [address, setAddress] = useState('');
   const [error, setError] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (!name.trim()) { setError('Full name is required.'); return; }
     if (!phone.trim()) { setError('Phone number is required.'); return; }
