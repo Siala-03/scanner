@@ -18,11 +18,13 @@ function generateCodeToken(): string {
 /**
  * Create a new online ordering QR code for a restaurant
  */
+export const ONLINE_TABLE_NUMBER = 999;
+
 export async function createOnlineQRCode(restaurantId: string): Promise<OnlineQRCode> {
   const id = generateId();
   const codeToken = generateCodeToken();
-  const shortLink = `${window.location.origin}/order/${codeToken}`;
-  const qrUrl = shortLink; // The QR code will encode this URL
+  const shortLink = `${window.location.origin}/r/${encodeURIComponent(restaurantId)}/t/${ONLINE_TABLE_NUMBER}`;
+  const qrUrl = shortLink;
 
   const { data, error } = await supabaseAdmin
     .from('online_qr_codes')

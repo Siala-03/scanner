@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { RefreshCwIcon, DownloadIcon, CopyIcon, CheckIcon, QrCodeIcon, AlertCircleIcon, ShoppingBagIcon } from 'lucide-react';
 import QRCode from 'react-qr-code';
 import { Button } from '../../components/ui/Button';
-import { getOrCreateOnlineQRCode, regenerateOnlineQRCode } from '../../api/onlineOrders';
+import { getOrCreateOnlineQRCode, regenerateOnlineQRCode, ONLINE_TABLE_NUMBER } from '../../api/onlineOrders';
 import { OnlineQRCode, Order } from '../../types';
 import { formatDate } from '../../utils/dateUtils';
 import { formatPrice } from '../../utils/currency';
@@ -299,11 +299,10 @@ export function OnlineOrderingQRManager({ restaurantId, restaurantName, orders =
       <div className="rounded-xl border border-slate-200 dark:border-slate-700 p-6 bg-slate-50 dark:bg-slate-700/50">
         <h4 className="font-semibold text-slate-900 dark:text-slate-100 mb-3">How to Use</h4>
         <ul className="space-y-2 text-sm text-slate-700 dark:text-slate-300">
-          <li>✓ Download the QR code and print it or display it in-store</li>
-          <li>✓ Share the short link on social media (Instagram, Facebook, WhatsApp)</li>
-          <li>✓ Customers scan the QR code or click the link to place orders</li>
-          <li>✓ Online orders appear in your Supervisor and Waiter dashboards</li>
-          <li>✓ Regenerate the code if you suspect misuse</li>
+          <li>✓ Download the QR code and print it or share it on social media</li>
+          <li>✓ Customers scan or click the link — it opens your menu as <strong>Table {ONLINE_TABLE_NUMBER} (Online)</strong></li>
+          <li>✓ Online orders appear in Supervisor and Waiter dashboards under Table {ONLINE_TABLE_NUMBER}</li>
+          <li>✓ The link is tied to your restaurant ID — no other restaurant can use it</li>
         </ul>
       </div>
 

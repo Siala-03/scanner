@@ -173,6 +173,8 @@ export async function createOrder(order: CreateOrderInput): Promise<Order> {
     }
   }
 
+  const isOnlineOrder = order.tableNumber === 999;
+
   // Full payload — includes optional columns that may or may not exist in the schema
   const fullPayload = {
     id: orderId,
@@ -192,6 +194,7 @@ export async function createOrder(order: CreateOrderInput): Promise<Order> {
     assigned_waiter_id: assignedWaiterId,
     payment_status: 'unpaid',
     restaurant_id: restaurantId,
+    is_online_order: isOnlineOrder,
   };
 
   let result = await db.from('orders').insert(fullPayload).select().single();
@@ -216,6 +219,7 @@ export async function createOrder(order: CreateOrderInput): Promise<Order> {
       created_by: staffId,
       payment_status: 'unpaid',
       restaurant_id: restaurantId,
+      is_online_order: isOnlineOrder,
     };
     result = await db.from('orders').insert(payload2).select().single();
   }
