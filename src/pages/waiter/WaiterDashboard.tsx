@@ -28,6 +28,7 @@ import { ReceiptShareModal } from '../../components/ui/ReceiptShareModal';
 import { supabaseAdmin } from '../../lib/supabase';
 import { markTableSessionPendingCloseFromReceipt } from '../../utils/tableSessions';
 import { ThemeToggle } from '../../components/ui/ThemeToggle';
+import { OnlineOrdersForWaiter } from '../../components/waiter/OnlineOrdersSection';
 
 // ─── Kitchen detection ────────────────────────────────────────────────────────
 // Blacklist: these categories are bar/beverage only — everything else goes to kitchen.
@@ -601,7 +602,7 @@ export function WaiterDashboard({
 
   const [portalPage, setPortalPage] = useState<'orders' | 'analytics'>('orders');
   const [analyticsRange, setAnalyticsRange] = useState<AnalyticsRange>('weekly');
-  const [activeTab, setActiveTab] = useState<'incoming' | 'kitchen' | 'ready' | 'served'>('incoming');
+  const [activeTab, setActiveTab] = useState<'incoming' | 'kitchen' | 'ready' | 'served' | 'online'>('incoming');
   const [showQRScanner, setShowQRScanner] = useState(false);
   const [showOrderEntry, setShowOrderEntry] = useState(false);
   const [selectedTableNumber, setSelectedTableNumber] = useState<number | null>(null);
@@ -692,6 +693,11 @@ export function WaiterDashboard({
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     ),
     [myOrders]
+  );
+
+  const onlineOrders = useMemo(
+    () => orders.filter((o) => o.isOnlineOrder && o.status !== 'served' && o.status !== 'cancelled'),
+    [orders]
   );
 
   const todayServedOrders = useMemo(() => {
@@ -1117,6 +1123,13 @@ export function WaiterDashboard({
                   active={activeTab === 'served'}
                   onClick={() => setActiveTab('served')}
                 />
+                <TabButton
+                  label="Online"
+                  count={onlineOrders.length}
+                  active={activeTab === 'online'}
+                  dot={onlineOrders.some((o) => o.status === 'pending')}
+                  onClick={() => setActiveTab('online')}
+                />
               </div>
             </div>
 
@@ -1207,6 +1220,23 @@ export function WaiterDashboard({
                       ))}
                     </AnimatePresence>
                   )}
+                </motion.div>
+              )}
+
+              {activeTab === 'online' && (
+                <motion.div key="online" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-3">
+                  <PortalSectionHeader
+                    title="Online orders"
+                    description="Orders placed via QR code link. Pending orders await supervisor approval before going to the kitchen."
+                    count={onlineOrders.length}
+                    tone="border-blue-500/25 bg-blue-500/10 text-blue-200"
+                  />
+                  <OnlineOrdersForWaiter
+                    orders={onlineOrders}
+                    onUpdateStatus={(orderId, newStatus) =>
+                      onUpdateOrderStatus(orderId, newStatus)
+                    }
+                  />
                 </motion.div>
               )}
             </AnimatePresence>

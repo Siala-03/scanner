@@ -1,22 +1,46 @@
-import { useState, useEffect } from 'react';
-import { RefreshCwIcon, DownloadIcon, CopyIcon, CheckIcon, QrCodeIcon, AlertCircleIcon } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { RefreshCwIcon, DownloadIcon, CopyIcon, CheckIcon, QrCodeIcon, AlertCircleIcon, ShoppingBagIcon } from 'lucide-react';
 import QRCode from 'react-qr-code';
 import { Button } from '../../components/ui/Button';
 import { getOrCreateOnlineQRCode, regenerateOnlineQRCode } from '../../api/onlineOrders';
-import { OnlineQRCode } from '../../types';
+import { OnlineQRCode, Order } from '../../types';
 import { formatDate } from '../../utils/dateUtils';
+import { formatPrice } from '../../utils/currency';
 
 interface OnlineOrderingQRManagerProps {
   restaurantId: string;
   restaurantName?: string;
+  orders?: Order[];
 }
 
-export function OnlineOrderingQRManager({ restaurantId, restaurantName }: OnlineOrderingQRManagerProps) {
+const STATUS_COLORS: Record<string, string> = {
+  pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
+  verified: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
+  preparing: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
+  ready: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
+  served: 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300',
+  cancelled: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
+};
+
+export function OnlineOrderingQRManager({ restaurantId, restaurantName, orders = [] }: OnlineOrderingQRManagerProps) {
   const [qrCode, setQrCode] = useState<OnlineQRCode | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+
+  const onlineOrders = useMemo(
+    () => orders.filter((o) => o.isOnlineOrder).sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    ),
+    [orders]
+  );
+
+  const filteredOrders = useMemo(
+    () => statusFilter === 'all' ? onlineOrders : onlineOrders.filter((o) => o.status === statusFilter),
+    [onlineOrders, statusFilter]
+  );
 
   useEffect(() => {
     loadQRCode();
@@ -281,6 +305,89 @@ export function OnlineOrderingQRManager({ restaurantId, restaurantName }: Online
           <li>✓ Online orders appear in your Supervisor and Waiter dashboards</li>
           <li>✓ Regenerate the code if you suspect misuse</li>
         </ul>
+      </div>
+
+      {/* Online Orders Table */}
+      <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+        <div className="flex flex-wrap items-center justify-between gap-3 p-4 border-b border-slate-200 dark:border-slate-700">
+          <div className="flex items-center gap-2">
+            <ShoppingBagIcon className="w-5 h-5 text-blue-600" />
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Online Orders</h3>
+            <span className="px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
+              {onlineOrders.length} total
+            </span>
+          </div>
+          <div className="flex gap-1 overflow-x-auto">
+            {['all', 'pending', 'verified', 'preparing', 'ready', 'served', 'cancelled'].map((s) => (
+              <button
+                key={s}
+                onClick={() => setStatusFilter(s)}
+                className={`px-3 py-1 rounded text-xs font-medium whitespace-nowrap transition-colors ${
+                  statusFilter === s
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
+                }`}
+              >
+                {s.charAt(0).toUpperCase() + s.slice(1)}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {filteredOrders.length === 0 ? (
+          <div className="text-center py-12 text-slate-500 dark:text-slate-400">
+            <ShoppingBagIcon className="w-10 h-10 mx-auto mb-3 opacity-40" />
+            <p className="font-medium">No online orders yet</p>
+            <p className="text-sm mt-1">Share your QR code to start receiving orders</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 dark:bg-slate-700/50 text-xs uppercase text-slate-500 dark:text-slate-400">
+                <tr>
+                  <th className="px-4 py-3 text-left">Order #</th>
+                  <th className="px-4 py-3 text-left">Customer</th>
+                  <th className="px-4 py-3 text-left">Phone</th>
+                  <th className="px-4 py-3 text-left">Items</th>
+                  <th className="px-4 py-3 text-right">Total</th>
+                  <th className="px-4 py-3 text-left">Status</th>
+                  <th className="px-4 py-3 text-left">Time</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                {filteredOrders.map((order) => (
+                  <tr key={order.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
+                    <td className="px-4 py-3 font-mono font-medium text-slate-900 dark:text-slate-100">
+                      {order.orderNumber}
+                    </td>
+                    <td className="px-4 py-3 text-slate-700 dark:text-slate-300">
+                      {order.customerName || '—'}
+                    </td>
+                    <td className="px-4 py-3 text-slate-600 dark:text-slate-400">
+                      {order.customerPhone || '—'}
+                    </td>
+                    <td className="px-4 py-3 text-slate-600 dark:text-slate-400">
+                      {order.items?.length ?? 0} item{order.items?.length !== 1 ? 's' : ''}
+                    </td>
+                    <td className="px-4 py-3 text-right font-semibold text-slate-900 dark:text-slate-100">
+                      {formatPrice(order.total || 0)}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`px-2 py-0.5 rounded text-xs font-medium ${STATUS_COLORS[order.status || 'pending']}`}>
+                        {order.status?.charAt(0).toUpperCase() + (order.status?.slice(1) || '')}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                      {order.createdAt
+                        ? new Date(order.createdAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+                        : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

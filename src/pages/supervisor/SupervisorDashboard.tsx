@@ -8,6 +8,7 @@ import { useTodayKPIs } from '../../hooks/useAnalytics';
 import { useStaffKPIs } from '../../hooks/useKPIs';
 import { useOrdersContext } from '../../contexts/OrdersContext';
 import { KPICard } from '../../components/supervisor/KPICard';
+import { OnlineOrdersPanel } from '../../components/supervisor/OnlineOrdersPanel';
 import { TrendingUpIcon } from 'lucide-react';
 
 interface SupervisorDashboardProps {
@@ -21,7 +22,7 @@ export function SupervisorDashboard({ onManageMenu, onLogout }: SupervisorDashbo
   const { staff: onDutyStaff, isLoading: onDutyLoading } = useStaffOnDuty();
   const { data: kpis, isLoading: kpiLoading } = useTodayKPIs();
   const { kpis: staffKPIs } = useStaffKPIs();
-  const { orders } = useOrdersContext();
+  const { orders, updateOrderStatus } = useOrdersContext();
 
   const [deliveryStatusFilter, setDeliveryStatusFilter] = useState<string>('all');
 
@@ -138,6 +139,23 @@ export function SupervisorDashboard({ onManageMenu, onLogout }: SupervisorDashbo
             </div>
           </div>
         )}
+
+        {/* Online Orders Section */}
+        <div className="rounded-xl bg-slate-800 p-4 border border-slate-600 mt-4">
+          <div className="flex items-center gap-2 mb-4">
+            <span className="text-lg">🌐</span>
+            <h2 className="text-lg font-semibold">Online Orders</h2>
+            <span className="px-2 py-1 bg-blue-500/20 text-blue-400 rounded text-xs font-medium">
+              {orders.filter((o) => o.isOnlineOrder && o.status === 'pending').length} pending
+            </span>
+          </div>
+          <OnlineOrdersPanel
+            orders={orders}
+            onStatusChange={(orderId, newStatus) =>
+              updateOrderStatus(orderId, newStatus as 'verified' | 'preparing' | 'ready' | 'served' | 'cancelled')
+            }
+          />
+        </div>
 
         {/* Delivery Orders Section */}
         <div className="rounded-xl bg-slate-800 p-4 border border-slate-600 mt-4">

@@ -140,7 +140,7 @@ export function OnlineOrdersForWaiter({ orders, onUpdateStatus }: OnlineOrdersFo
   };
 
   // Empty state
-  if (activeOnlineOrders.length === 0) {
+  if (onlineOrders.length === 0) {
     return (
       <div className="rounded-lg border border-slate-200 dark:border-slate-700 p-6 bg-slate-50 dark:bg-slate-800/50 text-center">
         <UtensilsIcon className="w-12 h-12 text-slate-300 dark:text-slate-600 mx-auto mb-3" />

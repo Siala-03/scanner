@@ -800,6 +800,7 @@ export function App() {
               <OnlineOrderingQRManager
                 restaurantId={currentRestaurantId}
                 restaurantName={restaurantName}
+                orders={orders}
               />
             )}
             {managerPage === 'expenses' && <ExpenseApproval />}
