@@ -6,7 +6,6 @@ import { Modal } from '../../components/ui/Modal';
 import { Input } from '../../components/ui/Input';
 import { changePassword, signUpStaff } from '../../api/auth';
 import { fetchRestaurants, createRestaurant, updateRestaurant, deleteRestaurant, type Restaurant } from '../../api/restaurants';
-import { isAdminConfigured } from '../../lib/supabase';
 import { fetchTablesForRestaurant, deleteTable } from '../../api/tables';
 
 interface Table {
@@ -250,12 +249,6 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
           </div>
         </div>
 
-        {/* Admin key warning */}
-        {!isAdminConfigured && (
-          <div className="mb-4 px-4 py-3 bg-yellow-500/10 border border-yellow-500/40 rounded-lg text-yellow-400 text-sm">
-            <strong>Warning:</strong> VITE_SUPABASE_SERVICE_KEY is not configured. Company creation and staff management will fail due to RLS. Add the service role key to your <code>.env</code> file and restart the dev server.
-          </div>
-        )}
 
         {/* Stats */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
