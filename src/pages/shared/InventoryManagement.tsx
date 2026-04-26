@@ -1065,13 +1065,15 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                                 <div className="flex gap-1">
                                   <button
                                     onClick={() => handleSaveRow(row.item.id, row.item.name)}
-                                    className="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 transition"
+                                    className="p-1.5 text-emerald-400 hover:text-emerald-300 transition"
+                                    title="Save"
                                   >
                                     <CheckCircleIcon className="w-4 h-4" />
                                   </button>
                                   <button
                                     onClick={() => { setEditingRow(null); setEditValues({}); }}
-                                    className="p-1.5 rounded-lg bg-slate-700 text-slate-400 hover:bg-slate-600 transition"
+                                    className="p-1.5 text-slate-400 hover:text-slate-200 transition"
+                                    title="Cancel"
                                   >
                                     <XIcon className="w-4 h-4" />
                                   </button>
@@ -1091,7 +1093,7 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                                         location: rec?.location ?? '',
                                       });
                                     }}
-                                    className="p-1.5 rounded-lg bg-slate-700 text-slate-400 hover:text-amber-400 hover:bg-slate-600 transition"
+                                    className="p-1.5 text-slate-400 hover:text-amber-400 transition"
                                     title="Edit"
                                   >
                                     <EditIcon className="w-4 h-4" />
@@ -1102,7 +1104,7 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                                       setNewPOItems([{ menuItemId: row.item.id, orderedQty: Math.max((row.rec?.reorderQty ?? 5) - row.stock, 1), unitCost: row.rec?.unitCost ?? 0 }]);
                                       setShowNewPO(true);
                                     }}
-                                    className="p-1.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-500 transition"
+                                    className="p-1.5 text-emerald-400 hover:text-emerald-300 transition"
                                     title="Smart Reorder"
                                   >
                                     <PlusIcon className="w-4 h-4" />
@@ -1113,7 +1115,7 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                                         handleDeleteInventoryItem(row.item.id);
                                       }
                                     }}
-                                    className="p-1.5 rounded-lg bg-red-600 text-white hover:bg-red-500 transition"
+                                    className="p-1.5 text-red-400 hover:text-red-300 transition"
                                     title="Delete"
                                   >
                                     <TrashIcon className="w-4 h-4" />
