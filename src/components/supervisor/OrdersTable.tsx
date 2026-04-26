@@ -1,5 +1,6 @@
-import { useState, useMemo, ReactNode } from 'react';
+import { useState, useMemo, ReactNode, useEffect } from 'react';
 import { ChevronUpIcon, ChevronDownIcon } from 'lucide-react';
+import { Pagination } from '../ui/Pagination';
 import { motion } from 'framer-motion';
 import { Order, SortConfig } from '../../types';
 import { StatusBadge } from '../ui/Badge';
@@ -17,6 +18,10 @@ export function OrdersTable({ orders, onSelectOrder }: OrdersTableProps) {
     field: 'createdAt',
     direction: 'desc'
   });
+
+  const PAGE_SIZE = 20;
+  const [page, setPage] = useState(1);
+  useEffect(() => { setPage(1); }, [orders]);
 
   // Build table-number → waiter-id lookup from current staff assignments
   const tableToWaiter = useMemo(() => {
@@ -62,6 +67,8 @@ export function OrdersTable({ orders, onSelectOrder }: OrdersTableProps) {
     }
   });
 
+  const pagedOrders = sortedOrders.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
   const SortIcon = ({ field }: { field: string }) => {
     if (sortConfig.field !== field) return null;
     return sortConfig.direction === 'asc'
@@ -82,6 +89,7 @@ export function OrdersTable({ orders, onSelectOrder }: OrdersTableProps) {
   );
 
   return (
+    <>
     <div className="overflow-x-auto">
       <table className="w-full">
         <thead className="bg-slate-800/50 border-b border-slate-700">
@@ -97,7 +105,7 @@ export function OrdersTable({ orders, onSelectOrder }: OrdersTableProps) {
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-700/50">
-          {sortedOrders.map((order, index) => {
+          {pagedOrders.map((order, index) => {
             const waiter = resolveWaiter(order);
             const createdAt = new Date(order.createdAt);
             return (
@@ -139,5 +147,7 @@ export function OrdersTable({ orders, onSelectOrder }: OrdersTableProps) {
         </tbody>
       </table>
     </div>
+    <Pagination page={page} pageSize={PAGE_SIZE} totalCount={sortedOrders.length} onPageChange={setPage} />
+    </>
   );
 }

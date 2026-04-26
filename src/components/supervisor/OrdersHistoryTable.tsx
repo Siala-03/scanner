@@ -1,4 +1,5 @@
-import { useState, useMemo, ReactNode } from 'react';
+import { useState, useMemo, useEffect, ReactNode } from 'react';
+import { Pagination } from '../ui/Pagination';
 import { ChevronUpIcon, ChevronDownIcon, SearchIcon, CalendarIcon, DownloadIcon, FilterIcon } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { StatusBadge } from '../ui/Badge';
@@ -26,6 +27,9 @@ export function OrdersHistoryTable({ orders, onSelectOrder, onExport }: OrdersHi
   const [dateFrom, setDateFrom] = useState<string>('');
   const [dateTo, setDateTo] = useState<string>('');
   const [waiterFilter, setWaiterFilter] = useState<string>('all');
+
+  const PAGE_SIZE = 20;
+  const [page, setPage] = useState(1);
   
   const { staff } = useStaff();
 
@@ -132,6 +136,14 @@ export function OrdersHistoryTable({ orders, onSelectOrder, onExport }: OrdersHi
     });
     return sorted;
   }, [filteredOrders, sortConfig]);
+
+  // Reset to page 1 whenever filters or sort produce a new result set
+  useEffect(() => { setPage(1); }, [filteredOrders]);
+
+  const pagedOrders = useMemo(
+    () => sortedOrders.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [sortedOrders, page, PAGE_SIZE]
+  );
 
   const handleSort = (field: SortField) => {
     setSortConfig(prev => ({
@@ -270,8 +282,10 @@ export function OrdersHistoryTable({ orders, onSelectOrder, onExport }: OrdersHi
       {/* Results count */}
       <div className="flex items-center justify-between">
         <p className="text-sm text-slate-400">
-          Showing <span className="text-white font-medium">{sortedOrders.length}</span> of{' '}
-          <span className="text-white font-medium">{orders.length}</span> orders
+          <span className="text-white font-medium">{sortedOrders.length}</span> orders matched
+          {sortedOrders.length !== orders.length && (
+            <span> (of <span className="text-white font-medium">{orders.length}</span> total)</span>
+          )}
         </p>
       </div>
 
@@ -308,7 +322,7 @@ export function OrdersHistoryTable({ orders, onSelectOrder, onExport }: OrdersHi
                 </td>
               </tr>
             ) : (
-              sortedOrders.map((order: any, index) => {
+              pagedOrders.map((order: any, index) => {
                 const resolvedWaiterId = resolveWaiterId(order);
                 const waiter = resolvedWaiterId ? staff.find((s) => s.id === resolvedWaiterId) : null;
                 const createdAt = new Date(order.createdAt);
@@ -367,6 +381,7 @@ export function OrdersHistoryTable({ orders, onSelectOrder, onExport }: OrdersHi
           </tbody>
         </table>
       </div>
+      <Pagination page={page} pageSize={PAGE_SIZE} totalCount={sortedOrders.length} onPageChange={setPage} />
     </div>
   );
 }

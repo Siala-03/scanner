@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
+import { Pagination } from '../ui/Pagination';
 import { Package, Clock, AlertCircle, CheckCircle, User, Phone, Mail, MapPin, Globe, SearchIcon } from 'lucide-react';
 import { Order } from '../../types';
 import { formatPrice } from '../../utils/currency';
@@ -12,6 +13,9 @@ interface OnlineOrdersPanel {
 export function OnlineOrdersPanel({ orders, onStatusChange }: OnlineOrdersPanel) {
   const [tableSearch, setTableSearch] = useState('');
   const [tableStatusFilter, setTableStatusFilter] = useState('all');
+
+  const PIPELINE_PAGE_SIZE = 15;
+  const [pipelinePage, setPipelinePage] = useState(1);
   
   const isOnline = (o: Order) =>
     o.isOnlineOrder === true || (o as any).is_online_order === true ||
@@ -72,6 +76,9 @@ export function OnlineOrdersPanel({ orders, onStatusChange }: OnlineOrdersPanel)
           new Date((left as any).created_at || left.createdAt || 0).getTime()
       );
   }, [approvedPipelineOrders, tableSearch, tableStatusFilter]);
+
+  // Reset to page 1 whenever filters change
+  useEffect(() => { setPipelinePage(1); }, [filteredApprovedPipelineOrders]);
 
   const statusCounts = {
     pending: pendingApprovalOrders.length,
@@ -441,7 +448,10 @@ export function OnlineOrdersPanel({ orders, onStatusChange }: OnlineOrdersPanel)
               </thead>
               <tbody className="divide-y divide-slate-700">
                 {filteredApprovedPipelineOrders.length > 0 ? (
-                  filteredApprovedPipelineOrders.map((order) => {
+                  filteredApprovedPipelineOrders.slice(
+                    (pipelinePage - 1) * PIPELINE_PAGE_SIZE,
+                    pipelinePage * PIPELINE_PAGE_SIZE
+                  ).map((order) => {
                   const customerName = (order as any).customer_name || order.customerName || 'Guest';
                   const createdAt = (order as any).created_at || order.createdAt;
                   const total = (order as any).total || order.total || 0;
@@ -496,6 +506,7 @@ export function OnlineOrdersPanel({ orders, onStatusChange }: OnlineOrdersPanel)
               </tbody>
             </table>
           </div>
+          <Pagination page={pipelinePage} pageSize={PIPELINE_PAGE_SIZE} totalCount={filteredApprovedPipelineOrders.length} onPageChange={setPipelinePage} />
         </div>
       )}
     </div>

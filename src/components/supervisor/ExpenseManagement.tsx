@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { Pagination } from '../ui/Pagination';
 import {
   fetchExpenses,
   createExpense,
@@ -44,6 +45,10 @@ export default function SupervisorExpenseManagement() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | ApprovalStatus>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
+
+  const PAGE_SIZE = 15;
+  const [page, setPage] = useState(1);
+  useEffect(() => { setPage(1); }, [filteredExpenses]);
   const [formData, setFormData] = useState<ExpenseFormData>({
     categoryId: '',
     vendorName: '',
@@ -595,7 +600,7 @@ export default function SupervisorExpenseManagement() {
             </tr>
           </thead>
           <tbody className="divide-y">
-            {filteredExpenses.map(expense => (
+            {filteredExpenses.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map(expense => (
               <tr key={expense.id} className="hover:bg-slate-700/50 text-slate-200">
                 <td className="px-6 py-4 text-sm">{expense.description}</td>
                 <td className="px-6 py-4 text-sm">
@@ -648,6 +653,7 @@ export default function SupervisorExpenseManagement() {
           </tbody>
         </table>
       </div>
+      <Pagination page={page} pageSize={PAGE_SIZE} totalCount={filteredExpenses.length} onPageChange={setPage} />
 
       {/* Details Modal */}
       {showDetails && selectedExpense && (

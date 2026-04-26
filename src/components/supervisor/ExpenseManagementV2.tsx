@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { Pagination } from '../ui/Pagination';
 import { createExpense, fetchExpenseCategories, fetchExpenses } from '../../api/expenses';
 import type { Expense, ExpenseCategory, ExpenseFormData } from '../../types/expenses';
 
@@ -11,6 +12,10 @@ export default function SupervisorExpenseManagementV2() {
   const [categories, setCategories] = useState<ExpenseCategory[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const PAGE_SIZE = 15;
+  const [page, setPage] = useState(1);
+  useEffect(() => { setPage(1); }, [expenses]);
 
   const [form, setForm] = useState<ExpenseFormData>({
     categoryId: '',
@@ -225,7 +230,7 @@ export default function SupervisorExpenseManagementV2() {
             </tr>
           </thead>
           <tbody>
-            {expenses.map((expense) => {
+            {expenses.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map((expense) => {
               const category = categories.find((c) => c.id === expense.categoryId)?.name || 'Uncategorized';
               return (
                 <tr key={expense.id} className="border-t border-slate-700">
@@ -245,6 +250,7 @@ export default function SupervisorExpenseManagementV2() {
           </tbody>
         </table>
       </div>
+      <Pagination page={page} pageSize={PAGE_SIZE} totalCount={expenses.length} onPageChange={setPage} />
     </div>
   );
 }
