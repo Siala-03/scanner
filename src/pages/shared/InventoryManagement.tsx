@@ -37,6 +37,8 @@ import {
   createSupplier as apiCreateSupplier,
   updateSupplier as apiUpdateSupplier,
   createLocation as apiCreateLocation,
+  updateLocation as apiUpdateLocation,
+  deleteLocation as apiDeleteLocation,
   createPurchaseOrder as apiCreatePurchaseOrder,
   updatePurchaseOrder as apiUpdatePurchaseOrder,
   receivePurchaseOrder as apiReceivePurchaseOrder,
@@ -185,6 +187,8 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
   const [activeTab, setActiveTab] = useState<Tab>('overview');
   const [showAddInventoryModal, setShowAddInventoryModal] = useState(false);
   const [showLocationModal, setShowLocationModal] = useState(false);
+  const [editingLocation, setEditingLocation] = useState<typeof locations[number] | null>(null);
+  const [showEditLocationModal, setShowEditLocationModal] = useState(false);
   const [newLocation, setNewLocation] = useState({
     name: '',
     type: 'kitchen' as 'warehouse' | 'walk_in' | 'dry_store' | 'bar' | 'kitchen' | 'cold_room' | 'freezer' | 'display' | 'other',
@@ -579,6 +583,39 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
     }
   };
 
+  const handleUpdateLocation = async () => {
+    if (!editingLocation) return;
+    const name = editingLocation.name.trim();
+    if (!name) { alert('Location name is required'); return; }
+    try {
+      await apiUpdateLocation(editingLocation.id, {
+        name,
+        type: editingLocation.type,
+        description: editingLocation.description,
+        capacity: editingLocation.capacity,
+        temperatureRange: editingLocation.temperatureRange,
+        isActive: editingLocation.isActive,
+      });
+      await refresh();
+      setShowEditLocationModal(false);
+      setEditingLocation(null);
+    } catch (err) {
+      console.error('Failed to update location', err);
+      alert(`Failed to update location: ${getErrorMessage(err)}`);
+    }
+  };
+
+  const handleDeleteLocation = async (id: string, name: string) => {
+    if (!window.confirm(`Delete location "${name}"? This cannot be undone.`)) return;
+    try {
+      await apiDeleteLocation(id);
+      await refresh();
+    } catch (err) {
+      console.error('Failed to delete location', err);
+      alert(`Failed to delete location: ${getErrorMessage(err)}`);
+    }
+  };
+
   // ── Suppliers state ─────────────────────────────────────────────────────
   const [showSupplierModal, setShowSupplierModal] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
@@ -960,11 +997,16 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                           </td>
                           <td className="px-4 py-3">
                             {isEditing ? (
-                              <input
+                              <select
                                 value={editValues.location ?? row.rec?.location ?? ''}
                                 onChange={(e) => setEditValues((v) => ({ ...v, location: e.target.value }))}
-                                className="w-28 px-2 py-1 rounded bg-slate-900 border border-slate-600 text-white text-xs focus:outline-none focus:ring-1 focus:ring-amber-500"
-                              />
+                                className="w-32 px-2 py-1 rounded bg-slate-900 border border-slate-600 text-white text-xs focus:outline-none focus:ring-1 focus:ring-amber-500"
+                              >
+                                <option value="">— None —</option>
+                                {locations.map((loc) => (
+                                  <option key={loc.id} value={loc.name}>{loc.name}</option>
+                                ))}
+                              </select>
                             ) : (
                               <span className="text-xs text-slate-400 flex items-center gap-1">
                                 <MapPinIcon className="w-3 h-3" />
@@ -1191,9 +1233,25 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                       <h3 className="text-white font-semibold">{loc.name}</h3>
                       <p className="text-xs text-slate-400">{loc.type.replace(/_/g, ' ')}</p>
                     </div>
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${loc.isActive ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/20' : 'bg-slate-700 text-slate-400 border border-slate-600'}`}>
-                      {loc.isActive ? 'Active' : 'Inactive'}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${loc.isActive ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/20' : 'bg-slate-700 text-slate-400 border border-slate-600'}`}>
+                        {loc.isActive ? 'Active' : 'Inactive'}
+                      </span>
+                      <button
+                        onClick={() => { setEditingLocation({ ...loc }); setShowEditLocationModal(true); }}
+                        className="p-1.5 text-slate-400 hover:text-amber-400 transition-colors"
+                        title="Edit location"
+                      >
+                        <EditIcon className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteLocation(loc.id, loc.name)}
+                        className="p-1.5 text-slate-400 hover:text-red-400 transition-colors"
+                        title="Delete location"
+                      >
+                        <TrashIcon className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                   <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-300">
                     <div><span className="font-medium">Items</span>: {loc.totalItems}</div>
@@ -1223,6 +1281,7 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                       <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Low Stock</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Capacity</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Temp</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-700/30">
@@ -1235,6 +1294,24 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                         <td className="px-4 py-3 text-sm text-amber-300">{loc.lowStockItems}</td>
                         <td className="px-4 py-3 text-sm text-slate-300">{loc.capacity ?? '—'}</td>
                         <td className="px-4 py-3 text-sm text-slate-300">{loc.temperatureRange ?? 'N/A'}</td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => { setEditingLocation({ ...loc }); setShowEditLocationModal(true); }}
+                              className="p-1.5 text-slate-400 hover:text-amber-400 transition-colors"
+                              title="Edit location"
+                            >
+                              <EditIcon className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteLocation(loc.id, loc.name)}
+                              className="p-1.5 text-slate-400 hover:text-red-400 transition-colors"
+                              title="Delete location"
+                            >
+                              <TrashIcon className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -1743,12 +1820,16 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
               </label>
               <label className="block text-sm text-slate-300">
                 Location
-                <input
-                  placeholder="Location"
+                <select
                   value={newInventoryItemLocation}
                   onChange={(e) => setNewInventoryItemLocation(e.target.value)}
                   className="mt-1 w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
-                />
+                >
+                  <option value="">— None —</option>
+                  {locations.map((loc) => (
+                    <option key={loc.id} value={loc.name}>{loc.name}</option>
+                  ))}
+                </select>
               </label>
             </div>
 
@@ -2114,6 +2195,74 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
             </div>
           </div>
         </Modal>
+
+        {/* Edit Location Modal */}
+        {editingLocation && (
+          <Modal isOpen={showEditLocationModal} onClose={() => { setShowEditLocationModal(false); setEditingLocation(null); }} title="Edit Location">
+            <div className="space-y-3">
+              <input
+                value={editingLocation.name}
+                onChange={(e) => setEditingLocation((prev) => prev ? { ...prev, name: e.target.value } : prev)}
+                placeholder="Location name"
+                className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+              />
+              <select
+                value={editingLocation.type}
+                onChange={(e) => setEditingLocation((prev) => prev ? { ...prev, type: e.target.value as typeof prev.type } : prev)}
+                className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+              >
+                {['kitchen', 'bar', 'warehouse', 'walk_in', 'dry_store', 'cold_room', 'freezer', 'display', 'other'].map((type) => (
+                  <option key={type} value={type}>{type.replace(/_/g, ' ')}</option>
+                ))}
+              </select>
+              <input
+                value={editingLocation.capacity ?? ''}
+                onChange={(e) => setEditingLocation((prev) => prev ? { ...prev, capacity: e.target.value ? Number(e.target.value) : undefined } : prev)}
+                placeholder="Capacity (optional)"
+                type="number"
+                min={0}
+                className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+              />
+              <input
+                value={editingLocation.temperatureRange ?? ''}
+                onChange={(e) => setEditingLocation((prev) => prev ? { ...prev, temperatureRange: e.target.value } : prev)}
+                placeholder="Temperature range (optional)"
+                className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+              />
+              <textarea
+                value={editingLocation.description ?? ''}
+                onChange={(e) => setEditingLocation((prev) => prev ? { ...prev, description: e.target.value } : prev)}
+                placeholder="Description (optional)"
+                rows={2}
+                className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+              />
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="editLocActive"
+                  checked={editingLocation.isActive}
+                  onChange={(e) => setEditingLocation((prev) => prev ? { ...prev, isActive: e.target.checked } : prev)}
+                  className="rounded"
+                />
+                <label htmlFor="editLocActive" className="text-sm text-slate-300">Active</label>
+              </div>
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-700/30">
+                <button
+                  onClick={() => { setShowEditLocationModal(false); setEditingLocation(null); }}
+                  className="px-3 py-1 rounded-lg bg-slate-700 text-slate-300 text-xs hover:bg-slate-600 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleUpdateLocation}
+                  className="px-3 py-1 rounded-lg bg-amber-500/20 text-amber-400 text-xs font-medium hover:bg-amber-500/30 transition"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </div>
+          </Modal>
+        )}
 
         {/* Waste Modal */}
         <Modal isOpen={showWasteModal} onClose={() => setShowWasteModal(false)} title="Log Waste">

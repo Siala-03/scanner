@@ -1157,6 +1157,84 @@ export async function createLocation(payload: {
   }
 }
 
+export async function updateLocation(
+  id: string,
+  payload: {
+    name?: string;
+    type?: InventoryLocation['type'];
+    description?: string;
+    capacity?: number;
+    temperatureRange?: string;
+    isActive?: boolean;
+  }
+): Promise<InventoryLocation> {
+  try {
+    const updated = await apiRequest<any>(`/locations/${id}`, {
+      method: 'PUT',
+      json: payload,
+    });
+    return normalizeLocation(updated);
+  } catch {
+    const restaurantId = getRestaurantId();
+    if (!restaurantId) throw new Error('No company selected');
+    const dbPayload: Record<string, any> = {};
+    if (payload.name !== undefined)            dbPayload.name              = payload.name;
+    if (payload.type !== undefined)            dbPayload.type              = payload.type;
+    if (payload.description !== undefined)     dbPayload.description       = payload.description ?? null;
+    if (payload.capacity !== undefined)        dbPayload.capacity          = payload.capacity ?? null;
+    if (payload.temperatureRange !== undefined) dbPayload.temperature_range = payload.temperatureRange ?? null;
+    if (payload.isActive !== undefined)        dbPayload.is_active         = payload.isActive;
+    dbPayload.updated_at = new Date().toISOString();
+
+    const { data, error } = await supabase
+      .from('inventory_locations')
+      .update(dbPayload)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      // If table missing, mutate the localStorage fallback
+      if (isMissingLocationsTableError(error)) {
+        const existing = getFallbackLocationsFromStorage(restaurantId);
+        const target = existing.find((l) => l.id === id);
+        if (!target) throw new Error(`Location ${id} not found in fallback storage`);
+        const updated = normalizeLocation({ ...target, ...payload, id });
+        saveFallbackLocationToStorage(restaurantId, updated);
+        return updated;
+      }
+      throw new Error(error.message);
+    }
+    return normalizeLocation(data);
+  }
+}
+
+export async function deleteLocation(id: string): Promise<void> {
+  try {
+    await apiRequest<void>(`/locations/${id}`, { method: 'DELETE' });
+    return;
+  } catch {
+    const restaurantId = getRestaurantId();
+    if (!restaurantId) throw new Error('No company selected');
+
+    const { error } = await supabase
+      .from('inventory_locations')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      if (isMissingLocationsTableError(error)) {
+        // Remove from localStorage fallback
+        const existing = getFallbackLocationsFromStorage(restaurantId);
+        const next = existing.filter((l) => l.id !== id);
+        localStorage.setItem(locationFallbackStorageKey(restaurantId), JSON.stringify(next));
+        return;
+      }
+      throw new Error(error.message);
+    }
+  }
+}
+
 type ForecastGenerateResponse = {
   success: boolean;
   count: number;
