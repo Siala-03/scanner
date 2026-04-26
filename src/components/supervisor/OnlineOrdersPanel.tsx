@@ -44,6 +44,22 @@ export function OnlineOrdersPanel({ orders, onStatusChange }: OnlineOrdersPanel)
     [onlineOrders]
   );
 
+  // Orders that already passed supervisor approval and are in fulfillment flow
+  const approvedPipelineOrders = useMemo(
+    () => onlineOrders.filter((o) => o.status === 'verified' || o.status === 'preparing' || o.status === 'ready'),
+    [onlineOrders]
+  );
+
+  const sortedApprovedPipelineOrders = useMemo(
+    () =>
+      [...approvedPipelineOrders].sort(
+        (left, right) =>
+          new Date((right as any).created_at || right.createdAt || 0).getTime() -
+          new Date((left as any).created_at || left.createdAt || 0).getTime()
+      ),
+    [approvedPipelineOrders]
+  );
+
   // Completed/processed orders (approved and later fulfilled, rejected, or cancelled)
   const processedOrders = useMemo(
     () => onlineOrders.filter((o) => 
@@ -418,44 +434,66 @@ export function OnlineOrdersPanel({ orders, onStatusChange }: OnlineOrdersPanel)
         </div>
       )}
 
-      {verifiedOrders.length > 0 && (
+      {approvedPipelineOrders.length > 0 && (
         <div className="rounded-2xl border border-slate-700 bg-slate-900/55 p-4">
           <h4 className="mb-3 flex items-center gap-2 text-sm font-semibold text-blue-300">
             <CheckCircle className="w-4 h-4" />
-            Approved And Sent To Kitchen ({verifiedOrders.length})
+            Approved Orders Pipeline ({approvedPipelineOrders.length})
           </h4>
-          <div className="space-y-2">
-            {verifiedOrders.map((order) => (
-              <OrderCard key={order.id} order={order} variant="compact" />
-            ))}
-          </div>
-        </div>
-      )}
+          <div className="overflow-x-auto rounded-lg border border-slate-700/50">
+            <table className="w-full">
+              <thead className="bg-slate-800/50 border-b border-slate-700">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Order #</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Customer</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Items</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Total</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Status</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Time</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-700">
+                {sortedApprovedPipelineOrders.map((order) => {
+                  const customerName = (order as any).customer_name || order.customerName || 'Guest';
+                  const createdAt = (order as any).created_at || order.createdAt;
+                  const total = (order as any).total || order.total || 0;
+                  const itemCount = order.items?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0;
 
-      {preparingOrders.length > 0 && (
-        <div className="rounded-2xl border border-slate-700 bg-slate-900/55 p-4">
-          <h4 className="mb-3 flex items-center gap-2 text-sm font-semibold text-amber-300">
-            <Clock className="w-4 h-4" />
-            Being Prepared ({preparingOrders.length})
-          </h4>
-          <div className="space-y-2">
-            {preparingOrders.map((order) => (
-              <OrderCard key={order.id} order={order} variant="compact" />
-            ))}
-          </div>
-        </div>
-      )}
+                  const statusClasses =
+                    order.status === 'verified'
+                      ? 'bg-blue-500/15 text-blue-300 border-blue-500/30'
+                      : order.status === 'preparing'
+                      ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                      : 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30';
 
-      {readyOrders.length > 0 && (
-        <div className="rounded-2xl border border-slate-700 bg-slate-900/55 p-4">
-          <h4 className="mb-3 flex items-center gap-2 text-sm font-semibold text-emerald-300">
-            <Package className="w-4 h-4" />
-            Ready for Pickup ({readyOrders.length})
-          </h4>
-          <div className="space-y-2">
-            {readyOrders.map((order) => (
-              <OrderCard key={order.id} order={order} variant="compact" />
-            ))}
+                  return (
+                    <tr key={order.id} className="hover:bg-slate-800/30 transition-colors">
+                      <td className="px-4 py-3 text-sm font-medium text-slate-100">
+                        {(order as any).orderNumber || `#${order.id.slice(-6)}`}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-slate-300">{customerName}</td>
+                      <td className="px-4 py-3 text-sm text-slate-400">{itemCount} item{itemCount !== 1 ? 's' : ''}</td>
+                      <td className="px-4 py-3 text-sm font-medium text-amber-300">{formatPrice(total)}</td>
+                      <td className="px-4 py-3 text-sm">
+                        <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${statusClasses}`}>
+                          {order.status?.charAt(0).toUpperCase() + order.status?.slice(1)}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-slate-400">
+                        {createdAt
+                          ? new Date(createdAt).toLocaleString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })
+                          : '—'}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
