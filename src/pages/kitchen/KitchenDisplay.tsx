@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { ClockIcon, ChefHatIcon, UtensilsIcon, RefreshCwIcon, CheckCircleIcon, FlameIcon, AlertTriangleIcon, BarChart3Icon, ListOrderedIcon, TrendingUpIcon, LogOutIcon, PrinterIcon } from 'lucide-react';
 import { useSocket } from '../../hooks/useSocket';
 import { useStaffKPIs } from '../../hooks/useKPIs';
@@ -70,6 +70,17 @@ function getUrgency(createdAt: string): 'urgent' | 'normal' | 'ok' {
 function formatTime(createdAt: string): string {
   const date = new Date(createdAt);
   return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+}
+
+function getAgeMinutes(createdAt: string): number {
+  return Math.max(0, Math.floor((Date.now() - new Date(createdAt).getTime()) / 60000));
+}
+
+function formatDuration(minutes: number): string {
+  if (minutes < 60) return `${minutes}m`;
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return `${h}h ${m}m`;
 }
 
 async function fetchKitchenOrders(restaurantId?: string): Promise<KitchenOrder[]> {
@@ -358,6 +369,64 @@ export function KitchenDisplay({ onLogout, restaurantId, restaurantName }: { onL
 
   const stats: KitchenStats = calculateStats(orders, completedToday);
 
+  const now = Date.now();
+  const throughputLastHour = completedToday.filter((ts) => now - ts <= 60 * 60 * 1000).length;
+  const urgentOrdersCount = orders.filter((o) => getAgeMinutes(o.createdAt) > 15).length;
+  const averageQueueAge = orders.length > 0
+    ? Math.round(orders.reduce((sum, order) => sum + getAgeMinutes(order.createdAt), 0) / orders.length)
+    : 0;
+
+  const waitDistribution = useMemo(() => {
+    const groups = {
+      healthy: 0,
+      watch: 0,
+      critical: 0,
+    };
+
+    orders.forEach((order) => {
+      const age = getAgeMinutes(order.createdAt);
+      if (age <= 7) groups.healthy += 1;
+      else if (age <= 15) groups.watch += 1;
+      else groups.critical += 1;
+    });
+
+    return groups;
+  }, [orders]);
+
+  const hourlyLoad = useMemo(() => {
+    const buckets = Array.from({ length: 8 }).map((_, index) => {
+      const bucketDate = new Date(now - (7 - index) * 60 * 60 * 1000);
+      const hourKey = bucketDate.toLocaleTimeString('en-US', { hour: '2-digit', hour12: false });
+      return { hour: `${hourKey}:00`, count: 0 };
+    });
+
+    orders.forEach((order) => {
+      const createdAt = new Date(order.createdAt).getTime();
+      buckets.forEach((bucket, index) => {
+        const from = now - (8 - index) * 60 * 60 * 1000;
+        const to = now - (7 - index) * 60 * 60 * 1000;
+        if (createdAt >= from && createdAt < to) {
+          bucket.count += 1;
+        }
+      });
+    });
+
+    return buckets;
+  }, [orders, now]);
+
+  const maxHourlyLoad = Math.max(1, ...hourlyLoad.map((bucket) => bucket.count));
+
+  const delayedOrders = useMemo(
+    () => [...orders].sort((a, b) => getAgeMinutes(b.createdAt) - getAgeMinutes(a.createdAt)).slice(0, 5),
+    [orders]
+  );
+
+  const kitchenHealthTone = urgentOrdersCount > 0
+    ? 'text-red-300 border-red-500/30 bg-red-500/10'
+    : orders.length > 0
+      ? 'text-amber-300 border-amber-500/30 bg-amber-500/10'
+      : 'text-emerald-300 border-emerald-500/30 bg-emerald-500/10';
+
   const loadOrders = useCallback(async () => {
     const data = await fetchKitchenOrders(restaurantId);
     setOrders(data);
@@ -471,7 +540,28 @@ export function KitchenDisplay({ onLogout, restaurantId, restaurantName }: { onL
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl p-4">
+      <main className="mx-auto max-w-6xl p-4 md:p-6">
+        <div className="mb-5 rounded-2xl border border-slate-700 bg-gradient-to-r from-slate-900 via-slate-900 to-slate-800 px-4 py-4 md:px-6">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-[0.25em] text-slate-500">Kitchen Command Center</p>
+              <h2 className="mt-1 text-2xl font-semibold text-slate-100">Shift Overview</h2>
+              <p className="mt-1 text-sm text-slate-400">
+                Live prep visibility across new, cooking, and ready queues.
+              </p>
+            </div>
+            <div className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-wide ${kitchenHealthTone}`}>
+              {orders.length === 0 ? 'No queue pressure' : urgentOrdersCount > 0 ? `${urgentOrdersCount} urgent order${urgentOrdersCount !== 1 ? 's' : ''}` : 'Queue under control'}
+            </div>
+          </div>
+          <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+            <StatCard title="Active Queue" value={orders.length.toString()} color="blue" />
+            <StatCard title="Ready For Handoff" value={readyOrders.length.toString()} color="green" />
+            <StatCard title="Avg Queue Age" value={formatDuration(averageQueueAge)} color="amber" />
+            <StatCard title="Completed (1h)" value={throughputLastHour.toString()} color="purple" />
+          </div>
+        </div>
+
         {/* Staff KPIs Section */}
         {staffKPIs.length > 0 && (
           <div className="mb-6">
@@ -500,6 +590,39 @@ export function KitchenDisplay({ onLogout, restaurantId, restaurantName }: { onL
               <StatCard title="Completed" value={stats.completedOrders.toString()} color="green" />
               <StatCard title="In Progress" value={(stats.pendingOrders + stats.preparingOrders).toString()} color="amber" />
               <StatCard title="Avg Prep Time" value={`${stats.avgPrepTime} min`} color="purple" />
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="bg-slate-800 border border-slate-700 rounded-lg p-6">
+                <h3 className="text-lg font-bold text-white mb-2">Queue Health Distribution</h3>
+                <p className="text-sm text-slate-400 mb-4">Orders grouped by waiting time.</p>
+                <div className="space-y-3">
+                  <ProgressBar label="Healthy (0-7 min)" value={waitDistribution.healthy} total={orders.length || 1} color="green" />
+                  <ProgressBar label="Watch (8-15 min)" value={waitDistribution.watch} total={orders.length || 1} color="amber" />
+                  <ProgressBar label="Critical (>15 min)" value={waitDistribution.critical} total={orders.length || 1} color="blue" />
+                </div>
+              </div>
+
+              <div className="bg-slate-800 border border-slate-700 rounded-lg p-6">
+                <h3 className="text-lg font-bold text-white mb-2">Hourly Kitchen Load</h3>
+                <p className="text-sm text-slate-400 mb-4">Incoming order volume over the last 8 hours.</p>
+                <div className="space-y-3">
+                  {hourlyLoad.map((bucket) => (
+                    <div key={bucket.hour}>
+                      <div className="mb-1 flex items-center justify-between text-xs">
+                        <span className="text-slate-400">{bucket.hour}</span>
+                        <span className="font-semibold text-slate-100">{bucket.count}</span>
+                      </div>
+                      <div className="h-2 overflow-hidden rounded-full bg-slate-700">
+                        <div
+                          className="h-full rounded-full bg-sky-400"
+                          style={{ width: `${Math.round((bucket.count / maxHourlyLoad) * 100)}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
 
             {/* More Stats */}
@@ -533,6 +656,30 @@ export function KitchenDisplay({ onLogout, restaurantId, restaurantName }: { onL
                   )}
                 </div>
               </div>
+            </div>
+
+            <div className="bg-slate-800 border border-slate-700 rounded-lg p-6">
+              <h3 className="text-lg font-bold text-white mb-2">Most Delayed Active Orders</h3>
+              <p className="text-sm text-slate-400 mb-4">Orders with the longest current queue time.</p>
+              {delayedOrders.length === 0 ? (
+                <p className="text-slate-500">No active delayed orders.</p>
+              ) : (
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                  {delayedOrders.map((order) => {
+                    const age = getAgeMinutes(order.createdAt);
+                    return (
+                      <div key={order.id} className="rounded-lg border border-slate-700 bg-slate-900/70 p-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-semibold text-slate-100">#{order.orderNumber}</span>
+                          <span className="text-xs text-slate-400">Table {order.tableNumber}</span>
+                        </div>
+                        <div className="mt-2 text-sm text-slate-300">Status: {STATUS_CONFIG[order.status].label}</div>
+                        <div className="mt-1 text-sm font-semibold text-amber-300">Waiting {formatDuration(age)}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
         ) : (
@@ -630,6 +777,8 @@ function OrderCard({
 }) {
   const urgency = getUrgency(order.createdAt);
   const config = STATUS_CONFIG[order.status];
+  const ageMinutes = getAgeMinutes(order.createdAt);
+  const ageProgress = Math.min(100, Math.round((ageMinutes / 20) * 100));
 
   return (
     <div className={`bg-slate-800 rounded-lg overflow-hidden border ${config.borderColor} transition-all hover:-translate-y-0.5`}>
@@ -649,7 +798,7 @@ function OrderCard({
       <div className="px-3 py-1.5 bg-slate-900/60 flex items-center justify-between border-b border-slate-700">
         <div className="flex items-center gap-1.5 text-slate-400 text-xs">
           <ClockIcon className="w-3 h-3" />
-          <span className="font-mono">{formatTime(order.createdAt)}</span>
+          <span className="font-mono">{formatTime(order.createdAt)} • {ageMinutes}m</span>
         </div>
         {urgency === 'urgent' && (
           <div className="flex items-center gap-1 text-orange-400 text-xs font-bold animate-pulse">
@@ -663,6 +812,19 @@ function OrderCard({
             <span>SOON</span>
           </div>
         )}
+      </div>
+
+      <div className="px-3 py-2 border-b border-slate-700 bg-slate-900/40">
+        <div className="mb-1 flex items-center justify-between text-[11px] text-slate-400 uppercase tracking-wider">
+          <span>Order Aging</span>
+          <span>{formatDuration(ageMinutes)}</span>
+        </div>
+        <div className="h-1.5 overflow-hidden rounded-full bg-slate-700">
+          <div
+            className={`h-full rounded-full ${urgency === 'urgent' ? 'bg-red-400' : urgency === 'normal' ? 'bg-amber-400' : 'bg-emerald-400'}`}
+            style={{ width: `${ageProgress}%` }}
+          />
+        </div>
       </div>
 
       {/* Items */}
