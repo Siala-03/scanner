@@ -1036,7 +1036,7 @@ export async function fetchLocations(): Promise<InventoryLocation[]> {
   if (!restaurantId) return [];
 
   try {
-    const payload = await apiRequest<any[]>('/locations');
+    const payload = await apiRequest<any[]>('/api/locations');
     if (Array.isArray(payload)) {
       return payload.map(normalizeLocation);
     }
@@ -1104,7 +1104,7 @@ export async function createLocation(payload: {
   temperatureRange?: string;
 }): Promise<InventoryLocation> {
   try {
-    const created = await apiRequest<any>('/locations', {
+    const created = await apiRequest<any>('/api/locations', {
       method: 'POST',
       json: payload,
     });
@@ -1169,7 +1169,7 @@ export async function updateLocation(
   }
 ): Promise<InventoryLocation> {
   try {
-    const updated = await apiRequest<any>(`/locations/${id}`, {
+    const updated = await apiRequest<any>(`/api/locations/${id}`, {
       method: 'PUT',
       json: payload,
     });
@@ -1211,7 +1211,7 @@ export async function updateLocation(
 
 export async function deleteLocation(id: string): Promise<void> {
   try {
-    await apiRequest<void>(`/locations/${id}`, { method: 'DELETE' });
+    await apiRequest<void>(`/api/locations/${id}`, { method: 'DELETE' });
     return;
   } catch {
     const restaurantId = getRestaurantId();
@@ -1283,7 +1283,7 @@ function computeClientSideForecasts(
 
 export async function fetchForecasts(): Promise<InventoryForecast[]> {
   try {
-    const forecasts = await apiRequest<any[]>('/forecasting');
+    const forecasts = await apiRequest<any[]>('/api/forecasting');
     return Array.isArray(forecasts) ? forecasts.map(normalizeForecast) : [];
   } catch {
     // Backend unavailable — fall through to client-side computation
@@ -1312,7 +1312,7 @@ export async function fetchForecasts(): Promise<InventoryForecast[]> {
 
 export async function generateForecasts() {
   try {
-    const payload = await apiRequest<ForecastGenerateResponse>('/forecasting/generate', {
+    const payload = await apiRequest<ForecastGenerateResponse>('/api/forecasting/generate', {
       method: 'POST',
     });
 
@@ -1333,7 +1333,7 @@ export async function generateForecasts() {
 
 export async function fetchForecastAlerts(): Promise<InventoryForecast[]> {
   try {
-    const alerts = await apiRequest<any[]>('/forecasting/alerts');
+    const alerts = await apiRequest<any[]>('/api/forecasting/alerts');
     return Array.isArray(alerts) ? alerts.map(normalizeForecast) : [];
   } catch (error) {
     const forecasts = await fetchForecasts();

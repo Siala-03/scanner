@@ -109,7 +109,7 @@ function ReservationBookingForm({ restaurantId, restaurantName }: { restaurantId
         </div>
         <div>
           <label className="block text-xs font-semibold text-slate-600 mb-1">Party Size</label>
-          <input type="number" min={1} max={20} value={form.partySize} onChange={e => setForm(f => ({ ...f, partySize: Number(e.target.value) }))} className={inputClass} />
+          <input type="number" min={1} max={20} placeholder="2" value={form.partySize === 0 ? '' : form.partySize} onChange={e => setForm(f => ({ ...f, partySize: Number(e.target.value) }))} className={inputClass} />
         </div>
         <div>
           <label className="block text-xs font-semibold text-slate-600 mb-1">Special Requests</label>

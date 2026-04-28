@@ -433,8 +433,8 @@ export function MenuItemEditor({
                         type="number"
                         step="50"
                         className="w-24 px-2 py-1 rounded bg-slate-700 border border-slate-600 text-white text-xs text-right focus:outline-none focus:ring-1 focus:ring-amber-500"
-                        placeholder="+0 RWF"
-                        value={opt.priceAdjustment}
+                        placeholder="0"
+                        value={opt.priceAdjustment === 0 ? '' : opt.priceAdjustment}
                         onChange={e => updateModifierItem(group.id, opt.id, { priceAdjustment: Number(e.target.value) || 0 })}
                       />
                       <span className="text-xs text-slate-500">RWF</span>

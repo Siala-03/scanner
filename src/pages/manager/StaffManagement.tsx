@@ -1006,7 +1006,7 @@ export function StaffManagement({ onShowPerformance }: StaffManagementProps) {
             <Input
               label="Target Value"
               type="number"
-              value={kpiForm.targetValue}
+              value={kpiForm.targetValue === 0 ? '' : kpiForm.targetValue}
               onChange={(e) => setKpiForm(prev => ({ ...prev, targetValue: parseFloat(e.target.value) || 0 }))}
               placeholder="e.g. 50"
               className="bg-slate-700 border-slate-600 text-white" />
@@ -1107,7 +1107,7 @@ export function StaffManagement({ onShowPerformance }: StaffManagementProps) {
             <Input
               label="Target Value"
               type="number"
-              value={kpiForm.targetValue}
+              value={kpiForm.targetValue === 0 ? '' : kpiForm.targetValue}
               onChange={(e) => setKpiForm(prev => ({ ...prev, targetValue: parseFloat(e.target.value) || 0 }))}
               placeholder="e.g. 50"
               className="bg-slate-700 border-slate-600 text-white" />

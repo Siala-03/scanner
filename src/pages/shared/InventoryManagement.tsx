@@ -465,7 +465,7 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
   const [selectedPO, setSelectedPO] = useState<PurchaseOrder | null>(null);
   const [showNewPO, setShowNewPO] = useState(false);
   const [newPO, setNewPO] = useState({ supplierId: '', expectedDelivery: '', notes: '' });
-  const [newPOItems, setNewPOItems] = useState<{ menuItemId: string; orderedQty: number; unitCost: number }[]>([]);
+  const [newPOItems, setNewPOItems] = useState<{ menuItemId: string; orderedQty: number; unit: string; unitCost: number }[]>([]);
   const [receiveModal, setReceiveModal] = useState<PurchaseOrder | null>(null);
   const [receiveQtys, setReceiveQtys] = useState<Record<string, number>>({});
 
@@ -1020,7 +1020,8 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                                 {isEditing ? (
                                   <input
                                     type="number"
-                                    value={editValues.stock ?? row.stock}
+                                    placeholder="0"
+                                    value={(editValues.stock ?? row.stock) === 0 ? '' : (editValues.stock ?? row.stock)}
                                     onChange={(e) => setEditValues((v) => ({ ...v, stock: parseInt(e.target.value || '0', 10) }))}
                                     className="w-20 px-2 py-1 rounded bg-slate-900 border border-slate-600 text-white text-sm focus:outline-none focus:ring-1 focus:ring-amber-500"
                                     min={0}
@@ -1039,7 +1040,8 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                             {isEditing ? (
                               <input
                                 type="number"
-                                value={editValues.lowStockThreshold ?? row.rec?.lowStockThreshold ?? 0}
+                                placeholder="0"
+                                value={(editValues.lowStockThreshold ?? row.rec?.lowStockThreshold ?? 0) === 0 ? '' : (editValues.lowStockThreshold ?? row.rec?.lowStockThreshold ?? 0)}
                                 onChange={(e) => setEditValues((v) => ({ ...v, lowStockThreshold: parseInt(e.target.value || '0', 10) }))}
                                 className="w-16 px-2 py-1 rounded bg-slate-900 border border-slate-600 text-white text-xs focus:outline-none focus:ring-1 focus:ring-amber-500"
                                 min={0}
@@ -1052,7 +1054,8 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                             {isEditing ? (
                               <input
                                 type="number"
-                                value={editValues.reorderPoint ?? row.rec?.reorderPoint ?? 0}
+                                placeholder="0"
+                                value={(editValues.reorderPoint ?? row.rec?.reorderPoint ?? 0) === 0 ? '' : (editValues.reorderPoint ?? row.rec?.reorderPoint ?? 0)}
                                 onChange={(e) => setEditValues((v) => ({ ...v, reorderPoint: parseInt(e.target.value || '0', 10) }))}
                                 className="w-16 px-2 py-1 rounded bg-slate-900 border border-slate-600 text-white text-xs focus:outline-none focus:ring-1 focus:ring-amber-500"
                                 min={0}
@@ -1065,7 +1068,8 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                             {isEditing ? (
                               <input
                                 type="number"
-                                value={editValues.reorderQty ?? row.rec?.reorderQty ?? 0}
+                                placeholder="0"
+                                value={(editValues.reorderQty ?? row.rec?.reorderQty ?? 0) === 0 ? '' : (editValues.reorderQty ?? row.rec?.reorderQty ?? 0)}
                                 onChange={(e) => setEditValues((v) => ({ ...v, reorderQty: parseInt(e.target.value || '0', 10) }))}
                                 className="w-16 px-2 py-1 rounded bg-slate-900 border border-slate-600 text-white text-xs focus:outline-none focus:ring-1 focus:ring-amber-500"
                                 min={0}
@@ -1078,7 +1082,8 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                             {isEditing ? (
                               <input
                                 type="number"
-                                value={editValues.unitCost ?? row.rec?.unitCost ?? 0}
+                                placeholder="0"
+                                value={(editValues.unitCost ?? row.rec?.unitCost ?? 0) === 0 ? '' : (editValues.unitCost ?? row.rec?.unitCost ?? 0)}
                                 onChange={(e) => setEditValues((v) => ({ ...v, unitCost: parseFloat(e.target.value || '0') }))}
                                 step="0.01"
                                 className="w-24 px-2 py-1 rounded bg-slate-900 border border-slate-600 text-white text-xs focus:outline-none focus:ring-1 focus:ring-amber-500"
@@ -1143,7 +1148,7 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                                   <button
                                     onClick={() => {
                                       setNewPO({ supplierId: suppliers[0]?.id ?? '', expectedDelivery: '', notes: `Auto reordering ${row.item.name} based on threshold` });
-                                      setNewPOItems([{ menuItemId: row.item.id, orderedQty: Math.max((row.rec?.reorderQty ?? 5) - row.stock, 1), unitCost: row.rec?.unitCost ?? 0 }]);
+                                      setNewPOItems([{ menuItemId: row.item.id, orderedQty: Math.max((row.rec?.reorderQty ?? 5) - row.stock, 1), unit: '', unitCost: row.rec?.unitCost ?? 0 }]);
                                       setShowNewPO(true);
                                     }}
                                     className="p-2 md:p-1.5 text-emerald-400 hover:text-emerald-300 transition"
@@ -1465,12 +1470,18 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                     <p className="text-xs text-slate-500 italic mb-3">{sup.notes}</p>
                   )}
                   {isManager && (
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2">
                       <button
                         onClick={() => { setEditingSupplier(sup); setSupplierForm({ ...sup }); setEnablePortalAccess(false); setPortalEmail(sup.email ?? ''); setPortalName(sup.contactPerson ?? sup.name ?? ''); setPortalPhone(sup.phone ?? ''); setPortalPassword(generatePortalPassword()); setShowSupplierModal(true); }}
                         className="px-3 py-1 rounded-lg bg-slate-700 text-slate-300 text-xs hover:bg-slate-600 transition"
                       >
                         Edit
+                      </button>
+                      <button
+                        onClick={() => { setEditingSupplier(sup); setSupplierForm({ ...sup }); setEnablePortalAccess(true); setPortalEmail(sup.email ?? ''); setPortalName(sup.contactPerson ?? sup.name ?? ''); setPortalPhone(sup.phone ?? ''); setPortalPassword(generatePortalPassword()); setShowSupplierModal(true); }}
+                        className="px-3 py-1 rounded-lg bg-blue-500/20 text-blue-400 text-xs hover:bg-blue-500/30 transition"
+                      >
+                        Grant Access
                       </button>
                       <button
                         onClick={async () => { try { await apiUpdateSupplier(sup.id, { isActive: !sup.isActive }); await refresh(); alert(`Supplier ${sup.isActive ? 'deactivated' : 'activated'} successfully`); } catch (err) { console.error('Failed to update supplier', err); alert(`Failed to update supplier: ${err instanceof Error ? err.message : 'Unknown error'}`); } }}
@@ -1630,7 +1641,8 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                     </div>
                     <input
                       type="number"
-                      value={receiveQtys[i.menuItemId] ?? 0}
+                      placeholder="0"
+                      value={(receiveQtys[i.menuItemId] ?? 0) === 0 ? '' : (receiveQtys[i.menuItemId] ?? 0)}
                       onChange={(e) => setReceiveQtys((v) => ({ ...v, [i.menuItemId]: parseInt(e.target.value || '0', 10) }))}
                       min={0}
                       max={i.orderedQty - i.receivedQty}
@@ -1722,18 +1734,27 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
               <div className="flex justify-between items-center">
                 <p className="text-slate-400 text-sm">Items</p>
                 <button
-                  onClick={() => setNewPOItems((v) => [...v, { menuItemId: '', orderedQty: 1, unitCost: 0 }])}
+                  onClick={() => setNewPOItems((v) => [...v, { menuItemId: '', orderedQty: 1, unit: '', unitCost: 0 }])}
                   className="px-3 py-1 rounded-lg bg-slate-700 text-slate-300 text-xs hover:bg-slate-600 transition"
                 >
                   Add Item
                 </button>
               </div>
+              {newPOItems.length > 0 && (
+                <div className="grid grid-cols-[1fr_80px_90px_90px_28px] gap-2 px-2 pb-0.5">
+                  <span className="text-xs text-slate-500">Item</span>
+                  <span className="text-xs text-slate-500">Qty</span>
+                  <span className="text-xs text-slate-500">Unit</span>
+                  <span className="text-xs text-slate-500">Cost (RWF)</span>
+                  <span />
+                </div>
+              )}
               {newPOItems.map((item, idx) => (
-                <div key={idx} className="grid grid-cols-3 gap-2 p-2 bg-slate-800/50 rounded-lg border border-slate-700/30">
+                <div key={idx} className="grid grid-cols-[1fr_80px_90px_90px_28px] gap-2 items-center p-2 bg-slate-800/50 rounded-lg border border-slate-700/30">
                   <select
                     value={item.menuItemId}
                     onChange={(e) => setNewPOItems((v) => v.map((i, j) => j === idx ? { ...i, menuItemId: e.target.value } : i))}
-                    className="px-3 py-2 rounded-lg bg-slate-900 border border-slate-600 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    className="px-2 py-2 rounded-lg bg-slate-900 border border-slate-600 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
                   >
                     <option value="">Select Item</option>
                     <optgroup label="Menu Items">
@@ -1751,21 +1772,47 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                   </select>
                   <input
                     type="number"
-                    placeholder="Qty"
-                    value={item.orderedQty}
+                    placeholder="0"
+                    value={item.orderedQty === 0 ? '' : item.orderedQty}
                     onChange={(e) => setNewPOItems((v) => v.map((i, j) => j === idx ? { ...i, orderedQty: parseInt(e.target.value || '0', 10) } : i))}
-                    className="px-3 py-2 rounded-lg bg-slate-900 border border-slate-600 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    className="px-2 py-2 rounded-lg bg-slate-900 border border-slate-600 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
                     min={1}
                   />
+                  <select
+                    value={item.unit}
+                    onChange={(e) => setNewPOItems((v) => v.map((i, j) => j === idx ? { ...i, unit: e.target.value } : i))}
+                    className="px-2 py-2 rounded-lg bg-slate-900 border border-slate-600 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  >
+                    <option value="">—</option>
+                    <option value="units">Units</option>
+                    <option value="kg">kg</option>
+                    <option value="g">g</option>
+                    <option value="L">L</option>
+                    <option value="ml">ml</option>
+                    <option value="boxes">Boxes</option>
+                    <option value="cases">Cases</option>
+                    <option value="packs">Packs</option>
+                    <option value="bags">Bags</option>
+                    <option value="bottles">Bottles</option>
+                    <option value="cans">Cans</option>
+                  </select>
                   <input
                     type="number"
-                    placeholder="Unit Cost"
-                    value={item.unitCost}
+                    placeholder="0"
+                    value={item.unitCost === 0 ? '' : item.unitCost}
                     onChange={(e) => setNewPOItems((v) => v.map((i, j) => j === idx ? { ...i, unitCost: parseFloat(e.target.value || '0') } : i))}
                     step="0.01"
-                    className="px-3 py-2 rounded-lg bg-slate-900 border border-slate-600 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    className="px-2 py-2 rounded-lg bg-slate-900 border border-slate-600 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
                     min={0}
                   />
+                  <button
+                    type="button"
+                    onClick={() => setNewPOItems((v) => v.filter((_, j) => j !== idx))}
+                    className="flex items-center justify-center w-7 h-7 rounded hover:bg-red-500/20 text-slate-500 hover:text-red-400 transition-colors"
+                    title="Remove item"
+                  >
+                    <XIcon className="w-3.5 h-3.5" />
+                  </button>
                 </div>
               ))}
             </div>
@@ -1839,7 +1886,7 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                 <input
                   type="number"
                   placeholder="Stock"
-                  value={newInventoryItemStock}
+                  value={newInventoryItemStock === 0 ? '' : newInventoryItemStock}
                   onChange={(e) => setNewInventoryItemStock(parseInt(e.target.value || '0', 10))}
                   min={0}
                   className="mt-1 w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
@@ -1850,7 +1897,7 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                 <input
                   type="number"
                   placeholder="Unit cost"
-                  value={newInventoryItemUnitCost}
+                  value={newInventoryItemUnitCost === 0 ? '' : newInventoryItemUnitCost}
                   onChange={(e) => setNewInventoryItemUnitCost(parseFloat(e.target.value || '0'))}
                   min={0}
                   step="0.01"
@@ -1887,7 +1934,7 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                 <input
                   type="number"
                   placeholder="Low threshold"
-                  value={newInventoryItemLowThreshold}
+                  value={newInventoryItemLowThreshold === 0 ? '' : newInventoryItemLowThreshold}
                   onChange={(e) => setNewInventoryItemLowThreshold(parseInt(e.target.value || '0', 10))}
                   min={0}
                   className="mt-1 w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
@@ -1898,7 +1945,7 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                 <input
                   type="number"
                   placeholder="Reorder point"
-                  value={newInventoryItemReorderPoint}
+                  value={newInventoryItemReorderPoint === 0 ? '' : newInventoryItemReorderPoint}
                   onChange={(e) => setNewInventoryItemReorderPoint(parseInt(e.target.value || '0', 10))}
                   min={0}
                   className="mt-1 w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
@@ -1909,7 +1956,7 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                 <input
                   type="number"
                   placeholder="Reorder qty"
-                  value={newInventoryItemReorderQty}
+                  value={newInventoryItemReorderQty === 0 ? '' : newInventoryItemReorderQty}
                   onChange={(e) => setNewInventoryItemReorderQty(parseInt(e.target.value || '0', 10))}
                   min={0}
                   className="mt-1 w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"

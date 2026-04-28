@@ -263,7 +263,8 @@ export function PromotionsManagement() {
                     min={0}
                     step={form.type === 'percentage' ? 1 : 100}
                     className="w-full px-3 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-sm focus:outline-none focus:ring-1 focus:ring-amber-500"
-                    value={form.discountValue || 0}
+                    placeholder="0"
+                    value={form.discountValue === 0 ? '' : form.discountValue}
                     onChange={e => setForm(f => ({ ...f, discountValue: Number(e.target.value) }))}
                   />
                 </div>
@@ -277,7 +278,8 @@ export function PromotionsManagement() {
                     min={0}
                     step={100}
                     className="w-full px-3 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-sm focus:outline-none focus:ring-1 focus:ring-amber-500"
-                    value={form.minOrderAmount || 0}
+                    placeholder="0"
+                    value={form.minOrderAmount === 0 ? '' : form.minOrderAmount}
                     onChange={e => setForm(f => ({ ...f, minOrderAmount: Number(e.target.value) }))}
                   />
                 </div>

@@ -294,7 +294,8 @@ export function ReservationsPage() {
                     min={30}
                     step={15}
                     className="w-full px-2 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-sm focus:outline-none focus:ring-1 focus:ring-amber-500"
-                    value={form.durationMinutes}
+                    placeholder="90"
+                    value={form.durationMinutes === 0 ? '' : form.durationMinutes}
                     onChange={e => setForm(f => ({ ...f, durationMinutes: Number(e.target.value) }))}
                   />
                 </div>
@@ -307,7 +308,8 @@ export function ReservationsPage() {
                     type="number"
                     min={1}
                     className="w-full px-3 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-sm focus:outline-none focus:ring-1 focus:ring-amber-500"
-                    value={form.partySize}
+                    placeholder="2"
+                    value={form.partySize === 0 ? '' : form.partySize}
                     onChange={e => setForm(f => ({ ...f, partySize: Number(e.target.value) }))}
                   />
                 </div>
