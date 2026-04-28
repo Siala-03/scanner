@@ -1,7 +1,6 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import type { Staff } from '../types';
 import { fetchStaff, fetchStaffOnDuty, fetchWaiters, fetchStaffById } from '../api/staff';
-import { supabase } from '../lib/supabase';
 
 function resolveRestaurantId(): string | undefined {
   const direct = localStorage.getItem('restaurantId');
@@ -28,7 +27,6 @@ export function useStaff() {
   const [staff, setStaff] = useState<Staff[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   const loadStaff = useCallback(async () => {
     try {
@@ -46,26 +44,6 @@ export function useStaff() {
 
   useEffect(() => {
     loadStaff();
-
-    const restaurantId = resolveRestaurantId();
-    if (restaurantId) {
-      if (channelRef.current) supabase.removeChannel(channelRef.current);
-      channelRef.current = supabase
-        .channel(`staff-realtime-${restaurantId}`)
-        .on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table: 'staff', filter: `restaurant_id=eq.${restaurantId}` },
-          () => loadStaff()
-        )
-        .subscribe();
-    }
-
-    return () => {
-      if (channelRef.current) {
-        supabase.removeChannel(channelRef.current);
-        channelRef.current = null;
-      }
-    };
   }, [loadStaff]);
 
   return { staff, isLoading, error, refetch: loadStaff };

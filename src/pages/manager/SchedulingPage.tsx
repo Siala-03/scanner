@@ -69,13 +69,29 @@ export function SchedulingPage() {
   async function load() {
     setLoading(true);
     try {
-      const [data, staffData] = await Promise.all([
+      const [schedulesResult, staffResult] = await Promise.allSettled([
         getSchedules(restaurantId(), toDateStr(weekStart), toDateStr(weekEnd)),
         fetchStaff(),
       ]);
-      setSchedules(data);
-      setStaff(staffData);
-    } catch (e) { console.error(e); }
+
+      if (schedulesResult.status === 'fulfilled') {
+        setSchedules(schedulesResult.value);
+      } else {
+        console.error('Failed to load schedules:', schedulesResult.reason);
+        setSchedules([]);
+      }
+
+      if (staffResult.status === 'fulfilled') {
+        setStaff(staffResult.value);
+      } else {
+        console.error('Failed to load staff:', staffResult.reason);
+        setStaff([]);
+      }
+    } catch (e) {
+      console.error(e);
+      setSchedules([]);
+      setStaff([]);
+    }
     finally { setLoading(false); }
   }
 

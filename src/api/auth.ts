@@ -1,4 +1,4 @@
-import { supabase, callEdgeFn } from '../lib/supabase';
+import { apiRequest } from './http';
 import type { Staff, StaffRole, StaffPerformance } from '../types';
 
 function normalizeStaff(raw: Record<string, any>): Staff {
@@ -54,9 +54,9 @@ export async function loginStaff(
   password: string,
   restaurantId?: string
 ): Promise<Staff> {
-  const raw = await callEdgeFn('staff-login', {
+  const raw = await apiRequest<any>('/api/auth/login', {
     method: 'POST',
-    body: { action: 'login', username, password, restaurantId },
+    json: { username, password, restaurantId },
   });
 
   const staff = normalizeStaff(raw);
@@ -72,36 +72,24 @@ export async function fetchAllStaff(): Promise<Staff[]> {
   const restaurantId = getRestaurantId();
   const role         = localStorage.getItem('staffRole');
 
-  let query = supabase.from('staff').select('*').order('name');
-  if (role !== 'superadmin' && restaurantId) {
-    query = query.eq('restaurant_id', restaurantId);
-  }
-
-  const { data, error } = await query;
-  if (error) throw error;
-  return (data || []).map(normalizeStaff);
+  const params = new URLSearchParams();
+  if (restaurantId) params.set('restaurantId', restaurantId);
+  const url = `/api/staff${params.toString() ? '?' + params.toString() : ''}`;
+  
+  const response = await apiRequest<{ staff: any[] }>(url);
+  return (response.staff || []).map(normalizeStaff);
 }
 
 export async function fetchStaffById(id: string): Promise<Staff> {
-  const { data, error } = await supabase
-    .from('staff')
-    .select('*')
-    .eq('id', id)
-    .single();
-  if (error) throw error;
-  return normalizeStaff(data);
+  const response = await apiRequest<{ staff: any }>(`/api/staff/${id}`);
+  return normalizeStaff(response.staff);
 }
 
 export async function fetchWaiters(): Promise<Staff[]> {
   const restaurantId = getRestaurantId();
-  const { data, error } = await supabase
-    .from('staff')
-    .select('*')
-    .eq('role', 'waiter')
-    .eq('restaurant_id', restaurantId)
-    .order('name');
-  if (error) throw error;
-  return (data || []).map(normalizeStaff);
+  const url = `/api/staff/waiters${restaurantId ? '?restaurantId=' + restaurantId : ''}`;
+  const response = await apiRequest<{ staff: any[] }>(url);
+  return (response.staff || []).map(normalizeStaff);
 }
 
 /**
@@ -117,43 +105,34 @@ export async function signUpStaff(input: {
   restaurantId?: string;
 }): Promise<Staff> {
   const restaurantId = input.restaurantId || getRestaurantId();
-  const raw = await callEdgeFn('admin-staff', {
+  const raw = await apiRequest<{ staff: any }>('/api/auth/signup', {
     method: 'POST',
-    body: { ...input, restaurantId },
+    json: { ...input, restaurantId },
   });
-  return normalizeStaff(raw);
+  return normalizeStaff(raw.staff);
 }
 
 export async function updateStaffRole(staffId: string, role: string): Promise<Staff> {
-  const { data, error } = await supabase
-    .from('staff')
-    .update({ role })
-    .eq('id', staffId)
-    .select()
-    .single();
-  if (error) throw error;
-  return normalizeStaff(data);
+  const response = await apiRequest<{ staff: any }>(`/api/staff/${staffId}/role`, {
+    method: 'PUT',
+    json: { role },
+  });
+  return normalizeStaff(response.staff);
 }
 
 export async function updateStaffDuty(staffId: string, isOnDuty: boolean): Promise<Staff> {
-  const { data, error } = await supabase
-    .from('staff')
-    .update({ is_on_duty: isOnDuty })
-    .eq('id', staffId)
-    .select()
-    .single();
-  if (error) throw error;
-  return normalizeStaff(data);
+  const response = await apiRequest<{ staff: any }>(`/api/staff/${staffId}/status`, {
+    method: 'PUT',
+    json: { isOnDuty },
+  });
+  return normalizeStaff(response.staff);
 }
 
 /**
- * Delete a staff member via Edge Function — also removes credentials server-side.
+ * Delete a staff member via backend API
  */
 export async function deleteStaff(staffId: string): Promise<void> {
-  await callEdgeFn('admin-staff', {
-    method: 'DELETE',
-    params: { staff_id: staffId },
-  });
+  await apiRequest(`/api/staff/${staffId}`, { method: 'DELETE' });
 }
 
 export function logoutStaff(): void {
