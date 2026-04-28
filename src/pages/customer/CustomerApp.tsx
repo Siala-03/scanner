@@ -1,4 +1,4 @@
-import { useCallback, useState, FormEvent } from 'react';
+import { useCallback, useEffect, useState, FormEvent } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   UtensilsIcon,
@@ -229,6 +229,7 @@ interface CustomerAppProps {
   orders: Order[];
   restaurantName?: string;
   restaurantId?: string;
+  initialTab?: 'menu' | 'reserve';
   onPlaceOrder: (
   tableNumber: number,
   items: CartItem[],
@@ -248,14 +249,19 @@ export function CustomerApp({
   orders,
   restaurantName,
   restaurantId,
+  initialTab = 'menu',
   onPlaceOrder,
   onCallWaiter
 }: CustomerAppProps) {
-  const [activeTab, setActiveTab] = useState<CustomerTab>('menu');
+  const [activeTab, setActiveTab] = useState<CustomerTab>(initialTab);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [waiterCalled, setWaiterCalled] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const [onlineCustomerInfo, setOnlineCustomerInfo] = useState<OnlineCustomerInfo | null>(null);
+
+  useEffect(() => {
+    setActiveTab(initialTab);
+  }, [initialTab]);
 
   const handleAddToCart = useCallback((
     item: MenuItem,
@@ -372,7 +378,7 @@ export function CustomerApp({
   }];
 
   // Gate: all hooks above are always called; gate is in the render path, not before hooks
-  if (tableNumber === 999 && !onlineCustomerInfo) {
+  if (tableNumber === 999 && !onlineCustomerInfo && initialTab !== 'reserve') {
     return (
       <OnlineCustomerGate
         restaurantName={restaurantName}

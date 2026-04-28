@@ -286,7 +286,8 @@ export default function SupervisorExpenseManagement() {
   };
 
   return (
-    <div className="supervisor-surface space-y-6 bg-slate-900 text-slate-100 p-6 rounded-lg transition-colors">
+    <div className="supervisor-surface min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-slate-100 p-4 md:p-8 transition-colors">
+      <div className="max-w-6xl mx-auto space-y-6">
       {/* Header */}
       <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4">
         <div>
@@ -791,6 +792,7 @@ export default function SupervisorExpenseManagement() {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

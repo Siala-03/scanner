@@ -14,7 +14,7 @@ const API_BASE = import.meta.env.VITE_API_URL || '';
 
 export async function apiRequest<T>(
   path: string,
-  init: RequestInit & { json?: unknown } = {}
+  init: RequestInit & { json?: unknown; includeAuthHeaders?: boolean } = {}
 ): Promise<T> {
   let url = path;
   if (!path.startsWith('http')) {
@@ -31,28 +31,31 @@ export async function apiRequest<T>(
     headers.set('Cache-Control', 'no-cache');
   }
 
-  // Add authentication headers automatically from localStorage
-  let staffId = localStorage.getItem('staffId');
-  if (!staffId) {
-    const savedAuthUser = localStorage.getItem('authUser');
-    if (savedAuthUser) {
-      try {
-        const authUser = JSON.parse(savedAuthUser);
-        if (authUser?.id) {
-          staffId = authUser.id;
+  const includeAuthHeaders = init.includeAuthHeaders ?? true;
+  if (includeAuthHeaders) {
+    // Add authentication headers automatically from localStorage
+    let staffId = localStorage.getItem('staffId');
+    if (!staffId) {
+      const savedAuthUser = localStorage.getItem('authUser');
+      if (savedAuthUser) {
+        try {
+          const authUser = JSON.parse(savedAuthUser);
+          if (authUser?.id) {
+            staffId = authUser.id;
+          }
+        } catch {
+          // ignore invalid auth user JSON
         }
-      } catch {
-        // ignore invalid auth user JSON
       }
     }
-  }
 
-  const token = localStorage.getItem('token');
-  if (staffId) {
-    headers.set('x-staff-id', staffId);
-  }
-  if (token) {
-    headers.set('Authorization', `Bearer ${token}`);
+    const token = localStorage.getItem('token');
+    if (staffId) {
+      headers.set('x-staff-id', staffId);
+    }
+    if (token) {
+      headers.set('Authorization', `Bearer ${token}`);
+    }
   }
 
   let res: Response;

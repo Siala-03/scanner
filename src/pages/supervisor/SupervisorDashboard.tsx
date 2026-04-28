@@ -62,7 +62,7 @@ export function SupervisorDashboard({ restaurantName, ordersByHour, statusBreakd
   const sortedRoleBreakdown = Object.entries(roleBreakdown).sort((a, b) => b[1] - a[1]);
 
   return (
-    <div className="supervisor-surface min-h-screen bg-slate-900 text-slate-100 p-4 md:p-6 transition-colors">
+    <div className="supervisor-surface min-h-screen bg-slate-900 text-slate-100 p-4 md:p-8 transition-colors">
       <div className="max-w-6xl mx-auto">
         <div className="mb-5">
           <div>

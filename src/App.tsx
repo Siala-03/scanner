@@ -59,6 +59,7 @@ export function App() {
   const [receiptSettings, setReceiptSettings] = useState<RestaurantReceiptSettings>({});
   const [currentRestaurantId, setCurrentRestaurantId] = useState<string | null>(null);
   const [tableNumber, setTableNumber] = useState<number | null>(null);
+  const [customerInitialTab, setCustomerInitialTab] = useState<'menu' | 'reserve'>('menu');
   const [managerPage, setManagerPage] = useState<ManagerPage>('dashboard');
   const [supervisorPage, setSupervisorPage] =
   useState<SupervisorPage>('dashboard');
@@ -345,6 +346,7 @@ export function App() {
       // Brief "detected" display, then navigate
       setTimeout(() => {
         setSelectedRole('customer');
+        setCustomerInitialTab('menu');
         setTableNumber(targetTable);
         // update URL so it matches what a real scan would point to
         window.history.pushState({}, '', `/t/${targetTable}`);
@@ -360,14 +362,30 @@ export function App() {
     const path = window.location.pathname;
     const query = new URLSearchParams(window.location.search);
 
+    // Check for direct reservation deep-link: /r/:restaurantId/t/:table/reserve
+    const reserveMatch = path.match(/^\/r\/([^/]+)\/t\/(\d+)\/reserve\/?$/);
+    if (reserveMatch) {
+      const parsedRestaurantId = decodeURIComponent(reserveMatch[1]);
+      const num = parseInt(reserveMatch[2], 10);
+      if (!isNaN(num)) {
+        persistRestaurantContext(parsedRestaurantId);
+        setSelectedRole('customer');
+        setCustomerInitialTab('reserve');
+        setTableNumber(num);
+        setRouteResolved(true);
+        return;
+      }
+    }
+
     // Check for restaurant-specific table QR code path: /r/:restaurantId/t/:table
-    const restaurantTableMatch = path.match(/^\/r\/([^/]+)\/t\/(\d+)/);
+    const restaurantTableMatch = path.match(/^\/r\/([^/]+)\/t\/(\d+)\/?$/);
     if (restaurantTableMatch) {
       const parsedRestaurantId = decodeURIComponent(restaurantTableMatch[1]);
       const num = parseInt(restaurantTableMatch[2], 10);
       if (!isNaN(num)) {
         persistRestaurantContext(parsedRestaurantId);
         setSelectedRole('customer');
+        setCustomerInitialTab('menu');
         setTableNumber(num);
         setRouteResolved(true);
         return;
@@ -385,6 +403,7 @@ export function App() {
           persistRestaurantContext(restaurantIdFromQuery);
         }
         setSelectedRole('customer');
+        setCustomerInitialTab('menu');
         setTableNumber(num);
         setRouteResolved(true);
         return;
@@ -401,6 +420,7 @@ export function App() {
           persistRestaurantContext(restaurantIdFromQuery);
         }
         setSelectedRole('customer');
+        setCustomerInitialTab('menu');
         setTableNumber(num);
         setRouteResolved(true);
         return;
@@ -526,6 +546,7 @@ export function App() {
           tableNumber={tableNumber}
           orders={orders}
           restaurantName={restaurantName}
+          initialTab={customerInitialTab}
           onPlaceOrder={handlePlaceOrder}
           onCallWaiter={() => handleCallWaiter(tableNumber)}
         />

@@ -10,7 +10,7 @@ export async function getReservations(restaurantId: string, date?: string, statu
 
 export async function checkAvailability(restaurantId: string, date: string): Promise<Reservation[]> {
   const params = new URLSearchParams({ restaurantId, date });
-  return apiRequest(`/api/reservations/availability?${params}`);
+  return apiRequest(`/api/reservations/availability?${params}`, { includeAuthHeaders: false });
 }
 
 export async function createReservation(data: {
@@ -25,7 +25,7 @@ export async function createReservation(data: {
   tableNumber?: number;
   notes?: string;
 }): Promise<Reservation> {
-  return apiRequest('/api/reservations', { method: 'POST', json: data });
+  return apiRequest('/api/reservations', { method: 'POST', json: data, includeAuthHeaders: false });
 }
 
 export async function updateReservation(id: string, data: {

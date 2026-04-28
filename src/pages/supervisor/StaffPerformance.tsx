@@ -88,7 +88,7 @@ export function StaffPerformance({ onBack }: StaffPerformanceProps) {
     rating: w.performance?.rating || 0,
   }));
   return (
-    <div className="supervisor-surface min-h-screen bg-slate-900 p-4 md:p-6 transition-colors">
+    <div className="supervisor-surface min-h-screen bg-slate-900 p-4 md:p-8 transition-colors">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="mb-6">
