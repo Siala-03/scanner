@@ -25,6 +25,8 @@ import CreditManagement from './pages/manager/CreditManagement';
 import { LoyaltyManagement } from './pages/manager/LoyaltyManagement';
 import { PromotionsManagement } from './pages/manager/PromotionsManagement';
 import { ReservationsPage } from './pages/manager/ReservationsPage';
+import { SchedulingPage } from './pages/manager/SchedulingPage';
+import { ReviewsPage } from './pages/manager/ReviewsPage';
 import ExpenseApproval from './components/manager/ExpenseApproval';
 import SupervisorExpenseManagement from './components/supervisor/ExpenseManagement';
 import { InventoryManagement } from './pages/shared/InventoryManagement';
@@ -42,7 +44,7 @@ import type { RestaurantReceiptSettings } from './api/restaurants';
 import { RestaurantSettings } from './pages/manager/RestaurantSettings';
 
 type UserRole = 'customer' | 'waiter' | 'supervisor' | 'manager' | 'kitchen' | 'superadmin' | 'supplier' | null;
-type ManagerPage = 'dashboard' | 'menu' | 'staff' | 'analytics' | 'performance' | 'qrcodes' | 'inventory' | 'history' | 'expenses' | 'credit' | 'loyalty' | 'promotions' | 'reservations' | 'settings';
+type ManagerPage = 'dashboard' | 'menu' | 'staff' | 'analytics' | 'performance' | 'qrcodes' | 'inventory' | 'history' | 'expenses' | 'credit' | 'loyalty' | 'promotions' | 'reservations' | 'scheduling' | 'reviews' | 'settings';
 type SupervisorPage = 'dashboard' | 'revenue' | 'staff' | 'qrcodes' | 'inventory' | 'menu' | 'history' | 'expenses' | 'online-orders';
 
 const MANAGER_NAV_GROUPS: Array<{
@@ -56,6 +58,7 @@ const MANAGER_NAV_GROUPS: Array<{
     items: [
       { id: 'history', label: 'Order History' },
       { id: 'reservations', label: 'Reservations' },
+      { id: 'reviews', label: 'Reviews' },
     ],
   },
   {
@@ -81,6 +84,7 @@ const MANAGER_NAV_GROUPS: Array<{
     label: 'Setup',
     items: [
       { id: 'staff', label: 'Staff' },
+      { id: 'scheduling', label: 'Schedule' },
       { id: 'qrcodes', label: 'QR Codes' },
       { id: 'inventory', label: 'Inventory' },
       { id: 'settings', label: 'Settings' },
@@ -920,6 +924,8 @@ export function App() {
             {managerPage === 'loyalty' && <LoyaltyManagement />}
             {managerPage === 'promotions' && <PromotionsManagement />}
             {managerPage === 'reservations' && <ReservationsPage />}
+            {managerPage === 'scheduling' && <SchedulingPage />}
+            {managerPage === 'reviews' && <ReviewsPage />}
             {managerPage === 'history' && <OrderHistoryPage onBack={() => setManagerPage('dashboard')} existingOrders={orders} />}
             {managerPage === 'settings' && currentRestaurantId && (
               <RestaurantSettings

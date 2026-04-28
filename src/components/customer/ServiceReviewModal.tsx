@@ -4,6 +4,7 @@ import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import type { Order, Staff } from '../../types';
 import { addReview } from '../../utils/reviewsStorage';
+import { submitReview } from '../../api/reviews';
 import { useStaff } from '../../hooks/useStaff';
 
 interface ServiceReviewModalProps {
@@ -118,6 +119,7 @@ export function ServiceReviewModal({ order, isOpen, onClose }: ServiceReviewModa
             disabled={!canSubmit}
             onClick={() => {
               if (!resolvedWaiterId) return;
+              const restaurantId = localStorage.getItem('restaurantId') || '';
               addReview({
                 id: `rev-${Date.now()}`,
                 orderId: order.id,
@@ -127,6 +129,16 @@ export function ServiceReviewModal({ order, isOpen, onClose }: ServiceReviewModa
                 comment: comment.trim() ? comment.trim() : undefined,
                 createdAt: new Date().toISOString()
               });
+              if (restaurantId) {
+                submitReview({
+                  restaurantId,
+                  orderId: order.id,
+                  tableNumber: order.tableNumber ?? undefined,
+                  rating,
+                  comment: comment.trim() || undefined,
+                  waiterId: resolvedWaiterId,
+                }).catch(() => {});
+              }
               onClose();
             }}
           >

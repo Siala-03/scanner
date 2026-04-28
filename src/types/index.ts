@@ -432,4 +432,31 @@ export interface Reservation {
 }
 
 export * from './reviews';
+
+export interface StaffSchedule {
+  id: string;
+  restaurantId: string;
+  staffId: string;
+  staffName?: string;
+  staffRole?: string;
+  shiftDate: string;
+  startTime: string;
+  endTime: string;
+  role?: string;
+  notes?: string;
+  createdAt: string;
+}
+
+export interface Review {
+  id: string;
+  restaurantId: string;
+  orderId?: string;
+  tableNumber?: number;
+  rating: number;
+  comment?: string;
+  customerName?: string;
+  waiterId?: string;
+  waiterName?: string;
+  createdAt: string;
+}
 export * from './inventory';

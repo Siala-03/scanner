@@ -33,6 +33,8 @@ import { restaurantsRouter } from './routes/restaurants.js';
 import creditRouter from './routes/credit.js';
 import { promotionsRouter } from './routes/promotions.js';
 import { reservationsRouter } from './routes/reservations.js';
+import { schedulesRouter } from './routes/schedules.js';
+import { reviewsRouter } from './routes/reviews.js';
 import { initSocket } from './socket.js';
 import { logger } from './logger.js';
 import { pool } from './db.js';
@@ -277,6 +279,8 @@ app.use('/api/restaurants', restaurantsRouter);
 app.use('/api/credit', creditRouter);
 app.use('/api/promotions', promotionsRouter);
 app.use('/api/reservations', reservationsRouter);
+app.use('/api/schedules', schedulesRouter);
+app.use('/api/reviews', reviewsRouter);
 
 app.use(
   (
