@@ -23,6 +23,8 @@ import { AnalyticsPage } from './pages/manager/AnalyticsPage';
 import { QRCodeGenerator } from './pages/manager/QRCodeGenerator';
 import CreditManagement from './pages/manager/CreditManagement';
 import { LoyaltyManagement } from './pages/manager/LoyaltyManagement';
+import { PromotionsManagement } from './pages/manager/PromotionsManagement';
+import { ReservationsPage } from './pages/manager/ReservationsPage';
 import ExpenseApproval from './components/manager/ExpenseApproval';
 import SupervisorExpenseManagement from './components/supervisor/ExpenseManagement';
 import { InventoryManagement } from './pages/shared/InventoryManagement';
@@ -40,7 +42,7 @@ import type { RestaurantReceiptSettings } from './api/restaurants';
 import { RestaurantSettings } from './pages/manager/RestaurantSettings';
 
 type UserRole = 'customer' | 'waiter' | 'supervisor' | 'manager' | 'kitchen' | 'superadmin' | 'supplier' | null;
-type ManagerPage = 'dashboard' | 'menu' | 'staff' | 'analytics' | 'performance' | 'qrcodes' | 'inventory' | 'history' | 'expenses' | 'credit' | 'loyalty' | 'settings';
+type ManagerPage = 'dashboard' | 'menu' | 'staff' | 'analytics' | 'performance' | 'qrcodes' | 'inventory' | 'history' | 'expenses' | 'credit' | 'loyalty' | 'promotions' | 'reservations' | 'settings';
 type SupervisorPage = 'dashboard' | 'revenue' | 'staff' | 'qrcodes' | 'inventory' | 'menu' | 'history' | 'expenses' | 'online-orders';
 
 function getThemeStorageKeyForRole(role: UserRole): string {
@@ -175,8 +177,8 @@ export function App() {
   }, []);
 
   const handlePlaceOrder = useCallback(
-    async (tableNum: number, items: CartItem[], specialInstructions?: string, customer?: Customer | null, delivery?: { provider: string; address: string }, loyaltyRewardId?: string) => {
-      await addOrder(tableNum, items, specialInstructions, customer, delivery, loyaltyRewardId);
+    async (tableNum: number, items: CartItem[], specialInstructions?: string, customer?: Customer | null, delivery?: { provider: string; address: string }, loyaltyRewardId?: string, promotionCode?: string) => {
+      await addOrder(tableNum, items, specialInstructions, customer, delivery, loyaltyRewardId, promotionCode);
       handleCallWaiter(tableNum);
     },
     [addOrder, handleCallWaiter]
@@ -575,12 +577,22 @@ export function App() {
               {receiptSettings.logo && (
                 <img src={receiptSettings.logo} alt="logo" className="h-8 w-auto object-contain rounded" />
               )}
-              <span className="text-slate-100 font-medium">Supervisor Dashboard</span>
-              <div className="ml-auto">
+              <div>
+                <div className="text-xs sm:text-sm text-slate-300 uppercase tracking-wider">Supervisor Portal</div>
+                <div className="text-base sm:text-lg font-semibold">Welcome, {authUser.name}</div>
+                <div className="text-xs sm:text-sm text-slate-400">{restaurantName || 'Company'}</div>
+              </div>
+              <div className="ml-auto flex items-center gap-2">
                 <ThemeToggle />
+                <button
+                  onClick={handleLogout}
+                  className="p-2 rounded-lg bg-slate-700/60 hover:bg-red-600 text-slate-200 hover:text-white transition-colors"
+                  aria-label="Logout"
+                >
+                  <LogOutIcon className="w-5 h-5" />
+                </button>
               </div>
             </div>
-            <div className="text-sm text-slate-400">{restaurantName || 'Company'}</div>
           </div>
         </div>
 
@@ -651,8 +663,9 @@ export function App() {
 
         {supervisorPage === 'dashboard' && (
           <SupervisorDashboard
-            onManageMenu={() => setSupervisorPage('menu')}
-            onLogout={handleBack}
+            restaurantName={restaurantName}
+            ordersByHour={ordersByHour}
+            statusBreakdown={statusBreakdown}
           />
         )}
         {supervisorPage === 'revenue' && <RevenueReports />}
@@ -731,6 +744,8 @@ export function App() {
                   { id: 'expenses', label: 'Expenses' },
                   { id: 'credit', label: 'Credit' },
                   { id: 'loyalty', label: 'Loyalty & SMS' },
+                  { id: 'promotions', label: 'Promotions' },
+                  { id: 'reservations', label: 'Reservations' },
                   { id: 'settings', label: 'Settings' },
                 ] as Array<{ id: ManagerPage; label: string }>
               ).map((item) => (
@@ -778,6 +793,8 @@ export function App() {
             {managerPage === 'expenses' && <ExpenseApproval />}
             {managerPage === 'credit' && <CreditManagement />}
             {managerPage === 'loyalty' && <LoyaltyManagement />}
+            {managerPage === 'promotions' && <PromotionsManagement />}
+            {managerPage === 'reservations' && <ReservationsPage />}
             {managerPage === 'history' && <OrderHistoryPage onBack={() => setManagerPage('dashboard')} existingOrders={orders} />}
             {managerPage === 'settings' && currentRestaurantId && (
               <RestaurantSettings

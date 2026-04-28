@@ -2,6 +2,32 @@
 // SMART ORDERING SYSTEM - TYPE DEFINITIONS
 // ============================================
 
+// ============================================
+// MODIFIER TYPES
+// ============================================
+
+export interface ModifierItem {
+  id: string;
+  name: string;
+  priceAdjustment: number;
+}
+
+export interface ModifierGroup {
+  id: string;
+  name: string;
+  required: boolean;
+  maxSelections: number;
+  items: ModifierItem[];
+}
+
+export interface SelectedModifier {
+  groupId: string;
+  groupName: string;
+  itemId: string;
+  itemName: string;
+  priceAdjustment: number;
+}
+
 // Menu Types
 export interface MenuItem {
   id: string;
@@ -14,6 +40,7 @@ export interface MenuItem {
   isAvailable: boolean;
   isPopular: boolean;
   requiresKitchen?: boolean; // true = food (goes to kitchen), false = bar only — hidden from customer menu
+  modifiers?: ModifierGroup[];
 }
 
 export type MenuCategory =
@@ -88,6 +115,11 @@ export interface Order {
   customerEmail?: string;
   customerPhone?: string;
   customerAddress?: string;
+  promotionId?: string;
+  promotionCode?: string;
+  promotionDiscount?: number;
+  loyaltyRewardId?: string;
+  loyaltyDiscount?: number;
 }
 
 // Table Types
@@ -278,6 +310,8 @@ export interface CartItem {
   menuItem: MenuItem;
   quantity: number;
   specialInstructions?: string;
+  selectedModifiers?: SelectedModifier[];
+  adjustedUnitPrice?: number; // base price + modifier adjustments
 }
 
 // Filter/Sort Types
@@ -352,6 +386,49 @@ export type SortDirection = 'asc' | 'desc';
 export interface SortConfig {
   field: string;
   direction: SortDirection;
+}
+
+// ============================================
+// PROMOTIONS TYPES
+// ============================================
+
+export interface Promotion {
+  id: string;
+  restaurantId: string;
+  name: string;
+  code: string;
+  type: 'percentage' | 'fixed';
+  discountValue: number;
+  minOrderAmount: number;
+  maxUses?: number;
+  usesCount: number;
+  validFrom: string;
+  validUntil: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
+// ============================================
+// RESERVATION TYPES
+// ============================================
+
+export type ReservationStatus = 'pending' | 'confirmed' | 'seated' | 'completed' | 'cancelled' | 'no_show';
+
+export interface Reservation {
+  id: string;
+  restaurantId: string;
+  tableNumber?: number;
+  customerName: string;
+  customerPhone: string;
+  customerEmail?: string;
+  partySize: number;
+  reservationDate: string;
+  reservationTime: string;
+  durationMinutes: number;
+  status: ReservationStatus;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export * from './reviews';

@@ -220,27 +220,35 @@ export function useOrders(): UseOrdersReturn {
       return !drinkCategories.has(category);
     });
 
-  const buildOrderItemPayload = (item: CartItem) => ({
-    menuItemId: item.menuItem.id,
-    menuItemName: item.menuItem.name,
-    quantity: item.quantity,
-    unitPrice: getEffectivePrice(item.menuItem),
-    notes: item.specialInstructions,
-    category: item.menuItem.category,
-    requiresKitchen: item.menuItem.requiresKitchen,
-  });
+  const buildOrderItemPayload = (item: CartItem) => {
+    const unitPrice = item.adjustedUnitPrice ?? getEffectivePrice(item.menuItem);
+    return {
+      menuItemId: item.menuItem.id,
+      menuItemName: item.menuItem.name,
+      quantity: item.quantity,
+      unitPrice,
+      notes: item.specialInstructions,
+      category: item.menuItem.category,
+      requiresKitchen: item.menuItem.requiresKitchen,
+      selectedModifiers: item.selectedModifiers || [],
+    };
+  };
 
-  const buildLocalOrderItem = (item: CartItem) => ({
-    id: `local-${item.menuItem.id}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-    menuItem: item.menuItem,
-    menuItemId: item.menuItem.id,
-    menuItemName: item.menuItem.name,
-    quantity: item.quantity,
-    unitPrice: getEffectivePrice(item.menuItem),
-    totalPrice: getEffectivePrice(item.menuItem) * item.quantity,
-    specialInstructions: item.specialInstructions,
-    status: 'pending',
-  });
+  const buildLocalOrderItem = (item: CartItem) => {
+    const unitPrice = item.adjustedUnitPrice ?? getEffectivePrice(item.menuItem);
+    return {
+      id: `local-${item.menuItem.id}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      menuItem: item.menuItem,
+      menuItemId: item.menuItem.id,
+      menuItemName: item.menuItem.name,
+      quantity: item.quantity,
+      unitPrice,
+      totalPrice: unitPrice * item.quantity,
+      specialInstructions: item.specialInstructions,
+      selectedModifiers: item.selectedModifiers || [],
+      status: 'pending',
+    };
+  };
 
   const addOrder = useCallback(
     async (
@@ -249,7 +257,8 @@ export function useOrders(): UseOrdersReturn {
       specialInstructions?: string,
       customer?: Customer | null,
       delivery?: { provider: string; address: string },
-      loyaltyRewardId?: string
+      loyaltyRewardId?: string,
+      promotionCode?: string
     ): Promise<Order> => {
       const currentRestaurantId = resolveRestaurantId();
       if (!currentRestaurantId) {
@@ -303,6 +312,7 @@ export function useOrders(): UseOrdersReturn {
           deliveryProvider: delivery?.provider,
           deliveryAddress: delivery?.address,
           loyaltyRewardId,
+          promotionCode,
         } as any);
 
         savedOrder = normalizeOrderPayload(createdOrder) ?? localOrder;

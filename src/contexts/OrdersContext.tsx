@@ -10,7 +10,8 @@ type UseOrdersReturn = {
     specialInstructions?: string,
     customer?: Customer | null,
     delivery?: { provider: string; address: string },
-    loyaltyRewardId?: string
+    loyaltyRewardId?: string,
+    promotionCode?: string
   ) => Promise<Order>;
   updateOrderStatus: (
     orderId: string,

@@ -1,0 +1,41 @@
+import { apiRequest } from './http';
+import { Reservation } from '../types';
+
+export async function getReservations(restaurantId: string, date?: string, status?: string): Promise<Reservation[]> {
+  const params = new URLSearchParams({ restaurantId });
+  if (date) params.set('date', date);
+  if (status) params.set('status', status);
+  return apiRequest(`/api/reservations?${params}`);
+}
+
+export async function checkAvailability(restaurantId: string, date: string): Promise<Reservation[]> {
+  const params = new URLSearchParams({ restaurantId, date });
+  return apiRequest(`/api/reservations/availability?${params}`);
+}
+
+export async function createReservation(data: {
+  restaurantId: string;
+  customerName: string;
+  customerPhone: string;
+  customerEmail?: string;
+  partySize: number;
+  reservationDate: string;
+  reservationTime: string;
+  durationMinutes?: number;
+  tableNumber?: number;
+  notes?: string;
+}): Promise<Reservation> {
+  return apiRequest('/api/reservations', { method: 'POST', json: data });
+}
+
+export async function updateReservation(id: string, data: {
+  status?: string;
+  tableNumber?: number;
+  notes?: string;
+}): Promise<Reservation> {
+  return apiRequest(`/api/reservations/${id}`, { method: 'PUT', json: data });
+}
+
+export async function cancelReservation(id: string): Promise<void> {
+  return apiRequest(`/api/reservations/${id}`, { method: 'DELETE' });
+}

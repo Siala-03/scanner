@@ -2,6 +2,8 @@
 // ORDER TYPES
 // ============================================
 
+import { SelectedModifier } from './index';
+
 export type OrderStatus = 
   | 'pending' 
   | 'preparing' 
@@ -28,6 +30,7 @@ export interface OrderItem {
   unitPrice: number;
   totalPrice: number;
   modifiers?: string[];
+  selectedModifiers?: SelectedModifier[];
   notes?: string;
   status: OrderItemStatus;
   startedAt?: string;
@@ -56,6 +59,9 @@ export interface Order {
   loyaltyRewardId?: string;
   loyaltyDiscount?: number;
   loyaltyFreeItemId?: string;
+  promotionId?: string;
+  promotionCode?: string;
+  promotionDiscount?: number;
   createdAt: string;
   updatedAt: string;
   completedAt?: string;
@@ -73,6 +79,7 @@ export interface CreateOrderInput {
     quantity: number;
     unitPrice: number;
     modifiers?: string[];
+    selectedModifiers?: SelectedModifier[];
     notes?: string;
   }[];
   notes?: string;
@@ -80,6 +87,7 @@ export interface CreateOrderInput {
   deliveryProvider?: string;
   deliveryAddress?: string;
   loyaltyRewardId?: string;
+  promotionCode?: string;
   requiresKitchen?: boolean;
 }
 

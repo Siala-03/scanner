@@ -6,13 +6,124 @@ import {
   ClipboardListIcon,
   BellRingIcon,
   CheckIcon,
-  GlobeIcon } from
-'lucide-react';
-import { CartItem, MenuItem, Order, Customer } from '../../types';
+  GlobeIcon,
+  CalendarIcon,
+} from 'lucide-react';
+import { CartItem, MenuItem, Order, Customer, SelectedModifier } from '../../types';
 import { MenuPage } from './MenuPage';
 import { CartPage } from './CartPage';
 import { OrderStatusPage } from './OrderStatusPage';
 import { getMenuItemCartKey } from '../../utils/menuKeys';
+import { createReservation } from '../../api/reservations';
+
+function ReservationBookingForm({ restaurantId, restaurantName }: { restaurantId?: string; restaurantName?: string }) {
+  const today = new Date().toISOString().slice(0, 10);
+  const [form, setForm] = useState({
+    customerName: '',
+    customerPhone: '',
+    partySize: 2,
+    reservationDate: today,
+    reservationTime: '19:00',
+    notes: '',
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [confirmed, setConfirmed] = useState(false);
+
+  const inputClass = "w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent text-sm";
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    if (!form.customerName.trim() || !form.customerPhone.trim()) {
+      setError('Name and phone are required.');
+      return;
+    }
+    const rid = restaurantId || localStorage.getItem('restaurantId') || '';
+    if (!rid) { setError('Restaurant not found.'); return; }
+    setSaving(true);
+    setError('');
+    try {
+      await createReservation({
+        restaurantId: rid,
+        customerName: form.customerName.trim(),
+        customerPhone: form.customerPhone.trim(),
+        partySize: Number(form.partySize),
+        reservationDate: form.reservationDate,
+        reservationTime: form.reservationTime,
+        notes: form.notes.trim() || undefined,
+      });
+      setConfirmed(true);
+    } catch (e: any) {
+      setError(e?.message || 'Failed to submit reservation. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (confirmed) {
+    return (
+      <div className="min-h-[60vh] flex flex-col items-center justify-center p-6 text-center">
+        <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mb-4">
+          <CheckIcon className="w-8 h-8 text-green-600" />
+        </div>
+        <h2 className="text-xl font-bold text-slate-900 mb-2">Reservation Submitted!</h2>
+        <p className="text-slate-500 text-sm mb-1">We'll confirm your booking shortly.</p>
+        <p className="text-slate-400 text-xs">You'll receive a WhatsApp confirmation once a staff member reviews your request.</p>
+        <button
+          onClick={() => { setConfirmed(false); setForm({ customerName: '', customerPhone: '', partySize: 2, reservationDate: today, reservationTime: '19:00', notes: '' }); }}
+          className="mt-6 px-6 py-2.5 rounded-xl bg-amber-500 text-white font-semibold text-sm hover:bg-amber-600 transition-colors"
+        >
+          Make Another Reservation
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-4 max-w-md mx-auto">
+      <div className="mb-6 text-center">
+        <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center mx-auto mb-3">
+          <CalendarIcon className="w-6 h-6 text-amber-600" />
+        </div>
+        <h2 className="text-lg font-bold text-slate-900">Reserve a Table</h2>
+        {restaurantName && <p className="text-slate-500 text-sm mt-1">{restaurantName}</p>}
+      </div>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="block text-xs font-semibold text-slate-600 mb-1">Full Name <span className="text-red-500">*</span></label>
+          <input type="text" value={form.customerName} onChange={e => setForm(f => ({ ...f, customerName: e.target.value }))} placeholder="Your full name" className={inputClass} />
+        </div>
+        <div>
+          <label className="block text-xs font-semibold text-slate-600 mb-1">Phone <span className="text-red-500">*</span></label>
+          <input type="tel" value={form.customerPhone} onChange={e => setForm(f => ({ ...f, customerPhone: e.target.value }))} placeholder="+250 7XX XXX XXX" className={inputClass} />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1">Date</label>
+            <input type="date" min={today} value={form.reservationDate} onChange={e => setForm(f => ({ ...f, reservationDate: e.target.value }))} className={inputClass} />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1">Time</label>
+            <input type="time" value={form.reservationTime} onChange={e => setForm(f => ({ ...f, reservationTime: e.target.value }))} className={inputClass} />
+          </div>
+        </div>
+        <div>
+          <label className="block text-xs font-semibold text-slate-600 mb-1">Party Size</label>
+          <input type="number" min={1} max={20} value={form.partySize} onChange={e => setForm(f => ({ ...f, partySize: Number(e.target.value) }))} className={inputClass} />
+        </div>
+        <div>
+          <label className="block text-xs font-semibold text-slate-600 mb-1">Special Requests</label>
+          <textarea rows={2} value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="Allergies, special occasions..." className={`${inputClass} resize-none`} />
+        </div>
+        {error && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>}
+        <button type="submit" disabled={saving} className="w-full py-3.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-white font-semibold text-sm shadow-lg shadow-amber-500/30 hover:from-amber-600 hover:to-amber-700 transition-all disabled:opacity-60">
+          {saving ? 'Submitting...' : 'Request Reservation'}
+        </button>
+        <p className="text-center text-xs text-slate-400">You'll receive a WhatsApp confirmation once confirmed.</p>
+      </form>
+    </div>
+  );
+}
 
 interface OnlineCustomerInfo {
   name: string;
@@ -117,23 +228,26 @@ interface CustomerAppProps {
   tableNumber: number;
   orders: Order[];
   restaurantName?: string;
+  restaurantId?: string;
   onPlaceOrder: (
   tableNumber: number,
   items: CartItem[],
   specialInstructions?: string,
   customer?: Customer | null,
   delivery?: { provider: string; address: string },
-  loyaltyRewardId?: string
+  loyaltyRewardId?: string,
+  promotionCode?: string
   )
   => Promise<void>;
   onCallWaiter: () => void;
 }
-type CustomerTab = 'menu' | 'cart' | 'orders';
+type CustomerTab = 'menu' | 'cart' | 'orders' | 'reserve';
 
 export function CustomerApp({
   tableNumber,
   orders,
   restaurantName,
+  restaurantId,
   onPlaceOrder,
   onCallWaiter
 }: CustomerAppProps) {
@@ -143,31 +257,29 @@ export function CustomerApp({
   const [showToast, setShowToast] = useState(false);
   const [onlineCustomerInfo, setOnlineCustomerInfo] = useState<OnlineCustomerInfo | null>(null);
 
-  const handleAddToCart = useCallback((item: MenuItem, quantity: number) => {
+  const handleAddToCart = useCallback((
+    item: MenuItem,
+    quantity: number,
+    selectedModifiers?: SelectedModifier[],
+    adjustedUnitPrice?: number
+  ) => {
     setCartItems((prev) => {
-      const itemKey = getMenuItemCartKey(item as any);
-      const existingIndex = prev.findIndex((ci) => getMenuItemCartKey(ci.menuItem as any) === itemKey);
+      const baseKey = getMenuItemCartKey(item as any);
+      // Items with modifiers are always a new cart line (different customisations)
+      if (selectedModifiers && selectedModifiers.length > 0) {
+        const normalizedItem: MenuItem = { ...item, id: baseKey };
+        return [...prev, { menuItem: normalizedItem, quantity, selectedModifiers, adjustedUnitPrice }];
+      }
+      const existingIndex = prev.findIndex(
+        (ci) => getMenuItemCartKey(ci.menuItem as any) === baseKey && !ci.selectedModifiers?.length
+      );
       if (existingIndex >= 0) {
         const updated = [...prev];
-        updated[existingIndex] = {
-          ...updated[existingIndex],
-          quantity: updated[existingIndex].quantity + quantity
-        };
+        updated[existingIndex] = { ...updated[existingIndex], quantity: updated[existingIndex].quantity + quantity };
         return updated;
       }
-
-      const normalizedItem: MenuItem = {
-        ...item,
-        id: itemKey,
-      };
-
-      return [
-      ...prev,
-      {
-        menuItem: normalizedItem,
-        quantity
-      }];
-
+      const normalizedItem: MenuItem = { ...item, id: baseKey };
+      return [...prev, { menuItem: normalizedItem, quantity }];
     });
   }, []);
   const handleUpdateQuantity = useCallback(
@@ -199,13 +311,13 @@ export function CustomerApp({
       specialInstructions: string,
       customer?: Customer | null,
       delivery?: { provider: string; address: string },
-      loyaltyRewardId?: string
+      loyaltyRewardId?: string,
+      promotionCode?: string
     ): Promise<void> => {
       if (typeof onPlaceOrder !== 'function') {
         console.error('onPlaceOrder prop is missing or not a function');
         throw new Error('Order placement is not available. Please refresh and try again.');
       }
-      // For online orders attach the collected customer info
       const mergedCustomer: any = onlineCustomerInfo
         ? {
             ...(customer || {}),
@@ -216,7 +328,7 @@ export function CustomerApp({
             customerAddress: onlineCustomerInfo.address,
           }
         : customer;
-      await onPlaceOrder(tableNumber, cartItems, specialInstructions, mergedCustomer, delivery, loyaltyRewardId);
+      await onPlaceOrder(tableNumber, cartItems, specialInstructions, mergedCustomer, delivery, loyaltyRewardId, promotionCode);
       setCartItems([]);
       setActiveTab('orders');
     },
@@ -252,6 +364,11 @@ export function CustomerApp({
     id: 'orders' as const,
     label: 'Orders',
     icon: ClipboardListIcon
+  },
+  {
+    id: 'reserve' as const,
+    label: 'Reserve',
+    icon: CalendarIcon
   }];
 
   // Gate: all hooks above are always called; gate is in the render path, not before hooks
@@ -325,11 +442,15 @@ export function CustomerApp({
             onPlaceOrder={handleConfirmOrder}
             tableNumber={tableNumber}
             onCallWaiter={onCallWaiter}
+            restaurantId={restaurantId || localStorage.getItem('restaurantId') || undefined}
           />
 
           }
           {activeTab === 'orders' &&
           <OrderStatusPage orders={orders} tableNumber={tableNumber} />
+          }
+          {activeTab === 'reserve' &&
+          <ReservationBookingForm restaurantId={restaurantId || localStorage.getItem('restaurantId') || undefined} restaurantName={restaurantName} />
           }
         </motion.div>
       </AnimatePresence>

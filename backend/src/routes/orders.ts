@@ -5,6 +5,7 @@ import { createOrder as createOrderService } from '../services/orderService.js';
 import { emitOrderUpdate } from '../socket.js';
 import { createVubaVubaOrder, updateVubaVubaOrderStatus } from '../services/vubaVubaService.js';
 import { toCamelCase } from '../utils/camelCase.js';
+import { notifyOrderReady } from '../services/notificationService.js';
 
 const router = Router();
 
@@ -350,7 +351,8 @@ router.post('/', async (req: Request, res: Response) => {
       delivery_address,
       deliveryAddress,
       loyalty_reward_id,
-      loyaltyRewardId
+      loyaltyRewardId,
+      promotionCode
     } = req.body;
 
     const resolvedRestaurantId = req.body.restaurantId || req.query.restaurantId;
@@ -376,6 +378,7 @@ router.post('/', async (req: Request, res: Response) => {
         quantity: item.quantity,
         unitPrice: item.unitPrice,
         modifiers: item.modifiers,
+        selectedModifiers: item.selectedModifiers,
         notes: item.notes,
       })),
       notes,
@@ -383,6 +386,7 @@ router.post('/', async (req: Request, res: Response) => {
       deliveryProvider: delivery_provider ?? deliveryProvider,
       deliveryAddress: delivery_address ?? deliveryAddress,
       loyaltyRewardId: loyalty_reward_id ?? loyaltyRewardId,
+      promotionCode,
       requiresKitchen: req.body.requiresKitchen ?? req.body.requires_kitchen ?? false
     });
 
@@ -492,6 +496,21 @@ router.put('/:id/status', async (req: Request, res: Response) => {
         console.error('Error awarding loyalty points:', loyaltyError);
         // Don't fail the order update if loyalty points fail
       }
+    }
+
+    // SMS customer when their order is ready
+    if (status === 'ready') {
+      try {
+        const customerPhone = order.customerPhone;
+        if (customerPhone) {
+          notifyOrderReady(customerPhone, order.orderNumber, order.tableNumber).catch(() => {});
+        } else if (order.customerId) {
+          pool.query('SELECT phone FROM customers WHERE id = $1', [order.customerId])
+            .then(r => {
+              if (r.rows[0]?.phone) notifyOrderReady(r.rows[0].phone, order.orderNumber, order.tableNumber).catch(() => {});
+            }).catch(() => {});
+        }
+      } catch (_) { /* silent */ }
     }
 
     // Notify delivery partner when order is served/completed

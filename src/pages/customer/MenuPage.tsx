@@ -9,7 +9,7 @@ import {
   RefreshCwIcon
 } from
 'lucide-react';
-import { MenuItem } from '../../types';
+import { MenuItem, SelectedModifier } from '../../types';
 import { useMenu } from '../../hooks/useMenu';
 import { MenuItemCard } from '../../components/customer/MenuItemCard';
 import { Modal } from '../../components/ui/Modal';
@@ -18,7 +18,7 @@ import { formatPrice } from '../../utils/currency';
 import { getEffectivePrice } from '../../utils/pricing';
 
 interface MenuPageProps {
-  onAddToCart: (item: MenuItem, quantity: number) => void;
+  onAddToCart: (item: MenuItem, quantity: number, selectedModifiers?: SelectedModifier[], adjustedUnitPrice?: number) => void;
 }
 
 const categoryNames: Record<string, string> = {
@@ -40,6 +40,8 @@ export function MenuPage({ onAddToCart }: MenuPageProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null);
   const [quantity, setQuantity] = useState(1);
+  // groupId → Set of selected itemIds
+  const [selectedModifierIds, setSelectedModifierIds] = useState<Record<string, Set<string>>>({});
 
   const normalizeCategory = (value: string) => value.trim().toLowerCase();
 
@@ -73,13 +75,68 @@ export function MenuPage({ onAddToCart }: MenuPageProps) {
   const handleViewDetails = (item: MenuItem) => {
     setSelectedItem(item);
     setQuantity(1);
+    setSelectedModifierIds({});
   };
+
+  function toggleModifierOption(groupId: string, itemId: string, maxSelections: number) {
+    setSelectedModifierIds(prev => {
+      const current = new Set(prev[groupId] || []);
+      if (current.has(itemId)) {
+        current.delete(itemId);
+      } else {
+        if (current.size >= maxSelections) {
+          // Replace first selection when max=1 (radio behaviour)
+          if (maxSelections === 1) current.clear();
+          else return prev; // already at max
+        }
+        current.add(itemId);
+      }
+      return { ...prev, [groupId]: current };
+    });
+  }
+
+  const modifierAdjustment = useMemo(() => {
+    if (!selectedItem?.modifiers) return 0;
+    return selectedItem.modifiers.reduce((total, group) => {
+      const selected = selectedModifierIds[group.id] || new Set();
+      return total + group.items
+        .filter(opt => selected.has(opt.id))
+        .reduce((s, opt) => s + opt.priceAdjustment, 0);
+    }, 0);
+  }, [selectedItem, selectedModifierIds]);
+
+  const requiredGroupsMet = useMemo(() => {
+    if (!selectedItem?.modifiers) return true;
+    return selectedItem.modifiers
+      .filter(g => g.required)
+      .every(g => (selectedModifierIds[g.id]?.size || 0) > 0);
+  }, [selectedItem, selectedModifierIds]);
 
   const handleAddFromModal = () => {
     if (selectedItem) {
-      onAddToCart(selectedItem, quantity);
+      const flatModifiers: SelectedModifier[] = [];
+      if (selectedItem.modifiers) {
+        for (const group of selectedItem.modifiers) {
+          const selected = selectedModifierIds[group.id] || new Set();
+          for (const opt of group.items) {
+            if (selected.has(opt.id)) {
+              flatModifiers.push({
+                groupId: group.id,
+                groupName: group.name,
+                itemId: opt.id,
+                itemName: opt.name,
+                priceAdjustment: opt.priceAdjustment,
+              });
+            }
+          }
+        }
+      }
+      const basePrice = getEffectivePrice(selectedItem);
+      const adjustedUnitPrice = basePrice + modifierAdjustment;
+      onAddToCart(selectedItem, quantity, flatModifiers.length ? flatModifiers : undefined, adjustedUnitPrice !== basePrice ? adjustedUnitPrice : undefined);
       setSelectedItem(null);
       setQuantity(1);
+      setSelectedModifierIds({});
     }
   };
 
@@ -238,14 +295,62 @@ export function MenuPage({ onAddToCart }: MenuPageProps) {
               <span className="text-sm text-slate-600">{selectedItem.prepTime} minutes preparation time</span>
             </div>
 
+            {/* Modifier Groups */}
+            {selectedItem.modifiers && selectedItem.modifiers.length > 0 && (
+              <div className="mb-4 space-y-4">
+                {selectedItem.modifiers.map(group => (
+                  <div key={group.id}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-sm font-semibold text-slate-800">{group.name}</span>
+                      {group.required && (
+                        <span className="text-xs px-1.5 py-0.5 bg-red-100 text-red-600 rounded-full">Required</span>
+                      )}
+                      <span className="text-xs text-slate-400 ml-auto">
+                        {group.maxSelections > 1 ? `Pick up to ${group.maxSelections}` : 'Pick one'}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      {group.items.map(opt => {
+                        const selected = (selectedModifierIds[group.id] || new Set()).has(opt.id);
+                        return (
+                          <button
+                            key={opt.id}
+                            type="button"
+                            onClick={() => toggleModifierOption(group.id, opt.id, group.maxSelections)}
+                            className={`flex items-center justify-between px-3 py-2 rounded-lg border text-sm transition-all ${
+                              selected
+                                ? 'bg-amber-50 border-amber-400 text-amber-800'
+                                : 'bg-slate-50 border-slate-200 text-slate-700 hover:border-slate-300'
+                            }`}
+                          >
+                            <span>{opt.name}</span>
+                            {opt.priceAdjustment !== 0 && (
+                              <span className={`text-xs font-medium ${opt.priceAdjustment > 0 ? 'text-amber-600' : 'text-green-600'}`}>
+                                {opt.priceAdjustment > 0 ? '+' : ''}{formatPrice(opt.priceAdjustment)}
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 sm:gap-0 mb-4 sm:mb-6 pt-4 border-t border-slate-100">
               <div>
                 <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">Price</p>
-                <span className="text-2xl font-bold text-amber-600">
-                  {formatPrice(getEffectivePrice(selectedItem))}
-                </span>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-2xl font-bold text-amber-600">
+                    {formatPrice(getEffectivePrice(selectedItem) + modifierAdjustment)}
+                  </span>
+                  {modifierAdjustment !== 0 && (
+                    <span className="text-sm text-slate-400 line-through">{formatPrice(getEffectivePrice(selectedItem))}</span>
+                  )}
+                </div>
               </div>
-              
+
               <div className="flex items-center justify-center sm:justify-end gap-3">
                 <button
                   onClick={() => setQuantity(Math.max(1, quantity - 1))}
@@ -267,8 +372,9 @@ export function MenuPage({ onAddToCart }: MenuPageProps) {
               onClick={handleAddFromModal}
               className="w-full touch-manipulation"
               size="lg"
+              disabled={!requiredGroupsMet}
             >
-              Add to Cart - {formatPrice(getEffectivePrice(selectedItem) * quantity)}
+              {!requiredGroupsMet ? 'Select required options' : `Add to Cart — ${formatPrice((getEffectivePrice(selectedItem) + modifierAdjustment) * quantity)}`}
             </Button>
           </div>
         )}

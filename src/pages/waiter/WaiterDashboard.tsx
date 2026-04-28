@@ -16,9 +16,13 @@ import {
   ChevronUpIcon,
   PrinterIcon,
   ShareIcon,
+  CalendarIcon,
+  UsersIcon,
+  ClockIcon,
 } from 'lucide-react';
 import { formatPrice } from '../../utils/currency';
-import { Order, Staff, CartItem, OrderItem } from '../../types';
+import { Order, Staff, CartItem, OrderItem, Reservation } from '../../types';
+import { getReservations, updateReservation } from '../../api/reservations';
 import { QRScanner } from '../../components/waiter/QRScanner';
 import { WaiterOrderEntry } from '../../components/waiter/WaiterOrderEntry';
 import { loadReviews } from '../../utils/reviewsStorage';
@@ -609,6 +613,8 @@ export function WaiterDashboard({
   const [socketCalls, setSocketCalls] = useState<{ tableNumber: number; timestamp: Date }[]>([]);
   const [showShareModal, setShowShareModal] = useState(false);
   const [selectedOrderForShare, setSelectedOrderForShare] = useState<Order | null>(null);
+  const [todayReservations, setTodayReservations] = useState<Reservation[]>([]);
+  const [reservationsExpanded, setReservationsExpanded] = useState(true);
   // Track order IDs we've already seen so we can detect truly new ones
   const knownOrderIdsRef = useRef<Set<string>>(new Set());
 
@@ -682,6 +688,29 @@ export function WaiterDashboard({
 
     return () => { supabase.removeChannel(channel); };
   }, []);
+
+  // ── Load today's reservations ──
+  useEffect(() => {
+    const restaurantId = localStorage.getItem('restaurantId');
+    if (!restaurantId) return;
+    const todayStr = new Date().toISOString().slice(0, 10);
+    getReservations(restaurantId, todayStr)
+      .then((data) => setTodayReservations(data.filter((r) => !['cancelled', 'completed', 'no_show'].includes(r.status))))
+      .catch(() => {});
+  }, []);
+
+  async function handleMarkSeated(reservation: Reservation) {
+    try {
+      const updated = await updateReservation(reservation.id, { status: 'seated' });
+      setTodayReservations((prev) => prev.map((r) => r.id === reservation.id ? updated : r));
+    } catch (_e) {}
+  }
+
+  function formatResTime(time: string) {
+    const [h, m] = time.split(':').map(Number);
+    const period = h >= 12 ? 'PM' : 'AM';
+    return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${period}`;
+  }
 
   // ── Order buckets (scoped to this waiter's tables via myOrders) ──
   const incomingOrders = useMemo(
@@ -1104,6 +1133,56 @@ export function WaiterDashboard({
       <div className="mx-auto max-w-6xl px-4 py-5">
         {portalPage === 'orders' ? (
           <div className="space-y-4">
+            {/* ── Today's Reservations Panel ── */}
+            {todayReservations.length > 0 && (
+              <div className="rounded-lg border border-blue-500/25 bg-blue-500/8 overflow-hidden">
+                <button
+                  onClick={() => setReservationsExpanded((v) => !v)}
+                  className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-blue-500/10 transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <CalendarIcon className="w-4 h-4 text-blue-400" />
+                    <span className="text-sm font-semibold text-blue-200">Today's Reservations</span>
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 font-medium">{todayReservations.length}</span>
+                  </div>
+                  {reservationsExpanded ? <ChevronUpIcon className="w-4 h-4 text-slate-400" /> : <ChevronDownIcon className="w-4 h-4 text-slate-400" />}
+                </button>
+                {reservationsExpanded && (
+                  <div className="border-t border-blue-500/20 divide-y divide-slate-700/50">
+                    {todayReservations.map((r) => (
+                      <div key={r.id} className="flex items-center gap-3 px-4 py-2.5">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-sm font-medium text-slate-100">{r.customerName}</span>
+                            {r.tableNumber && (
+                              <span className="text-xs px-1.5 py-0.5 rounded bg-slate-700 text-slate-300">T{r.tableNumber}</span>
+                            )}
+                            <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
+                              r.status === 'confirmed' ? 'bg-blue-900/40 text-blue-300' :
+                              r.status === 'seated' ? 'bg-green-900/40 text-green-300' :
+                              'bg-yellow-900/30 text-yellow-300'
+                            }`}>{r.status}</span>
+                          </div>
+                          <div className="flex items-center gap-3 text-xs text-slate-400 mt-0.5">
+                            <span className="flex items-center gap-1"><ClockIcon className="w-3 h-3" />{formatResTime(r.reservationTime)}</span>
+                            <span className="flex items-center gap-1"><UsersIcon className="w-3 h-3" />{r.partySize} guests</span>
+                          </div>
+                        </div>
+                        {r.status !== 'seated' && (
+                          <button
+                            onClick={() => handleMarkSeated(r)}
+                            className="flex-shrink-0 text-xs px-3 py-1.5 rounded-lg bg-green-600 hover:bg-green-500 text-white font-medium transition-colors"
+                          >
+                            Seat
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Order status tabs */}
             <div className="-mx-4 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
               <div className="flex min-w-max gap-2">

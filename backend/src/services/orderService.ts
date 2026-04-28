@@ -12,12 +12,21 @@ function generateOrderNumber(): string {
   return value;
 }
 
+export interface SelectedModifier {
+  groupId: string;
+  groupName: string;
+  itemId: string;
+  itemName: string;
+  priceAdjustment: number;
+}
+
 export interface OrderLine {
   menuItemId: string;
   menuItemName?: string;
   quantity: number;
   unitPrice: number;
   modifiers?: string[];
+  selectedModifiers?: SelectedModifier[];
   notes?: string;
 }
 
@@ -32,6 +41,7 @@ export async function createOrder(orderInput: {
   deliveryProvider?: string;
   deliveryAddress?: string;
   loyaltyRewardId?: string;
+  promotionCode?: string;
   requiresKitchen?: boolean;
 }) {
   const {
@@ -45,6 +55,7 @@ export async function createOrder(orderInput: {
     deliveryProvider,
     deliveryAddress,
     loyaltyRewardId,
+    promotionCode,
     requiresKitchen = false
   } = orderInput;
 
@@ -119,6 +130,37 @@ export async function createOrder(orderInput: {
     }
   }
 
+  // Apply promotion code discount
+  let promotionDiscount = 0;
+  let resolvedPromotionId: string | null = null;
+  if (promotionCode && restaurantId) {
+    try {
+      const promoResult = await pool.query(
+        `SELECT * FROM promotions
+         WHERE restaurant_id = $1 AND LOWER(code) = LOWER($2)
+           AND is_active = true AND valid_from <= now() AND valid_until >= now()
+           AND (max_uses IS NULL OR uses_count < max_uses)`,
+        [restaurantId, promotionCode]
+      );
+      if (promoResult.rows.length > 0) {
+        const promo = promoResult.rows[0];
+        if (subtotal >= promo.min_order_amount) {
+          if (promo.type === 'percentage') {
+            promotionDiscount = Math.round((subtotal * promo.discount_value) / 100);
+          } else {
+            promotionDiscount = Math.min(promo.discount_value, subtotal);
+          }
+          total = Math.max(0, total - promotionDiscount);
+          resolvedPromotionId = promo.id;
+          // Increment uses atomically
+          await pool.query('UPDATE promotions SET uses_count = uses_count + 1 WHERE id = $1', [promo.id]);
+        }
+      }
+    } catch (promoErr) {
+      console.error('Error applying promotion code:', promoErr);
+    }
+  }
+
   const orderItems = items.map((item, index) => ({
     id: `item_${Date.now().toString(36)}_${index}`,
     menuItemId: item.menuItemId,
@@ -127,14 +169,15 @@ export async function createOrder(orderInput: {
     unitPrice: item.unitPrice,
     totalPrice: item.unitPrice * item.quantity,
     modifiers: item.modifiers || [],
+    selectedModifiers: item.selectedModifiers || [],
     notes: item.notes || '',
     status: 'pending',
   }));
 
   const result = await pool.query(
-    `INSERT INTO orders 
-      (id, order_number, table_number, customer_name, customer_id, restaurant_id, status, items, subtotal, tax, total, notes, created_by, delivery_provider, delivery_address, delivery_status, loyalty_reward_id, loyalty_discount, loyalty_free_item_id, requires_kitchen)
-     VALUES ($1, $2, $3, $4, $5, $6, 'pending', $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+    `INSERT INTO orders
+      (id, order_number, table_number, customer_name, customer_id, restaurant_id, status, items, subtotal, tax, total, notes, created_by, delivery_provider, delivery_address, delivery_status, loyalty_reward_id, loyalty_discount, loyalty_free_item_id, promotion_id, promotion_code, promotion_discount, requires_kitchen)
+     VALUES ($1, $2, $3, $4, $5, $6, 'pending', $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
      RETURNING *`,
     [
       id,
@@ -155,6 +198,9 @@ export async function createOrder(orderInput: {
       loyaltyRewardId || null,
       loyaltyDiscount,
       loyaltyFreeItemId,
+      resolvedPromotionId,
+      promotionCode || null,
+      promotionDiscount,
       requiresKitchen
     ]
   );

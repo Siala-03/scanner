@@ -1,14 +1,16 @@
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShoppingBagIcon, ArrowRightIcon, CheckCircleIcon, BellRingIcon, CheckIcon } from 'lucide-react';
+import { ShoppingBagIcon, ArrowRightIcon, CheckCircleIcon, BellRingIcon, CheckIcon, TagIcon } from 'lucide-react';
 import { CartItem, Customer, LoyaltySummary, Reward } from '../../types';
 import { CartItemCard } from '../../components/customer/CartItem';
 import { CustomerIdentification } from '../../components/customer/CustomerIdentification';
 import { Button } from '../../components/ui/Button';
 import { getCustomerDetails } from '../../api/loyalty';
+import { validatePromoCode, ValidatePromoResult } from '../../api/promotions';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { formatPrice } from '../../utils/currency';
 import { getEffectivePrice } from '../../utils/pricing';
+
 interface CartPageProps {
   cartItems: CartItem[];
   onUpdateQuantity: (itemId: string, quantity: number) => void;
@@ -17,10 +19,12 @@ interface CartPageProps {
     specialInstructions: string,
     customer?: Customer | null,
     delivery?: { provider: string; address: string },
-    loyaltyRewardId?: string
+    loyaltyRewardId?: string,
+    promotionCode?: string
   ) => Promise<void>;
   tableNumber: number;
   onCallWaiter: () => void;
+  restaurantId?: string;
 }
 export function CartPage({
   cartItems,
@@ -28,7 +32,8 @@ export function CartPage({
   onRemoveItem,
   onPlaceOrder,
   tableNumber,
-  onCallWaiter
+  onCallWaiter,
+  restaurantId,
 }: CartPageProps) {
   const [specialInstructions, setSpecialInstructions] = useState('');
   const [isDelivery, setIsDelivery] = useState(false);
@@ -42,16 +47,43 @@ export function CartPage({
   const [rewardMessage, setRewardMessage] = useState('');
   const [rewardError, setRewardError] = useState('');
   const [waiterCalled, setWaiterCalled] = useState(false);
+  // Promo code state
+  const [promoCode, setPromoCode] = useState('');
+  const [promoResult, setPromoResult] = useState<ValidatePromoResult | null>(null);
+  const [promoError, setPromoError] = useState('');
+  const [promoLoading, setPromoLoading] = useState(false);
+
   const subtotal = cartItems.reduce(
-    (sum, item) => sum + getEffectivePrice(item.menuItem) * item.quantity,
+    (sum, item) => sum + (item.adjustedUnitPrice ?? getEffectivePrice(item.menuItem)) * item.quantity,
     0
   );
   const tax = Math.round(subtotal * 0.15);
-  const total = subtotal + tax;
-  const discount = appliedReward?.rewardType === 'discount' && appliedReward.discountPercentage
+  const loyaltyDiscount = appliedReward?.rewardType === 'discount' && appliedReward.discountPercentage
     ? Math.round((subtotal * appliedReward.discountPercentage) / 100)
     : 0;
-  const adjustedTotal = Math.max(0, total - discount);
+  const promoDiscount = promoResult?.discountAmount ?? 0;
+  const adjustedTotal = Math.max(0, subtotal + tax - loyaltyDiscount - promoDiscount);
+
+  const handleApplyPromo = async () => {
+    if (!promoCode.trim()) return;
+    setPromoLoading(true);
+    setPromoError('');
+    setPromoResult(null);
+    try {
+      const result = await validatePromoCode(promoCode.trim(), restaurantId || '', subtotal);
+      setPromoResult(result);
+    } catch (err: any) {
+      setPromoError(err?.message || 'Invalid promo code');
+    } finally {
+      setPromoLoading(false);
+    }
+  };
+
+  const handleRemovePromo = () => {
+    setPromoCode('');
+    setPromoResult(null);
+    setPromoError('');
+  };
 
   useEffect(() => {
     async function loadLoyalty() {
@@ -107,7 +139,7 @@ export function CartPage({
       const delivery = isDelivery && deliveryProvider
         ? { provider: deliveryProvider, address: deliveryAddress }
         : undefined;
-      await onPlaceOrder(specialInstructions, identifiedCustomer, delivery, appliedReward?.id);
+      await onPlaceOrder(specialInstructions, identifiedCustomer, delivery, appliedReward?.id, promoResult ? promoCode : undefined);
       setOrderPlaced(true);
     } catch (err) {
       console.error('Place order failed', err);
@@ -247,6 +279,42 @@ export function CartPage({
           </div>
         )}
 
+        {/* Promo code */}
+        <div className="mb-6 rounded-xl border border-slate-200 bg-white p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <TagIcon className="w-4 h-4 text-amber-500" />
+            <h2 className="font-semibold text-slate-800">Promo Code</h2>
+          </div>
+          {promoResult ? (
+            <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+              <span className="text-sm font-medium text-green-700">
+                {promoResult.promotion.code} — {promoResult.promotion.type === 'percentage' ? `${promoResult.promotion.discountValue}% off` : `${formatPrice(promoResult.promotion.discountValue)} off`}
+              </span>
+              <button onClick={handleRemovePromo} className="text-xs text-red-500 hover:text-red-700 ml-3">Remove</button>
+            </div>
+          ) : (
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={promoCode}
+                onChange={e => { setPromoCode(e.target.value.toUpperCase()); setPromoError(''); }}
+                placeholder="Enter promo code"
+                className="flex-1 px-3 py-2 rounded-lg border border-slate-200 bg-slate-50 text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                onKeyDown={e => e.key === 'Enter' && handleApplyPromo()}
+              />
+              <Button
+                variant="secondary"
+                onClick={handleApplyPromo}
+                isLoading={promoLoading}
+                disabled={!promoCode.trim() || promoLoading}
+              >
+                Apply
+              </Button>
+            </div>
+          )}
+          {promoError && <p className="text-xs text-red-600 mt-2">{promoError}</p>}
+        </div>
+
         {/* Special instructions */}
         <div className="mb-6">
           <div className="w-full">
@@ -328,10 +396,16 @@ export function CartPage({
             <span className="font-medium">Tax (15%)</span>
             <span className="font-semibold">{formatPrice(tax)}</span>
           </div>
-          {appliedReward && appliedReward.rewardType === 'discount' && (
+          {appliedReward && appliedReward.rewardType === 'discount' && loyaltyDiscount > 0 && (
             <div className="flex justify-between text-amber-600">
-              <span className="font-medium">Discount ({appliedReward.discountPercentage}%)</span>
-              <span className="font-semibold">-{formatPrice(discount)}</span>
+              <span className="font-medium">Loyalty Discount ({appliedReward.discountPercentage}%)</span>
+              <span className="font-semibold">-{formatPrice(loyaltyDiscount)}</span>
+            </div>
+          )}
+          {promoResult && promoDiscount > 0 && (
+            <div className="flex justify-between text-green-600">
+              <span className="font-medium">Promo: {promoResult.promotion.code}</span>
+              <span className="font-semibold">-{formatPrice(promoDiscount)}</span>
             </div>
           )}
           <div className="flex justify-between text-xl font-bold text-slate-900 pt-2 border-t border-slate-200">
