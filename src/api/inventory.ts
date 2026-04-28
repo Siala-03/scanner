@@ -13,8 +13,8 @@ import type {
 import { apiRequest } from './http';
 
 const API_BASE = import.meta.env.VITE_API_URL
-  ? `${import.meta.env.VITE_API_URL.replace(/\/$/, '')}/api`
-  : '/api';
+  ? import.meta.env.VITE_API_URL.replace(/\/$/, '')
+  : '';
 
 function getRestaurantId(): string | undefined {
   if (typeof window !== 'undefined') {
@@ -1036,7 +1036,7 @@ export async function fetchLocations(): Promise<InventoryLocation[]> {
   if (!restaurantId) return [];
 
   try {
-    const payload = await apiRequest<any[]>('/api/locations');
+    const payload = await apiRequest<any[]>('/locations');
     if (Array.isArray(payload)) {
       return payload.map(normalizeLocation);
     }
@@ -1104,7 +1104,7 @@ export async function createLocation(payload: {
   temperatureRange?: string;
 }): Promise<InventoryLocation> {
   try {
-    const created = await apiRequest<any>('/api/locations', {
+    const created = await apiRequest<any>('/locations', {
       method: 'POST',
       json: payload,
     });
@@ -1168,15 +1168,26 @@ export async function updateLocation(
     isActive?: boolean;
   }
 ): Promise<InventoryLocation> {
+  const restaurantId = getRestaurantId();
+  if (!restaurantId) throw new Error('No company selected');
+
+  // Fallback IDs are client-side only — skip the API and update localStorage directly
+  if (id.startsWith('loc-fallback-')) {
+    const existing = getFallbackLocationsFromStorage(restaurantId);
+    const target = existing.find((l) => l.id === id);
+    if (!target) throw new Error(`Location ${id} not found in fallback storage`);
+    const updated = normalizeLocation({ ...target, ...payload, id });
+    saveFallbackLocationToStorage(restaurantId, updated);
+    return updated;
+  }
+
   try {
-    const updated = await apiRequest<any>(`/api/locations/${id}`, {
+    const updated = await apiRequest<any>(`/locations/${id}`, {
       method: 'PUT',
       json: payload,
     });
     return normalizeLocation(updated);
   } catch {
-    const restaurantId = getRestaurantId();
-    if (!restaurantId) throw new Error('No company selected');
     const dbPayload: Record<string, any> = {};
     if (payload.name !== undefined)            dbPayload.name              = payload.name;
     if (payload.type !== undefined)            dbPayload.type              = payload.type;
@@ -1210,13 +1221,21 @@ export async function updateLocation(
 }
 
 export async function deleteLocation(id: string): Promise<void> {
+  const restaurantId = getRestaurantId();
+  if (!restaurantId) throw new Error('No company selected');
+
+  // Fallback IDs are client-side only — remove from localStorage directly
+  if (id.startsWith('loc-fallback-')) {
+    const existing = getFallbackLocationsFromStorage(restaurantId);
+    const next = existing.filter((l) => l.id !== id);
+    localStorage.setItem(locationFallbackStorageKey(restaurantId), JSON.stringify(next));
+    return;
+  }
+
   try {
-    await apiRequest<void>(`/api/locations/${id}`, { method: 'DELETE' });
+    await apiRequest<void>(`/locations/${id}`, { method: 'DELETE' });
     return;
   } catch {
-    const restaurantId = getRestaurantId();
-    if (!restaurantId) throw new Error('No company selected');
-
     const { error } = await supabase
       .from('inventory_locations')
       .delete()
@@ -1224,7 +1243,6 @@ export async function deleteLocation(id: string): Promise<void> {
 
     if (error) {
       if (isMissingLocationsTableError(error)) {
-        // Remove from localStorage fallback
         const existing = getFallbackLocationsFromStorage(restaurantId);
         const next = existing.filter((l) => l.id !== id);
         localStorage.setItem(locationFallbackStorageKey(restaurantId), JSON.stringify(next));
@@ -1283,7 +1301,7 @@ function computeClientSideForecasts(
 
 export async function fetchForecasts(): Promise<InventoryForecast[]> {
   try {
-    const forecasts = await apiRequest<any[]>('/api/forecasting');
+    const forecasts = await apiRequest<any[]>('/forecasting');
     return Array.isArray(forecasts) ? forecasts.map(normalizeForecast) : [];
   } catch {
     // Backend unavailable — fall through to client-side computation
@@ -1312,7 +1330,7 @@ export async function fetchForecasts(): Promise<InventoryForecast[]> {
 
 export async function generateForecasts() {
   try {
-    const payload = await apiRequest<ForecastGenerateResponse>('/api/forecasting/generate', {
+    const payload = await apiRequest<ForecastGenerateResponse>('/forecasting/generate', {
       method: 'POST',
     });
 
@@ -1333,7 +1351,7 @@ export async function generateForecasts() {
 
 export async function fetchForecastAlerts(): Promise<InventoryForecast[]> {
   try {
-    const alerts = await apiRequest<any[]>('/api/forecasting/alerts');
+    const alerts = await apiRequest<any[]>('/forecasting/alerts');
     return Array.isArray(alerts) ? alerts.map(normalizeForecast) : [];
   } catch (error) {
     const forecasts = await fetchForecasts();

@@ -7,7 +7,7 @@ export async function getSchedules(
   endDate: string
 ): Promise<StaffSchedule[]> {
   const params = new URLSearchParams({ restaurantId, startDate, endDate });
-  return apiRequest(`/api/schedules?${params}`);
+  return apiRequest(`/schedules?${params}`);
 }
 
 export async function createSchedule(data: {
@@ -19,16 +19,16 @@ export async function createSchedule(data: {
   role?: string;
   notes?: string;
 }): Promise<StaffSchedule> {
-  return apiRequest('/api/schedules', { method: 'POST', json: data });
+  return apiRequest('/schedules', { method: 'POST', json: data });
 }
 
 export async function updateSchedule(
   id: string,
   data: { startTime?: string; endTime?: string; role?: string; notes?: string }
 ): Promise<StaffSchedule> {
-  return apiRequest(`/api/schedules/${id}`, { method: 'PUT', json: data });
+  return apiRequest(`/schedules/${id}`, { method: 'PUT', json: data });
 }
 
 export async function deleteSchedule(id: string): Promise<void> {
-  return apiRequest(`/api/schedules/${id}`, { method: 'DELETE' });
+  return apiRequest(`/schedules/${id}`, { method: 'DELETE' });
 }

@@ -16,12 +16,12 @@ export async function getReviews(
   if (params?.rating)   q.set('rating', String(params.rating));
   if (params?.waiterId) q.set('waiterId', params.waiterId);
   if (params?.limit)    q.set('limit', String(params.limit));
-  return apiRequest(`/api/reviews?${q}`);
+  return apiRequest(`/reviews?${q}`);
 }
 
 export async function getReviewStats(restaurantId: string): Promise<ReviewStats> {
   const q = new URLSearchParams({ restaurantId });
-  return apiRequest(`/api/reviews/stats?${q}`);
+  return apiRequest(`/reviews/stats?${q}`);
 }
 
 export async function submitReview(data: {
@@ -33,5 +33,5 @@ export async function submitReview(data: {
   customerName?: string;
   waiterId?: string;
 }): Promise<Review> {
-  return apiRequest('/api/reviews', { method: 'POST', json: data });
+  return apiRequest('/reviews', { method: 'POST', json: data });
 }

@@ -11,24 +11,24 @@ export async function validatePromoCode(
   restaurantId: string,
   orderSubtotal: number
 ): Promise<ValidatePromoResult> {
-  return apiRequest('/api/promotions/validate', {
+  return apiRequest('/promotions/validate', {
     method: 'POST',
     json: { code, restaurantId, orderSubtotal },
   });
 }
 
 export async function getPromotions(restaurantId: string): Promise<Promotion[]> {
-  return apiRequest(`/api/promotions?restaurantId=${encodeURIComponent(restaurantId)}`);
+  return apiRequest(`/promotions?restaurantId=${encodeURIComponent(restaurantId)}`);
 }
 
 export async function createPromotion(data: Partial<Promotion>): Promise<Promotion> {
-  return apiRequest('/api/promotions', { method: 'POST', json: data });
+  return apiRequest('/promotions', { method: 'POST', json: data });
 }
 
 export async function updatePromotion(id: string, data: Partial<Promotion>): Promise<Promotion> {
-  return apiRequest(`/api/promotions/${id}`, { method: 'PUT', json: data });
+  return apiRequest(`/promotions/${id}`, { method: 'PUT', json: data });
 }
 
 export async function deletePromotion(id: string): Promise<void> {
-  return apiRequest(`/api/promotions/${id}`, { method: 'DELETE' });
+  return apiRequest(`/promotions/${id}`, { method: 'DELETE' });
 }

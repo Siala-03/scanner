@@ -5,12 +5,12 @@ export async function getReservations(restaurantId: string, date?: string, statu
   const params = new URLSearchParams({ restaurantId });
   if (date) params.set('date', date);
   if (status) params.set('status', status);
-  return apiRequest(`/api/reservations?${params}`);
+  return apiRequest(`/reservations?${params}`);
 }
 
 export async function checkAvailability(restaurantId: string, date: string): Promise<Reservation[]> {
   const params = new URLSearchParams({ restaurantId, date });
-  return apiRequest(`/api/reservations/availability?${params}`, { includeAuthHeaders: false });
+  return apiRequest(`/reservations/availability?${params}`, { includeAuthHeaders: false });
 }
 
 export async function createReservation(data: {
@@ -25,7 +25,7 @@ export async function createReservation(data: {
   tableNumber?: number;
   notes?: string;
 }): Promise<Reservation> {
-  return apiRequest('/api/reservations', { method: 'POST', json: data, includeAuthHeaders: false });
+  return apiRequest('/reservations', { method: 'POST', json: data, includeAuthHeaders: false });
 }
 
 export async function updateReservation(id: string, data: {
@@ -33,9 +33,9 @@ export async function updateReservation(id: string, data: {
   tableNumber?: number;
   notes?: string;
 }): Promise<Reservation> {
-  return apiRequest(`/api/reservations/${id}`, { method: 'PUT', json: data });
+  return apiRequest(`/reservations/${id}`, { method: 'PUT', json: data });
 }
 
 export async function cancelReservation(id: string): Promise<void> {
-  return apiRequest(`/api/reservations/${id}`, { method: 'DELETE' });
+  return apiRequest(`/reservations/${id}`, { method: 'DELETE' });
 }
