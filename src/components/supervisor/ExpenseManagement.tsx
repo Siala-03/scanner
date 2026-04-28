@@ -48,7 +48,6 @@ export default function SupervisorExpenseManagement() {
 
   const PAGE_SIZE = 15;
   const [page, setPage] = useState(1);
-  useEffect(() => { setPage(1); }, [filteredExpenses]);
   const [formData, setFormData] = useState<ExpenseFormData>({
     categoryId: '',
     vendorName: '',
@@ -108,6 +107,10 @@ export default function SupervisorExpenseManagement() {
       return matchesStatus && matchesCategory && matchesQuery;
     });
   }, [expenses, searchQuery, statusFilter, categoryFilter, categoryNameById]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [filteredExpenses]);
 
   const summary = useMemo(() => {
     const totalAmount = filteredExpenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
