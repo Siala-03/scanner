@@ -1,7 +1,7 @@
 import { useCallback, useState, useEffect } from 'react';
 import { useTheme } from './contexts/ThemeContext';
 import { motion } from 'framer-motion';
-import { ArrowLeftIcon, QrCodeIcon, LogOutIcon } from 'lucide-react';
+import { ArrowLeftIcon, QrCodeIcon, LogOutIcon, ChevronDownIcon } from 'lucide-react';
 import { ThemeToggle } from './components/ui/ThemeToggle';
 import { CartItem, OrderStatus, Customer } from './types';
 import { setCurrency, CurrencyCode } from './utils/currency';
@@ -45,6 +45,54 @@ type UserRole = 'customer' | 'waiter' | 'supervisor' | 'manager' | 'kitchen' | '
 type ManagerPage = 'dashboard' | 'menu' | 'staff' | 'analytics' | 'performance' | 'qrcodes' | 'inventory' | 'history' | 'expenses' | 'credit' | 'loyalty' | 'promotions' | 'reservations' | 'settings';
 type SupervisorPage = 'dashboard' | 'revenue' | 'staff' | 'qrcodes' | 'inventory' | 'menu' | 'history' | 'expenses' | 'online-orders';
 
+const MANAGER_NAV_GROUPS: Array<{
+  id: string;
+  label: string;
+  items: Array<{ id: ManagerPage; label: string }>;
+}> = [
+  {
+    id: 'operations',
+    label: 'Operations',
+    items: [
+      { id: 'history', label: 'Order History' },
+      { id: 'reservations', label: 'Reservations' },
+    ],
+  },
+  {
+    id: 'marketing',
+    label: 'Menu & Marketing',
+    items: [
+      { id: 'menu', label: 'Manage Menu' },
+      { id: 'promotions', label: 'Promotions' },
+      { id: 'loyalty', label: 'Loyalty & SMS' },
+    ],
+  },
+  {
+    id: 'finance',
+    label: 'Finance',
+    items: [
+      { id: 'analytics', label: 'Analytics' },
+      { id: 'expenses', label: 'Expenses' },
+      { id: 'credit', label: 'Credit' },
+    ],
+  },
+  {
+    id: 'setup',
+    label: 'Setup',
+    items: [
+      { id: 'staff', label: 'Staff' },
+      { id: 'qrcodes', label: 'QR Codes' },
+      { id: 'inventory', label: 'Inventory' },
+      { id: 'settings', label: 'Settings' },
+    ],
+  },
+];
+
+const MANAGER_NAV_FLAT: Array<{ id: ManagerPage; label: string }> = [
+  { id: 'dashboard', label: 'Dashboard' },
+  ...MANAGER_NAV_GROUPS.flatMap((g) => g.items),
+];
+
 function getThemeStorageKeyForRole(role: UserRole): string {
   return `theme:${role ?? 'default'}`;
 }
@@ -61,6 +109,7 @@ export function App() {
   const [tableNumber, setTableNumber] = useState<number | null>(null);
   const [customerInitialTab, setCustomerInitialTab] = useState<'menu' | 'reserve'>('menu');
   const [managerPage, setManagerPage] = useState<ManagerPage>('dashboard');
+  const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());
   const [supervisorPage, setSupervisorPage] =
   useState<SupervisorPage>('dashboard');
   const [routeResolved, setRouteResolved] = useState(false);
@@ -465,6 +514,16 @@ export function App() {
     setRouteResolved(true);
   }, []);
 
+  // Auto-open the sidebar group that contains the active manager page
+  useEffect(() => {
+    for (const group of MANAGER_NAV_GROUPS) {
+      if (group.items.some((item) => item.id === managerPage)) {
+        setOpenGroups((prev) => prev.has(group.id) ? prev : new Set([...prev, group.id]));
+        break;
+      }
+    }
+  }, [managerPage]);
+
   // Update URL when role changes
   useEffect(() => {
     if (selectedRole && selectedRole !== 'customer') {
@@ -749,31 +808,15 @@ export function App() {
         </div>
 
         <div className="flex flex-col lg:flex-row">
-          {/* Side Menu - responsive: horizontal scroll on mobile/tablet, vertical on desktop */}
-          <aside className="w-full lg:w-56 lg:min-h-[calc(100vh-73px)] bg-slate-800 border-r border-slate-700 p-4">
-            {/* Mobile/Tablet: horizontal scrollable menu */}
-            <nav className="flex lg:flex-col overflow-x-auto gap-1 lg:space-y-1 pb-2 lg:pb-0">
-              {(
-                [
-                  { id: 'dashboard', label: 'Dashboard' },
-                  { id: 'inventory', label: 'Inventory' },
-                  { id: 'menu', label: 'Manage Menu' },
-                  { id: 'qrcodes', label: 'QR Codes' },
-                  { id: 'history', label: 'Order History' },
-                  { id: 'analytics', label: 'Analytics' },
-                  { id: 'staff', label: 'Staff' },
-                  { id: 'expenses', label: 'Expenses' },
-                  { id: 'credit', label: 'Credit' },
-                  { id: 'loyalty', label: 'Loyalty & SMS' },
-                  { id: 'promotions', label: 'Promotions' },
-                  { id: 'reservations', label: 'Reservations' },
-                  { id: 'settings', label: 'Settings' },
-                ] as Array<{ id: ManagerPage; label: string }>
-              ).map((item) => (
+          {/* Side Menu */}
+          <aside className="w-full lg:w-56 lg:min-h-[calc(100vh-73px)] bg-slate-800 border-r border-slate-700 p-3">
+            {/* Mobile: flat horizontal scroll (unchanged behaviour) */}
+            <nav className="flex lg:hidden overflow-x-auto gap-1 pb-1">
+              {MANAGER_NAV_FLAT.map((item) => (
                 <button
                   key={item.id}
                   onClick={() => setManagerPage(item.id)}
-                  className={`whitespace-nowrap px-4 py-2 text-left text-sm font-medium rounded-lg transition flex-shrink-0 ${
+                  className={`whitespace-nowrap px-3 py-2 text-sm font-medium rounded-lg transition flex-shrink-0 ${
                     managerPage === item.id
                       ? 'bg-amber-500 text-slate-900'
                       : 'text-slate-300 hover:bg-slate-700 hover:text-white'
@@ -782,6 +825,67 @@ export function App() {
                   {item.label}
                 </button>
               ))}
+            </nav>
+
+            {/* Desktop: accordion groups */}
+            <nav className="hidden lg:flex lg:flex-col gap-0.5">
+              {/* Dashboard — standalone */}
+              <button
+                onClick={() => setManagerPage('dashboard')}
+                className={`w-full px-3 py-2 text-left text-sm font-medium rounded-lg transition ${
+                  managerPage === 'dashboard'
+                    ? 'bg-amber-500 text-slate-900'
+                    : 'text-slate-300 hover:bg-slate-700 hover:text-white'
+                }`}
+              >
+                Dashboard
+              </button>
+
+              {/* Collapsible groups */}
+              {MANAGER_NAV_GROUPS.map((group) => {
+                const isOpen = openGroups.has(group.id);
+                const hasActive = group.items.some((i) => i.id === managerPage);
+                return (
+                  <div key={group.id}>
+                    <button
+                      onClick={() =>
+                        setOpenGroups((prev) => {
+                          const next = new Set(prev);
+                          isOpen ? next.delete(group.id) : next.add(group.id);
+                          return next;
+                        })
+                      }
+                      className={`w-full flex items-center justify-between px-3 py-2 text-left text-sm font-medium rounded-lg transition ${
+                        hasActive
+                          ? 'text-amber-400 bg-amber-500/10'
+                          : 'text-slate-400 hover:bg-slate-700 hover:text-slate-200'
+                      }`}
+                    >
+                      <span>{group.label}</span>
+                      <ChevronDownIcon
+                        className={`w-3.5 h-3.5 transition-transform duration-200 ${isOpen ? '' : '-rotate-90'}`}
+                      />
+                    </button>
+                    {isOpen && (
+                      <div className="mt-0.5 ml-2 pl-3 border-l border-slate-700 flex flex-col gap-0.5">
+                        {group.items.map((item) => (
+                          <button
+                            key={item.id}
+                            onClick={() => setManagerPage(item.id)}
+                            className={`w-full px-3 py-1.5 text-left text-sm font-medium rounded-lg transition ${
+                              managerPage === item.id
+                                ? 'bg-amber-500 text-slate-900'
+                                : 'text-slate-300 hover:bg-slate-700 hover:text-white'
+                            }`}
+                          >
+                            {item.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </nav>
           </aside>
 
