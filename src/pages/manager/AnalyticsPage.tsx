@@ -20,6 +20,7 @@ import { useMenu } from '../../hooks/useMenu';
 import { Card } from '../../components/ui/Card';
 import { Tabs } from '../../components/ui/Tabs';
 import { formatPrice } from '../../utils/currency';
+
 export function AnalyticsPage() {
   const [timeRange, setTimeRange] = useState<'today' | 'week' | 'month' | 'year'>('week');
   const [comparisonMode, setComparisonMode] = useState<'previousMonth' | 'lastYear'>('previousMonth');
@@ -29,6 +30,27 @@ export function AnalyticsPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const { menuItems } = useMenu();
   const menuById = useMemo(() => Object.fromEntries(menuItems.map((item) => [item.id, item])), [menuItems]);
+
+  // KPI targets — persisted per restaurant in localStorage
+  const [kpiTargets, setKpiTargetsState] = useState(() => {
+    try {
+      const rid = localStorage.getItem('restaurantId') || 'default';
+      const saved = localStorage.getItem(`kpiTargets_${rid}`);
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return { revenue: 150000, orders: 3200, avgOrderValue: 45 };
+  });
+
+  const setKpiTargets = (updater: ((prev: typeof kpiTargets) => typeof kpiTargets) | typeof kpiTargets) => {
+    setKpiTargetsState((prev) => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      try {
+        const rid = localStorage.getItem('restaurantId') || 'default';
+        localStorage.setItem(`kpiTargets_${rid}`, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  };
 
   const normalizeOrderItems = (rawItems: any): any[] => {
     if (Array.isArray(rawItems)) return rawItems;
@@ -67,6 +89,89 @@ export function AnalyticsPage() {
     return Number.isNaN(parsed.getTime()) ? null : parsed;
   };
 
+  // Compute the [start, end] window for the selected timeRange tab
+  const periodWindow = useMemo(() => {
+    const now = new Date();
+    const start = new Date(now);
+    start.setHours(0, 0, 0, 0);
+    if (timeRange === 'week') {
+      const day = start.getDay(); // 0=Sun
+      start.setDate(start.getDate() - (day === 0 ? 6 : day - 1)); // back to Monday
+    } else if (timeRange === 'month') {
+      start.setDate(1);
+    } else if (timeRange === 'year') {
+      start.setMonth(0, 1);
+    }
+    return { start, end: now };
+  }, [timeRange]);
+
+  // Orders within the selected timeRange
+  const filteredOrders = useMemo(() => {
+    return orders.filter((order) => {
+      const d = parseOrderDate(order);
+      return d ? d >= periodWindow.start && d <= periodWindow.end : false;
+    });
+  }, [orders, periodWindow]);
+
+  // KPI metrics for the selected period, with correct "new customers" detection
+  const periodMetrics = useMemo(() => {
+    // Customers who placed any order BEFORE this period
+    const priorCustomers = new Set<string>();
+    orders.forEach((order) => {
+      const d = parseOrderDate(order);
+      if (!d || d >= periodWindow.start) return;
+      const key = order.customerId ?? order.customer_id ?? order.customerName ?? order.customer_name;
+      if (key) priorCustomers.add(String(key));
+    });
+
+    let revenue = 0;
+    let orderCount = 0;
+    const periodCustomers = new Set<string>();
+
+    filteredOrders.forEach((order) => {
+      orderCount += 1;
+      if (order.status === 'served') revenue += order.total ?? order.total_price ?? 0;
+      const key = order.customerId ?? order.customer_id ?? order.customerName ?? order.customer_name;
+      if (key) periodCustomers.add(String(key));
+    });
+
+    // New customers = those seen in this period for the first time ever
+    let newCustomers = 0;
+    periodCustomers.forEach((key) => {
+      if (!priorCustomers.has(key)) newCustomers += 1;
+    });
+
+    return {
+      revenue,
+      orders: orderCount,
+      avgOrderValue: orderCount ? revenue / orderCount : 0,
+      newCustomers,
+    };
+  }, [orders, filteredOrders, periodWindow]);
+
+  // Metrics for the equivalent prior period (same duration, immediately before)
+  const previousPeriodMetrics = useMemo(() => {
+    const durationMs = periodWindow.end.getTime() - periodWindow.start.getTime();
+    const prevEnd = new Date(periodWindow.start.getTime());
+    const prevStart = new Date(periodWindow.start.getTime() - durationMs);
+    let revenue = 0;
+    let orderCount = 0;
+    orders.forEach((order) => {
+      const d = parseOrderDate(order);
+      if (!d || d < prevStart || d >= prevEnd) return;
+      orderCount += 1;
+      if (order.status === 'served') revenue += order.total ?? order.total_price ?? 0;
+    });
+    return { revenue, orders: orderCount };
+  }, [orders, periodWindow]);
+
+  const revenueChange = previousPeriodMetrics.revenue > 0
+    ? Math.round((periodMetrics.revenue - previousPeriodMetrics.revenue) / previousPeriodMetrics.revenue * 100)
+    : 0;
+  const ordersChange = previousPeriodMetrics.orders > 0
+    ? Math.round((periodMetrics.orders - previousPeriodMetrics.orders) / previousPeriodMetrics.orders * 100)
+    : 0;
+
   const weeklyRevenue = useMemo(() => {
     const now = new Date();
     const rows: Array<{ date: string; label: string; revenue: number; orders: number; avgOrderValue: number }> = [];
@@ -102,7 +207,6 @@ export function AnalyticsPage() {
     }
 
     if (dateWindow === '90d') {
-      // 13 weekly buckets (~90 days)
       for (let i = 12; i >= 0; i -= 1) {
         const weekStart = new Date(now);
         weekStart.setHours(0, 0, 0, 0);
@@ -156,38 +260,6 @@ export function AnalyticsPage() {
     return rows;
   }, [orders, dateWindow]);
 
-  const monthlyComparison = useMemo(() => {
-    const current = { revenue: 0, orders: 0, avgOrderValue: 0, newCustomers: 0 };
-    const previous = { revenue: 0, orders: 0, avgOrderValue: 0, newCustomers: 0 };
-    const currSet = new Set<string>();
-    const prevSet = new Set<string>();
-    const nowDate = new Date();
-    const month = nowDate.getMonth();
-    const year = nowDate.getFullYear();
-    const prevDate = new Date(year, month - 1, 1);
-    orders.forEach((order) => {
-      const d = new Date(order.createdAt ?? order.created_at);
-      if (Number.isNaN(d.getTime())) return;
-      // Prefer customerId for deduplication (unique customers); fall back to customerName
-      const customerKey = order.customerId ?? order.customer_id ?? order.customerName ?? order.customer_name;
-      if (d.getMonth() === month && d.getFullYear() === year) {
-        current.orders += 1;
-        if (order.status === 'served') current.revenue += order.total ?? order.total_price ?? 0;
-        if (customerKey) currSet.add(String(customerKey));
-      }
-      if (d.getMonth() === prevDate.getMonth() && d.getFullYear() === prevDate.getFullYear()) {
-        previous.orders += 1;
-        if (order.status === 'served') previous.revenue += order.total ?? order.total_price ?? 0;
-        if (customerKey) prevSet.add(String(customerKey));
-      }
-    });
-    current.avgOrderValue = current.orders ? current.revenue / current.orders : 0;
-    previous.avgOrderValue = previous.orders ? previous.revenue / previous.orders : 0;
-    current.newCustomers = currSet.size;
-    previous.newCustomers = prevSet.size;
-    return { currentMonth: current, previousMonth: previous };
-  }, [orders]);
-
   const hourlyOrders = useMemo(() => {
     const now = new Date();
     const hours = Array.from({ length: 24 }, (_, i) => ({ hour: i, orders: 0, revenue: 0 }));
@@ -203,10 +275,11 @@ export function AnalyticsPage() {
     return hours.slice(8, 23);
   }, [orders]);
 
+  // Category revenue filtered to current period
   const categoryRevenue = useMemo(() => {
     const map = new Map<string, { category: string; revenue: number; orders: number; percentage: number }>();
     let totalRevenue = 0;
-    orders.forEach((order) => {
+    filteredOrders.forEach((order) => {
       if (order.status !== 'served') return;
       const items = normalizeOrderItems(order.items);
 
@@ -229,7 +302,7 @@ export function AnalyticsPage() {
       .map((r) => ({ ...r, percentage: totalRevenue ? Math.round((r.revenue / totalRevenue) * 100) : 0 }))
       .sort((a, b) => b.revenue - a.revenue)
       .slice(0, 5);
-  }, [orders, menuById]);
+  }, [filteredOrders, menuById]);
 
   const peakHoursData = useMemo(() => {
     const byDay: Record<string, Set<number>> = {};
@@ -274,42 +347,70 @@ export function AnalyticsPage() {
     name: c.category.replace('-', ' ').replace(/\b\w/g, (l) => l.toUpperCase()),
     color: COLORS[i % COLORS.length]
   }));
-  const revenueChange = monthlyComparison.previousMonth.revenue > 0
-    ? Math.round((monthlyComparison.currentMonth.revenue - monthlyComparison.previousMonth.revenue) / monthlyComparison.previousMonth.revenue * 100)
-    : 0;
-  const ordersChange = monthlyComparison.previousMonth.orders > 0
-    ? Math.round((monthlyComparison.currentMonth.orders - monthlyComparison.previousMonth.orders) / monthlyComparison.previousMonth.orders * 100)
-    : 0;
-  const yearlyTotals = useMemo(() => {
-    const currentYear = new Date().getFullYear();
-    return orders.reduce(
-      (acc, order) => {
-        const d = new Date(order.createdAt ?? order.created_at);
-        if (Number.isNaN(d.getTime()) || d.getFullYear() !== currentYear) return acc;
-        acc.orders += 1;
-        if (order.status === 'served') acc.revenue += order.total ?? order.total_price ?? 0;
-        return acc;
-      },
-      { revenue: 0, orders: 0 }
-    );
-  }, [orders]);
 
-  const currentRevenue =
-    timeRange === 'today'
-      ? weeklyRevenue[weeklyRevenue.length - 1]?.revenue ?? 0
-      : timeRange === 'week'
-      ? weeklyRevenue.reduce((s, d) => s + d.revenue, 0)
-      : timeRange === 'year'
-      ? yearlyTotals.revenue
-      : monthlyComparison.currentMonth.revenue;
-  const currentOrders =
-    timeRange === 'today'
-      ? weeklyRevenue[weeklyRevenue.length - 1]?.orders ?? 0
-      : timeRange === 'week'
-      ? weeklyRevenue.reduce((s, d) => s + d.orders, 0)
-      : timeRange === 'year'
-      ? yearlyTotals.orders
-      : monthlyComparison.currentMonth.orders;
+  const revenueProgress = Math.min(100, (periodMetrics.revenue / kpiTargets.revenue) * 100);
+  const ordersProgress = Math.min(100, (periodMetrics.orders / kpiTargets.orders) * 100);
+  const avgOrderValueProgress = Math.min(100, (periodMetrics.avgOrderValue / kpiTargets.avgOrderValue) * 100);
+
+  // Sales funnel filtered to current period
+  const salesFunnel = useMemo(() => {
+    const statuses = { pending: 0, verified: 0, preparing: 0, ready: 0, served: 0, cancelled: 0 } as Record<string, number>;
+    filteredOrders.forEach((order) => {
+      const status = order.status ?? 'pending';
+      statuses[status] = (statuses[status] ?? 0) + 1;
+    });
+    return statuses;
+  }, [filteredOrders]);
+
+  // Top items filtered to current period
+  const topItems = useMemo(() => {
+    const itemStats = new Map<string, { name: string; revenue: number; orders: number }>();
+    filteredOrders.forEach((order) => {
+      const items = normalizeOrderItems(order.items);
+      items.forEach((item: any) => {
+        const menuItemId = String(item.menuItemId ?? item.menu_item_id ?? item.id ?? '').trim();
+        const menuItemName = String(
+          item.menuItemName ?? item.menu_item_name ?? item.menuItem?.name ?? item.menu_item?.name ?? ''
+        ).trim();
+        const key = menuItemId || menuItemName || 'unknown';
+        const menuItem = menuItemId ? menuById[menuItemId] : undefined;
+
+        const quantity = Number(item.quantity ?? 1) || 1;
+        const unitPrice = Number(
+          item.unitPrice ??
+            item.unit_price ??
+            item.menuItem?.price ??
+            item.menu_item?.price ??
+            menuItem?.price ??
+            0
+        );
+        const totalPrice = Number(
+          item.totalPrice ?? item.total_price ?? (Number.isFinite(unitPrice) ? unitPrice * quantity : 0)
+        );
+
+        const stat = itemStats.get(key) ?? {
+          name: menuItem?.name ?? (menuItemName || key),
+          revenue: 0,
+          orders: 0,
+        };
+        stat.revenue += Number.isFinite(totalPrice) ? totalPrice : 0;
+        stat.orders += quantity;
+        itemStats.set(key, stat);
+      });
+    });
+    return Array.from(itemStats.values())
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 5);
+  }, [filteredOrders, menuById]);
+
+  const highDemandItems = useMemo(
+    () => topItems.filter((item) => item.orders >= 3).slice(0, 5),
+    [topItems]
+  );
+
+  const inventoryRiskItems = menuItems
+    .filter((item) => !item.isAvailable)
+    .slice(0, 5);
 
   const attributionHealth = useMemo(() => {
     const now = new Date();
@@ -373,77 +474,9 @@ export function AnalyticsPage() {
       ? '90D'
       : '1Y';
 
-  const [kpiTargets, setKpiTargets] = useState({
-    revenue: 150000,
-    orders: 3200,
-    avgOrderValue: 45
-  });
-
-  const revenueProgress = Math.min(100, (currentRevenue / kpiTargets.revenue) * 100);
-  const ordersProgress = Math.min(100, (currentOrders / kpiTargets.orders) * 100);
-  const avgOrderValueProgress = Math.min(100, (monthlyComparison.currentMonth.avgOrderValue / kpiTargets.avgOrderValue) * 100);
-
-  const salesFunnel = useMemo(() => {
-    const statuses = { pending: 0, verified: 0, preparing: 0, ready: 0, served: 0, cancelled: 0 } as Record<string, number>;
-    orders.forEach((order) => {
-      const status = order.status ?? 'pending';
-      statuses[status] = (statuses[status] ?? 0) + 1;
-    });
-    return statuses;
-  }, [orders]);
-
-  const topItems = useMemo(() => {
-    const itemStats = new Map<string, { name: string; revenue: number; orders: number }>();
-    orders.forEach((order) => {
-      const items = normalizeOrderItems(order.items);
-      items.forEach((item: any) => {
-        const menuItemId = String(item.menuItemId ?? item.menu_item_id ?? item.id ?? '').trim();
-        const menuItemName = String(
-          item.menuItemName ?? item.menu_item_name ?? item.menuItem?.name ?? item.menu_item?.name ?? ''
-        ).trim();
-        const key = menuItemId || menuItemName || 'unknown';
-        const menuItem = menuItemId ? menuById[menuItemId] : undefined;
-
-        const quantity = Number(item.quantity ?? 1) || 1;
-        const unitPrice = Number(
-          item.unitPrice ??
-            item.unit_price ??
-            item.menuItem?.price ??
-            item.menu_item?.price ??
-            menuItem?.price ??
-            0
-        );
-        const totalPrice = Number(
-          item.totalPrice ?? item.total_price ?? (Number.isFinite(unitPrice) ? unitPrice * quantity : 0)
-        );
-
-        const stat = itemStats.get(key) ?? {
-          name: menuItem?.name ?? (menuItemName || key),
-          revenue: 0,
-          orders: 0,
-        };
-        stat.revenue += Number.isFinite(totalPrice) ? totalPrice : 0;
-        stat.orders += quantity;
-        itemStats.set(key, stat);
-      });
-    });
-    return Array.from(itemStats.values())
-      .sort((a, b) => b.revenue - a.revenue)
-      .slice(0, 5);
-  }, [orders, menuById]);
-
-  const highDemandItems = useMemo(
-    () => topItems.filter((item) => item.orders >= 3).slice(0, 5),
-    [topItems]
-  );
-
-  const inventoryRiskItems = menuItems
-    .filter((item) => !item.isAvailable)
-    .slice(0, 5);
-
   const alerts = [] as string[];
-  if (revenueChange <= -10) alerts.push('Revenue is down over 10% vs last month.');
-  if (ordersChange <= -10) alerts.push('Orders are down over 10% vs last month.');
+  if (revenueChange <= -10) alerts.push('Revenue is down over 10% vs previous period.');
+  if (ordersChange <= -10) alerts.push('Orders are down over 10% vs previous period.');
   if (salesFunnel.cancelled > 5) alerts.push(`${salesFunnel.cancelled} cancelled orders this period. Review process.`);
   const avgDailyGrowthPct = avgDailyRevenue > 0 ? (avgDailyGrowth / avgDailyRevenue) * 100 : 0;
   if (avgDailyGrowthPct > 20) alerts.push('High growth: consider expanding staffing and inventory.');
@@ -455,9 +488,15 @@ export function AnalyticsPage() {
     trend: avgDailyGrowth >= 0 ? 'Upward' : 'Downward'
   };
 
+  const periodLabel =
+    timeRange === 'today' ? 'Today'
+    : timeRange === 'week' ? 'This Week'
+    : timeRange === 'month' ? 'This Month'
+    : 'This Year';
+
   const comparisonData = comparisonMode === 'lastYear'
-    ? `${monthlyComparison.currentMonth.revenue.toFixed(0)} vs last year (N/A)`
-    : `${monthlyComparison.currentMonth.revenue.toFixed(0)} vs previous month`;
+    ? `${formatPrice(periodMetrics.revenue)} (${periodLabel}) vs last year (N/A)`
+    : `${formatPrice(periodMetrics.revenue)} (${periodLabel}) vs previous period: ${formatPrice(previousPeriodMetrics.revenue)}`;
 
   const predictiveRecommendations = {
     staffing:
@@ -531,7 +570,7 @@ export function AnalyticsPage() {
             <button
               className={`px-3 py-1 rounded text-sm ${comparisonMode === 'previousMonth' ? 'bg-sky-500 text-white' : 'bg-slate-700 text-slate-200'}`}
               onClick={() => setComparisonMode('previousMonth')}>
-              Prev Month
+              Prev Period
             </button>
             <button
               className={`px-3 py-1 rounded text-sm ${comparisonMode === 'lastYear' ? 'bg-sky-500 text-white' : 'bg-slate-700 text-slate-200'}`}
@@ -544,9 +583,9 @@ export function AnalyticsPage() {
         {/* KPI targets */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
           <Card className="bg-slate-800 p-4">
-            <p className="text-xs text-slate-400">Revenue Target</p>
+            <p className="text-xs text-slate-400">Revenue Target ({periodLabel})</p>
             <div className="flex flex-wrap items-center gap-2">
-              <p className="text-xl md:text-2xl font-bold text-gray-100">{formatPrice(currentRevenue)} / {formatPrice(kpiTargets.revenue)}</p>
+              <p className="text-xl md:text-2xl font-bold text-gray-100">{formatPrice(periodMetrics.revenue)} / {formatPrice(kpiTargets.revenue)}</p>
               <input
                 type="number"
                 min={0}
@@ -560,9 +599,9 @@ export function AnalyticsPage() {
             </div>
           </Card>
           <Card className="bg-slate-800 p-4">
-            <p className="text-xs text-slate-400">Orders Target</p>
+            <p className="text-xs text-slate-400">Orders Target ({periodLabel})</p>
             <div className="flex flex-wrap items-center gap-2">
-              <p className="text-xl md:text-2xl font-bold text-gray-100">{currentOrders.toLocaleString()} / {kpiTargets.orders}</p>
+              <p className="text-xl md:text-2xl font-bold text-gray-100">{periodMetrics.orders.toLocaleString()} / {kpiTargets.orders}</p>
               <input
                 type="number"
                 min={0}
@@ -578,7 +617,7 @@ export function AnalyticsPage() {
           <Card className="bg-slate-800 p-4">
             <p className="text-xs text-slate-400">Avg Order Value Target</p>
             <div className="flex flex-wrap items-center gap-2">
-              <p className="text-xl md:text-2xl font-bold text-gray-100">{formatPrice(monthlyComparison.currentMonth.avgOrderValue)} / {formatPrice(kpiTargets.avgOrderValue)}</p>
+              <p className="text-xl md:text-2xl font-bold text-gray-100">{formatPrice(periodMetrics.avgOrderValue)} / {formatPrice(kpiTargets.avgOrderValue)}</p>
               <input
                 type="number"
                 min={0}
@@ -599,7 +638,7 @@ export function AnalyticsPage() {
           <p className="text-sm text-white">{comparisonData}</p>
         </div>
 
-        {/* Month Comparison */}
+        {/* Period summary cards */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
           <Card className="bg-slate-800">
             <p className="text-sm text-slate-400 mb-1">
@@ -607,10 +646,12 @@ export function AnalyticsPage() {
                 ? 'Revenue Today'
                 : timeRange === 'week'
                 ? 'Revenue This Week'
-                : 'Monthly Revenue'}
+                : timeRange === 'year'
+                ? 'Revenue This Year'
+                : 'Revenue This Month'}
             </p>
             <p className="text-2xl font-bold text-gray-100">
-              {formatPrice(currentRevenue)}
+              {formatPrice(periodMetrics.revenue)}
             </p>
             <div
               className={`flex items-center gap-1 text-sm mt-1 ${revenueChange >= 0 ? 'text-green-400' : 'text-red-400'}`}>
@@ -620,7 +661,7 @@ export function AnalyticsPage() {
 
               <TrendingDownIcon className="w-4 h-4" />
               }
-              <span>{revenueChange}% vs last month</span>
+              <span>{revenueChange}% vs prev period</span>
             </div>
           </Card>
           <Card className="bg-slate-800">
@@ -629,10 +670,12 @@ export function AnalyticsPage() {
                 ? 'Orders Today'
                 : timeRange === 'week'
                 ? 'Orders This Week'
-                : 'Monthly Orders'}
+                : timeRange === 'year'
+                ? 'Orders This Year'
+                : 'Orders This Month'}
             </p>
             <p className="text-2xl font-bold text-gray-100">
-              {currentOrders.toLocaleString()}
+              {periodMetrics.orders.toLocaleString()}
             </p>
             <div
               className={`flex items-center gap-1 text-sm mt-1 ${ordersChange >= 0 ? 'text-green-400' : 'text-red-400'}`}>
@@ -642,20 +685,21 @@ export function AnalyticsPage() {
 
               <TrendingDownIcon className="w-4 h-4" />
               }
-              <span>{ordersChange}% vs last month</span>
+              <span>{ordersChange}% vs prev period</span>
             </div>
           </Card>
           <Card className="bg-slate-800">
             <p className="text-sm text-slate-400 mb-1">Avg Order Value</p>
             <p className="text-2xl font-bold text-white">
-              {formatPrice(monthlyComparison.currentMonth.avgOrderValue)}
+              {formatPrice(periodMetrics.avgOrderValue)}
             </p>
           </Card>
           <Card className="bg-slate-800">
             <p className="text-sm text-slate-400 mb-1">New Customers</p>
             <p className="text-2xl font-bold text-white">
-              {monthlyComparison.currentMonth.newCustomers}
+              {periodMetrics.newCustomers}
             </p>
+            <p className="text-xs text-slate-400 mt-1">First-time buyers</p>
           </Card>
           <Card className="bg-slate-800">
             <p className="text-sm text-slate-400 mb-1">Attribution Health</p>
@@ -689,7 +733,7 @@ export function AnalyticsPage() {
         {/* Additional BI improvements */}
         <div className="grid sm:grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
           <Card className="bg-slate-800 p-4">
-            <h3 className="text-sm font-semibold text-gray-100 mb-2">Sales Funnel</h3>
+            <h3 className="text-sm font-semibold text-gray-100 mb-2">Sales Funnel ({periodLabel})</h3>
             <ul className="space-y-1 text-sm text-slate-300">
               <li>Pending: {salesFunnel.pending}</li>
               <li>Verified: {salesFunnel.verified}</li>
@@ -700,7 +744,7 @@ export function AnalyticsPage() {
             </ul>
           </Card>
           <Card className="bg-slate-800 p-4">
-            <h3 className="text-sm font-semibold text-gray-100 mb-2">Top 5 Menu Items</h3>
+            <h3 className="text-sm font-semibold text-gray-100 mb-2">Top 5 Menu Items ({periodLabel})</h3>
             <ol className="text-sm text-slate-300 list-decimal list-inside space-y-1">
               {topItems.map((item) => (
                 <li key={item.name}>{item.name}: {formatPrice(item.revenue)} ({item.orders} orders)</li>
@@ -756,7 +800,7 @@ export function AnalyticsPage() {
           {/* Revenue Trend */}
           <Card className="bg-slate-800">
             <h3 className="text-lg font-semibold text-gray-100 mb-4">
-              Revenue Trend
+              Revenue Trend ({selectedWindowLabel})
             </h3>
             <div className="h-72">
               <ResponsiveContainer width="100%" height="100%">
@@ -808,7 +852,7 @@ export function AnalyticsPage() {
           {/* Orders by Hour */}
           <Card className="bg-slate-800">
             <h3 className="text-lg font-semibold text-gray-100 mb-4">
-              Orders by Hour
+              Orders by Hour (Today)
             </h3>
             <div className="h-72">
               <ResponsiveContainer width="100%" height="100%">
@@ -840,7 +884,7 @@ export function AnalyticsPage() {
           {/* Revenue by Category */}
           <Card className="bg-slate-800">
             <h3 className="text-lg font-semibold text-gray-100 mb-4">
-              Revenue by Category
+              Revenue by Category ({periodLabel})
             </h3>
             <div className="h-72 flex items-center">
               <ResponsiveContainer width="50%" height="100%">
@@ -967,7 +1011,7 @@ export function AnalyticsPage() {
         {/* Orders Trend */}
         <Card className="bg-slate-800">
           <h3 className="text-lg font-semibold text-gray-100 mb-4">
-            Daily Orders & Revenue
+            Daily Orders & Revenue ({selectedWindowLabel})
           </h3>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">

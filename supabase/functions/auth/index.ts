@@ -38,14 +38,15 @@ Deno.serve(async (req: Request) => {
 
       let query = db
         .from('staff_credentials')
-        .select('staff_id, password_hash, restaurant_id, staff(role)')
+        .select('staff_id, password_hash, restaurant_id')
         .eq('username', username);
 
       if (restaurantId) query = query.eq('restaurant_id', restaurantId);
 
       const { data: creds, error: credErr } = await query.limit(1).maybeSingle();
 
-      if (credErr || !creds) return err('Invalid username or password', 401);
+      if (credErr) return err(credErr.message, 500);
+      if (!creds) return err('Invalid username or password', 401);
 
       const valid = bcrypt.compareSync(password, creds.password_hash);
       if (!valid) return err('Invalid username or password', 401);
