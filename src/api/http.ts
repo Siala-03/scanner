@@ -11,6 +11,7 @@ export class ApiError extends Error {
 
 // API base URL - defaults to production backend, override with VITE_API_URL if needed
 const API_BASE = import.meta.env.VITE_API_URL || '';
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
 export async function apiRequest<T>(
   path: string,
@@ -27,6 +28,10 @@ export async function apiRequest<T>(
   const headers = new Headers(init.headers);
   headers.set('Accept', 'application/json');
   if (init.json !== undefined) headers.set('Content-Type', 'application/json');
+  if (API_BASE.includes('supabase.co') && SUPABASE_ANON_KEY) {
+    headers.set('apikey', SUPABASE_ANON_KEY);
+    headers.set('Authorization', `Bearer ${SUPABASE_ANON_KEY}`);
+  }
   if (!init.method || init.method.toUpperCase() === 'GET') {
     headers.set('Cache-Control', 'no-cache');
   }
