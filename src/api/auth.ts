@@ -1,4 +1,5 @@
 import { apiRequest } from './http';
+import { callEdgeFn } from '../lib/supabase';
 import type { Staff, StaffRole, StaffPerformance } from '../types';
 
 function normalizeStaff(raw: Record<string, any>): Staff {
@@ -54,9 +55,9 @@ export async function loginStaff(
   password: string,
   restaurantId?: string
 ): Promise<Staff> {
-  const raw = await apiRequest<any>('/auth/login', {
+  const raw = await callEdgeFn('staff-login', {
     method: 'POST',
-    json: { username, password, restaurantId },
+    body: { action: 'login', username, password, restaurantId },
   });
 
   const staff = normalizeStaff(raw);
