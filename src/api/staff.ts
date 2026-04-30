@@ -1,4 +1,4 @@
-import { apiRequest } from './http';
+import { supabase, callEdgeFn } from '../lib/supabase';
 import type { Staff, StaffRole, StaffPerformance } from '../types';
 
 function getRestaurantId(): string | undefined {
@@ -48,62 +48,91 @@ function normalizeStaff(raw: any): Staff {
 
 export async function fetchStaff(): Promise<Staff[]> {
   const restaurantId = getRestaurantId();
+  const role = localStorage.getItem('staffRole');
 
-  const params = new URLSearchParams();
-  if (restaurantId) params.set('restaurantId', restaurantId);
-  const url = `/auth/staff${params.toString() ? '?' + params.toString() : ''}`;
-  
-  const response = await apiRequest<{ staff: any[] }>(url);
-  return (response.staff || []).map(normalizeStaff);
+  let query = supabase.from('staff').select('*').order('name');
+  if (role !== 'superadmin' && restaurantId) {
+    query = query.eq('restaurant_id', restaurantId);
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data || []).map(normalizeStaff);
 }
 
 export async function fetchStaffById(id: string): Promise<Staff> {
-  const response = await apiRequest<{ staff: any }>(`/auth/staff/${id}`);
-  return normalizeStaff(response.staff);
+  const { data, error } = await supabase
+    .from('staff')
+    .select('*')
+    .eq('id', id)
+    .single();
+  if (error) throw error;
+  return normalizeStaff(data);
 }
 
 export async function fetchWaiters(): Promise<Staff[]> {
   const restaurantId = getRestaurantId();
-  const url = `/auth/waiters${restaurantId ? '?restaurantId=' + restaurantId : ''}`;
-  const response = await apiRequest<{ staff: any[] }>(url);
-  return (response.staff || []).map(normalizeStaff);
+  if (!restaurantId) return [];
+
+  const { data, error } = await supabase
+    .from('staff')
+    .select('*')
+    .eq('restaurant_id', restaurantId)
+    .eq('role', 'waiter')
+    .order('name');
+  if (error) throw error;
+  return (data || []).map(normalizeStaff);
 }
 
 export async function fetchStaffOnDuty(): Promise<Staff[]> {
   const restaurantId = getRestaurantId();
   if (!restaurantId) return [];
 
-  const params = new URLSearchParams({ restaurantId });
-  const response = await apiRequest<{ staff: any[] }>(`/auth/staff/on-duty?${params.toString()}`);
-  return (response.staff || []).map(normalizeStaff);
+  const { data, error } = await supabase
+    .from('staff')
+    .select('*')
+    .eq('restaurant_id', restaurantId)
+    .eq('is_on_duty', true)
+    .order('name');
+  if (error) throw error;
+  return (data || []).map(normalizeStaff);
 }
 
 export async function updateStaffStatus(id: string, isOnDuty: boolean): Promise<Staff> {
-  const response = await apiRequest<{ staff: any }>(`/auth/staff/${id}/status`, {
-    method: 'PUT',
-    json: { isOnDuty },
-  });
-  return normalizeStaff(response.staff);
+  const { data, error } = await supabase
+    .from('staff')
+    .update({ is_on_duty: isOnDuty })
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw error;
+  return normalizeStaff(data);
 }
 
 export async function updateStaffAssignments(id: string, assignedTables: number[]): Promise<Staff> {
-  const response = await apiRequest<{ staff: any }>(`/auth/staff/${id}/assignments`, {
-    method: 'PUT',
-    json: { assignedTables },
-  });
-  return normalizeStaff(response.staff);
+  const { data, error } = await supabase
+    .from('staff')
+    .update({ assigned_tables: assignedTables })
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw error;
+  return normalizeStaff(data);
 }
 
 export async function updateStaffRole(id: string, role: StaffRole): Promise<Staff> {
-  const response = await apiRequest<{ staff: any }>(`/auth/staff/${id}/role`, {
-    method: 'PUT',
-    json: { role },
-  });
-  return normalizeStaff(response.staff);
+  const { data, error } = await supabase
+    .from('staff')
+    .update({ role })
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw error;
+  return normalizeStaff(data);
 }
 
 export async function deleteStaff(id: string): Promise<{ success: boolean }> {
-  await apiRequest(`/auth/staff/${id}`, { method: 'DELETE' });
+  await callEdgeFn('admin-staff', { method: 'DELETE', params: { staff_id: id } });
   return { success: true };
 }
 
@@ -117,9 +146,9 @@ export async function createStaff(input: {
   restaurantId?: string;
 }): Promise<Staff> {
   const restaurantId = input.restaurantId || getRestaurantId();
-  const response = await apiRequest<{ staff: any }>('/auth/signup', {
+  const raw = await callEdgeFn('admin-staff', {
     method: 'POST',
-    json: { ...input, restaurantId },
+    body: { ...input, restaurantId },
   });
-  return normalizeStaff(response.staff);
+  return normalizeStaff(raw);
 }

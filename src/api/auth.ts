@@ -1,5 +1,4 @@
-import { apiRequest } from './http';
-import { callEdgeFn } from '../lib/supabase';
+import { supabase, callEdgeFn } from '../lib/supabase';
 import type { Staff, StaffRole, StaffPerformance } from '../types';
 
 function normalizeStaff(raw: Record<string, any>): Staff {
@@ -47,9 +46,6 @@ function getRestaurantId(): string | undefined {
   return undefined;
 }
 
-/**
- * Login via Edge Function — credentials never leave the server.
- */
 export async function loginStaff(
   username: string,
   password: string,
@@ -73,29 +69,38 @@ export async function fetchAllStaff(): Promise<Staff[]> {
   const restaurantId = getRestaurantId();
   const role         = localStorage.getItem('staffRole');
 
-  const params = new URLSearchParams();
-  if (restaurantId) params.set('restaurantId', restaurantId);
-  const url = `/auth/staff${params.toString() ? '?' + params.toString() : ''}`;
-  
-  const response = await apiRequest<{ staff: any[] }>(url);
-  return (response.staff || []).map(normalizeStaff);
+  let query = supabase.from('staff').select('*').order('name');
+  if (role !== 'superadmin' && restaurantId) {
+    query = query.eq('restaurant_id', restaurantId);
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data || []).map(normalizeStaff);
 }
 
 export async function fetchStaffById(id: string): Promise<Staff> {
-  const response = await apiRequest<{ staff: any }>(`/auth/staff/${id}`);
-  return normalizeStaff(response.staff);
+  const { data, error } = await supabase
+    .from('staff')
+    .select('*')
+    .eq('id', id)
+    .single();
+  if (error) throw error;
+  return normalizeStaff(data);
 }
 
 export async function fetchWaiters(): Promise<Staff[]> {
   const restaurantId = getRestaurantId();
-  const url = `/auth/waiters${restaurantId ? '?restaurantId=' + restaurantId : ''}`;
-  const response = await apiRequest<{ staff: any[] }>(url);
-  return (response.staff || []).map(normalizeStaff);
+  const { data, error } = await supabase
+    .from('staff')
+    .select('*')
+    .eq('role', 'waiter')
+    .eq('restaurant_id', restaurantId)
+    .order('name');
+  if (error) throw error;
+  return (data || []).map(normalizeStaff);
 }
 
-/**
- * Create a new staff member via Edge Function — writes to staff_credentials server-side.
- */
 export async function signUpStaff(input: {
   name: string;
   email: string;
@@ -106,34 +111,40 @@ export async function signUpStaff(input: {
   restaurantId?: string;
 }): Promise<Staff> {
   const restaurantId = input.restaurantId || getRestaurantId();
-  const raw = await apiRequest<{ staff: any }>('/auth/signup', {
+  const raw = await callEdgeFn('admin-staff', {
     method: 'POST',
-    json: { ...input, restaurantId },
+    body: { ...input, restaurantId },
   });
-  return normalizeStaff(raw.staff);
+  return normalizeStaff(raw);
 }
 
 export async function updateStaffRole(staffId: string, role: string): Promise<Staff> {
-  const response = await apiRequest<{ staff: any }>(`/auth/staff/${staffId}/role`, {
-    method: 'PUT',
-    json: { role },
-  });
-  return normalizeStaff(response.staff);
+  const { data, error } = await supabase
+    .from('staff')
+    .update({ role })
+    .eq('id', staffId)
+    .select()
+    .single();
+  if (error) throw error;
+  return normalizeStaff(data);
 }
 
 export async function updateStaffDuty(staffId: string, isOnDuty: boolean): Promise<Staff> {
-  const response = await apiRequest<{ staff: any }>(`/auth/staff/${staffId}/status`, {
-    method: 'PUT',
-    json: { isOnDuty },
-  });
-  return normalizeStaff(response.staff);
+  const { data, error } = await supabase
+    .from('staff')
+    .update({ is_on_duty: isOnDuty })
+    .eq('id', staffId)
+    .select()
+    .single();
+  if (error) throw error;
+  return normalizeStaff(data);
 }
 
-/**
- * Delete a staff member via backend API
- */
 export async function deleteStaff(staffId: string): Promise<void> {
-  await apiRequest(`/auth/staff/${staffId}`, { method: 'DELETE' });
+  await callEdgeFn('admin-staff', {
+    method: 'DELETE',
+    params: { staff_id: staffId },
+  });
 }
 
 export function logoutStaff(): void {
@@ -143,9 +154,6 @@ export function logoutStaff(): void {
   localStorage.removeItem('restaurantId');
 }
 
-/**
- * Change password via Edge Function — current password verified server-side.
- */
 export async function changePassword(
   currentPassword: string,
   newPassword: string
