@@ -83,13 +83,19 @@ const CreditManagement: React.FC = () => {
   const [txDescription, setTxDescription] = useState('');
   const [txReference, setTxReference] = useState('');
 
+  // Transactions tab state
+  const [selectedTxAccountId, setSelectedTxAccountId] = useState('');
+  const [txTabLoading, setTxTabLoading] = useState(false);
+
   const {
     accounts,
+    transactions,
     applications,
     summary,
     isLoading,
     loadError,
     loadCreditData,
+    loadAccountTransactions,
     createAccount,
     chargeCredit,
     makePayment,
@@ -780,12 +786,90 @@ const CreditManagement: React.FC = () => {
   const renderTransactionsTab = () => (
     <div className="space-y-6">
       <div className="bg-slate-800 shadow overflow-hidden sm:rounded-3xl border border-slate-700">
-        <div className="px-6 py-4 border-b border-slate-800">
-          <h3 className="text-lg font-medium text-white">Recent Transactions</h3>
+        <div className="px-6 py-4 border-b border-slate-700 flex flex-col sm:flex-row sm:items-center gap-3">
+          <h3 className="text-lg font-medium text-white flex-1">Transaction History</h3>
+          <select
+            value={selectedTxAccountId}
+            onChange={async (e) => {
+              const id = e.target.value;
+              setSelectedTxAccountId(id);
+              if (id) {
+                setTxTabLoading(true);
+                await loadAccountTransactions(id);
+                setTxTabLoading(false);
+              }
+            }}
+            className="rounded-xl border border-slate-600 bg-slate-700 px-3 py-2 text-sm text-slate-100 focus:border-amber-500 focus:outline-none"
+          >
+            <option value="">— Select an account —</option>
+            {accounts.map((account) => (
+              <option key={account.id} value={account.id}>
+                {account.customerName} ({account.customerPhone})
+              </option>
+            ))}
+          </select>
         </div>
-        <div className="p-6">
-          <p className="text-slate-300">Transaction history will be displayed here. Select an account from the Accounts tab to view its transactions.</p>
-        </div>
+
+        {!selectedTxAccountId && (
+          <div className="p-6 text-slate-400 text-sm">
+            Select a credit account above to view its transaction history.
+          </div>
+        )}
+
+        {selectedTxAccountId && txTabLoading && (
+          <div className="flex justify-center py-10">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-amber-500" />
+          </div>
+        )}
+
+        {selectedTxAccountId && !txTabLoading && (
+          <>
+            {transactions.length === 0 ? (
+              <div className="p-6 text-slate-400 text-sm">No transactions found for this account.</div>
+            ) : (
+              <table className="min-w-full divide-y divide-slate-700">
+                <thead className="bg-slate-800">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Date</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Type</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Description</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Amount</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Performed By</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-slate-800 divide-y divide-slate-700">
+                  {transactions.map((tx) => (
+                    <tr key={tx.id}>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-400">
+                        {formatDate(tx.createdAt)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`px-2 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                          tx.type === 'charge' ? 'bg-red-100 text-red-800'
+                          : tx.type === 'payment' ? 'bg-green-100 text-green-800'
+                          : 'bg-yellow-100 text-yellow-800'
+                        }`}>
+                          {tx.type}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-slate-300 max-w-xs truncate">
+                        {tx.notes || '—'}
+                      </td>
+                      <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${
+                        tx.type === 'payment' ? 'text-emerald-300' : 'text-amber-300'
+                      }`}>
+                        {tx.type === 'payment' ? '-' : '+'}{formatCurrency(tx.amount)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-400">
+                        {tx.performedByName || tx.performedBy || '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </>
+        )}
       </div>
     </div>
   );

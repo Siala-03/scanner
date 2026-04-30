@@ -25,6 +25,7 @@ import {
   Search,
 } from 'lucide-react';
 import { buildExpenseReceiptHtml, printExpenseReceipt } from '../../utils/receipt';
+import { fetchRestaurant } from '../../api/restaurants';
 
 interface ExpenseWithDetails extends Omit<Expense, 'notes'> {
   notes_?: any[];
@@ -221,11 +222,23 @@ export default function SupervisorExpenseManagement() {
     }
   };
 
-  const handleGenerateReceipt = (expenseId: string) => {
+  const handleGenerateReceipt = async (expenseId: string) => {
     const expense = expenses.find(e => e.id === expenseId);
     if (!expense) return;
     const restaurantName = localStorage.getItem('restaurantName') || 'Company';
-    const html = buildExpenseReceiptHtml(expense as any, restaurantName);
+    const restaurantId = localStorage.getItem('restaurantId') || '';
+    let address = '';
+    let phone = '';
+    let logo = '';
+    try {
+      if (restaurantId) {
+        const info = await fetchRestaurant(restaurantId);
+        address = (info as any)?.settings?.receipt?.address || info.address || '';
+        phone = (info as any)?.settings?.receipt?.phone || info.phone || '';
+        logo = (info as any)?.settings?.receipt?.logo || info.logo_url || '';
+      }
+    } catch {}
+    const html = buildExpenseReceiptHtml(expense as any, restaurantName, address, phone, logo);
     printExpenseReceipt(html);
   };
 

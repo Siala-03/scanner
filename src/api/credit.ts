@@ -110,6 +110,7 @@ function normalizeApplication(raw: any): CreditApplication {
     approvedLimit: raw.approved_limit,
     notes: raw.notes,
     rejectionReason: raw.rejection_reason,
+    requestedAt: raw.requested_at,
     createdAt: raw.created_at,
     restaurantId: raw.restaurant_id,
   };
