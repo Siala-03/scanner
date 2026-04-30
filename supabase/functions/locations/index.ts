@@ -19,21 +19,37 @@ Deno.serve(async (req: Request) => {
 
     // GET /locations
     if (req.method === 'GET' && path === '') {
-      const { data, error } = await db
+      const { data: locs, error } = await db
         .from('inventory_locations')
-        .select('*, inventory_stock(count)')
+        .select('*')
         .eq('restaurant_id', restaurantId)
         .eq('is_active', true)
         .order('name');
-      if (error) {
-        const { data: d2 } = await db
-          .from('inventory_locations')
-          .select('*')
-          .eq('restaurant_id', restaurantId)
-          .order('name');
-        return cors(d2 ?? []);
+      if (error) return err(error.message);
+
+      const { data: invRecs } = await db
+        .from('inventory_records')
+        .select('location_id, location, stock, low_stock_threshold')
+        .eq('restaurant_id', restaurantId);
+
+      const statsById = new Map<string, { totalItems: number; totalStock: number; lowStockItems: number }>();
+      const statsByName = new Map<string, { totalItems: number; totalStock: number; lowStockItems: number }>();
+      for (const rec of (invRecs ?? [])) {
+        const key = rec.location_id || rec.location?.toLowerCase().trim();
+        if (!key) continue;
+        const target = rec.location_id ? statsById : statsByName;
+        const s = target.get(key) ?? { totalItems: 0, totalStock: 0, lowStockItems: 0 };
+        s.totalItems += 1;
+        s.totalStock += rec.stock ?? 0;
+        if ((rec.stock ?? 0) <= (rec.low_stock_threshold ?? 0)) s.lowStockItems += 1;
+        target.set(key, s);
       }
-      return cors(data ?? []);
+
+      const result = (locs ?? []).map((loc: any) => {
+        const s = statsById.get(loc.id) ?? statsByName.get(loc.name?.toLowerCase().trim()) ?? { totalItems: 0, totalStock: 0, lowStockItems: 0 };
+        return { ...loc, total_items: s.totalItems, total_stock: s.totalStock, low_stock_items: s.lowStockItems };
+      });
+      return cors(result);
     }
 
     // GET /locations/:id

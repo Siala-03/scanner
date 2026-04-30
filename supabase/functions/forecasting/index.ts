@@ -109,15 +109,21 @@ Deno.serve(async (req: Request) => {
     if (req.method === 'POST' && path === '/generate') {
       const { data: items } = await db
         .from('inventory_records')
-        .select('menu_item_id, menu_items(name)')
+        .select('menu_item_id')
         .eq('restaurant_id', restaurantId)
         .limit(50);
+
+      const menuItemIds = (items ?? []).map((i: any) => i.menu_item_id).filter(Boolean);
+      const { data: menuItems } = menuItemIds.length
+        ? await db.from('menu_items').select('id, name').in('id', menuItemIds)
+        : { data: [] };
+      const nameById = new Map((menuItems ?? []).map((m: any) => [m.id, m.name]));
 
       const forecasts = [];
       for (const item of (items ?? [])) {
         const forecast = await generateForecast(
           item.menu_item_id,
-          item.menu_items?.name || item.menu_item_id,
+          nameById.get(item.menu_item_id) || item.menu_item_id,
           restaurantId,
           db
         );
