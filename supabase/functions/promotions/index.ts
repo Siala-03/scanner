@@ -86,7 +86,13 @@ Deno.serve(async (req: Request) => {
         is_active: true,
       }).select('*').single();
       if (error) return err(error.message);
-      return cors(data, { status: 201 });
+      return cors({
+        id: data.id, restaurantId: data.restaurant_id, name: data.name, code: data.code,
+        type: data.type, discountValue: data.discount_value, minOrderAmount: data.min_order_amount,
+        maxUses: data.max_uses, usesCount: data.uses_count,
+        validFrom: data.valid_from, validUntil: data.valid_until,
+        isActive: data.is_active, createdAt: data.created_at,
+      }, { status: 201 });
     }
 
     const idMatch = path.match(/^\/([^/]+)$/);
@@ -105,7 +111,13 @@ Deno.serve(async (req: Request) => {
       const { data, error } = await db.from('promotions').update(update)
         .eq('id', idMatch[1]).eq('restaurant_id', restaurantId).select('*').single();
       if (error) return err(error.message);
-      return cors(data);
+      return cors({
+        id: data.id, restaurantId: data.restaurant_id, name: data.name, code: data.code,
+        type: data.type, discountValue: data.discount_value, minOrderAmount: data.min_order_amount,
+        maxUses: data.max_uses, usesCount: data.uses_count,
+        validFrom: data.valid_from, validUntil: data.valid_until,
+        isActive: data.is_active, createdAt: data.created_at,
+      });
     }
 
     // DELETE /promotions/:id

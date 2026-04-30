@@ -9,12 +9,16 @@ interface MenuItemCardProps {
   item: MenuItem;
   onAddToCart: (item: MenuItem) => void;
   onViewDetails: (item: MenuItem) => void;
+  avgRating?: number | null;
+  reviewCount?: number;
 }
 
 export function MenuItemCard({
   item,
   onAddToCart,
-  onViewDetails
+  onViewDetails,
+  avgRating,
+  reviewCount = 0,
 }: MenuItemCardProps) {
   return (
     <motion.div
@@ -63,9 +67,18 @@ export function MenuItemCard({
             <span className="text-lg sm:text-xl font-bold text-slate-900 block">
               {formatPrice(getEffectivePrice(item))}
             </span>
-            <div className="flex items-center gap-1 text-xs text-slate-400 mt-1">
-              <ClockIcon className="w-3 h-3 flex-shrink-0" />
-              <span className="truncate">{item.prepTime} min</span>
+            <div className="flex items-center gap-2 mt-1 flex-wrap">
+              <div className="flex items-center gap-1 text-xs text-slate-400">
+                <ClockIcon className="w-3 h-3 flex-shrink-0" />
+                <span className="truncate">{item.prepTime} min</span>
+              </div>
+              {avgRating != null && reviewCount > 0 && (
+                <div className="flex items-center gap-0.5 text-xs text-amber-600 font-medium">
+                  <StarIcon className="w-3 h-3 fill-amber-500 text-amber-500 flex-shrink-0" />
+                  <span>{avgRating.toFixed(1)}</span>
+                  <span className="text-slate-400 font-normal">({reviewCount})</span>
+                </div>
+              )}
             </div>
           </div>
 

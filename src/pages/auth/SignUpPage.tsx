@@ -90,11 +90,13 @@ export function SignUpPage({ role, onSignedUp, onBack }: SignUpPageProps) {
     }
   };
 
+  const inputClass = "w-full pl-10 pr-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-colors";
+
   return (
-    <div className="min-h-screen bg-[#1a1410] flex items-center justify-center p-4">
+    <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
       <button
         onClick={onBack}
-        className="fixed top-4 left-4 z-50 p-2 rounded-full bg-[#2a2018] text-[#a89f91] hover:text-amber-500 transition-colors"
+        className="fixed top-4 left-4 z-50 p-2 rounded-full bg-slate-800 text-slate-400 hover:text-amber-400 transition-colors"
       >
         <ArrowLeftIcon className="w-5 h-5" />
       </button>
@@ -102,7 +104,7 @@ export function SignUpPage({ role, onSignedUp, onBack }: SignUpPageProps) {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-md bg-[#2a2018] border border-[#3a2e20] rounded-2xl p-8 shadow-2xl"
+        className="w-full max-w-md bg-slate-800 border border-slate-700 rounded-2xl p-8 shadow-2xl"
       >
         {role !== 'manager' && (
           <div className="mb-4 rounded-lg border border-amber-400/35 bg-amber-500/10 p-3">
@@ -112,28 +114,28 @@ export function SignUpPage({ role, onSignedUp, onBack }: SignUpPageProps) {
           </div>
         )}
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-serif text-[#e8e4dc] mb-2">
+          <h1 className="text-3xl font-bold text-slate-100 mb-2">
             {roleTitle} Sign Up
           </h1>
-          <p className="text-[#a89f91]">
+          <p className="text-slate-400">
             Create a new account to access the portal
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-[#e8e4dc] mb-1.5">
+            <label className="block text-sm font-medium text-slate-100 mb-1.5">
               Full Name
             </label>
             <div className="relative">
-              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-[#a89f91]">
+              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
                 <UserIcon className="w-5 h-5" />
               </div>
               <input
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#1a1410] border border-[#3a2e20] text-[#e8e4dc] focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-colors"
+                className={inputClass}
                 placeholder="Your full name"
                 required
               />
@@ -141,18 +143,18 @@ export function SignUpPage({ role, onSignedUp, onBack }: SignUpPageProps) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-[#e8e4dc] mb-1.5">
+            <label className="block text-sm font-medium text-slate-100 mb-1.5">
               Email
             </label>
             <div className="relative">
-              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-[#a89f91]">
+              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
                 <MailIcon className="w-5 h-5" />
               </div>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#1a1410] border border-[#3a2e20] text-[#e8e4dc] focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-colors"
+                className={inputClass}
                 placeholder="you@example.com"
                 required
               />
@@ -160,18 +162,18 @@ export function SignUpPage({ role, onSignedUp, onBack }: SignUpPageProps) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-[#e8e4dc] mb-1.5">
+            <label className="block text-sm font-medium text-slate-100 mb-1.5">
               Phone
             </label>
             <div className="relative">
-              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-[#a89f91]">
+              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
                 <PhoneIcon className="w-5 h-5" />
               </div>
               <input
                 type="tel"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#1a1410] border border-[#3a2e20] text-[#e8e4dc] focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-colors"
+                className={inputClass}
                 placeholder="+1 555-0101"
                 required
               />
@@ -179,18 +181,18 @@ export function SignUpPage({ role, onSignedUp, onBack }: SignUpPageProps) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-[#e8e4dc] mb-1.5">
+            <label className="block text-sm font-medium text-slate-100 mb-1.5">
               Username
             </label>
             <div className="relative">
-              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-[#a89f91]">
+              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
                 <UserIcon className="w-5 h-5" />
               </div>
               <input
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#1a1410] border border-[#3a2e20] text-[#e8e4dc] focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-colors"
+                className={inputClass}
                 placeholder="Choose a username"
                 required
               />
@@ -199,18 +201,18 @@ export function SignUpPage({ role, onSignedUp, onBack }: SignUpPageProps) {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-[#e8e4dc] mb-1.5">
+              <label className="block text-sm font-medium text-slate-100 mb-1.5">
                 Password
               </label>
               <div className="relative">
-                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-[#a89f91]">
+                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
                   <LockIcon className="w-5 h-5" />
                 </div>
                 <input
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#1a1410] border border-[#3a2e20] text-[#e8e4dc] focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-colors"
+                  className={inputClass}
                   placeholder="Create password"
                   required
                   minLength={6}
@@ -219,18 +221,18 @@ export function SignUpPage({ role, onSignedUp, onBack }: SignUpPageProps) {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-[#e8e4dc] mb-1.5">
+              <label className="block text-sm font-medium text-slate-100 mb-1.5">
                 Confirm Password
               </label>
               <div className="relative">
-                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-[#a89f91]">
+                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
                   <LockIcon className="w-5 h-5" />
                 </div>
                 <input
                   type="password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#1a1410] border border-[#3a2e20] text-[#e8e4dc] focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-colors"
+                  className={inputClass}
                   placeholder="Repeat password"
                   required
                   minLength={6}
@@ -264,4 +266,3 @@ export function SignUpPage({ role, onSignedUp, onBack }: SignUpPageProps) {
     </div>
   );
 }
-

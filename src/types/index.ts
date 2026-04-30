@@ -459,4 +459,21 @@ export interface Review {
   waiterName?: string;
   createdAt: string;
 }
+
+export interface MenuItemReview {
+  id: string;
+  restaurantId: string;
+  menuItemId: string;
+  orderId?: string;
+  rating: number;
+  comment?: string;
+  customerName?: string;
+  createdAt: string;
+}
+
+export interface MenuItemRatingSummary {
+  menuItemId: string;
+  avgRating: number | null;
+  totalCount: number;
+}
 export * from './inventory';

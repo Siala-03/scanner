@@ -219,7 +219,7 @@ export function SupplierDashboard({ user, onLogout }: SupplierDashboardProps) {
               onClick={() => setFilter(tab)}
               className={`px-4 py-2 rounded-full text-sm font-medium transition-colors whitespace-nowrap ${
                 filter === tab
-                  ? 'bg-blue-500 text-white'
+                  ? 'bg-amber-500 text-slate-900'
                   : 'bg-slate-800 text-slate-400 hover:text-white'
               }`}
             >
@@ -230,7 +230,7 @@ export function SupplierDashboard({ user, onLogout }: SupplierDashboardProps) {
 
         {loading ? (
           <div className="flex items-center justify-center py-12">
-            <div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full" />
+            <div className="animate-spin w-8 h-8 border-4 border-amber-500 border-t-transparent rounded-full" />
           </div>
         ) : filteredOrders.length === 0 ? (
           <div className="text-center py-12">
@@ -437,7 +437,7 @@ export function SupplierDashboard({ user, onLogout }: SupplierDashboardProps) {
                   <div className="space-y-2">
                     {selectedOrder.status_history.map((history) => (
                       <div key={history.id} className="flex items-center gap-3 text-sm">
-                        <div className="w-2 h-2 rounded-full bg-blue-500" />
+                        <div className="w-2 h-2 rounded-full bg-amber-500" />
                         <div className="flex-1">
                           <p className="text-white">
                             <span className="font-medium capitalize">{history.status}</span>

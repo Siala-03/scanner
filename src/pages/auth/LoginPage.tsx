@@ -58,13 +58,13 @@ export function LoginPage({ onLogin, onBack, embedded = false }: LoginPageProps)
     <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-md bg-[#2a2018] border border-[#3a2e20] rounded-2xl p-8 shadow-2xl">
+        className="w-full max-w-md bg-slate-800 border border-slate-700 rounded-2xl p-8 shadow-2xl">
 
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-serif text-[#e8e4dc] mb-2">
+          <h1 className="text-3xl font-bold text-slate-100 mb-2">
             Staff Login
           </h1>
-          <p className="text-[#a89f91] mb-3">
+          <p className="text-slate-400 mb-3">
             Enter your credentials to access the portal
           </p>
           <div className="flex items-center justify-center gap-2 text-sm">
@@ -89,18 +89,18 @@ export function LoginPage({ onLogin, onBack, embedded = false }: LoginPageProps)
 
         <form onSubmit={handleLogin} className="space-y-5">
           <div>
-            <label className="block text-sm font-medium text-[#e8e4dc] mb-1.5">
+            <label className="block text-sm font-medium text-slate-100 mb-1.5">
               Username
             </label>
             <div className="relative">
-              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-[#a89f91]">
+              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
                 <UserIcon className="w-5 h-5" />
               </div>
               <input
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#1a1410] border border-[#3a2e20] text-[#e8e4dc] focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-colors"
+                className="w-full pl-10 pr-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-colors"
                 placeholder="Enter username"
                 required />
 
@@ -108,25 +108,25 @@ export function LoginPage({ onLogin, onBack, embedded = false }: LoginPageProps)
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-[#e8e4dc] mb-1.5">
+            <label className="block text-sm font-medium text-slate-100 mb-1.5">
               Password
             </label>
             <div className="relative">
-              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-[#a89f91]">
+              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
                 <LockIcon className="w-5 h-5" />
               </div>
               <input
                 type={showPassword ? 'text' : 'password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-10 pr-10 py-3 rounded-xl bg-[#1a1410] border border-[#3a2e20] text-[#e8e4dc] focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-colors"
+                className="w-full pl-10 pr-10 py-3 rounded-xl bg-slate-900 border border-slate-700 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-colors"
                 placeholder="Enter password"
                 required />
 
               <button
                 type="button"
                 onClick={() => setShowPassword((v) => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#a89f91] hover:text-[#e8e4dc]"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-100"
                 aria-label={showPassword ? 'Hide password' : 'Show password'}>
                 {showPassword ? <EyeOffIcon className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
               </button>
@@ -168,10 +168,10 @@ export function LoginPage({ onLogin, onBack, embedded = false }: LoginPageProps)
   if (embedded) return form;
 
   return (
-    <div className="min-h-screen bg-[#1a1410] flex items-center justify-center p-4">
+    <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
       <button
         onClick={onBack}
-        className="absolute top-4 left-4 md:top-6 md:left-6 z-50 p-2 rounded-full bg-[#2a2018] text-[#a89f91] hover:text-amber-500 transition-colors"
+        className="absolute top-4 left-4 md:top-6 md:left-6 z-50 p-2 rounded-full bg-slate-800 text-slate-400 hover:text-amber-400 transition-colors"
         aria-label="Back">
         <ArrowLeftIcon className="w-5 h-5" />
       </button>

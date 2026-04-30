@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ClockIcon, ReceiptIcon } from 'lucide-react';
+import { ClockIcon, ReceiptIcon, StarIcon } from 'lucide-react';
 import { Order, OrderStatus } from '../../types';
 import { OrderTracker } from '../../components/customer/OrderTracker';
 import { ServiceReviewModal } from '../../components/customer/ServiceReviewModal';
@@ -7,6 +7,8 @@ import { Card } from '../../components/ui/Card';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { formatPrice } from '../../utils/currency';
 import { hasReviewForOrder } from '../../utils/reviewsStorage';
+import { submitMenuItemReview } from '../../api/reviews';
+import { hasReviewedMenuItem, markMenuItemReviewed } from '../../utils/menuItemReviewsStorage';
 import {
   closeExpiredTableSessions,
   getActiveTableSession,
@@ -73,6 +75,32 @@ export function OrderStatusPage({ orders, tableNumber }: OrderStatusPageProps) {
     !hasReviewForOrder(latestServedOrder.id);
 
   const [reviewingOrder, setReviewingOrder] = useState<Order | null>(null);
+
+  // Per-item ratings: menuItemId → { rating, submitted }
+  const [itemRatings, setItemRatings] = useState<Record<string, { rating: number; submitted: boolean }>>({});
+
+  const handleItemRatingChange = (menuItemId: string, rating: number) => {
+    setItemRatings((prev) => ({ ...prev, [menuItemId]: { rating, submitted: false } }));
+  };
+
+  const handleSubmitItemRating = async (menuItemId: string, orderId: string) => {
+    const entry = itemRatings[menuItemId];
+    if (!entry || entry.submitted) return;
+    const restaurantId = localStorage.getItem('restaurantId');
+    if (!restaurantId) return;
+    try {
+      const review = await submitMenuItemReview({
+        restaurantId,
+        menuItemId,
+        orderId,
+        rating: entry.rating,
+      });
+      markMenuItemReviewed(menuItemId, review.id);
+    } catch {
+      markMenuItemReviewed(menuItemId, `local-${Date.now()}`);
+    }
+    setItemRatings((prev) => ({ ...prev, [menuItemId]: { ...prev[menuItemId], submitted: true } }));
+  };
 
   if (scopedOrders.length === 0) {
     return (
@@ -168,6 +196,60 @@ export function OrderStatusPage({ orders, tableNumber }: OrderStatusPageProps) {
                 </div>
               </div>
 
+              {/* Per-dish quick ratings */}
+              {latestServedOrder.items.length > 0 && (
+                <div className="mt-4 border-t border-slate-100 pt-4">
+                  <p className="text-sm font-semibold text-slate-800 mb-3">How was your food?</p>
+                  <div className="space-y-3">
+                    {latestServedOrder.items.map((item, idx) => {
+                      const menuItemId = item.menuItem.id;
+                      const alreadyDone = hasReviewedMenuItem(menuItemId);
+                      const entry = itemRatings[menuItemId];
+                      return (
+                        <div key={`${menuItemId}-${idx}`} className="flex items-center justify-between gap-3">
+                          <span className="text-sm text-slate-700 truncate flex-1 min-w-0">
+                            {item.menuItem.name}
+                          </span>
+                          {alreadyDone || entry?.submitted ? (
+                            <span className="text-xs text-green-600 font-medium flex-shrink-0">Rated ✓</span>
+                          ) : (
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                              {[1,2,3,4,5].map((v) => (
+                                <button
+                                  key={v}
+                                  type="button"
+                                  onClick={() => {
+                                    handleItemRatingChange(menuItemId, v);
+                                    // auto-submit on tap
+                                    setItemRatings((prev) => {
+                                      const next = { ...prev, [menuItemId]: { rating: v, submitted: false } };
+                                      return next;
+                                    });
+                                    setTimeout(() => handleSubmitItemRating(menuItemId, latestServedOrder.id), 0);
+                                  }}
+                                  aria-label={`Rate ${item.menuItem.name} ${v} stars`}
+                                  className="p-0.5 touch-manipulation"
+                                >
+                                  <StarIcon
+                                    className={`w-6 h-6 transition-colors ${
+                                      (entry?.rating ?? 0) >= v
+                                        ? 'fill-amber-500 text-amber-500'
+                                        : 'text-slate-300 hover:text-amber-300'
+                                    }`}
+                                  />
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              <div className="mt-4 border-t border-slate-100 pt-4">
+                <p className="text-sm font-semibold text-slate-800 mb-2">Service</p>
               {canRateLatestServed ? (
                 <button
                   type="button"
@@ -183,6 +265,7 @@ export function OrderStatusPage({ orders, tableNumber }: OrderStatusPageProps) {
                     : 'Review window has expired for this session.'}
                 </p>
               )}
+              </div>
             </Card>
           </div>
         }

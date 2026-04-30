@@ -74,20 +74,20 @@ export async function fetchAllStaff(): Promise<Staff[]> {
 
   const params = new URLSearchParams();
   if (restaurantId) params.set('restaurantId', restaurantId);
-  const url = `/api/staff${params.toString() ? '?' + params.toString() : ''}`;
+  const url = `/api/auth/staff${params.toString() ? '?' + params.toString() : ''}`;
   
   const response = await apiRequest<{ staff: any[] }>(url);
   return (response.staff || []).map(normalizeStaff);
 }
 
 export async function fetchStaffById(id: string): Promise<Staff> {
-  const response = await apiRequest<{ staff: any }>(`/api/staff/${id}`);
+  const response = await apiRequest<{ staff: any }>(`/api/auth/staff/${id}`);
   return normalizeStaff(response.staff);
 }
 
 export async function fetchWaiters(): Promise<Staff[]> {
   const restaurantId = getRestaurantId();
-  const url = `/api/staff/waiters${restaurantId ? '?restaurantId=' + restaurantId : ''}`;
+  const url = `/api/auth/waiters${restaurantId ? '?restaurantId=' + restaurantId : ''}`;
   const response = await apiRequest<{ staff: any[] }>(url);
   return (response.staff || []).map(normalizeStaff);
 }
@@ -113,7 +113,7 @@ export async function signUpStaff(input: {
 }
 
 export async function updateStaffRole(staffId: string, role: string): Promise<Staff> {
-  const response = await apiRequest<{ staff: any }>(`/api/staff/${staffId}/role`, {
+  const response = await apiRequest<{ staff: any }>(`/api/auth/staff/${staffId}/role`, {
     method: 'PUT',
     json: { role },
   });
@@ -121,7 +121,7 @@ export async function updateStaffRole(staffId: string, role: string): Promise<St
 }
 
 export async function updateStaffDuty(staffId: string, isOnDuty: boolean): Promise<Staff> {
-  const response = await apiRequest<{ staff: any }>(`/api/staff/${staffId}/status`, {
+  const response = await apiRequest<{ staff: any }>(`/api/auth/staff/${staffId}/status`, {
     method: 'PUT',
     json: { isOnDuty },
   });
@@ -132,7 +132,7 @@ export async function updateStaffDuty(staffId: string, isOnDuty: boolean): Promi
  * Delete a staff member via backend API
  */
 export async function deleteStaff(staffId: string): Promise<void> {
-  await apiRequest(`/api/staff/${staffId}`, { method: 'DELETE' });
+  await apiRequest(`/api/auth/staff/${staffId}`, { method: 'DELETE' });
 }
 
 export function logoutStaff(): void {

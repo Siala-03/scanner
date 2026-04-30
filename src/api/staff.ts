@@ -58,13 +58,13 @@ export async function fetchStaff(): Promise<Staff[]> {
 }
 
 export async function fetchStaffById(id: string): Promise<Staff> {
-  const response = await apiRequest<{ staff: any }>(`/api/staff/${id}`);
+  const response = await apiRequest<{ staff: any }>(`/api/auth/staff/${id}`);
   return normalizeStaff(response.staff);
 }
 
 export async function fetchWaiters(): Promise<Staff[]> {
   const restaurantId = getRestaurantId();
-  const url = `/api/staff/waiters${restaurantId ? '?restaurantId=' + restaurantId : ''}`;
+  const url = `/api/auth/waiters${restaurantId ? '?restaurantId=' + restaurantId : ''}`;
   const response = await apiRequest<{ staff: any[] }>(url);
   return (response.staff || []).map(normalizeStaff);
 }
@@ -73,13 +73,13 @@ export async function fetchStaffOnDuty(): Promise<Staff[]> {
   const restaurantId = getRestaurantId();
   if (!restaurantId) return [];
 
-  const params = new URLSearchParams({ restaurantId, onDuty: 'true' });
-  const response = await apiRequest<{ staff: any[] }>(`/api/staff?${params.toString()}`);
+  const params = new URLSearchParams({ restaurantId });
+  const response = await apiRequest<{ staff: any[] }>(`/api/auth/staff/on-duty?${params.toString()}`);
   return (response.staff || []).map(normalizeStaff);
 }
 
 export async function updateStaffStatus(id: string, isOnDuty: boolean): Promise<Staff> {
-  const response = await apiRequest<{ staff: any }>(`/api/staff/${id}/status`, {
+  const response = await apiRequest<{ staff: any }>(`/api/auth/staff/${id}/status`, {
     method: 'PUT',
     json: { isOnDuty },
   });
@@ -87,7 +87,7 @@ export async function updateStaffStatus(id: string, isOnDuty: boolean): Promise<
 }
 
 export async function updateStaffAssignments(id: string, assignedTables: number[]): Promise<Staff> {
-  const response = await apiRequest<{ staff: any }>(`/api/staff/${id}/assignments`, {
+  const response = await apiRequest<{ staff: any }>(`/api/auth/staff/${id}/assignments`, {
     method: 'PUT',
     json: { assignedTables },
   });
@@ -95,7 +95,7 @@ export async function updateStaffAssignments(id: string, assignedTables: number[
 }
 
 export async function updateStaffRole(id: string, role: StaffRole): Promise<Staff> {
-  const response = await apiRequest<{ staff: any }>(`/api/staff/${id}/role`, {
+  const response = await apiRequest<{ staff: any }>(`/api/auth/staff/${id}/role`, {
     method: 'PUT',
     json: { role },
   });
@@ -103,7 +103,7 @@ export async function updateStaffRole(id: string, role: StaffRole): Promise<Staf
 }
 
 export async function deleteStaff(id: string): Promise<{ success: boolean }> {
-  await apiRequest(`/api/staff/${id}`, { method: 'DELETE' });
+  await apiRequest(`/api/auth/staff/${id}`, { method: 'DELETE' });
   return { success: true };
 }
 
@@ -117,7 +117,7 @@ export async function createStaff(input: {
   restaurantId?: string;
 }): Promise<Staff> {
   const restaurantId = input.restaurantId || getRestaurantId();
-  const response = await apiRequest<{ staff: any }>('/api/staff', {
+  const response = await apiRequest<{ staff: any }>('/api/auth/signup', {
     method: 'POST',
     json: { ...input, restaurantId },
   });

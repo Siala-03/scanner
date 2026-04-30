@@ -44,8 +44,8 @@ export function SupplierLoginPage({ onLogin, onBack }: SupplierLoginPageProps) {
 
         <div className="bg-slate-800/50 backdrop-blur rounded-2xl border border-slate-700 p-8">
           <div className="flex items-center gap-3 mb-8">
-            <div className="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center">
-              <TruckIcon className="w-6 h-6 text-blue-400" />
+            <div className="w-12 h-12 rounded-xl bg-amber-500/20 flex items-center justify-center">
+              <TruckIcon className="w-6 h-6 text-amber-400" />
             </div>
             <div>
               <h1 className="text-2xl font-bold text-white">Supplier Portal</h1>
@@ -62,7 +62,7 @@ export function SupplierLoginPage({ onLogin, onBack }: SupplierLoginPageProps) {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500"
                 placeholder="supplier@example.com"
                 required
               />
@@ -76,7 +76,7 @@ export function SupplierLoginPage({ onLogin, onBack }: SupplierLoginPageProps) {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500"
                 placeholder="Enter your password"
                 required
               />

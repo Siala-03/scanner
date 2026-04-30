@@ -1005,7 +1005,7 @@ export function App() {
 
   // Login page (default landing page)
   return (
-    <div className="min-h-screen bg-[#1a1410] flex items-center justify-center p-4 md:p-8">
+    <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4 md:p-8">
       <div className="w-full max-w-md">
         {/* Header */}
         <motion.div
@@ -1016,7 +1016,7 @@ export function App() {
           <div className="flex items-center justify-center mb-4">
             <img src={servvLogo} alt="Servv IQ" className="h-14 w-auto object-contain" />
           </div>
-          <p className="text-lg text-[#a89f91] max-w-sm mx-auto font-light">
+          <p className="text-lg text-slate-400 max-w-sm mx-auto font-light">
             The operating system for hospitality
           </p>
         </motion.div>
@@ -1054,14 +1054,14 @@ export function App() {
           transition={{ delay: 0.2 }}
           className="mt-8 text-center"
         >
-          <p className="text-[#a89f91] mb-4">
+          <p className="text-slate-400 mb-4">
             Or scan QR code to order as a customer
           </p>
           <div className="flex flex-col items-center gap-3">
             <Button
               variant="secondary"
               size="sm"
-              className="px-6 py-2 rounded-full border-[#3a2e20] text-[#a89f91] hover:text-amber-500 hover:border-amber-500/50"
+              className="px-6 py-2 rounded-full border-slate-700 text-slate-400 hover:text-amber-500 hover:border-amber-500/50"
               onClick={() => handleScanQR()}
             >
               <QrCodeIcon className="w-4 h-4 mr-2" />
@@ -1070,13 +1070,13 @@ export function App() {
             <Button
               variant="ghost"
               size="sm"
-              className="px-6 py-2 rounded-full border-[#3a2e20] text-[#a89f91] hover:text-slate-100 hover:border-slate-500"
+              className="px-6 py-2 rounded-full border-slate-700 text-slate-400 hover:text-slate-100 hover:border-slate-500"
               onClick={handleGoSupplierPortal}
             >
               Supplier Portal
             </Button>
             <div className="flex items-center gap-2 mt-2">
-              <span className="text-xs text-[#a89f91]">Theme</span>
+              <span className="text-xs text-slate-400">Theme</span>
               <ThemeToggle />
             </div>
           </div>

@@ -90,7 +90,7 @@ export function Modal({
             `}>
 
             {title &&
-          <div className={`flex items-center justify-between px-4 py-3 sm:px-6 sm:py-4 border-b ${isLight ? 'border-slate-100' : 'border-[#3a2e20]'}`}>
+          <div className={`flex items-center justify-between px-4 py-3 sm:px-6 sm:py-4 border-b ${isLight ? 'border-slate-100' : 'border-slate-600'}`}>
                 <h2 className={`text-xl font-semibold ${isLight ? 'text-slate-900' : 'text-white'}`}>
                   {title}
                 </h2>
