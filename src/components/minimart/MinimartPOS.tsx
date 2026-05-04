@@ -8,7 +8,11 @@ import { fetchMenu } from '../../api/menu';
 import { createOrder, confirmPayment } from '../../api/orders';
 import { supabase } from '../../lib/supabase';
 import { formatPrice } from '../../utils/currency';
+import { fetchReceiptSettings } from '../../api/restaurants';
+import { buildReceiptHtml, printReceipt } from '../../utils/receipt';
+import { fiscalizeOrder } from '../../api/ebm';
 import type { MenuItem, Staff } from '../../types';
+import type { RestaurantReceiptSettings } from '../../api/restaurants';
 
 interface CartLine {
   item: MenuItem;
@@ -22,6 +26,7 @@ interface Receipt {
   total: number;
   paymentMethod: string;
   cashierName: string;
+  customerName?: string;
   timestamp: Date;
 }
 
@@ -50,6 +55,7 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
   const [receipt, setReceipt] = useState<Receipt | null>(null);
   const [showCart, setShowCart] = useState(false);
   const [shiftSales, setShiftSales] = useState({ count: 0, total: 0 });
+  const [receiptSettings, setReceiptSettings] = useState<RestaurantReceiptSettings>({});
 
   const loadShiftStats = useCallback(async () => {
     if (!restaurantId || !cashier?.id) return;
@@ -90,6 +96,10 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
 
   useEffect(() => { loadProducts(); }, [loadProducts]);
   useEffect(() => { loadShiftStats(); }, [loadShiftStats]);
+  useEffect(() => {
+    if (!restaurantId) return;
+    fetchReceiptSettings(restaurantId).then(setReceiptSettings).catch(() => {});
+  }, [restaurantId]);
 
   const categories = ['all', ...Array.from(new Set(products.map((p) => p.category))).sort()];
 
@@ -146,6 +156,12 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
         restaurantId,
       });
 
+      // Fire-and-forget EBM fiscalization
+      if (restaurantId) {
+        fiscalizeOrder(order.id, { restaurantId, paymentType: paymentMethod })
+          .catch((err) => console.warn('[EBM] Fiscalization failed:', err));
+      }
+
       setReceipt({
         orderId:       order.id,
         orderNumber:   (order as any).order_number || (order as any).orderNumber || order.id.slice(-6).toUpperCase(),
@@ -153,6 +169,7 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
         total:         cartTotal,
         paymentMethod: PAYMENT_METHODS.find((m) => m.code === paymentMethod)?.label || 'Cash',
         cashierName:   cashier?.name || 'Cashier',
+        customerName:  customerName || undefined,
         timestamp:     new Date(),
       });
 
@@ -168,7 +185,41 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
     }
   };
 
-  const handlePrint = () => window.print();
+  const handlePrint = () => {
+    if (!receipt) return;
+    const receiptData = {
+      restaurantName:    restaurantName,
+      restaurantAddress: receiptSettings.address || '',
+      restaurantPhone:   receiptSettings.phone   || '',
+      restaurantLogo:    receiptSettings.logo,
+      restaurantCity:    receiptSettings.city,
+      restaurantCountry: receiptSettings.country,
+      orderNumber:       receipt.orderNumber,
+      receiptId:         receipt.orderNumber,
+      orderType:         'takeout' as const,
+      serverName:        receipt.cashierName,
+      orderDate:         receipt.timestamp,
+      customerName:      receipt.customerName,
+      items: receipt.lines.map((l) => ({
+        quantity:   l.qty,
+        name:       l.item.name,
+        unitPrice:  l.item.price,
+        totalPrice: l.item.price * l.qty,
+      })),
+      currency:      'RWF' as const,
+      subtotal:      receipt.total,
+      taxRate:       0,
+      taxAmount:     0,
+      total:         receipt.total,
+      paymentMethod: receipt.paymentMethod,
+      paymentStatus: 'paid' as const,
+    };
+    try {
+      printReceipt(buildReceiptHtml(receiptData));
+    } catch {
+      alert('Could not open print window. Please allow pop-ups in your browser.');
+    }
+  };
 
   // ── Receipt Modal ──────────────────────────────────────────────────────────
   if (receipt) {

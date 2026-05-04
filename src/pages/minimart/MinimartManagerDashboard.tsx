@@ -199,10 +199,8 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
   const loadCashiers = useCallback(async () => {
     setCashiersLoading(true);
     try {
-      localStorage.setItem('restaurantId', restaurantId);
-      localStorage.setItem('staffRole', 'manager');
       const all = await fetchAllStaff();
-      setCashiers(all.filter((s) => s.role === 'cashier'));
+      setCashiers(all.filter((s) => s.role === 'cashier' && s.restaurantId === restaurantId));
     } catch (err) {
       console.error('Failed to load cashiers:', err);
     } finally {
