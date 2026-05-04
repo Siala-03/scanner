@@ -337,7 +337,7 @@ router.get('/:id', async (req: Request, res: Response) => {
 router.post('/:id/confirm-payment', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { confirmedBy, paymentType, restaurantId } = req.body;
+    const { confirmedBy, confirmedByName, paymentType, restaurantId } = req.body;
 
     const orderResult = await pool.query('SELECT * FROM orders WHERE id = $1', [id]);
     if (orderResult.rows.length === 0) throw new HttpError(404, 'Order not found');
@@ -352,11 +352,12 @@ router.post('/:id/confirm-payment', async (req: Request, res: Response) => {
       `UPDATE orders
        SET payment_status = 'confirmed',
            payment_confirmed_by = $1,
+           payment_confirmed_by_name = $2,
            payment_confirmed_at = now(),
            updated_at = now()
-       WHERE id = $2
+       WHERE id = $3
        RETURNING *`,
-      [confirmedBy || null, id]
+      [confirmedBy || null, confirmedByName || null, id]
     );
 
     const confirmedOrder = normalizeOrder(updated.rows[0]);

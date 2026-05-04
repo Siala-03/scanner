@@ -339,16 +339,17 @@ export async function updateOrderStatus(
 
 export async function confirmPayment(
   orderId: string,
-  opts: { paymentType?: string; confirmedBy?: string; restaurantId?: string }
+  opts: { paymentType?: string; confirmedBy?: string; confirmedByName?: string; restaurantId?: string }
 ): Promise<Order> {
   const now = new Date().toISOString();
 
-  // Full update — requires migration 040 (payment columns + fixed constraint)
+  // Full update — requires migrations 040 + 041
   let result = await db
     .from('orders')
     .update({
       payment_status: 'confirmed',
       payment_confirmed_by: opts.confirmedBy || null,
+      payment_confirmed_by_name: opts.confirmedByName || null,
       payment_confirmed_at: now,
       updated_at: now,
     })

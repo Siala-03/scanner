@@ -30,9 +30,10 @@ const PAYMENT_METHODS = [
 interface PaymentApprovalPanelProps {
   restaurantId?: string;
   staffId?: string;
+  staffName?: string;
 }
 
-export function PaymentApprovalPanel({ restaurantId, staffId }: PaymentApprovalPanelProps) {
+export function PaymentApprovalPanel({ restaurantId, staffId, staffName }: PaymentApprovalPanelProps) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [confirming, setConfirming] = useState<string | null>(null);
@@ -45,7 +46,9 @@ export function PaymentApprovalPanel({ restaurantId, staffId }: PaymentApprovalP
       const pending = (all as any[]).filter((o) => {
         const ps = o.paymentStatus ?? o.payment_status;
         const st = o.status;
-        return ps !== 'confirmed' && st !== 'cancelled';
+        // Show any order that hasn't had payment explicitly confirmed, across all channels
+        const unpaid = ps == null || ps === '' || ps === 'unpaid' || ps === 'pending' || ps === 'paid';
+        return unpaid && st !== 'cancelled' && st !== 'completed';
       });
       setOrders(pending);
     } catch (err) {
@@ -77,6 +80,7 @@ export function PaymentApprovalPanel({ restaurantId, staffId }: PaymentApprovalP
       await confirmPayment(orderId, {
         paymentType,
         confirmedBy: staffId,
+        confirmedByName: staffName,
         restaurantId,
       });
       setJustConfirmed((prev) => new Set(prev).add(orderId));
@@ -208,9 +212,12 @@ export function PaymentApprovalPanel({ restaurantId, staffId }: PaymentApprovalP
 
                 {/* Confirm button */}
                 {confirmed ? (
-                  <div className="flex items-center justify-center gap-1.5 text-emerald-400 text-sm py-2">
-                    <CheckCircleIcon className="w-4 h-4" />
-                    Payment Confirmed
+                  <div className="flex flex-col items-center gap-0.5 py-2">
+                    <div className="flex items-center gap-1.5 text-emerald-400 text-sm">
+                      <CheckCircleIcon className="w-4 h-4" />
+                      Payment Confirmed
+                    </div>
+                    {staffName && <p className="text-xs text-slate-500">by {staffName}</p>}
                   </div>
                 ) : (
                   <button

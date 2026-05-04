@@ -21,6 +21,21 @@ const setStoredTables = (tables: number[]) => {
   }
 };
 
+const getNextAvailableTableNumber = (tableNumbers: number[]): number => {
+  const used = new Set(
+    tableNumbers
+      .filter((n) => Number.isInteger(n) && n > 0)
+      .map((n) => Number(n))
+  );
+
+  let candidate = 1;
+  while (used.has(candidate)) {
+    candidate += 1;
+  }
+
+  return candidate;
+};
+
 // Hook to get tables from backend
 export function useTables() {
   const [tables, setTables] = useState<number[]>([]);
@@ -59,7 +74,7 @@ export function useTables() {
   const addTable = async () => {
     try {
       console.log('useTables: Adding table...');
-      const nextTableNumber = tables.length > 0 ? Math.max(...tables) + 1 : 1;
+      const nextTableNumber = getNextAvailableTableNumber(tables);
       console.log('useTables: Next table number:', nextTableNumber);
 
       // Always update local state first for immediate UI feedback
@@ -88,7 +103,9 @@ export function useTables() {
       // Try to delete from backend
       try {
         const allTables = await fetchTables();
-        const tableToDelete = allTables.find(t => t.tableNumber || t.table_number === tableNumber);
+        const tableToDelete = allTables.find(
+          (t) => (t.tableNumber ?? t.table_number) === tableNumber
+        );
         if (tableToDelete) {
           await deleteTable(tableToDelete.id);
         }

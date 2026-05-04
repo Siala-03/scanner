@@ -805,6 +805,7 @@ export function App() {
             <PaymentApprovalPanel
               restaurantId={authUser?.restaurantId || localStorage.getItem('restaurantId') || undefined}
               staffId={authUser?.id}
+              staffName={authUser?.name}
             />
           </div>
         )}

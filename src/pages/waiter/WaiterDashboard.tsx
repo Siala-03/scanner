@@ -260,6 +260,15 @@ function IncomingOrderCard({
             </p>
             <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500">
               <span className="rounded-full border border-slate-700 bg-slate-900 px-2 py-1">Needs confirmation</span>
+              {(order as any).paymentStatus === 'confirmed' || (order as any).payment_status === 'confirmed' ? (
+                <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-1 text-emerald-300">
+                  <CheckCircleIcon className="w-3 h-3" />Payment received
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-1 text-amber-300">
+                  <ClockIcon className="w-3 h-3" />Payment pending
+                </span>
+              )}
               <span className="rounded-full border border-slate-700 bg-slate-900 px-2 py-1">
                 {isQROrder ? 'Customer self-order' : 'Staff-assisted order'}
               </span>
@@ -422,6 +431,15 @@ function ActiveOrderRow({
               {order.requiresKitchen && (
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-orange-500/15 text-orange-300 text-xs border border-orange-500/20">
                   <UtensilsIcon className="w-3 h-3" />KOT
+                </span>
+              )}
+              {(order as any).paymentStatus === 'confirmed' || (order as any).payment_status === 'confirmed' ? (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 text-xs border border-emerald-500/20">
+                  <CheckCircleIcon className="w-3 h-3" />Paid
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 text-xs border border-amber-500/20">
+                  <ClockIcon className="w-3 h-3" />Awaiting Payment
                 </span>
               )}
             </div>
