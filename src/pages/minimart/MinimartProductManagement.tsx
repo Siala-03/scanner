@@ -1,0 +1,390 @@
+import { useState, useEffect, useCallback } from 'react';
+import {
+  PlusIcon, EditIcon, TrashIcon, RefreshCwIcon,
+  CheckIcon, XIcon, SearchIcon, ToggleLeftIcon, ToggleRightIcon,
+} from 'lucide-react';
+import {
+  fetchMenu, createMenuItem, updateMenuItem,
+  deleteMenuItem, toggleMenuItemAvailability,
+} from '../../api/menu';
+import { formatPrice } from '../../utils/currency';
+import type { MenuItem } from '../../lib/supabase';
+
+interface ProductForm {
+  name: string;
+  category: string;
+  price: string;
+}
+
+const EMPTY_FORM: ProductForm = { name: '', category: '', price: '' };
+
+export function MinimartProductManagement() {
+  const [products, setProducts] = useState<MenuItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [filterCategory, setFilterCategory] = useState('all');
+
+  // Add form
+  const [showAdd, setShowAdd] = useState(false);
+  const [addForm, setAddForm] = useState<ProductForm>(EMPTY_FORM);
+  const [addError, setAddError] = useState('');
+  const [addSaving, setAddSaving] = useState(false);
+
+  // Inline edit
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<ProductForm>(EMPTY_FORM);
+  const [editSaving, setEditSaving] = useState(false);
+
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const items = await fetchMenu();
+      setProducts(items as MenuItem[]);
+    } catch (err) {
+      console.error('Failed to load products:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const categories = ['all', ...Array.from(new Set(products.map((p) => p.category))).sort()];
+
+  const filtered = products.filter((p) => {
+    const matchCat = filterCategory === 'all' || p.category === filterCategory;
+    const matchSearch = !search || p.name.toLowerCase().includes(search.toLowerCase()) ||
+      p.category.toLowerCase().includes(search.toLowerCase());
+    return matchCat && matchSearch;
+  });
+
+  const validateForm = (f: ProductForm): string => {
+    if (!f.name.trim()) return 'Product name is required.';
+    if (!f.category.trim()) return 'Category is required.';
+    const price = parseFloat(f.price);
+    if (isNaN(price) || price < 0) return 'Enter a valid price.';
+    return '';
+  };
+
+  const handleAdd = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const err = validateForm(addForm);
+    if (err) { setAddError(err); return; }
+    setAddSaving(true);
+    setAddError('');
+    try {
+      const created = await createMenuItem({
+        name: addForm.name.trim(),
+        category: addForm.category.trim(),
+        price: parseFloat(addForm.price),
+        emoji: '📦',
+        description: '',
+        prep_time: 0,
+        requires_kitchen: false,
+        is_available: true,
+        is_popular: false,
+      } as any);
+      setProducts((prev) => [...prev, created as MenuItem]);
+      setAddForm(EMPTY_FORM);
+      setShowAdd(false);
+    } catch (err: any) {
+      setAddError(err?.message || 'Failed to add product.');
+    } finally {
+      setAddSaving(false);
+    }
+  };
+
+  const startEdit = (p: MenuItem) => {
+    setEditingId(p.id);
+    setEditForm({ name: p.name, category: p.category, price: String(p.price) });
+  };
+
+  const handleEditSave = async (id: string) => {
+    const err = validateForm(editForm);
+    if (err) return;
+    setEditSaving(true);
+    try {
+      const updated = await updateMenuItem(id, {
+        name: editForm.name.trim(),
+        category: editForm.category.trim(),
+        price: parseFloat(editForm.price),
+      });
+      setProducts((prev) => prev.map((p) => (p.id === id ? (updated as MenuItem) : p)));
+      setEditingId(null);
+    } catch (err) {
+      console.error('Failed to update product:', err);
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!window.confirm('Delete this product? This cannot be undone.')) return;
+    setDeletingId(id);
+    try {
+      await deleteMenuItem(id);
+      setProducts((prev) => prev.filter((p) => p.id !== id));
+    } catch {
+      alert('Failed to delete product.');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const handleToggle = async (p: MenuItem) => {
+    setTogglingId(p.id);
+    try {
+      const updated = await toggleMenuItemAvailability(p.id, !(p.is_available ?? (p as any).isAvailable));
+      setProducts((prev) => prev.map((x) => (x.id === p.id ? (updated as MenuItem) : x)));
+    } catch {
+      // non-fatal
+    } finally {
+      setTogglingId(null);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Toolbar */}
+      <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+        <div className="flex gap-2 flex-1 min-w-0">
+          <div className="relative flex-1 max-w-xs">
+            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search products…"
+              className="w-full pl-9 pr-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+            />
+          </div>
+          <select
+            value={filterCategory}
+            onChange={(e) => setFilterCategory(e.target.value)}
+            className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-indigo-500"
+          >
+            {categories.map((c) => (
+              <option key={c} value={c}>{c === 'all' ? 'All categories' : c}</option>
+            ))}
+          </select>
+          <button
+            onClick={load}
+            className="p-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-400 hover:text-slate-200 transition-colors"
+          >
+            <RefreshCwIcon className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
+        <button
+          onClick={() => { setShowAdd((v) => !v); setAddError(''); setAddForm(EMPTY_FORM); }}
+          className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium transition-colors shrink-0"
+        >
+          <PlusIcon className="w-4 h-4" /> Add Product
+        </button>
+      </div>
+
+      {/* Add form */}
+      {showAdd && (
+        <form
+          onSubmit={handleAdd}
+          className="bg-slate-900 border border-indigo-600/40 rounded-2xl p-5"
+        >
+          <p className="text-sm font-semibold text-slate-200 mb-4">New Product</p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="sm:col-span-1">
+              <label className="block text-xs text-slate-400 mb-1">Product Name *</label>
+              <input
+                value={addForm.name}
+                onChange={(e) => setAddForm((p) => ({ ...p, name: e.target.value }))}
+                placeholder="e.g. Coca Cola 500ml"
+                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Category *</label>
+              <input
+                value={addForm.category}
+                onChange={(e) => setAddForm((p) => ({ ...p, category: e.target.value }))}
+                placeholder="e.g. Beverages"
+                list="minimart-categories"
+                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                required
+              />
+              <datalist id="minimart-categories">
+                {categories.filter((c) => c !== 'all').map((c) => (
+                  <option key={c} value={c} />
+                ))}
+              </datalist>
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Price *</label>
+              <input
+                type="number"
+                min="0"
+                step="1"
+                value={addForm.price}
+                onChange={(e) => setAddForm((p) => ({ ...p, price: e.target.value }))}
+                placeholder="0"
+                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                required
+              />
+            </div>
+          </div>
+          {addError && <p className="text-red-400 text-xs mt-3">{addError}</p>}
+          <div className="flex gap-2 mt-4">
+            <button
+              type="submit"
+              disabled={addSaving}
+              className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-sm font-medium transition-colors"
+            >
+              {addSaving ? 'Saving…' : 'Add Product'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowAdd(false)}
+              className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      )}
+
+      {/* Product table */}
+      {loading ? (
+        <div className="flex items-center justify-center h-40 text-slate-400">
+          <RefreshCwIcon className="w-5 h-5 animate-spin mr-2" /> Loading…
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="flex flex-col items-center justify-center h-32 text-slate-500">
+          <p className="text-sm">No products found</p>
+          {products.length === 0 && (
+            <p className="text-xs mt-1">Click "Add Product" to add your first item</p>
+          )}
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-slate-800 text-left text-xs text-slate-500 uppercase tracking-wide">
+                <th className="pb-2 pr-4">Product</th>
+                <th className="pb-2 pr-4">Category</th>
+                <th className="pb-2 pr-4 text-right">Price</th>
+                <th className="pb-2 pr-4 text-center">Available</th>
+                <th className="pb-2 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-800">
+              {filtered.map((p) => {
+                const isAvailable = p.is_available ?? (p as any).isAvailable ?? true;
+                const isEditing = editingId === p.id;
+                return (
+                  <tr key={p.id} className="group">
+                    <td className="py-3 pr-4">
+                      {isEditing ? (
+                        <input
+                          value={editForm.name}
+                          onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
+                          className="w-full px-2 py-1 bg-slate-800 border border-indigo-500 rounded text-sm text-slate-100 focus:outline-none"
+                          autoFocus
+                        />
+                      ) : (
+                        <span className={`font-medium ${isAvailable ? 'text-slate-200' : 'text-slate-500 line-through'}`}>
+                          {p.name}
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-3 pr-4">
+                      {isEditing ? (
+                        <input
+                          value={editForm.category}
+                          onChange={(e) => setEditForm((f) => ({ ...f, category: e.target.value }))}
+                          list="minimart-categories"
+                          className="w-full px-2 py-1 bg-slate-800 border border-indigo-500 rounded text-sm text-slate-100 focus:outline-none"
+                        />
+                      ) : (
+                        <span className="text-slate-400">{p.category}</span>
+                      )}
+                    </td>
+                    <td className="py-3 pr-4 text-right">
+                      {isEditing ? (
+                        <input
+                          type="number"
+                          min="0"
+                          step="1"
+                          value={editForm.price}
+                          onChange={(e) => setEditForm((f) => ({ ...f, price: e.target.value }))}
+                          className="w-24 px-2 py-1 bg-slate-800 border border-indigo-500 rounded text-sm text-slate-100 text-right focus:outline-none"
+                        />
+                      ) : (
+                        <span className="text-indigo-400 font-semibold">{formatPrice(p.price)}</span>
+                      )}
+                    </td>
+                    <td className="py-3 pr-4 text-center">
+                      <button
+                        onClick={() => handleToggle(p)}
+                        disabled={togglingId === p.id}
+                        className="inline-flex items-center justify-center text-slate-400 hover:text-slate-200 transition-colors disabled:opacity-40"
+                        title={isAvailable ? 'Mark unavailable' : 'Mark available'}
+                      >
+                        {isAvailable
+                          ? <ToggleRightIcon className="w-6 h-6 text-emerald-400" />
+                          : <ToggleLeftIcon className="w-6 h-6 text-slate-600" />}
+                      </button>
+                    </td>
+                    <td className="py-3 text-right">
+                      {isEditing ? (
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            onClick={() => handleEditSave(p.id)}
+                            disabled={editSaving}
+                            className="p-1.5 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/40 transition-colors disabled:opacity-40"
+                            title="Save"
+                          >
+                            <CheckIcon className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => setEditingId(null)}
+                            className="p-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors"
+                            title="Cancel"
+                          >
+                            <XIcon className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={() => startEdit(p)}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
+                            title="Edit"
+                          >
+                            <EditIcon className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(p.id)}
+                            disabled={deletingId === p.id}
+                            className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-900/20 transition-colors disabled:opacity-40"
+                            title="Delete"
+                          >
+                            <TrashIcon className="w-4 h-4" />
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <p className="text-xs text-slate-600">
+        {filtered.length} product{filtered.length !== 1 ? 's' : ''}
+        {filtered.length !== products.length && ` (${products.length} total)`}
+      </p>
+    </div>
+  );
+}

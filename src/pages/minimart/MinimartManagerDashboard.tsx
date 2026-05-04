@@ -12,7 +12,7 @@ import { supabase } from '../../lib/supabase';
 import { signUpStaff, deleteStaff, fetchAllStaff } from '../../api/auth';
 import { formatPrice } from '../../utils/currency';
 import { InventoryManagement } from '../shared/InventoryManagement';
-import { MenuManagement } from '../manager/MenuManagement';
+import { MinimartProductManagement } from './MinimartProductManagement';
 import type { Staff } from '../../types';
 
 interface Transaction {
@@ -518,7 +518,7 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
 
         {/* ── Products ── */}
         {page === 'products' && (
-          <MenuManagement />
+          <MinimartProductManagement />
         )}
 
         {/* ── Inventory ── */}
