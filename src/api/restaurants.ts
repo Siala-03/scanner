@@ -246,7 +246,7 @@ export async function fetchRestaurantPublic(restaurantId: string): Promise<Resta
   console.log('Fetching restaurant public for ID:', restaurantId);
   const { data, error } = await supabase
     .from('restaurants')
-    .select('id, name, email, phone, address')
+    .select('id, name, email, phone, address, outlet_type')
     .eq('id', restaurantId)
     .single();
 
