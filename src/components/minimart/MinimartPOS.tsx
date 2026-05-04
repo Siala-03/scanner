@@ -305,7 +305,7 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
         >
           <ShoppingCartIcon className="w-5 h-5" />
           {cartCount > 0 && (
-            <span className="absolute -top-1 -right-1 bg-indigo-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
+            <span className="absolute -top-1 -right-1 bg-amber-500 text-slate-900 text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
               {cartCount}
             </span>
           )}
@@ -334,7 +334,7 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search products…"
-                className="w-full pl-9 pr-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                className="w-full pl-9 pr-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500"
               />
             </div>
             <button
@@ -353,7 +353,7 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
                 onClick={() => setActiveCategory(cat)}
                 className={`shrink-0 px-3 py-1 rounded-full text-xs font-medium capitalize transition-colors ${
                   activeCategory === cat
-                    ? 'bg-indigo-600 text-white'
+                    ? 'bg-amber-500 text-slate-900 font-semibold'
                     : 'bg-slate-800 text-slate-400 hover:text-slate-200'
                 }`}
               >
@@ -382,15 +382,15 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
                       onClick={() => addToCart(product)}
                       className={`flex flex-col items-start p-3 rounded-xl border text-left transition-all active:scale-95 ${
                         inCart
-                          ? 'border-indigo-500 bg-indigo-500/10'
+                          ? 'border-amber-500 bg-amber-500/10'
                           : 'border-slate-700 bg-slate-800/60 hover:border-slate-600 hover:bg-slate-800'
                       }`}
                     >
                       <span className="text-2xl mb-1.5">{product.emoji || '📦'}</span>
                       <p className="text-xs font-medium text-slate-200 line-clamp-2 leading-snug">{product.name}</p>
-                      <p className="text-xs text-indigo-400 font-semibold mt-1">{formatPrice(product.price)}</p>
+                      <p className="text-xs text-amber-400 font-semibold mt-1">{formatPrice(product.price)}</p>
                       {inCart && (
-                        <span className="mt-1.5 text-[10px] bg-indigo-600 text-white px-1.5 py-0.5 rounded-full">
+                        <span className="mt-1.5 text-[10px] bg-amber-500 text-slate-900 px-1.5 py-0.5 rounded-full font-semibold">
                           ×{inCart.qty} in cart
                         </span>
                       )}
@@ -418,7 +418,7 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
               <ShoppingCartIcon className="w-4 h-4 text-slate-400" />
               <span className="font-semibold text-slate-100 text-sm">Cart</span>
               {cartCount > 0 && (
-                <span className="bg-indigo-600 text-white text-xs font-bold px-1.5 py-0.5 rounded-full">{cartCount}</span>
+                <span className="bg-amber-500 text-slate-900 text-xs font-bold px-1.5 py-0.5 rounded-full">{cartCount}</span>
               )}
             </div>
             <button
@@ -443,7 +443,7 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
                     <span className="text-lg">{line.item.emoji || '📦'}</span>
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-medium text-slate-200 truncate">{line.item.name}</p>
-                      <p className="text-xs text-indigo-400">{formatPrice(line.item.price * line.qty)}</p>
+                      <p className="text-xs text-amber-400">{formatPrice(line.item.price * line.qty)}</p>
                     </div>
                     <div className="flex items-center gap-1">
                       <button
@@ -480,7 +480,7 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
               value={customerName}
               onChange={(e) => setCustomerName(e.target.value)}
               placeholder="Customer name (optional)"
-              className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+              className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500"
             />
 
             {/* Payment method */}
@@ -491,7 +491,7 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
                   onClick={() => setPaymentMethod(code)}
                   className={`flex-1 flex flex-col items-center gap-0.5 py-2 rounded-xl border text-xs transition-all ${
                     paymentMethod === code
-                      ? 'border-indigo-500 bg-indigo-500/15 text-indigo-300'
+                      ? 'border-amber-500 bg-amber-500/15 text-amber-300'
                       : 'border-slate-700 bg-slate-800/60 text-slate-400 hover:border-slate-600'
                   }`}
                 >

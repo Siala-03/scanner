@@ -6,6 +6,22 @@ const db = createClient(
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
 );
 
+async function signJwt(payload: Record<string, unknown>, secret: string): Promise<string> {
+  const enc = new TextEncoder();
+  const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }))
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+  const body = btoa(JSON.stringify(payload))
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+  const signing = `${header}.${body}`;
+  const key = await crypto.subtle.importKey(
+    'raw', enc.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'],
+  );
+  const sig = await crypto.subtle.sign('HMAC', key, enc.encode(signing));
+  const sigB64 = btoa(String.fromCharCode(...new Uint8Array(sig)))
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+  return `${signing}.${sigB64}`;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -80,7 +96,27 @@ Deno.serve(async (req) => {
       });
     }
 
-    return new Response(JSON.stringify(staff), {
+    const jwtSecret = Deno.env.get('SUPABASE_JWT_SECRET');
+    if (!jwtSecret) {
+      return new Response(JSON.stringify({ error: 'Server configuration error' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const now = Math.floor(Date.now() / 1000);
+    const token = await signJwt({
+      iss: 'supabase',
+      aud: 'authenticated',
+      role: 'authenticated',
+      sub: staff.id,
+      restaurant_id: staff.restaurant_id,
+      staff_role: staff.role,
+      iat: now,
+      exp: now + 28800, // 8 hours
+    }, jwtSecret);
+
+    return new Response(JSON.stringify({ ...staff, token }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }

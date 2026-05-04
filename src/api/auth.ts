@@ -62,6 +62,11 @@ export async function loginStaff(
   localStorage.setItem('staffRole',    staff.role);
   localStorage.setItem('restaurantId', staff.restaurantId || '');
 
+  if (raw.token) {
+    localStorage.setItem('token', raw.token);
+    await supabase.auth.setSession({ access_token: raw.token, refresh_token: '' });
+  }
+
   return staff;
 }
 
@@ -152,6 +157,7 @@ export function logoutStaff(): void {
   localStorage.removeItem('token');
   localStorage.removeItem('staffRole');
   localStorage.removeItem('restaurantId');
+  supabase.auth.signOut().catch(() => {});
 }
 
 export async function changePassword(

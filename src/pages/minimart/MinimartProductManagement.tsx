@@ -61,8 +61,8 @@ function CategorySelect({ value, onChange, categories, onNewCategory, className 
   };
 
   const baseInput = small
-    ? 'px-2 py-1 bg-slate-800 border border-indigo-500 rounded text-sm text-slate-100 focus:outline-none'
-    : 'w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-100 focus:outline-none focus:border-indigo-500';
+    ? 'px-2 py-1 bg-slate-800 border border-amber-500 rounded text-sm text-slate-100 focus:outline-none'
+    : 'w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-100 focus:outline-none focus:border-amber-500';
 
   if (addingNew) {
     return (
@@ -108,7 +108,7 @@ function CategorySelect({ value, onChange, categories, onNewCategory, className 
           onChange(e.target.value);
         }
       }}
-      className={`${small ? 'px-2 py-1 bg-slate-800 border border-indigo-500 rounded text-sm text-slate-100 focus:outline-none' : 'w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-indigo-500'} ${className}`}
+      className={`${small ? 'px-2 py-1 bg-slate-800 border border-amber-500 rounded text-sm text-slate-100 focus:outline-none' : 'w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-amber-500'} ${className}`}
     >
       {categories.length === 0 && (
         <option value="" disabled>Select or add category</option>
@@ -283,13 +283,13 @@ export function MinimartProductManagement() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search products…"
-              className="w-full pl-9 pr-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+              className="w-full pl-9 pr-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500"
             />
           </div>
           <select
             value={filterCategory}
             onChange={(e) => setFilterCategory(e.target.value)}
-            className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-indigo-500"
+            className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-amber-500"
           >
             {filterOptions.map((c) => (
               <option key={c} value={c}>{c === 'all' ? 'All categories' : c}</option>
@@ -308,7 +308,7 @@ export function MinimartProductManagement() {
             setAddError('');
             setAddForm({ ...EMPTY_FORM, category: allCats[0] || '' });
           }}
-          className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium transition-colors shrink-0"
+          className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-900 text-sm font-semibold transition-colors shrink-0"
         >
           <PlusIcon className="w-4 h-4" /> Add Product
         </button>
@@ -352,7 +352,7 @@ export function MinimartProductManagement() {
       {showAdd && (
         <form
           onSubmit={handleAdd}
-          className="bg-slate-900 border border-indigo-600/40 rounded-2xl p-5"
+          className="bg-slate-900 border border-amber-500/40 rounded-2xl p-5"
         >
           <p className="text-sm font-semibold text-slate-200 mb-4">New Product</p>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -362,7 +362,7 @@ export function MinimartProductManagement() {
                 value={addForm.name}
                 onChange={(e) => setAddForm((p) => ({ ...p, name: e.target.value }))}
                 placeholder="e.g. Coca Cola 500ml"
-                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500"
                 required
               />
             </div>
@@ -384,7 +384,7 @@ export function MinimartProductManagement() {
                 value={addForm.price}
                 onChange={(e) => setAddForm((p) => ({ ...p, price: e.target.value }))}
                 placeholder="0"
-                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500"
                 required
               />
             </div>
@@ -394,7 +394,7 @@ export function MinimartProductManagement() {
             <button
               type="submit"
               disabled={addSaving}
-              className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-sm font-medium transition-colors"
+              className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-slate-900 text-sm font-semibold transition-colors"
             >
               {addSaving ? 'Saving…' : 'Add Product'}
             </button>
@@ -444,7 +444,7 @@ export function MinimartProductManagement() {
                         <input
                           value={editForm.name}
                           onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
-                          className="w-full px-2 py-1 bg-slate-800 border border-indigo-500 rounded text-sm text-slate-100 focus:outline-none"
+                          className="w-full px-2 py-1 bg-slate-800 border border-amber-500 rounded text-sm text-slate-100 focus:outline-none"
                           autoFocus
                         />
                       ) : (
@@ -474,10 +474,10 @@ export function MinimartProductManagement() {
                           step="1"
                           value={editForm.price}
                           onChange={(e) => setEditForm((f) => ({ ...f, price: e.target.value }))}
-                          className="w-24 px-2 py-1 bg-slate-800 border border-indigo-500 rounded text-sm text-slate-100 text-right focus:outline-none"
+                          className="w-24 px-2 py-1 bg-slate-800 border border-amber-500 rounded text-sm text-slate-100 text-right focus:outline-none"
                         />
                       ) : (
-                        <span className="text-indigo-400 font-semibold">{formatPrice(p.price)}</span>
+                        <span className="text-amber-400 font-semibold">{formatPrice(p.price)}</span>
                       )}
                     </td>
                     <td className="py-3 pr-4 text-center">

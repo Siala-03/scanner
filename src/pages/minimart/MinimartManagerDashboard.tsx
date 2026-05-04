@@ -260,7 +260,7 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
       <header className="sticky top-0 z-40 bg-slate-900 border-b border-slate-800">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
           <div>
-            <p className="text-xs text-indigo-400 uppercase tracking-wide font-medium">Minimart Manager</p>
+            <p className="text-xs text-amber-400 uppercase tracking-wide font-medium">Minimart Manager</p>
             <p className="font-semibold text-slate-100 truncate">{restaurantName}</p>
           </div>
           <div className="flex items-center gap-2">
@@ -283,7 +283,7 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
               key={p}
               onClick={() => setPage(p)}
               className={`shrink-0 px-4 py-1.5 rounded-full text-sm font-medium capitalize transition-colors ${
-                page === p ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200'
+                page === p ? 'bg-amber-500 text-slate-900 font-semibold' : 'text-slate-400 hover:text-slate-200'
               }`}
             >
               {p}
@@ -304,7 +304,7 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
                   key={f}
                   onClick={() => setDateFilter(f)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                    dateFilter === f ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-slate-200'
+                    dateFilter === f ? 'bg-amber-500 text-slate-900 font-medium' : 'bg-slate-800 text-slate-400 hover:text-slate-200'
                   }`}
                 >
                   {f === 'today' ? 'Today' : f === '7d' ? 'Last 7 days' : 'Last 30 days'}
@@ -364,15 +364,15 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
                             tickFormatter={(v) => v >= 1_000_000 ? `${(v / 1_000_000).toFixed(1)}M` : v >= 1000 ? `${(v / 1000).toFixed(0)}K` : `${v}`}
                           />
                           <Tooltip
-                            contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #4f46e5', borderRadius: 10, color: '#fff' }}
+                            contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #f59e0b', borderRadius: 10, color: '#fff' }}
                             formatter={(v: number) => [formatPrice(v), 'Revenue']}
-                            labelStyle={{ color: '#818cf8' }}
+                            labelStyle={{ color: '#fbbf24' }}
                           />
                           <Bar dataKey="revenue" radius={[4, 4, 0, 0]}>
                             {summary.dailyBars.map((entry, i) => (
                               <Cell
                                 key={i}
-                                fill={entry.revenue === maxBarRevenue && entry.revenue > 0 ? '#6366f1' : '#334155'}
+                                fill={entry.revenue === maxBarRevenue && entry.revenue > 0 ? '#f59e0b' : '#334155'}
                               />
                             ))}
                           </Bar>
@@ -400,7 +400,7 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
                                 </div>
                                 <div className="h-1.5 bg-slate-800 rounded-full">
                                   <div
-                                    className="h-1.5 bg-indigo-500 rounded-full transition-all"
+                                    className="h-1.5 bg-amber-500 rounded-full transition-all"
                                     style={{ width: `${pct}%` }}
                                   />
                                 </div>
@@ -425,7 +425,7 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
                               <p className="text-sm text-slate-200 truncate">{p.name}</p>
                               <p className="text-xs text-slate-500">{p.qty} sold</p>
                             </div>
-                            <p className="text-xs font-semibold text-indigo-400 shrink-0">{formatPrice(p.revenue)}</p>
+                            <p className="text-xs font-semibold text-amber-400 shrink-0">{formatPrice(p.revenue)}</p>
                           </div>
                         ))}
                       </div>
@@ -448,7 +448,7 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
                               <p className="text-sm font-medium text-slate-200">{name}</p>
                               <p className="text-xs text-slate-500">{stats.count} transaction{stats.count !== 1 ? 's' : ''}</p>
                             </div>
-                            <p className="text-sm font-semibold text-indigo-400">{formatPrice(stats.revenue)}</p>
+                            <p className="text-sm font-semibold text-amber-400">{formatPrice(stats.revenue)}</p>
                           </div>
                         ))}
                     </div>
@@ -475,7 +475,7 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
                   key={f}
                   onClick={() => setDateFilter(f)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                    dateFilter === f ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-slate-200'
+                    dateFilter === f ? 'bg-amber-500 text-slate-900 font-medium' : 'bg-slate-800 text-slate-400 hover:text-slate-200'
                   }`}
                 >
                   {f === 'today' ? 'Today' : f === '7d' ? 'Last 7 days' : 'Last 30 days'}
@@ -499,7 +499,7 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <p className="text-sm font-semibold text-slate-100">#{t.orderNumber}</p>
-                        <span className="text-xs bg-indigo-900/40 text-indigo-300 px-2 py-0.5 rounded-full">{t.paymentMethod}</span>
+                        <span className="text-xs bg-amber-900/40 text-amber-300 px-2 py-0.5 rounded-full">{t.paymentMethod}</span>
                       </div>
                       <p className="text-xs text-slate-500 mt-0.5">
                         {t.cashierName} · {t.itemCount} item{t.itemCount !== 1 ? 's' : ''} ·{' '}
@@ -531,7 +531,7 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
               <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wide">Cashier Accounts</h2>
               <button
                 onClick={() => { setShowAddForm((v) => !v); setAddError(''); setAddForm(EMPTY_FORM); }}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-900 text-sm font-semibold transition-colors"
               >
                 <PlusIcon className="w-4 h-4" /> Add Cashier
               </button>
@@ -540,7 +540,7 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
             {showAddForm && (
               <form
                 onSubmit={handleAddCashier}
-                className="bg-slate-900 border border-indigo-600/40 rounded-2xl p-5 space-y-4"
+                className="bg-slate-900 border border-amber-500/40 rounded-2xl p-5 space-y-4"
               >
                 <p className="text-sm font-semibold text-slate-200">New Cashier Account</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -550,7 +550,7 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
                       value={addForm.name}
                       onChange={(e) => setAddForm((p) => ({ ...p, name: e.target.value }))}
                       placeholder="e.g. Jane Doe"
-                      className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                      className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500"
                       required
                     />
                   </div>
@@ -560,7 +560,7 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
                       value={addForm.phone}
                       onChange={(e) => setAddForm((p) => ({ ...p, phone: e.target.value }))}
                       placeholder="e.g. 0788000000"
-                      className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                      className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500"
                     />
                   </div>
                   <div>
@@ -570,7 +570,7 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
                       onChange={(e) => setAddForm((p) => ({ ...p, username: e.target.value }))}
                       placeholder="Login username"
                       autoComplete="off"
-                      className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                      className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500"
                       required
                     />
                   </div>
@@ -583,7 +583,7 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
                         onChange={(e) => setAddForm((p) => ({ ...p, password: e.target.value }))}
                         placeholder="Set a password"
                         autoComplete="new-password"
-                        className="w-full px-3 py-2 pr-9 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                        className="w-full px-3 py-2 pr-9 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500"
                         required
                       />
                       <button
@@ -601,7 +601,7 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
                   <button
                     type="submit"
                     disabled={addSaving}
-                    className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-sm font-medium transition-colors"
+                    className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-slate-900 text-sm font-semibold transition-colors"
                   >
                     {addSaving ? 'Creating…' : 'Create Account'}
                   </button>
@@ -630,7 +630,7 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
               <div className="space-y-2">
                 {cashiers.map((c) => (
                   <div key={c.id} className="bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-indigo-600/20 border border-indigo-600/40 flex items-center justify-center text-indigo-300 text-sm font-bold shrink-0">
+                    <div className="w-8 h-8 rounded-full bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-300 text-sm font-bold shrink-0">
                       {c.name.charAt(0).toUpperCase()}
                     </div>
                     <div className="flex-1 min-w-0">
