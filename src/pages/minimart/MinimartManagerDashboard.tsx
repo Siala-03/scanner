@@ -12,6 +12,7 @@ import { supabase } from '../../lib/supabase';
 import { signUpStaff, deleteStaff, fetchAllStaff } from '../../api/auth';
 import { formatPrice } from '../../utils/currency';
 import { InventoryManagement } from '../shared/InventoryManagement';
+import { MenuManagement } from '../manager/MenuManagement';
 import type { Staff } from '../../types';
 
 interface Transaction {
@@ -64,7 +65,7 @@ interface Props {
 }
 
 type DateFilter = 'today' | '7d' | '30d';
-type Page = 'dashboard' | 'transactions' | 'inventory' | 'cashiers';
+type Page = 'dashboard' | 'transactions' | 'products' | 'inventory' | 'cashiers';
 
 const PAYMENT_LABEL: Record<string, string> = {
   '01': 'Cash', '02': 'Card', '04': 'Mobile Money',
@@ -279,7 +280,7 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
         </div>
 
         <div className="max-w-5xl mx-auto px-4 pb-3 flex gap-1 overflow-x-auto">
-          {(['dashboard', 'transactions', 'inventory', 'cashiers'] as Page[]).map((p) => (
+          {(['dashboard', 'transactions', 'products', 'inventory', 'cashiers'] as Page[]).map((p) => (
             <button
               key={p}
               onClick={() => setPage(p)}
@@ -513,6 +514,11 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
               )}
             </div>
           </>
+        )}
+
+        {/* ── Products ── */}
+        {page === 'products' && (
+          <MenuManagement />
         )}
 
         {/* ── Inventory ── */}
