@@ -509,6 +509,11 @@ export function App() {
       setSelectedRole('kitchen');
       setRouteResolved(true);
       return;
+    } else if (path === '/minimart' || path.startsWith('/minimart')) {
+      const savedRole = localStorage.getItem('selectedRole') as UserRole;
+      setSelectedRole(savedRole || 'manager');
+      setRouteResolved(true);
+      return;
     } else if (path === '/manager' || path.startsWith('/manager')) {
       setSelectedRole('manager');
       setRouteResolved(true);
@@ -554,6 +559,13 @@ export function App() {
       window.history.replaceState({}, '', `/${selectedRole}`);
     }
   }, [selectedRole]);
+
+  // Override URL to /minimart when in minimart context (runs after role effect)
+  useEffect(() => {
+    if (authUser && (outletType === 'minimart' || selectedRole === 'cashier')) {
+      window.history.replaceState({}, '', '/minimart');
+    }
+  }, [authUser, outletType, selectedRole]);
 
   useEffect(() => {
     if (selectedRole !== 'supplier') {
