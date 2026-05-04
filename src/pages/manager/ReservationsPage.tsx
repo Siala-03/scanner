@@ -57,7 +57,12 @@ export function ReservationsPage() {
     try {
       const data = await getReservations(restaurantId(), date);
       // Normalize reservation_date from Postgres (may come as full ISO timestamp)
-      setReservations(data.map(r => ({ ...r, reservationDate: dateOnly(r.reservationDate) })));
+      // Also coerce reservationTime to a plain HH:MM string in case Postgres returns an object
+      setReservations(data.map(r => ({
+        ...r,
+        reservationDate: dateOnly(r.reservationDate),
+        reservationTime: r.reservationTime ? String(r.reservationTime).slice(0, 5) : '',
+      })));
     } catch (e) {
       console.error(e);
     } finally {
@@ -119,8 +124,9 @@ export function ReservationsPage() {
     }
   }
 
-  function formatTime(time: string) {
-    const [h, m] = time.split(':').map(Number);
+  function formatTime(time: string | undefined) {
+    if (!time) return '—';
+    const [h, m] = time.slice(0, 5).split(':').map(Number);
     const period = h >= 12 ? 'PM' : 'AM';
     const displayH = h % 12 || 12;
     return `${displayH}:${String(m).padStart(2, '0')} ${period}`;
