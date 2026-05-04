@@ -437,6 +437,7 @@ export function StaffManagement({ onShowPerformance }: StaffManagementProps) {
                         className="rounded-lg bg-slate-700 px-2 py-1 text-xs text-white border border-slate-600"
                       >
                         <option value="waiter">Waiter</option>
+                        <option value="cashier">Cashier</option>
                         <option value="kitchen">Kitchen</option>
                         <option value="supervisor">Supervisor</option>
                         <option value="manager">Manager</option>
@@ -778,6 +779,7 @@ export function StaffManagement({ onShowPerformance }: StaffManagementProps) {
                 className="w-full px-4 py-2 rounded-lg bg-white border border-slate-100 text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
               >
                 <option value="waiter">Waiter</option>
+                <option value="cashier">Cashier</option>
                 <option value="kitchen">Kitchen</option>
                 <option value="supervisor">Supervisor</option>
                 <option value="manager">Manager</option>

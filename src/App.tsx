@@ -42,7 +42,7 @@ import { Staff } from './types';
 import { SupplierUser, getSupplierMe, clearSupplierToken } from './api/supplier';
 import { fetchRestaurantPublic, fetchReceiptSettings, type OutletType } from './api/restaurants';
 import type { RestaurantReceiptSettings } from './api/restaurants';
-import { MinimartPOS } from './components/minimart/MinimartPOS';
+import { MinimartApp } from './pages/minimart/MinimartApp';
 import { RestaurantSettings } from './pages/manager/RestaurantSettings';
 
 type UserRole = 'customer' | 'waiter' | 'supervisor' | 'manager' | 'kitchen' | 'superadmin' | 'supplier' | null;
@@ -649,13 +649,13 @@ export function App() {
     return <SupplierDashboard user={supplierUser} onLogout={handleBack} />;
   }
 
-  // Minimart cashier portal — waiter role on a minimart outlet
-  if (selectedRole === 'waiter' && authUser && outletType === 'minimart') {
+  // Minimart portal — all roles on a minimart outlet go through MinimartApp
+  if (authUser && outletType === 'minimart' && currentRestaurantId) {
     return (
-      <MinimartPOS
+      <MinimartApp
+        restaurantId={currentRestaurantId}
         restaurantName={restaurantName}
-        cashier={authUser}
-        restaurantId={currentRestaurantId ?? undefined}
+        authUser={authUser}
         onLogout={handleLogout}
       />
     );

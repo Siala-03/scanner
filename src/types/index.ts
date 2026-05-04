@@ -141,7 +141,7 @@ export interface Table {
 }
 
 // Staff Types
-export type StaffRole = 'waiter' | 'supervisor' | 'manager' | 'kitchen' | 'superadmin';
+export type StaffRole = 'waiter' | 'cashier' | 'supervisor' | 'manager' | 'kitchen' | 'superadmin';
 
 export interface Staff {
   id: string;
