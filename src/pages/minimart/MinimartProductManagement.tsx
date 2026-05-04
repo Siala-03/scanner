@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   PlusIcon, EditIcon, TrashIcon, RefreshCwIcon,
   CheckIcon, XIcon, SearchIcon, ToggleLeftIcon, ToggleRightIcon,
@@ -10,6 +10,119 @@ import {
 import { formatPrice } from '../../utils/currency';
 import type { MenuItem } from '../../lib/supabase';
 
+const CUSTOM_CATS_KEY = 'minimart_custom_categories';
+
+function loadCustomCategories(): string[] {
+  try {
+    const raw = localStorage.getItem(CUSTOM_CATS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+
+function saveCustomCategories(cats: string[]) {
+  localStorage.setItem(CUSTOM_CATS_KEY, JSON.stringify(cats));
+}
+
+// ── CategorySelect ────────────────────────────────────────────────────────────
+// Dropdown of existing categories + "＋ New category" option that reveals
+// an inline text input.
+interface CategorySelectProps {
+  value: string;
+  onChange: (v: string) => void;
+  categories: string[];       // existing cats (no 'all' sentinel)
+  onNewCategory: (v: string) => void;
+  className?: string;
+  small?: boolean;            // compact variant for inline table edit
+}
+
+function CategorySelect({ value, onChange, categories, onNewCategory, className = '', small }: CategorySelectProps) {
+  const [addingNew, setAddingNew] = useState(false);
+  const [newName, setNewName]     = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (addingNew) inputRef.current?.focus();
+  }, [addingNew]);
+
+  const commitNew = () => {
+    const trimmed = newName.trim();
+    if (!trimmed) { cancelNew(); return; }
+    onNewCategory(trimmed);
+    onChange(trimmed);
+    setAddingNew(false);
+    setNewName('');
+  };
+
+  const cancelNew = () => {
+    setAddingNew(false);
+    setNewName('');
+    // Restore previous value or first existing category
+    if (!categories.includes(value)) onChange(categories[0] || '');
+  };
+
+  const baseInput = small
+    ? 'px-2 py-1 bg-slate-800 border border-indigo-500 rounded text-sm text-slate-100 focus:outline-none'
+    : 'w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-100 focus:outline-none focus:border-indigo-500';
+
+  if (addingNew) {
+    return (
+      <div className={`flex gap-1 ${small ? '' : 'w-full'} ${className}`}>
+        <input
+          ref={inputRef}
+          value={newName}
+          onChange={(e) => setNewName(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') { e.preventDefault(); commitNew(); }
+            if (e.key === 'Escape') cancelNew();
+          }}
+          placeholder="Category name…"
+          className={`flex-1 min-w-0 ${baseInput}`}
+        />
+        <button
+          type="button"
+          onClick={commitNew}
+          className="shrink-0 p-1.5 rounded bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/40 transition-colors"
+          title="Confirm"
+        >
+          <CheckIcon className="w-3.5 h-3.5" />
+        </button>
+        <button
+          type="button"
+          onClick={cancelNew}
+          className="shrink-0 p-1.5 rounded bg-slate-700 text-slate-400 hover:text-slate-200 transition-colors"
+          title="Cancel"
+        >
+          <XIcon className="w-3.5 h-3.5" />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <select
+      value={value}
+      onChange={(e) => {
+        if (e.target.value === '__new__') {
+          setAddingNew(true);
+        } else {
+          onChange(e.target.value);
+        }
+      }}
+      className={`${small ? 'px-2 py-1 bg-slate-800 border border-indigo-500 rounded text-sm text-slate-100 focus:outline-none' : 'w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-indigo-500'} ${className}`}
+    >
+      {categories.length === 0 && (
+        <option value="" disabled>Select or add category</option>
+      )}
+      {categories.map((c) => (
+        <option key={c} value={c}>{c}</option>
+      ))}
+      <option value="__new__">＋ New category…</option>
+    </select>
+  );
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
+
 interface ProductForm {
   name: string;
   category: string;
@@ -19,20 +132,21 @@ interface ProductForm {
 const EMPTY_FORM: ProductForm = { name: '', category: '', price: '' };
 
 export function MinimartProductManagement() {
-  const [products, setProducts] = useState<MenuItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
+  const [products, setProducts]         = useState<MenuItem[]>([]);
+  const [loading, setLoading]           = useState(true);
+  const [search, setSearch]             = useState('');
   const [filterCategory, setFilterCategory] = useState('all');
+  const [customCats, setCustomCats]     = useState<string[]>(loadCustomCategories);
 
   // Add form
-  const [showAdd, setShowAdd] = useState(false);
-  const [addForm, setAddForm] = useState<ProductForm>(EMPTY_FORM);
+  const [showAdd, setShowAdd]   = useState(false);
+  const [addForm, setAddForm]   = useState<ProductForm>(EMPTY_FORM);
   const [addError, setAddError] = useState('');
   const [addSaving, setAddSaving] = useState(false);
 
   // Inline edit
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState<ProductForm>(EMPTY_FORM);
+  const [editingId, setEditingId]   = useState<string | null>(null);
+  const [editForm, setEditForm]     = useState<ProductForm>(EMPTY_FORM);
   const [editSaving, setEditSaving] = useState(false);
 
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -52,7 +166,19 @@ export function MinimartProductManagement() {
 
   useEffect(() => { load(); }, [load]);
 
-  const categories = ['all', ...Array.from(new Set(products.map((p) => p.category))).sort()];
+  // Merge categories from products + custom list (deduplicated, sorted)
+  const productCats = Array.from(new Set(products.map((p) => p.category))).sort();
+  const allCats = Array.from(new Set([...productCats, ...customCats])).sort();
+  const filterOptions = ['all', ...allCats];
+
+  const addCustomCategory = (name: string) => {
+    setCustomCats((prev) => {
+      if (prev.includes(name)) return prev;
+      const next = [...prev, name].sort();
+      saveCustomCategories(next);
+      return next;
+    });
+  };
 
   const filtered = products.filter((p) => {
     const matchCat = filterCategory === 'all' || p.category === filterCategory;
@@ -165,7 +291,7 @@ export function MinimartProductManagement() {
             onChange={(e) => setFilterCategory(e.target.value)}
             className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-indigo-500"
           >
-            {categories.map((c) => (
+            {filterOptions.map((c) => (
               <option key={c} value={c}>{c === 'all' ? 'All categories' : c}</option>
             ))}
           </select>
@@ -177,12 +303,50 @@ export function MinimartProductManagement() {
           </button>
         </div>
         <button
-          onClick={() => { setShowAdd((v) => !v); setAddError(''); setAddForm(EMPTY_FORM); }}
+          onClick={() => {
+            setShowAdd((v) => !v);
+            setAddError('');
+            setAddForm({ ...EMPTY_FORM, category: allCats[0] || '' });
+          }}
           className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium transition-colors shrink-0"
         >
           <PlusIcon className="w-4 h-4" /> Add Product
         </button>
       </div>
+
+      {/* Category chips */}
+      {allCats.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {allCats.map((cat) => {
+            const count = products.filter((p) => p.category === cat).length;
+            const isCustomOnly = !productCats.includes(cat);
+            return (
+              <div
+                key={cat}
+                className="group flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-800 border border-slate-700 text-xs text-slate-300"
+              >
+                <span>{cat}</span>
+                <span className="text-slate-500">({count})</span>
+                {isCustomOnly && (
+                  <button
+                    onClick={() => {
+                      setCustomCats((prev) => {
+                        const next = prev.filter((c) => c !== cat);
+                        saveCustomCategories(next);
+                        return next;
+                      });
+                    }}
+                    className="ml-0.5 opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 transition-all"
+                    title="Remove empty category"
+                  >
+                    <XIcon className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Add form */}
       {showAdd && (
@@ -204,19 +368,12 @@ export function MinimartProductManagement() {
             </div>
             <div>
               <label className="block text-xs text-slate-400 mb-1">Category *</label>
-              <input
+              <CategorySelect
                 value={addForm.category}
-                onChange={(e) => setAddForm((p) => ({ ...p, category: e.target.value }))}
-                placeholder="e.g. Beverages"
-                list="minimart-categories"
-                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500"
-                required
+                onChange={(v) => setAddForm((p) => ({ ...p, category: v }))}
+                categories={allCats}
+                onNewCategory={addCustomCategory}
               />
-              <datalist id="minimart-categories">
-                {categories.filter((c) => c !== 'all').map((c) => (
-                  <option key={c} value={c} />
-                ))}
-              </datalist>
             </div>
             <div>
               <label className="block text-xs text-slate-400 mb-1">Price *</label>
@@ -298,11 +455,12 @@ export function MinimartProductManagement() {
                     </td>
                     <td className="py-3 pr-4">
                       {isEditing ? (
-                        <input
+                        <CategorySelect
                           value={editForm.category}
-                          onChange={(e) => setEditForm((f) => ({ ...f, category: e.target.value }))}
-                          list="minimart-categories"
-                          className="w-full px-2 py-1 bg-slate-800 border border-indigo-500 rounded text-sm text-slate-100 focus:outline-none"
+                          onChange={(v) => setEditForm((f) => ({ ...f, category: v }))}
+                          categories={allCats}
+                          onNewCategory={addCustomCategory}
+                          small
                         />
                       ) : (
                         <span className="text-slate-400">{p.category}</span>
