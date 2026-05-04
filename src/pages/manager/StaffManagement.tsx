@@ -443,12 +443,20 @@ export function StaffManagement({ onShowPerformance }: StaffManagementProps) {
                       </select>
                     </div>
                     {member.role === 'waiter' && (
-                  <p className="text-xs">
-                        🍽️ Tables:{' '}
-                        {member.assignedTables.length > 0 ?
-                    member.assignedTables.join(', ') :
-                    'None'}
-                      </p>
+                      <div className="bg-slate-700/50 rounded-lg p-2 border border-amber-500/20">
+                        <p className="text-xs text-slate-300 mb-1.5 font-medium">🍽️ Assigned Tables</p>
+                        {member.assignedTables && member.assignedTables.length > 0 ? (
+                          <div className="flex flex-wrap gap-1.5">
+                            {member.assignedTables.sort((a, b) => a - b).map((tableNum) => (
+                              <span key={tableNum} className="inline-flex items-center px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-xs font-medium border border-amber-500/40">
+                                T{tableNum}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-slate-400 italic">No tables assigned</p>
+                        )}
+                      </div>
                     )}
                     {member.role !== 'waiter' && (
                       <p className="text-xs text-slate-600">-</p>
@@ -479,10 +487,13 @@ export function StaffManagement({ onShowPerformance }: StaffManagementProps) {
                     </Button>
                     {member.role === 'waiter' && (
                       <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => openAssignTablesModal(member)}>
-                        <span className="hidden sm:inline">Assign </span>Tables
+                        variant="primary"
+                        size="sm"
+                        onClick={() => openAssignTablesModal(member)}
+                        className="flex items-center gap-2">
+                        <span>🍽️</span>
+                        <span className="hidden sm:inline">Assign Tables</span>
+                        <span className="sm:hidden">Tables</span>
                       </Button>
                     )}
                     <div className="flex gap-1 ml-auto">
@@ -901,6 +912,35 @@ export function StaffManagement({ onShowPerformance }: StaffManagementProps) {
             <p className="text-sm text-slate-400">
               Select one or more tables to assign to this waiter.
             </p>
+            
+            {/* Current Assignment Info */}
+            {selectedStaffForAssign?.assignedTables && selectedStaffForAssign.assignedTables.length > 0 && (
+              <div className="rounded-lg border border-blue-500/25 bg-blue-500/10 p-3">
+                <p className="text-xs font-semibold text-blue-300 mb-2">Currently Assigned:</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {selectedStaffForAssign.assignedTables.sort((a, b) => a - b).map((t) => (
+                    <span key={t} className="inline-flex items-center px-2 py-0.5 rounded-full bg-blue-600/40 text-blue-200 text-xs font-medium">
+                      T{t}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* New Selection Info */}
+            {assignmentSelection.length > 0 && (
+              <div className="rounded-lg border border-amber-500/25 bg-amber-500/10 p-3">
+                <p className="text-xs font-semibold text-amber-300 mb-2">Will Be Assigned ({assignmentSelection.length}):</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {assignmentSelection.sort((a, b) => a - b).map((t) => (
+                    <span key={t} className="inline-flex items-center px-2 py-0.5 rounded-full bg-amber-600/40 text-amber-200 text-xs font-medium">
+                      T{t}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
               {availableTables.map((tableNumber) => {
                 const selected = assignmentSelection.includes(tableNumber);
@@ -912,7 +952,7 @@ export function StaffManagement({ onShowPerformance }: StaffManagementProps) {
                     className={`rounded-2xl border p-3 text-left transition-colors ${selected ? 'border-amber-400 bg-amber-500/10 text-amber-100 shadow-sm shadow-amber-500/10' : 'border-slate-700 bg-slate-800 text-slate-200 hover:border-slate-500'}`}>
                     <div className="flex items-center justify-between gap-3">
                       <span className="font-medium">Table {tableNumber}</span>
-                      {selected && <span className="rounded-full bg-amber-500/20 px-2 py-1 text-amber-200 text-xs">Assigned</span>}
+                      {selected && <span className="rounded-full bg-amber-500/20 px-2 py-1 text-amber-200 text-xs">✓ Selected</span>}
                     </div>
                   </button>
                 );

@@ -15,6 +15,7 @@ import { SupervisorDashboard } from './pages/supervisor/SupervisorDashboard';
 import { RevenueReports } from './pages/supervisor/RevenueReports';
 import { StaffPerformance } from './pages/supervisor/StaffPerformance';
 import { OrderHistoryPage } from './pages/supervisor/OrderHistoryPage';
+import { PaymentApprovalPanel } from './components/supervisor/PaymentApprovalPanel';
 import { OnlineOrdersPage } from './pages/supervisor/OnlineOrdersPage';
 import { ManagerDashboard } from './pages/manager/ManagerDashboard';
 import { MenuManagement } from './pages/manager/MenuManagement';
@@ -39,13 +40,14 @@ import { Card } from './components/ui/Card';
 import { Button } from './components/ui/Button';
 import { Staff } from './types';
 import { SupplierUser, getSupplierMe, clearSupplierToken } from './api/supplier';
-import { fetchRestaurantPublic, fetchReceiptSettings } from './api/restaurants';
+import { fetchRestaurantPublic, fetchReceiptSettings, type OutletType } from './api/restaurants';
 import type { RestaurantReceiptSettings } from './api/restaurants';
+import { MinimartPOS } from './components/minimart/MinimartPOS';
 import { RestaurantSettings } from './pages/manager/RestaurantSettings';
 
 type UserRole = 'customer' | 'waiter' | 'supervisor' | 'manager' | 'kitchen' | 'superadmin' | 'supplier' | null;
 type ManagerPage = 'dashboard' | 'menu' | 'staff' | 'analytics' | 'performance' | 'qrcodes' | 'inventory' | 'history' | 'expenses' | 'credit' | 'loyalty' | 'promotions' | 'reservations' | 'scheduling' | 'reviews' | 'settings';
-type SupervisorPage = 'dashboard' | 'revenue' | 'staff' | 'qrcodes' | 'inventory' | 'menu' | 'history' | 'expenses' | 'online-orders';
+type SupervisorPage = 'dashboard' | 'revenue' | 'staff' | 'qrcodes' | 'inventory' | 'menu' | 'history' | 'expenses' | 'online-orders' | 'payments';
 
 const MANAGER_NAV_GROUPS: Array<{
   id: string;
@@ -108,6 +110,7 @@ export function App() {
   const [authUser, setAuthUser] = useState<Staff | null>(null);
   const [supplierUser, setSupplierUser] = useState<SupplierUser | null>(null);
   const [restaurantName, setRestaurantName] = useState<string>('');
+  const [outletType, setOutletType] = useState<OutletType>(() => (localStorage.getItem('outletType') as OutletType) || 'restaurant');
   const [receiptSettings, setReceiptSettings] = useState<RestaurantReceiptSettings>({});
   const [currentRestaurantId, setCurrentRestaurantId] = useState<string | null>(null);
   const [tableNumber, setTableNumber] = useState<number | null>(null);
@@ -347,7 +350,9 @@ export function App() {
       localStorage.removeItem('authUser');
       localStorage.removeItem('selectedRole');
       localStorage.removeItem('restaurantId');
+      localStorage.removeItem('outletType');
       setRestaurantName('');
+      setOutletType('restaurant');
       setTableNumber(null);
       setManagerPage('dashboard');
       setSupervisorPage('dashboard');
@@ -370,7 +375,9 @@ export function App() {
     localStorage.removeItem('authUser');
     localStorage.removeItem('selectedRole');
     localStorage.removeItem('restaurantId');
+    localStorage.removeItem('outletType');
     setRestaurantName('');
+    setOutletType('restaurant');
     setTableNumber(null);
     setManagerPage('dashboard');
     setSupervisorPage('dashboard');
@@ -569,9 +576,12 @@ export function App() {
     }
 
     fetchRestaurantPublic(currentRestaurantId)
-      .then((restaurant: { name?: string }) => {
+      .then((restaurant) => {
         if (!active) return;
         setRestaurantName(restaurant.name || '');
+        const ot = ((restaurant as any).outlet_type || 'restaurant') as OutletType;
+        setOutletType(ot);
+        localStorage.setItem('outletType', ot);
       })
       .catch((err: unknown) => {
         console.warn('Failed to fetch restaurant info:', err);
@@ -624,6 +634,18 @@ export function App() {
 
   if (selectedRole === 'supplier' && supplierUser) {
     return <SupplierDashboard user={supplierUser} onLogout={handleBack} />;
+  }
+
+  // Minimart cashier portal — waiter role on a minimart outlet
+  if (selectedRole === 'waiter' && authUser && outletType === 'minimart') {
+    return (
+      <MinimartPOS
+        restaurantName={restaurantName}
+        cashier={authUser}
+        restaurantId={currentRestaurantId ?? undefined}
+        onLogout={handleLogout}
+      />
+    );
   }
 
   // Waiter portal
@@ -742,6 +764,17 @@ export function App() {
                 <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full" />
               )}
             </Button>
+            <Button
+              variant={supervisorPage === 'payments' ? 'primary' : 'ghost'}
+              size="sm"
+              onClick={() => setSupervisorPage('payments')}
+              className="relative"
+            >
+              Payments
+              {orders.filter((o: any) => (o.paymentStatus ?? o.payment_status) !== 'confirmed' && o.status !== 'cancelled').length > 0 && (
+                <span className="absolute -top-1 -right-1 w-2 h-2 bg-amber-500 rounded-full animate-pulse" />
+              )}
+            </Button>
           </div>
         </div>
 
@@ -767,6 +800,14 @@ export function App() {
         {supervisorPage === 'expenses' && <SupervisorExpenseManagement />}
         {supervisorPage === 'online-orders' && <OnlineOrdersPage />}
         {supervisorPage === 'menu' && <MenuManagement />}
+        {supervisorPage === 'payments' && (
+          <div className="p-4 md:p-6">
+            <PaymentApprovalPanel
+              restaurantId={authUser?.restaurantId || localStorage.getItem('restaurantId') || undefined}
+              staffId={authUser?.id}
+            />
+          </div>
+        )}
       </div>
     );
   }

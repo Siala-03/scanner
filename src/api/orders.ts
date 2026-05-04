@@ -174,6 +174,9 @@ export async function createOrder(order: CreateOrderInput): Promise<Order> {
 
   const isOnlineOrder = order.tableNumber === 999;
 
+  // Generate idempotency key once per submission to prevent duplicate orders
+  const idempotencyKey = (order as any).idempotencyKey || crypto.randomUUID();
+
   // Full payload — includes optional columns that may or may not exist in the schema
   const fullPayload = {
     id: orderId,
@@ -185,6 +188,7 @@ export async function createOrder(order: CreateOrderInput): Promise<Order> {
     customer_address: (order as any).customerAddress || null,
     customer_id: order.customerId || null,
     status: 'pending',
+    idempotency_key: idempotencyKey,
     items,
     subtotal: total,
     tax: 0,
@@ -328,6 +332,28 @@ export async function updateOrderStatus(
         .single();
     }
   }
+
+  if (result.error) throw result.error;
+  return result.data as Order;
+}
+
+export async function confirmPayment(
+  orderId: string,
+  opts: { paymentType?: string; confirmedBy?: string; restaurantId?: string }
+): Promise<Order> {
+  const result = await db
+    .from('orders')
+    .update({
+      payment_status: 'confirmed',
+      payment_confirmed_by: opts.confirmedBy || null,
+      payment_confirmed_at: new Date().toISOString(),
+      status: 'completed',
+      completed_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', orderId)
+    .select()
+    .single();
 
   if (result.error) throw result.error;
   return result.data as Order;

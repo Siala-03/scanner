@@ -1,11 +1,14 @@
 ﻿import { supabase } from '../lib/supabase';
 
+export type OutletType = 'restaurant' | 'bar' | 'minimart' | 'hotel' | 'cafe';
+
 export interface Restaurant {
   id: string;
   name: string;
   email: string;
   phone: string;
   address: string;
+  outlet_type?: OutletType;
   created_at?: string;
   city?: string;
   country?: string;
@@ -64,10 +67,11 @@ export async function createRestaurant(restaurant: Partial<Restaurant>): Promise
     .from('restaurants')
     .insert({
       id,
-      name:    restaurant.name    || '',
-      email:   restaurant.email   || '',
-      phone:   restaurant.phone   || '',
-      address: restaurant.address || '',
+      name:        restaurant.name        || '',
+      email:       restaurant.email       || '',
+      phone:       restaurant.phone       || '',
+      address:     restaurant.address     || '',
+      outlet_type: restaurant.outlet_type || 'restaurant',
     })
     .select()
     .single();
@@ -82,14 +86,17 @@ export async function createRestaurant(restaurant: Partial<Restaurant>): Promise
 
 export async function updateRestaurant(id: string, restaurant: Partial<Restaurant>): Promise<Restaurant> {
   console.log('Updating restaurant:', id, restaurant);
+  const payload: Record<string, unknown> = {
+    name:    restaurant.name,
+    email:   restaurant.email,
+    phone:   restaurant.phone,
+    address: restaurant.address,
+  };
+  if (restaurant.outlet_type) payload.outlet_type = restaurant.outlet_type;
+
   const { data, error } = await supabase
     .from('restaurants')
-    .update({
-      name:    restaurant.name,
-      email:   restaurant.email,
-      phone:   restaurant.phone,
-      address: restaurant.address,
-    })
+    .update(payload)
     .eq('id', id)
     .select()
     .single();

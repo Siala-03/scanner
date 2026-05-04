@@ -120,6 +120,15 @@ export interface Order {
   promotionDiscount?: number;
   loyaltyRewardId?: string;
   loyaltyDiscount?: number;
+  // Payment approval
+  paymentStatus?: 'unpaid' | 'confirmed';
+  paymentConfirmedBy?: string;
+  paymentConfirmedAt?: string;
+  // EBM fiscal
+  ebmInvoiceId?: string;
+  ebmRcptSign?: string;
+  ebmRcptNo?: number;
+  ebmFiscalizedAt?: string;
 }
 
 // Table Types

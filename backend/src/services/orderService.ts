@@ -43,6 +43,7 @@ export async function createOrder(orderInput: {
   loyaltyRewardId?: string;
   promotionCode?: string;
   requiresKitchen?: boolean;
+  idempotencyKey?: string | null;
 }) {
   const {
     tableNumber,
@@ -56,7 +57,8 @@ export async function createOrder(orderInput: {
     deliveryAddress,
     loyaltyRewardId,
     promotionCode,
-    requiresKitchen = false
+    requiresKitchen = false,
+    idempotencyKey = null,
   } = orderInput;
 
   if (!restaurantId) {
@@ -176,8 +178,8 @@ export async function createOrder(orderInput: {
 
   const result = await pool.query(
     `INSERT INTO orders
-      (id, order_number, table_number, customer_name, customer_id, restaurant_id, status, items, subtotal, tax, total, notes, created_by, delivery_provider, delivery_address, delivery_status, loyalty_reward_id, loyalty_discount, loyalty_free_item_id, promotion_id, promotion_code, promotion_discount, requires_kitchen)
-     VALUES ($1, $2, $3, $4, $5, $6, 'pending', $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
+      (id, order_number, table_number, customer_name, customer_id, restaurant_id, status, items, subtotal, tax, total, notes, created_by, delivery_provider, delivery_address, delivery_status, loyalty_reward_id, loyalty_discount, loyalty_free_item_id, promotion_id, promotion_code, promotion_discount, requires_kitchen, idempotency_key, payment_status)
+     VALUES ($1, $2, $3, $4, $5, $6, 'pending', $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, 'unpaid')
      RETURNING *`,
     [
       id,
@@ -201,7 +203,8 @@ export async function createOrder(orderInput: {
       resolvedPromotionId,
       promotionCode || null,
       promotionDiscount,
-      requiresKitchen
+      requiresKitchen,
+      idempotencyKey,
     ]
   );
 

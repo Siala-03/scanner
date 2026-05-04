@@ -6,6 +6,7 @@ import { emitOrderUpdate } from '../socket.js';
 import { createVubaVubaOrder, updateVubaVubaOrderStatus } from '../services/vubaVubaService.js';
 import { toCamelCase } from '../utils/camelCase.js';
 import { notifyOrderReady } from '../services/notificationService.js';
+import { saveSales, buildSalesFromOrder } from '../services/ebmService.js';
 
 const router = Router();
 
@@ -332,6 +333,103 @@ router.get('/:id', async (req: Request, res: Response) => {
   }
 });
 
+// POST confirm payment (supervisor approves that payment has been received)
+router.post('/:id/confirm-payment', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { confirmedBy, paymentType, restaurantId } = req.body;
+
+    const orderResult = await pool.query('SELECT * FROM orders WHERE id = $1', [id]);
+    if (orderResult.rows.length === 0) throw new HttpError(404, 'Order not found');
+
+    const order = normalizeOrder(orderResult.rows[0]);
+
+    if (order.paymentStatus === 'confirmed') {
+      return res.json({ ...order, alreadyConfirmed: true });
+    }
+
+    const updated = await pool.query(
+      `UPDATE orders
+       SET payment_status = 'confirmed',
+           payment_confirmed_by = $1,
+           payment_confirmed_at = now(),
+           status = CASE WHEN status NOT IN ('cancelled') THEN 'completed' ELSE status END,
+           completed_at = CASE WHEN status NOT IN ('cancelled', 'completed') THEN now() ELSE completed_at END,
+           updated_at = now()
+       WHERE id = $2
+       RETURNING *`,
+      [confirmedBy || null, id]
+    );
+
+    const confirmedOrder = normalizeOrder(updated.rows[0]);
+    emitOrderUpdate({ type: 'update', order: confirmedOrder });
+
+    // Trigger EBM fiscalization for this confirmed payment (fire-and-forget)
+    if (restaurantId || order.restaurantId) {
+      const restId = restaurantId || order.restaurantId;
+      (async () => {
+        try {
+          if (confirmedOrder.ebmInvoiceId) return;
+          const cfgResult = await pool.query(
+            'SELECT * FROM ebm_config WHERE restaurant_id = $1 AND is_active = true LIMIT 1',
+            [restId]
+          );
+          if (cfgResult.rows.length === 0) return;
+
+          const cfg = cfgResult.rows[0];
+          const ebmConfig = { tpin: cfg.tpin, bhfId: cfg.bhf_id, dvcSrlNo: cfg.dvc_srl_no, baseUrl: cfg.base_url };
+
+          const rawOrder = updated.rows[0];
+          if (typeof rawOrder.items === 'string') rawOrder.items = JSON.parse(rawOrder.items);
+
+          const cisInvcNo = rawOrder.order_number || `INV-${id.slice(-8).toUpperCase()}`;
+          const pmtTyCd = paymentType || '01';
+          const salesData = buildSalesFromOrder(rawOrder, cisInvcNo, pmtTyCd, 'S');
+
+          const invoiceId = `ebm-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}`;
+          await pool.query(
+            `INSERT INTO ebm_invoices
+               (id, restaurant_id, order_id, invoice_type, cis_invc_no, cust_nm,
+                pmt_ty_cd, tot_amt, tot_taxbl_amt, tot_tax_amt, raw_request, status)
+             VALUES ($1,$2,$3,'S',$4,$5,$6,$7,$8,$9,$10,'pending')`,
+            [invoiceId, restId, id, cisInvcNo, salesData.custNm, pmtTyCd,
+             salesData.totAmt, salesData.totTaxblAmt, salesData.totTaxAmt, JSON.stringify(salesData)]
+          );
+
+          const { saveSales: doSaveSales } = await import('../services/ebmService.js');
+          const vsdcResult = await doSaveSales(ebmConfig, salesData);
+
+          if (vsdcResult.resultCd === '000') {
+            const d = vsdcResult.data as any;
+            await pool.query(
+              `UPDATE ebm_invoices SET status='success', rcpt_no=$1, intrl_data=$2, rcpt_sign=$3,
+               sdc_id=$4, tot_rcpt_no=$5, raw_response=$6, fiscalized_at=now() WHERE id=$7`,
+              [d?.rcptNo, d?.intrlData, d?.rcptSign, d?.sdcId, d?.totRcptNo, JSON.stringify(vsdcResult), invoiceId]
+            );
+            await pool.query(
+              `UPDATE orders SET ebm_invoice_id=$1, ebm_rcpt_sign=$2, ebm_rcpt_no=$3, ebm_fiscalized_at=now() WHERE id=$4`,
+              [invoiceId, d?.rcptSign, d?.rcptNo, id]
+            );
+          } else {
+            await pool.query(
+              "UPDATE ebm_invoices SET status='failed', error_msg=$1, raw_response=$2 WHERE id=$3",
+              [vsdcResult.resultMsg, JSON.stringify(vsdcResult), invoiceId]
+            );
+          }
+        } catch (ebmErr) {
+          console.error('EBM fiscalize on confirm-payment error:', ebmErr);
+        }
+      })();
+    }
+
+    res.json(confirmedOrder);
+  } catch (err) {
+    if (err instanceof HttpError) return res.status(err.status).json({ error: err.message });
+    console.error('Error confirming payment:', err);
+    res.status(500).json({ error: 'Failed to confirm payment' });
+  }
+});
+
 // POST create new order
 router.post('/', async (req: Request, res: Response) => {
   try {
@@ -352,13 +450,28 @@ router.post('/', async (req: Request, res: Response) => {
       deliveryAddress,
       loyalty_reward_id,
       loyaltyRewardId,
-      promotionCode
+      promotionCode,
+      idempotencyKey,
+      idempotency_key,
     } = req.body;
 
     const resolvedRestaurantId = req.body.restaurantId || req.query.restaurantId;
     if (!resolvedRestaurantId) {
       return res.status(400).json({ error: 'restaurantId is required to create an order' });
     }
+
+    // Idempotency: return existing order if same key already used
+    const resolvedIdempotencyKey = idempotencyKey || idempotency_key || null;
+    if (resolvedIdempotencyKey) {
+      const existing = await pool.query(
+        'SELECT * FROM orders WHERE idempotency_key = $1 LIMIT 1',
+        [resolvedIdempotencyKey]
+      );
+      if (existing.rows.length > 0) {
+        return res.status(200).json(normalizeOrder(existing.rows[0]));
+      }
+    }
+
     console.log('POST /orders creating order for restaurantId:', resolvedRestaurantId, {
       bodyRestaurantId: req.body.restaurantId,
       queryRestaurantId: req.query.restaurantId,
@@ -387,7 +500,8 @@ router.post('/', async (req: Request, res: Response) => {
       deliveryAddress: delivery_address ?? deliveryAddress,
       loyaltyRewardId: loyalty_reward_id ?? loyaltyRewardId,
       promotionCode,
-      requiresKitchen: req.body.requiresKitchen ?? req.body.requires_kitchen ?? false
+      requiresKitchen: req.body.requiresKitchen ?? req.body.requires_kitchen ?? false,
+      idempotencyKey: resolvedIdempotencyKey,
     });
 
     const normalizedOrder = normalizeOrder(order);
@@ -511,6 +625,68 @@ router.put('/:id/status', async (req: Request, res: Response) => {
             }).catch(() => {});
         }
       } catch (_) { /* silent */ }
+    }
+
+    // Auto-fiscalize via EBM when order is completed (fire-and-forget, never blocks response)
+    if (status === 'served' || status === 'completed') {
+      (async () => {
+        try {
+          // Skip if already fiscalized
+          if (order.ebmInvoiceId) return;
+
+          const restaurantId = order.restaurantId;
+          const cfgResult = await pool.query(
+            'SELECT * FROM ebm_config WHERE restaurant_id = $1 AND is_active = true LIMIT 1',
+            [restaurantId]
+          );
+          if (cfgResult.rows.length === 0) return; // EBM not configured for this restaurant
+
+          const cfg = cfgResult.rows[0];
+          const ebmConfig = { tpin: cfg.tpin, bhfId: cfg.bhf_id, dvcSrlNo: cfg.dvc_srl_no, baseUrl: cfg.base_url };
+
+          const rawOrder = await pool.query('SELECT * FROM orders WHERE id = $1', [id]);
+          if (rawOrder.rows.length === 0) return;
+          const raw = rawOrder.rows[0];
+          if (typeof raw.items === 'string') raw.items = JSON.parse(raw.items);
+
+          const cisInvcNo = raw.order_number || `INV-${id.slice(-8).toUpperCase()}`;
+          const salesData = buildSalesFromOrder(raw, cisInvcNo, '01', 'S');
+
+          const invoiceId = `ebm-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}`;
+          await pool.query(
+            `INSERT INTO ebm_invoices
+               (id, restaurant_id, order_id, invoice_type, cis_invc_no, cust_nm,
+                pmt_ty_cd, tot_amt, tot_taxbl_amt, tot_tax_amt, raw_request, status)
+             VALUES ($1,$2,$3,'S',$4,$5,$6,$7,$8,$9,$10,'pending')`,
+            [invoiceId, restaurantId, id, cisInvcNo, salesData.custNm, salesData.pmtTyCd,
+             salesData.totAmt, salesData.totTaxblAmt, salesData.totTaxAmt, JSON.stringify(salesData)]
+          );
+
+          const vsdcResult = await saveSales(ebmConfig, salesData);
+
+          if (vsdcResult.resultCd === '000') {
+            const d = vsdcResult.data as any;
+            await pool.query(
+              `UPDATE ebm_invoices
+               SET status='success', rcpt_no=$1, intrl_data=$2, rcpt_sign=$3,
+                   sdc_id=$4, tot_rcpt_no=$5, raw_response=$6, fiscalized_at=now()
+               WHERE id=$7`,
+              [d?.rcptNo, d?.intrlData, d?.rcptSign, d?.sdcId, d?.totRcptNo, JSON.stringify(vsdcResult), invoiceId]
+            );
+            await pool.query(
+              `UPDATE orders SET ebm_invoice_id=$1, ebm_rcpt_sign=$2, ebm_rcpt_no=$3, ebm_fiscalized_at=now() WHERE id=$4`,
+              [invoiceId, d?.rcptSign, d?.rcptNo, id]
+            );
+          } else {
+            await pool.query(
+              "UPDATE ebm_invoices SET status='failed', error_msg=$1, raw_response=$2 WHERE id=$3",
+              [vsdcResult.resultMsg, JSON.stringify(vsdcResult), invoiceId]
+            );
+          }
+        } catch (ebmErr) {
+          console.error('EBM auto-fiscalize error (non-blocking):', ebmErr);
+        }
+      })();
     }
 
     // Notify delivery partner when order is served/completed

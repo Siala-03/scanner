@@ -5,7 +5,7 @@ import { Card } from '../../components/ui/Card';
 import { Modal } from '../../components/ui/Modal';
 import { Input } from '../../components/ui/Input';
 import { changePassword, signUpStaff } from '../../api/auth';
-import { fetchRestaurants, createRestaurant, updateRestaurant, deleteRestaurant, type Restaurant } from '../../api/restaurants';
+import { fetchRestaurants, createRestaurant, updateRestaurant, deleteRestaurant, type Restaurant, type OutletType } from '../../api/restaurants';
 import { fetchTablesForRestaurant, deleteTable } from '../../api/tables';
 
 interface Table {
@@ -45,6 +45,7 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
     email: '',
     phone: '',
     address: '',
+    outlet_type: 'restaurant' as OutletType,
     managerName: '',
     managerEmail: '',
     managerPhone: '',
@@ -133,18 +134,20 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
     try {
       if (editingId) {
         await updateRestaurant(editingId, {
-          name:    formData.name,
-          email:   formData.email,
-          phone:   formData.phone,
-          address: formData.address,
+          name:        formData.name,
+          email:       formData.email,
+          phone:       formData.phone,
+          address:     formData.address,
+          outlet_type: formData.outlet_type,
         });
       } else {
         // 1. Create the restaurant
         const newRestaurant = await createRestaurant({
-          name:    formData.name,
-          email:   formData.email,
-          phone:   formData.phone,
-          address: formData.address,
+          name:        formData.name,
+          email:       formData.email,
+          phone:       formData.phone,
+          address:     formData.address,
+          outlet_type: formData.outlet_type,
         });
 
         // 2. Create the manager staff account linked to this restaurant
@@ -182,6 +185,7 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
       email:           restaurant.email,
       phone:           restaurant.phone,
       address:         restaurant.address,
+      outlet_type:     (restaurant.outlet_type || 'restaurant') as OutletType,
       managerName:     '',
       managerEmail:    '',
       managerPhone:    '',
@@ -209,6 +213,7 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
       email:           '',
       phone:           '',
       address:         '',
+      outlet_type:     'restaurant',
       managerName:     '',
       managerEmail:    '',
       managerPhone:    '',
@@ -303,6 +308,7 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
                 <thead>
                   <tr className="border-b border-slate-700">
                     <th className="px-4 py-3 text-left text-sm font-semibold">Name</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold">Type</th>
                     <th className="px-4 py-3 text-left text-sm font-semibold">Email</th>
                     <th className="px-4 py-3 text-left text-sm font-semibold">Phone</th>
                     <th className="px-4 py-3 text-left text-sm font-semibold">Address</th>
@@ -314,6 +320,17 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
                     <tr key={restaurant.id} className="border-b border-slate-700 hover:bg-slate-700/30">
                       <td className="px-4 py-3">
                         <div className="font-medium">{restaurant.name}</div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize ${
+                          restaurant.outlet_type === 'minimart' ? 'bg-violet-500/15 text-violet-300 border border-violet-500/25' :
+                          restaurant.outlet_type === 'bar'      ? 'bg-amber-500/15 text-amber-300 border border-amber-500/25' :
+                          restaurant.outlet_type === 'hotel'    ? 'bg-sky-500/15 text-sky-300 border border-sky-500/25' :
+                          restaurant.outlet_type === 'cafe'     ? 'bg-orange-500/15 text-orange-300 border border-orange-500/25' :
+                          'bg-emerald-500/15 text-emerald-300 border border-emerald-500/25'
+                        }`}>
+                          {restaurant.outlet_type || 'restaurant'}
+                        </span>
                       </td>
                       <td className="px-4 py-3 text-sm">{restaurant.email}</td>
                       <td className="px-4 py-3 text-sm">{restaurant.phone}</td>
@@ -540,6 +557,26 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
               placeholder="123 Main Street"
               required
             />
+
+            <div className="space-y-1">
+              <label className="block text-sm font-medium text-slate-300">Outlet Type</label>
+              <select
+                value={formData.outlet_type}
+                onChange={(e) => setFormData({ ...formData, outlet_type: e.target.value as OutletType })}
+                className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-slate-100 text-sm focus:outline-none focus:border-indigo-500"
+              >
+                <option value="restaurant">Restaurant</option>
+                <option value="bar">Bar</option>
+                <option value="minimart">Minimart / Supermarket</option>
+                <option value="hotel">Hotel</option>
+                <option value="cafe">Cafe</option>
+              </select>
+              <p className="text-xs text-slate-500">
+                {formData.outlet_type === 'minimart'
+                  ? 'Minimart outlets use a cashier POS interface instead of table-based ordering.'
+                  : 'Restaurant, bar, hotel and cafe outlets use the standard table ordering interface.'}
+              </p>
+            </div>
 
             {!editingId && (
               <div className="border-t border-slate-600 pt-4 mt-6">

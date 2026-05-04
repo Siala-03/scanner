@@ -76,6 +76,12 @@ const normalizeOrderPayload = (rawOrder: any): Order | undefined => {
     loyaltyDiscount: rawOrder.loyaltyDiscount ?? rawOrder.loyalty_discount,
     loyaltyFreeItemId: rawOrder.loyaltyFreeItemId ?? rawOrder.loyalty_free_item_id,
     assignedWaiterId: rawOrder.assignedWaiterId ?? rawOrder.assigned_waiter_id ?? rawOrder.assigned_to,
+    paymentStatus: rawOrder.paymentStatus ?? rawOrder.payment_status,
+    paymentConfirmedBy: rawOrder.paymentConfirmedBy ?? rawOrder.payment_confirmed_by,
+    paymentConfirmedAt: rawOrder.paymentConfirmedAt ?? rawOrder.payment_confirmed_at,
+    ebmInvoiceId: rawOrder.ebmInvoiceId ?? rawOrder.ebm_invoice_id,
+    ebmRcptSign: rawOrder.ebmRcptSign ?? rawOrder.ebm_rcpt_sign,
+    ebmRcptNo: rawOrder.ebmRcptNo ?? rawOrder.ebm_rcpt_no,
     items: items.map(normalizeItem),
   } as Order;
 };
@@ -270,6 +276,7 @@ export function useOrders(): UseOrdersReturn {
 
       const subtotal = localItems.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
       const total = subtotal;
+      const idempotencyKey = crypto.randomUUID();
       const localOrderId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
       const now = new Date();
       const localOrder: Order = {
@@ -313,6 +320,7 @@ export function useOrders(): UseOrdersReturn {
           deliveryAddress: delivery?.address,
           loyaltyRewardId,
           promotionCode,
+          idempotencyKey,
         } as any);
 
         savedOrder = normalizeOrderPayload(createdOrder) ?? localOrder;
