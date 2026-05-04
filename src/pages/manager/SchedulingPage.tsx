@@ -21,7 +21,23 @@ function addDays(d: Date, n: number): Date {
   return r;
 }
 
-function toDateStr(d: Date) { return d.toISOString().slice(0, 10); }
+function toDateStr(d: Date) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function dateOnly(value: string): string {
+  return value.includes('T') ? value.slice(0, 10) : value;
+}
+
+function normalizeSchedules(list: StaffSchedule[]): StaffSchedule[] {
+  return list.map((s) => ({
+    ...s,
+    shiftDate: dateOnly(s.shiftDate),
+  }));
+}
 
 function fmtTime(t: string) {
   const [h, m] = t.split(':').map(Number);
@@ -75,7 +91,7 @@ export function SchedulingPage() {
       ]);
 
       if (schedulesResult.status === 'fulfilled') {
-        setSchedules(schedulesResult.value);
+        setSchedules(normalizeSchedules(schedulesResult.value));
       } else {
         console.error('Failed to load schedules:', schedulesResult.reason);
         setSchedules([]);
@@ -109,7 +125,8 @@ export function SchedulingPage() {
         endTime: form.endTime,
         notes: form.notes || undefined,
       });
-      setSchedules((prev) => [...prev, created].sort((a, b) => a.shiftDate.localeCompare(b.shiftDate) || a.startTime.localeCompare(b.startTime)));
+      const normalizedCreated = { ...created, shiftDate: dateOnly(created.shiftDate) };
+      setSchedules((prev) => [...prev, normalizedCreated].sort((a, b) => a.shiftDate.localeCompare(b.shiftDate) || a.startTime.localeCompare(b.startTime)));
       setShowModal(false);
     } catch (e: any) {
       setFormError(e?.message || 'Failed to create shift');
