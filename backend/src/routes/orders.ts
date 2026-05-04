@@ -353,8 +353,6 @@ router.post('/:id/confirm-payment', async (req: Request, res: Response) => {
        SET payment_status = 'confirmed',
            payment_confirmed_by = $1,
            payment_confirmed_at = now(),
-           status = CASE WHEN status NOT IN ('cancelled') THEN 'completed' ELSE status END,
-           completed_at = CASE WHEN status NOT IN ('cancelled', 'completed') THEN now() ELSE completed_at END,
            updated_at = now()
        WHERE id = $2
        RETURNING *`,

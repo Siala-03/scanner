@@ -343,39 +343,36 @@ export async function confirmPayment(
 ): Promise<Order> {
   const now = new Date().toISOString();
 
-  // Full update — requires migration 038
+  // Full update — requires migration 040 (payment columns + fixed constraint)
   let result = await db
     .from('orders')
     .update({
       payment_status: 'confirmed',
       payment_confirmed_by: opts.confirmedBy || null,
       payment_confirmed_at: now,
-      status: 'completed',
-      completed_at: now,
       updated_at: now,
     })
     .eq('id', orderId)
     .select()
     .single();
 
-  // Fallback 1: payment columns may not exist yet (migration 038 pending)
-  if (result.error?.code === 'PGRST204' || result.error?.message?.includes('payment_confirmed')) {
-    console.warn('[confirmPayment] payment columns missing, retrying without them:', result.error.message);
+  // Fallback 1: payment_confirmed_at / payment_confirmed_by columns not yet present
+  if (result.error?.code === 'PGRST204') {
+    console.warn('[confirmPayment] payment audit columns missing, retrying without them:', result.error.message);
     result = await db
       .from('orders')
-      .update({ status: 'completed', completed_at: now, updated_at: now })
+      .update({ payment_status: 'confirmed', updated_at: now })
       .eq('id', orderId)
       .select()
       .single();
   }
 
-  // Fallback 2: payment_status check constraint mismatch (wrong allowed values in live schema)
-  // or completed_at column missing — drop both and just set status
+  // Fallback 2: payment_status column missing or check constraint mismatch — mark updated only
   if (result.error?.code === 'PGRST204' || result.error?.code === '23514') {
-    console.warn('[confirmPayment] constraint/column issue, retrying with status only:', result.error.message);
+    console.warn('[confirmPayment] payment_status unavailable, marking updated_at only:', result.error.message);
     result = await db
       .from('orders')
-      .update({ status: 'completed', updated_at: now })
+      .update({ updated_at: now })
       .eq('id', orderId)
       .select()
       .single();
