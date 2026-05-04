@@ -1,10 +1,19 @@
-import { useMemo } from 'react';
+import { useMemo, useEffect, useState, useCallback } from 'react';
 import { Button } from '../../components/ui/Button';
-import { MenuIcon, QrCodeIcon } from 'lucide-react';
+import { MenuIcon, QrCodeIcon, ClockIcon, CheckCircleIcon, BellIcon, XIcon } from 'lucide-react';
 import { AIInsightsChat } from '../../components/manager/AIInsightsChat';
 import { useInventoryData } from '../../hooks/useInventory';
 import { formatPrice } from '../../utils/currency';
+import { supabase } from '../../lib/supabase';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, Legend } from 'recharts';
+
+interface PaymentNotification {
+  id: string;
+  orderNumber: string;
+  amount: number;
+  confirmedByName?: string;
+  at: Date;
+}
 
 interface ManagerDashboardProps {
   onNavigate: (page: 'dashboard' | 'menu' | 'staff' | 'analytics' | 'performance' | 'qrcodes' | 'inventory' | 'history') => void;
@@ -14,6 +23,11 @@ interface ManagerDashboardProps {
   todaysRevenue: number;
   ordersByHour: { hour: string; orders: number; revenue: number }[];
   statusBreakdown: { status: string; count: number }[];
+  pendingPaymentCount?: number;
+  pendingPaymentTotal?: number;
+  confirmedPaymentCount?: number;
+  confirmedPaymentTotal?: number;
+  restaurantId?: string;
 }
 
 const statusColors: Record<string, string> = {
@@ -24,8 +38,41 @@ const statusColors: Record<string, string> = {
   served: '#22c55e'
 };
 
-export function ManagerDashboard({ onNavigate, totalOrders, activeOrders, servedOrders, todaysRevenue, ordersByHour, statusBreakdown }: ManagerDashboardProps) {
+export function ManagerDashboard({ onNavigate, totalOrders, activeOrders, servedOrders, todaysRevenue, ordersByHour, statusBreakdown, pendingPaymentCount = 0, pendingPaymentTotal = 0, confirmedPaymentCount = 0, confirmedPaymentTotal = 0, restaurantId }: ManagerDashboardProps) {
   const { forecasts, forecastAlerts, isGeneratingForecasts, runForecasting, analytics, inventory } = useInventoryData();
+  const [notifications, setNotifications] = useState<PaymentNotification[]>([]);
+
+  const dismissNotification = useCallback((id: string) => {
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
+  }, []);
+
+  // Realtime subscription — fires when any order's payment_status changes to 'confirmed'
+  useEffect(() => {
+    if (!restaurantId) return;
+    const channel = supabase
+      .channel(`manager-payment-notify-${restaurantId}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'orders', filter: `restaurant_id=eq.${restaurantId}` },
+        (payload) => {
+          const row = payload.new as any;
+          if (row.payment_status === 'confirmed' && (payload.old as any).payment_status !== 'confirmed') {
+            const notif: PaymentNotification = {
+              id: row.id,
+              orderNumber: row.order_number || row.id.slice(-6).toUpperCase(),
+              amount: row.total ?? 0,
+              confirmedByName: row.payment_confirmed_by_name || undefined,
+              at: new Date(),
+            };
+            setNotifications((prev) => [notif, ...prev].slice(0, 5));
+            // Auto-dismiss after 8 seconds
+            setTimeout(() => dismissNotification(row.id), 8000);
+          }
+        }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [restaurantId, dismissNotification]);
   const trackedInventoryCount = useMemo(
     () => new Set(inventory.map((item) => item.menuItemId).filter(Boolean)).size,
     [inventory]
@@ -33,6 +80,25 @@ export function ManagerDashboard({ onNavigate, totalOrders, activeOrders, served
 
   return (
     <div className="bg-slate-900 text-slate-100 p-3 md:p-4 min-h-screen">
+      {/* Payment confirmation toast notifications */}
+      {notifications.length > 0 && (
+        <div className="fixed top-4 right-4 z-50 flex flex-col gap-2 w-80">
+          {notifications.map((n) => (
+            <div key={n.id} className="flex items-start gap-3 bg-emerald-900/90 border border-emerald-500/40 rounded-xl p-3 shadow-xl">
+              <BellIcon className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-emerald-300">Payment Confirmed</p>
+                <p className="text-xs text-slate-300">Order #{n.orderNumber} · {formatPrice(n.amount)}</p>
+                {n.confirmedByName && <p className="text-xs text-slate-400">by {n.confirmedByName}</p>}
+              </div>
+              <button onClick={() => dismissNotification(n.id)} className="text-slate-400 hover:text-slate-200 shrink-0">
+                <XIcon className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className="max-w-6xl mx-auto">
         <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-3 mb-4">
           <div>
@@ -49,6 +115,7 @@ export function ManagerDashboard({ onNavigate, totalOrders, activeOrders, served
           </div>
         </div>
 
+        {/* Order KPIs */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
           <div className="rounded-xl border border-slate-700 p-3 bg-slate-800/70">
             <div className="text-xs uppercase tracking-wide text-slate-400">Orders Today</div>
@@ -68,7 +135,31 @@ export function ManagerDashboard({ onNavigate, totalOrders, activeOrders, served
           <div className="rounded-xl border border-emerald-500/30 p-3 bg-emerald-500/5">
             <div className="text-xs uppercase tracking-wide text-emerald-400">Revenue Today</div>
             <div className="mt-2 text-2xl font-semibold text-emerald-400">{formatPrice(todaysRevenue)}</div>
-            <div className="text-xs text-slate-300 mt-1">Served orders only</div>
+            <div className="text-xs text-slate-300 mt-1">Confirmed payments only</div>
+          </div>
+        </div>
+
+        {/* Payment status cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+          <div className="rounded-xl border border-amber-500/30 p-4 bg-amber-500/5 flex items-center gap-4">
+            <div className="w-10 h-10 rounded-full bg-amber-500/15 flex items-center justify-center shrink-0">
+              <ClockIcon className="w-5 h-5 text-amber-400" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-xs uppercase tracking-wide text-amber-400">Pending Payments</div>
+              <div className="text-2xl font-bold text-amber-300 mt-0.5">{pendingPaymentCount} orders</div>
+              <div className="text-sm text-amber-200/70">{formatPrice(pendingPaymentTotal)} outstanding</div>
+            </div>
+          </div>
+          <div className="rounded-xl border border-emerald-500/30 p-4 bg-emerald-500/5 flex items-center gap-4">
+            <div className="w-10 h-10 rounded-full bg-emerald-500/15 flex items-center justify-center shrink-0">
+              <CheckCircleIcon className="w-5 h-5 text-emerald-400" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-xs uppercase tracking-wide text-emerald-400">Confirmed Payments</div>
+              <div className="text-2xl font-bold text-emerald-300 mt-0.5">{confirmedPaymentCount} orders</div>
+              <div className="text-sm text-emerald-200/70">{formatPrice(confirmedPaymentTotal)} collected</div>
+            </div>
           </div>
         </div>
 

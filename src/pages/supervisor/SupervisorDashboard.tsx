@@ -1,5 +1,7 @@
 import {
   Clock3Icon,
+  ClockIcon,
+  CheckCircleIcon,
   DollarSignIcon,
   ReceiptTextIcon,
   TrendingUpIcon,
@@ -20,6 +22,10 @@ interface SupervisorDashboardProps {
   restaurantName?: string;
   ordersByHour: { hour: string; orders: number; revenue: number }[];
   statusBreakdown: { status: string; count: number }[];
+  pendingPaymentCount?: number;
+  pendingPaymentTotal?: number;
+  confirmedPaymentCount?: number;
+  confirmedPaymentTotal?: number;
 }
 
 const statusTone: Record<string, string> = {
@@ -30,7 +36,7 @@ const statusTone: Record<string, string> = {
   served: 'bg-sky-500/10 text-sky-300 border-sky-500/20',
 };
 
-export function SupervisorDashboard({ restaurantName, ordersByHour, statusBreakdown }: SupervisorDashboardProps) {
+export function SupervisorDashboard({ restaurantName, ordersByHour, statusBreakdown, pendingPaymentCount = 0, pendingPaymentTotal = 0, confirmedPaymentCount = 0, confirmedPaymentTotal = 0 }: SupervisorDashboardProps) {
   const { menuItems } = useMenu();
   const { staff, isLoading: staffLoading } = useStaff();
   const { staff: onDutyStaff, isLoading: onDutyLoading } = useStaffOnDuty();
@@ -115,7 +121,7 @@ export function SupervisorDashboard({ restaurantName, ordersByHour, statusBreakd
               <DollarSignIcon className="w-4 h-4 text-emerald-300" />
             </div>
             <div className="mt-2 text-2xl font-semibold text-emerald-300">{kpiLoading ? '—' : formatPrice(kpis?.totalRevenue ?? 0)}</div>
-            <div className="text-xs text-emerald-200/80 mt-1">Served orders only</div>
+            <div className="text-xs text-emerald-200/80 mt-1">Confirmed payments only</div>
           </div>
 
           <div className="rounded-xl border border-slate-700 p-3 bg-slate-800/70">
@@ -145,6 +151,30 @@ export function SupervisorDashboard({ restaurantName, ordersByHour, statusBreakd
               {kpiLoading ? '—' : `${topPeakHour?.hour ?? 0}:00`}
             </div>
             <div className="text-xs text-slate-300 mt-1">{topPeakHour?.orders ?? 0} orders in busiest hour</div>
+          </div>
+        </div>
+
+        {/* Payment status overview */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+          <div className="rounded-xl border border-amber-500/30 p-4 bg-amber-500/5 flex items-center gap-4">
+            <div className="w-10 h-10 rounded-full bg-amber-500/15 flex items-center justify-center shrink-0">
+              <ClockIcon className="w-5 h-5 text-amber-400" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-xs uppercase tracking-wide text-amber-400">Pending Payments</div>
+              <div className="text-2xl font-bold text-amber-300 mt-0.5">{pendingPaymentCount} orders</div>
+              <div className="text-sm text-amber-200/70">{formatPrice(pendingPaymentTotal)} outstanding</div>
+            </div>
+          </div>
+          <div className="rounded-xl border border-emerald-500/30 p-4 bg-emerald-500/5 flex items-center gap-4">
+            <div className="w-10 h-10 rounded-full bg-emerald-500/15 flex items-center justify-center shrink-0">
+              <CheckCircleIcon className="w-5 h-5 text-emerald-400" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-xs uppercase tracking-wide text-emerald-400">Confirmed Payments</div>
+              <div className="text-2xl font-bold text-emerald-300 mt-0.5">{confirmedPaymentCount} orders</div>
+              <div className="text-sm text-emerald-200/70">{formatPrice(confirmedPaymentTotal)} collected</div>
+            </div>
           </div>
         </div>
 

@@ -130,7 +130,7 @@ export function AnalyticsPage() {
 
     filteredOrders.forEach((order) => {
       orderCount += 1;
-      if (order.status === 'served') revenue += order.total ?? order.total_price ?? 0;
+      if ((order as any).payment_status === 'confirmed' || (order as any).paymentStatus === 'confirmed') revenue += order.total ?? order.total_price ?? 0;
       const key = order.customerId ?? order.customer_id ?? order.customerName ?? order.customer_name;
       if (key) periodCustomers.add(String(key));
     });
@@ -160,7 +160,7 @@ export function AnalyticsPage() {
       const d = parseOrderDate(order);
       if (!d || d < prevStart || d >= prevEnd) return;
       orderCount += 1;
-      if (order.status === 'served') revenue += order.total ?? order.total_price ?? 0;
+      if ((order as any).payment_status === 'confirmed' || (order as any).paymentStatus === 'confirmed') revenue += order.total ?? order.total_price ?? 0;
     });
     return { revenue, orders: orderCount };
   }, [orders, periodWindow]);
@@ -192,7 +192,7 @@ export function AnalyticsPage() {
 
         const ordersCount = inBucket.length;
         const revenue = inBucket
-          .filter((order) => order.status === 'served')
+          .filter((order) => (order as any).payment_status === 'confirmed' || (order as any).paymentStatus === 'confirmed')
           .reduce((sum, order) => sum + (order.total ?? order.total_price ?? 0), 0);
 
         rows.push({
@@ -221,7 +221,7 @@ export function AnalyticsPage() {
 
         const ordersCount = inBucket.length;
         const revenue = inBucket
-          .filter((order) => order.status === 'served')
+          .filter((order) => (order as any).payment_status === 'confirmed' || (order as any).paymentStatus === 'confirmed')
           .reduce((sum, order) => sum + (order.total ?? order.total_price ?? 0), 0);
 
         rows.push({
@@ -270,7 +270,7 @@ export function AnalyticsPage() {
       if (d.toISOString().slice(0, 10) !== todayKey) return;
       const row = hours[d.getHours()];
       row.orders += 1;
-      if (order.status === 'served') row.revenue += order.total ?? order.total_price ?? 0;
+      if ((order as any).payment_status === 'confirmed' || (order as any).paymentStatus === 'confirmed') row.revenue += order.total ?? order.total_price ?? 0;
     });
     return hours.slice(8, 23);
   }, [orders]);
@@ -280,7 +280,7 @@ export function AnalyticsPage() {
     const map = new Map<string, { category: string; revenue: number; orders: number; percentage: number }>();
     let totalRevenue = 0;
     filteredOrders.forEach((order) => {
-      if (order.status !== 'served') return;
+      if ((order as any).payment_status !== 'confirmed' && (order as any).paymentStatus !== 'confirmed') return;
       const items = normalizeOrderItems(order.items);
 
       items.forEach((item: any) => {
@@ -428,7 +428,7 @@ export function AnalyticsPage() {
     start.setHours(0, 0, 0, 0);
 
     const servedInWindow = orders.filter((order) => {
-      if (order.status !== 'served') return false;
+      if ((order as any).payment_status !== 'confirmed' && (order as any).paymentStatus !== 'confirmed') return false;
       const createdAt = new Date(order.createdAt ?? order.created_at);
       if (Number.isNaN(createdAt.getTime())) return false;
       return createdAt >= start && createdAt <= now;

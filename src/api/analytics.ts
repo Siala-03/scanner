@@ -62,9 +62,10 @@ export async function fetchTodayKPIs(): Promise<KPIMetrics> {
 
   const list = orders || [];
   const totalOrders = list.length;
-  const servedOrders = list.filter((o: any) => o.status === 'served');
-  const totalRevenue = servedOrders.reduce((sum: number, o: any) => sum + (o.total || 0), 0);
-  const avgOrderValue = servedOrders.length > 0 ? totalRevenue / servedOrders.length : 0;
+  // Revenue only from payment-confirmed orders
+  const confirmedOrders = list.filter((o: any) => o.payment_status === 'confirmed');
+  const totalRevenue = confirmedOrders.reduce((sum: number, o: any) => sum + (o.total || 0), 0);
+  const avgOrderValue = confirmedOrders.length > 0 ? totalRevenue / confirmedOrders.length : 0;
 
   // Peak hours
   const hourMap = new Map<number, number>();

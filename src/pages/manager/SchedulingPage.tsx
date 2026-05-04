@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { CalendarDaysIcon, ChevronLeftIcon, ChevronRightIcon, PlusIcon, TrashIcon, XIcon } from 'lucide-react';
 import { StaffSchedule } from '../../types';
 import { Staff } from '../../types';
@@ -71,6 +71,8 @@ export function SchedulingPage() {
   const [form, setForm] = useState(emptyForm(toDateStr(new Date())));
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
+  const authRetryRef = useRef(0);
+  const authRetryTimerRef = useRef<number | null>(null);
 
   const weekEnd = addDays(weekStart, 6);
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
@@ -82,6 +84,12 @@ export function SchedulingPage() {
     return map;
   }, [staff]);
 
+  function isAuthError(err: unknown): boolean {
+    if (!err || typeof err !== 'object') return false;
+    const status = (err as { status?: number }).status;
+    return status === 401 || status === 403;
+  }
+
   async function load() {
     setLoading(true);
     try {
@@ -91,10 +99,21 @@ export function SchedulingPage() {
       ]);
 
       if (schedulesResult.status === 'fulfilled') {
+        authRetryRef.current = 0;
         setSchedules(normalizeSchedules(schedulesResult.value));
       } else {
         console.error('Failed to load schedules:', schedulesResult.reason);
         setSchedules([]);
+
+        if (isAuthError(schedulesResult.reason) && authRetryRef.current < 6) {
+          authRetryRef.current += 1;
+          if (authRetryTimerRef.current !== null) {
+            window.clearTimeout(authRetryTimerRef.current);
+          }
+          authRetryTimerRef.current = window.setTimeout(() => {
+            void load();
+          }, 600);
+        }
       }
 
       if (staffResult.status === 'fulfilled') {
@@ -102,6 +121,16 @@ export function SchedulingPage() {
       } else {
         console.error('Failed to load staff:', staffResult.reason);
         setStaff([]);
+
+        if (isAuthError(staffResult.reason) && authRetryRef.current < 6) {
+          authRetryRef.current += 1;
+          if (authRetryTimerRef.current !== null) {
+            window.clearTimeout(authRetryTimerRef.current);
+          }
+          authRetryTimerRef.current = window.setTimeout(() => {
+            void load();
+          }, 600);
+        }
       }
     } catch (e) {
       console.error(e);
@@ -111,7 +140,14 @@ export function SchedulingPage() {
     finally { setLoading(false); }
   }
 
-  useEffect(() => { load(); }, [weekStart]);
+  useEffect(() => {
+    void load();
+    return () => {
+      if (authRetryTimerRef.current !== null) {
+        window.clearTimeout(authRetryTimerRef.current);
+      }
+    };
+  }, [weekStart]);
 
   async function handleCreate() {
     if (!form.staffId) { setFormError('Please select a staff member'); return; }

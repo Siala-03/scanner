@@ -50,10 +50,10 @@ router.get('/revenue', authenticate, async (req: AuthenticatedRequest, res: Resp
       SELECT
         ${selectFields},
         COUNT(DISTINCT o.id) as total_orders,
-        SUM(o.total) as total_revenue,
-        AVG(o.total) as avg_order_value,
+        SUM(CASE WHEN o.payment_status = 'confirmed' THEN o.total ELSE 0 END) as total_revenue,
+        AVG(CASE WHEN o.payment_status = 'confirmed' THEN o.total END) as avg_order_value,
         COUNT(DISTINCT CASE WHEN o.customer_id IS NOT NULL THEN o.customer_id END) as unique_customers,
-        SUM(CASE WHEN o.status = 'served' THEN 1 ELSE 0 END) as completed_orders,
+        SUM(CASE WHEN o.payment_status = 'confirmed' THEN 1 ELSE 0 END) as completed_orders,
         AVG(EXTRACT(EPOCH FROM (o.updated_at - o.created_at))/60) as avg_prep_time_minutes
       FROM orders o
       WHERE o.restaurant_id = $1 ${dateFilter}
@@ -128,7 +128,7 @@ router.get('/customer-insights', authenticate, async (req: AuthenticatedRequest,
         END as customer_segment
       FROM orders o
       LEFT JOIN customers c ON o.customer_id = c.id
-      WHERE o.restaurant_id = $1 AND o.status = 'served'
+      WHERE o.restaurant_id = $1 AND o.payment_status = 'confirmed'
       GROUP BY c.id, c.phone, c.email
       HAVING COUNT(o.id) >= $2
       ON CONFLICT (id) DO UPDATE SET
@@ -226,7 +226,7 @@ router.get('/operational-efficiency', authenticate, async (req: AuthenticatedReq
         MAX(EXTRACT(EPOCH FROM (o.updated_at - o.created_at))/60) as max_prep_time,
         COUNT(*) as total_orders
       FROM orders o
-      WHERE o.restaurant_id = $1 ${dateFilter} AND o.status = 'served'
+      WHERE o.restaurant_id = $1 ${dateFilter} AND o.payment_status = 'confirmed'
       GROUP BY DATE(o.created_at)
       ORDER BY date DESC
     `;
@@ -296,7 +296,7 @@ router.get('/predictive-insights', authenticate, async (req: AuthenticatedReques
       FROM orders
       WHERE restaurant_id = $1
         AND created_at >= NOW() - INTERVAL '90 days'
-        AND status = 'served'
+        AND payment_status = 'confirmed'
       GROUP BY EXTRACT(dow FROM created_at), EXTRACT(hour FROM created_at)
       ORDER BY day_of_week, hour
     `;
@@ -318,7 +318,7 @@ router.get('/predictive-insights', authenticate, async (req: AuthenticatedReques
       FROM orders
       WHERE restaurant_id = $1
         AND created_at >= NOW() - INTERVAL '60 days'
-        AND status = 'served'
+        AND payment_status = 'confirmed'
       GROUP BY DATE(created_at)
       ORDER BY date DESC
     `;
@@ -392,7 +392,7 @@ router.get('/dashboard', authenticate, async (req: AuthenticatedRequest, res: Re
       FROM orders
       WHERE restaurant_id = $1
         AND DATE(created_at) = CURRENT_DATE
-        AND status = 'served'
+        AND payment_status = 'confirmed'
     `;
 
     // Yesterday comparison
@@ -405,7 +405,7 @@ router.get('/dashboard', authenticate, async (req: AuthenticatedRequest, res: Re
       FROM orders
       WHERE restaurant_id = $1
         AND DATE(created_at) = CURRENT_DATE - INTERVAL '1 day'
-        AND status = 'served'
+        AND payment_status = 'confirmed'
     `;
 
     // Weekly trend
@@ -417,7 +417,7 @@ router.get('/dashboard', authenticate, async (req: AuthenticatedRequest, res: Re
       FROM orders
       WHERE restaurant_id = $1
         AND created_at >= CURRENT_DATE - INTERVAL '7 days'
-        AND status = 'served'
+        AND payment_status = 'confirmed'
       GROUP BY DATE(created_at)
       ORDER BY date
     `;
@@ -434,7 +434,7 @@ router.get('/dashboard', authenticate, async (req: AuthenticatedRequest, res: Re
       JOIN orders o ON oi.order_id = o.id
       WHERE o.restaurant_id = $1
         AND o.created_at >= CURRENT_DATE - INTERVAL '30 days'
-        AND o.status = 'served'
+        AND o.payment_status = 'confirmed'
       GROUP BY mi.id, mi.name, mi.category
       ORDER BY revenue DESC
       LIMIT 10

@@ -272,23 +272,36 @@ export function App() {
     return dt >= dayStart;
   };
 
+  const isPaymentConfirmed = (order: any) =>
+    order.paymentStatus === 'confirmed' || order.payment_status === 'confirmed';
+
   const managerActiveOrders = orders.filter((order) => ['pending', 'verified', 'preparing', 'ready'].includes(order.status)).length;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const managerTotalOrders = orders.filter((order) => isSameDay(order.createdAt, today)).length;
-  // Served orders for TODAY only (matches the "Completed today" label on the dashboard card)
   const managerServedOrders = orders.filter(
     (order) =>
       order.status === 'served' &&
       (isSameDay(order.servedAt, today) || isSameDay(order.updatedAt, today) || isSameDay(order.createdAt, today))
   ).length;
+
+  // Revenue only counts orders with confirmed payment
   const managerTodaysRevenue = orders
     .filter(
       (order) =>
-        order.status === 'served' &&
-        (isSameDay(order.servedAt, today) || isSameDay(order.updatedAt, today) || isSameDay(order.createdAt, today))
+        isPaymentConfirmed(order) &&
+        (isSameDay((order as any).paymentConfirmedAt ?? (order as any).payment_confirmed_at ?? order.updatedAt, today) ||
+         isSameDay(order.createdAt, today))
     )
     .reduce((sum, order) => sum + (typeof order.total === 'number' ? order.total : 0), 0);
+
+  // Payment pending / confirmed counts (all time, for dashboard cards)
+  const pendingPaymentOrders = orders.filter(
+    (order) => !isPaymentConfirmed(order) && order.status !== 'cancelled'
+  );
+  const confirmedPaymentOrders = orders.filter(isPaymentConfirmed);
+  const pendingPaymentTotal = pendingPaymentOrders.reduce((s, o) => s + (typeof o.total === 'number' ? o.total : 0), 0);
+  const confirmedPaymentTotal = confirmedPaymentOrders.reduce((s, o) => s + (typeof o.total === 'number' ? o.total : 0), 0);
 
   const getHourKey = (date: Date) => `${date.getHours().toString().padStart(2, '0')}:00`;
   const chartHours = Array.from({ length: 12 }, (_, i) => {
@@ -310,9 +323,9 @@ export function App() {
     return {
       hour: getHourKey(hourDate),
       orders: ordersInHour.length,
-      // Only served orders count as realised revenue; totals are in RWF (no /100 conversion needed)
+      // Only payment-confirmed orders count as realised revenue
       revenue: ordersInHour
-        .filter((order) => order.status === 'served')
+        .filter(isPaymentConfirmed)
         .reduce((sum, order) => sum + (typeof order.total === 'number' ? order.total : 0), 0),
     };
   });
@@ -783,6 +796,10 @@ export function App() {
             restaurantName={restaurantName}
             ordersByHour={ordersByHour}
             statusBreakdown={statusBreakdown}
+            pendingPaymentCount={pendingPaymentOrders.length}
+            pendingPaymentTotal={pendingPaymentTotal}
+            confirmedPaymentCount={confirmedPaymentOrders.length}
+            confirmedPaymentTotal={confirmedPaymentTotal}
           />
         )}
         {supervisorPage === 'revenue' && <RevenueReports />}
@@ -945,6 +962,11 @@ export function App() {
                 todaysRevenue={managerTodaysRevenue}
                 ordersByHour={ordersByHour}
                 statusBreakdown={statusBreakdown}
+                pendingPaymentCount={pendingPaymentOrders.length}
+                pendingPaymentTotal={pendingPaymentTotal}
+                confirmedPaymentCount={confirmedPaymentOrders.length}
+                confirmedPaymentTotal={confirmedPaymentTotal}
+                restaurantId={currentRestaurantId ?? undefined}
               />
             }
             {managerPage === 'menu' && <MenuManagement />}
