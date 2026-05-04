@@ -507,7 +507,26 @@ router.post('/', async (req: Request, res: Response) => {
     console.log('Order created with restaurantId:', normalizedOrder.restaurantId, 'id:', normalizedOrder.id);
     emitOrderUpdate({ type: 'create', order: normalizedOrder });
     res.status(201).json(normalizedOrder);
-  } catch (error) {
+  } catch (error: any) {
+    // Unique-constraint race: another concurrent request already inserted this order.
+    // Return the existing row rather than a 500.
+    const isUniqueViolation = error?.code === '23505' || error?.constraint?.includes('idempotency');
+    if (isUniqueViolation) {
+      const resolvedIdempotencyKey = req.body.idempotencyKey || req.body.idempotency_key || null;
+      if (resolvedIdempotencyKey) {
+        try {
+          const existing = await pool.query(
+            'SELECT * FROM orders WHERE idempotency_key = $1 LIMIT 1',
+            [resolvedIdempotencyKey]
+          );
+          if (existing.rows.length > 0) {
+            return res.status(200).json(normalizeOrder(existing.rows[0]));
+          }
+        } catch {
+          // fall through to error response
+        }
+      }
+    }
     console.error('Error creating order:', error);
     res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to create order' });
   }

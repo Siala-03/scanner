@@ -204,6 +204,18 @@ export async function createOrder(order: CreateOrderInput): Promise<Order> {
 
   let result = await db.from('orders').insert(fullPayload).select().single();
 
+  // If the insert hit a unique-constraint violation (23505) on idempotency_key or id,
+  // the order was already created — return it instead of throwing.
+  if (result.error?.code === '23505') {
+    const { data: existing } = await db
+      .from('orders')
+      .select('*')
+      .or(`idempotency_key.eq.${idempotencyKey},id.eq.${orderId}`)
+      .limit(1)
+      .single();
+    if (existing) return existing as Order;
+  }
+
   // Fallback 1: remove assigned_waiter_id (may not exist in schema)
   if (result.error) {
     console.warn('[createOrder] Full insert failed, retrying without assigned_waiter_id:', result.error.message);
@@ -215,6 +227,7 @@ export async function createOrder(order: CreateOrderInput): Promise<Order> {
       customer_phone: (order as any).customerPhone || null,
       customer_id: order.customerId || null,
       status: 'pending',
+      idempotency_key: idempotencyKey,
       items,
       subtotal: total,
       tax: 0,
@@ -227,6 +240,10 @@ export async function createOrder(order: CreateOrderInput): Promise<Order> {
       is_online_order: isOnlineOrder,
     };
     result = await db.from('orders').insert(payload2).select().single();
+    if (result.error?.code === '23505') {
+      const { data: existing } = await db.from('orders').select('*').or(`idempotency_key.eq.${idempotencyKey},id.eq.${orderId}`).limit(1).single();
+      if (existing) return existing as Order;
+    }
   }
 
   // Fallback 2: also remove requires_kitchen (may not exist in schema)
@@ -239,6 +256,7 @@ export async function createOrder(order: CreateOrderInput): Promise<Order> {
       customer_name: order.customerName || null,
       customer_id: order.customerId || null,
       status: 'pending',
+      idempotency_key: idempotencyKey,
       items,
       total,
       notes: order.notes || null,
@@ -246,6 +264,10 @@ export async function createOrder(order: CreateOrderInput): Promise<Order> {
       restaurant_id: restaurantId,
     };
     result = await db.from('orders').insert(payload3).select().single();
+    if (result.error?.code === '23505') {
+      const { data: existing } = await db.from('orders').select('*').or(`idempotency_key.eq.${idempotencyKey},id.eq.${orderId}`).limit(1).single();
+      if (existing) return existing as Order;
+    }
   }
 
   // Fallback 3: absolute bare minimum
@@ -255,12 +277,17 @@ export async function createOrder(order: CreateOrderInput): Promise<Order> {
       id: orderId,
       table_number: order.tableNumber,
       status: 'pending',
+      idempotency_key: idempotencyKey,
       items,
       total,
       created_by: staffId,
       restaurant_id: restaurantId,
     };
     result = await db.from('orders').insert(corePayload).select().single();
+    if (result.error?.code === '23505') {
+      const { data: existing } = await db.from('orders').select('*').or(`idempotency_key.eq.${idempotencyKey},id.eq.${orderId}`).limit(1).single();
+      if (existing) return existing as Order;
+    }
   }
 
   if (result.error) throw result.error;
