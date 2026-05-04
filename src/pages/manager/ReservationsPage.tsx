@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { CalendarIcon, PlusIcon, CheckIcon, UserIcon, PhoneIcon, UsersIcon, ClockIcon } from 'lucide-react';
+import { CalendarIcon, PlusIcon, CheckIcon, UserIcon, PhoneIcon, UsersIcon, ClockIcon, ChevronDownIcon, MailIcon, MapPinIcon, StickyNoteIcon } from 'lucide-react';
 import { Reservation, ReservationStatus } from '../../types';
 import { getReservations, createReservation, updateReservation, cancelReservation } from '../../api/reservations';
 
@@ -51,6 +51,7 @@ export function ReservationsPage() {
   const [form, setForm] = useState(emptyForm());
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   async function load(date: string) {
     setLoading(true);
@@ -178,9 +179,14 @@ export function ReservationsPage() {
       <div className="space-y-3">
         {reservations.map(r => {
           const cfg = STATUS_CONFIG[r.status];
+          const expanded = expandedId === r.id;
           return (
-            <div key={r.id} className={`rounded-xl border p-4 ${cfg.bg}`}>
-              <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+            <div key={r.id} className={`rounded-xl border ${cfg.bg} overflow-hidden`}>
+              {/* Summary row */}
+              <div
+                className="flex flex-col sm:flex-row sm:items-center gap-3 p-4 cursor-pointer select-none"
+                onClick={() => setExpandedId(expanded ? null : r.id)}
+              >
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap mb-1">
                     <span className="font-bold text-slate-100">{r.customerName}</span>
@@ -194,52 +200,97 @@ export function ReservationsPage() {
                     <span className="flex items-center gap-1"><UsersIcon className="w-3 h-3" />{r.partySize} guests</span>
                     <span className="flex items-center gap-1"><PhoneIcon className="w-3 h-3" />{r.customerPhone}</span>
                   </div>
-                  {r.notes && <p className="text-xs text-slate-500 mt-1 italic">"{r.notes}"</p>}
                 </div>
-
-                <div className="flex items-center gap-2 flex-wrap">
-                  {r.status === 'pending' && (
-                    <button
-                      onClick={() => handleStatusChange(r, 'confirmed')}
-                      className="text-xs px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-medium transition-colors"
-                    >
-                      Confirm
-                    </button>
-                  )}
-                  {r.status === 'confirmed' && (
-                    <button
-                      onClick={() => handleStatusChange(r, 'seated')}
-                      className="text-xs px-3 py-1.5 rounded-lg bg-green-600 hover:bg-green-500 text-white font-medium transition-colors flex items-center gap-1"
-                    >
-                      <CheckIcon className="w-3 h-3" /> Seat
-                    </button>
-                  )}
-                  {r.status === 'seated' && (
-                    <button
-                      onClick={() => handleStatusChange(r, 'completed')}
-                      className="text-xs px-3 py-1.5 rounded-lg bg-slate-600 hover:bg-slate-500 text-white font-medium transition-colors"
-                    >
-                      Complete
-                    </button>
-                  )}
-                  {['pending', 'confirmed'].includes(r.status) && (
-                    <button
-                      onClick={() => handleStatusChange(r, 'no_show')}
-                      className="text-xs px-3 py-1.5 rounded-lg bg-orange-800/50 hover:bg-orange-800 text-orange-300 font-medium transition-colors"
-                    >
-                      No Show
-                    </button>
-                  )}
-                  {!['cancelled', 'completed'].includes(r.status) && (
-                    <button
-                      onClick={() => handleCancel(r)}
-                      className="text-xs px-3 py-1.5 rounded-lg bg-red-900/40 hover:bg-red-900/60 text-red-400 font-medium transition-colors"
-                    >
-                      Cancel
-                    </button>
-                  )}
+                <div className="flex items-center gap-2">
+                  <ChevronDownIcon className={`w-4 h-4 text-slate-400 transition-transform ${expanded ? 'rotate-180' : ''}`} />
                 </div>
               </div>
+
+              {/* Expanded guest detail panel */}
+              {expanded && (
+                <div className="border-t border-slate-700/60 px-4 py-3 bg-slate-800/60">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm mb-3">
+                    <div className="flex items-center gap-2 text-slate-300">
+                      <UserIcon className="w-4 h-4 text-slate-500 shrink-0" />
+                      <span className="font-medium text-slate-100">{r.customerName}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-slate-300">
+                      <PhoneIcon className="w-4 h-4 text-slate-500 shrink-0" />
+                      <a href={`tel:${r.customerPhone}`} className="hover:text-amber-300 transition-colors">{r.customerPhone}</a>
+                    </div>
+                    {r.customerEmail && (
+                      <div className="flex items-center gap-2 text-slate-300">
+                        <MailIcon className="w-4 h-4 text-slate-500 shrink-0" />
+                        <a href={`mailto:${r.customerEmail}`} className="hover:text-amber-300 transition-colors truncate">{r.customerEmail}</a>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-2 text-slate-300">
+                      <CalendarIcon className="w-4 h-4 text-slate-500 shrink-0" />
+                      <span>{r.reservationDate} at {formatTime(r.reservationTime)}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-slate-300">
+                      <ClockIcon className="w-4 h-4 text-slate-500 shrink-0" />
+                      <span>{r.durationMinutes} min · {r.partySize} {r.partySize === 1 ? 'guest' : 'guests'}</span>
+                    </div>
+                    {r.tableNumber && (
+                      <div className="flex items-center gap-2 text-slate-300">
+                        <MapPinIcon className="w-4 h-4 text-slate-500 shrink-0" />
+                        <span>Table {r.tableNumber}</span>
+                      </div>
+                    )}
+                    {r.notes && (
+                      <div className="flex items-start gap-2 text-slate-300 sm:col-span-2">
+                        <StickyNoteIcon className="w-4 h-4 text-slate-500 shrink-0 mt-0.5" />
+                        <span className="italic text-slate-400">{r.notes}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Action buttons */}
+                  <div className="flex items-center gap-2 flex-wrap pt-2 border-t border-slate-700/40">
+                    {r.status === 'pending' && (
+                      <button
+                        onClick={e => { e.stopPropagation(); handleStatusChange(r, 'confirmed'); }}
+                        className="text-xs px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-medium transition-colors"
+                      >
+                        Confirm
+                      </button>
+                    )}
+                    {r.status === 'confirmed' && (
+                      <button
+                        onClick={e => { e.stopPropagation(); handleStatusChange(r, 'seated'); }}
+                        className="text-xs px-3 py-1.5 rounded-lg bg-green-600 hover:bg-green-500 text-white font-medium transition-colors flex items-center gap-1"
+                      >
+                        <CheckIcon className="w-3 h-3" /> Seat
+                      </button>
+                    )}
+                    {r.status === 'seated' && (
+                      <button
+                        onClick={e => { e.stopPropagation(); handleStatusChange(r, 'completed'); }}
+                        className="text-xs px-3 py-1.5 rounded-lg bg-slate-600 hover:bg-slate-500 text-white font-medium transition-colors"
+                      >
+                        Complete
+                      </button>
+                    )}
+                    {['pending', 'confirmed'].includes(r.status) && (
+                      <button
+                        onClick={e => { e.stopPropagation(); handleStatusChange(r, 'no_show'); }}
+                        className="text-xs px-3 py-1.5 rounded-lg bg-orange-800/50 hover:bg-orange-800 text-orange-300 font-medium transition-colors"
+                      >
+                        No Show
+                      </button>
+                    )}
+                    {!['cancelled', 'completed'].includes(r.status) && (
+                      <button
+                        onClick={e => { e.stopPropagation(); handleCancel(r); }}
+                        className="text-xs px-3 py-1.5 rounded-lg bg-red-900/40 hover:bg-red-900/60 text-red-400 font-medium transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           );
         })}
