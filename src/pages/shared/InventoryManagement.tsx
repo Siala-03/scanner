@@ -1361,68 +1361,98 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
               ))}
             </div>
 
-            <div className="space-y-3">
-              {filteredPurchaseOrders.map((po) => (
-                <Card key={po.id} className="bg-slate-800/50 border border-slate-700/50 hover:border-slate-600/50 transition cursor-pointer" onClick={() => setSelectedPO(po)}>
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="font-bold text-white text-sm">{po.id}</span>
+            <div className="overflow-x-auto border border-slate-700/50 rounded-lg">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-slate-800/50 border-b border-slate-700/50">
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300">PO ID</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300">Supplier</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300">Status</th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-slate-300">Items</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-slate-300">Total</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300">Expected</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300">Created</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-slate-300">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-700/50">
+                  {filteredPurchaseOrders.map((po) => (
+                    <tr 
+                      key={po.id} 
+                      className="bg-slate-800/30 hover:bg-slate-800/50 transition cursor-pointer border-slate-700/30"
+                      onClick={() => setSelectedPO(po)}
+                    >
+                      <td className="px-4 py-3 text-sm font-semibold text-amber-400">
+                        {po.id}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-slate-300">
+                        {po.supplierName}
+                      </td>
+                      <td className="px-4 py-3 text-sm">
                         <StatusPill status={po.status} />
-                      </div>
-                      <p className="text-slate-300 text-sm">{po.supplierName}</p>
-                      <p className="text-xs text-slate-500 mt-1">
-                        {po.items.length} item{po.items.length !== 1 ? 's' : ''} · Expected {po.expectedDelivery}
-                        {po.notes && <span className="ml-2 italic">"{po.notes}"</span>}
-                      </p>
-                    </div>
-                    <div className="text-right flex-shrink-0">
-                      <p className="text-amber-400 font-bold">{formatPrice(po.totalCost)}</p>
-                      <p className="text-xs text-slate-500 mt-1">
-                        Created {new Date(po.createdAt).toLocaleDateString()}
-                      </p>
-                      {isManager && (po.status === 'confirmed' || po.status === 'sent' || po.status === 'partial') && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setReceiveModal(po);
-                            setReceiveQtys(Object.fromEntries(po.items.map((i) => [i.menuItemId, i.orderedQty - i.receivedQty])));
-                          }}
-                          className="mt-2 px-3 py-1 rounded-lg bg-emerald-500/20 text-emerald-400 text-xs font-medium hover:bg-emerald-500/30 transition"
-                        >
-                          Receive Delivery
-                        </button>
-                      )}
-                      {isManager && po.status === 'sent' && (
-                        <button
-                          onClick={async (e) => { e.stopPropagation(); try { await apiUpdatePurchaseOrder(po.id, { status: 'confirmed' }); await refresh(); alert('Purchase order confirmed'); } catch (err) { alert(`Failed: ${err instanceof Error ? err.message : 'Unknown error'}`); } }}
-                          className="mt-1 px-3 py-1 rounded-lg bg-amber-500/20 text-amber-400 text-xs font-medium hover:bg-amber-500/30 transition"
-                        >
-                          Confirm PO
-                        </button>
-                      )}
-                      {isManager && po.status === 'draft' && (
-                        <div className="flex gap-1 mt-2 justify-end">
-                          <button
-                            onClick={async (e) => { e.stopPropagation(); try { await apiUpdatePurchaseOrder(po.id, { status: 'sent' }); await refresh(); alert('Purchase order sent successfully'); } catch (err) { console.error('Failed to send PO', err); alert(`Failed to send PO: ${err instanceof Error ? err.message : 'Unknown error'}`); } }}
-                            className="px-3 py-1 rounded-lg bg-blue-500/20 text-blue-400 text-xs font-medium hover:bg-blue-500/30 transition"
-                          >
-                            Send PO
-                          </button>
-                          <button
-                            onClick={async (e) => { e.stopPropagation(); try { await apiUpdatePurchaseOrder(po.id, { status: 'cancelled' }); await refresh(); alert('Purchase order cancelled successfully'); } catch (err) { console.error('Failed to cancel PO', err); alert(`Failed to cancel PO: ${err instanceof Error ? err.message : 'Unknown error'}`); } }}
-                            className="px-3 py-1 rounded-lg bg-red-500/20 text-red-400 text-xs font-medium hover:bg-red-500/30 transition"
-                          >
-                            Cancel
-                          </button>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-slate-400 text-center">
+                        {po.items.length}
+                      </td>
+                      <td className="px-4 py-3 text-sm font-bold text-emerald-400 text-right">
+                        {formatPrice(po.totalCost)}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-slate-400">
+                        {po.expectedDelivery}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-slate-500">
+                        {new Date(po.createdAt).toLocaleDateString()}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <div className="flex gap-1.5 justify-end flex-wrap">
+                          {isManager && (po.status === 'confirmed' || po.status === 'sent' || po.status === 'partial') && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setReceiveModal(po);
+                                setReceiveQtys(Object.fromEntries(po.items.map((i) => [i.menuItemId, i.orderedQty - i.receivedQty])));
+                              }}
+                              className="px-2 py-1 rounded text-xs bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 transition"
+                              title="Receive Delivery"
+                            >
+                              Receive
+                            </button>
+                          )}
+                          {isManager && po.status === 'sent' && (
+                            <button
+                              onClick={async (e) => { e.stopPropagation(); try { await apiUpdatePurchaseOrder(po.id, { status: 'confirmed' }); await refresh(); alert('Purchase order confirmed'); } catch (err) { alert(`Failed: ${err instanceof Error ? err.message : 'Unknown error'}`); } }}
+                              className="px-2 py-1 rounded text-xs bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 transition"
+                              title="Confirm PO"
+                            >
+                              Confirm
+                            </button>
+                          )}
+                          {isManager && po.status === 'draft' && (
+                            <>
+                              <button
+                                onClick={async (e) => { e.stopPropagation(); try { await apiUpdatePurchaseOrder(po.id, { status: 'sent' }); await refresh(); alert('Purchase order sent successfully'); } catch (err) { console.error('Failed to send PO', err); alert(`Failed to send PO: ${err instanceof Error ? err.message : 'Unknown error'}`); } }}
+                                className="px-2 py-1 rounded text-xs bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 transition"
+                                title="Send PO"
+                              >
+                                Send
+                              </button>
+                              <button
+                                onClick={async (e) => { e.stopPropagation(); try { await apiUpdatePurchaseOrder(po.id, { status: 'cancelled' }); await refresh(); alert('Purchase order cancelled successfully'); } catch (err) { console.error('Failed to cancel PO', err); alert(`Failed to cancel PO: ${err instanceof Error ? err.message : 'Unknown error'}`); } }}
+                                className="px-2 py-1 rounded text-xs bg-red-500/20 text-red-400 hover:bg-red-500/30 transition"
+                                title="Cancel"
+                              >
+                                Cancel
+                              </button>
+                            </>
+                          )}
                         </div>
-                      )}
-                    </div>
-                  </div>
-                </Card>
-              ))}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
               {filteredPurchaseOrders.length === 0 && (
-                <div className="py-16 text-center text-slate-500">No purchase orders found.</div>
+                <div className="py-16 text-center text-slate-500 bg-slate-800/30">No purchase orders found.</div>
               )}
             </div>
           </motion.div>

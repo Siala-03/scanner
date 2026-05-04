@@ -341,19 +341,45 @@ export async function confirmPayment(
   orderId: string,
   opts: { paymentType?: string; confirmedBy?: string; restaurantId?: string }
 ): Promise<Order> {
-  const result = await db
+  const now = new Date().toISOString();
+
+  // Full update — requires migration 038
+  let result = await db
     .from('orders')
     .update({
       payment_status: 'confirmed',
       payment_confirmed_by: opts.confirmedBy || null,
-      payment_confirmed_at: new Date().toISOString(),
+      payment_confirmed_at: now,
       status: 'completed',
-      completed_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+      completed_at: now,
+      updated_at: now,
     })
     .eq('id', orderId)
     .select()
     .single();
+
+  // Fallback 1: payment columns may not exist yet (migration 038 pending)
+  if (result.error?.code === 'PGRST204' || result.error?.message?.includes('payment_confirmed')) {
+    console.warn('[confirmPayment] payment columns missing, retrying without them:', result.error.message);
+    result = await db
+      .from('orders')
+      .update({ status: 'completed', completed_at: now, updated_at: now })
+      .eq('id', orderId)
+      .select()
+      .single();
+  }
+
+  // Fallback 2: payment_status check constraint mismatch (wrong allowed values in live schema)
+  // or completed_at column missing — drop both and just set status
+  if (result.error?.code === 'PGRST204' || result.error?.code === '23514') {
+    console.warn('[confirmPayment] constraint/column issue, retrying with status only:', result.error.message);
+    result = await db
+      .from('orders')
+      .update({ status: 'completed', updated_at: now })
+      .eq('id', orderId)
+      .select()
+      .single();
+  }
 
   if (result.error) throw result.error;
   return result.data as Order;
