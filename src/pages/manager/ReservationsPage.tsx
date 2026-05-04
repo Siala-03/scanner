@@ -8,7 +8,16 @@ function restaurantId(): string {
 }
 
 function today(): string {
-  return new Date().toISOString().slice(0, 10);
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function dateOnly(value: string | undefined): string {
+  if (!value) return '';
+  return String(value).slice(0, 10);
 }
 
 function emptyForm() {
@@ -47,7 +56,8 @@ export function ReservationsPage() {
     setLoading(true);
     try {
       const data = await getReservations(restaurantId(), date);
-      setReservations(data);
+      // Normalize reservation_date from Postgres (may come as full ISO timestamp)
+      setReservations(data.map(r => ({ ...r, reservationDate: dateOnly(r.reservationDate) })));
     } catch (e) {
       console.error(e);
     } finally {
@@ -84,7 +94,7 @@ export function ReservationsPage() {
     setSaving(true);
     setFormError('');
     try {
-      const created = await createReservation({
+      await createReservation({
         restaurantId: restaurantId(),
         customerName: form.customerName.trim(),
         customerPhone: form.customerPhone.trim(),
@@ -96,11 +106,12 @@ export function ReservationsPage() {
         tableNumber: form.tableNumber ? Number(form.tableNumber) : undefined,
         notes: form.notes.trim() || undefined,
       });
-      if (created.reservationDate === selectedDate) {
-        setReservations(prev => [...prev, created].sort((a, b) => a.reservationTime.localeCompare(b.reservationTime)));
-      }
+      // Navigate to the reservation's date and reload so the entry is always visible
+      const targetDate = form.reservationDate;
       setShowModal(false);
       setForm(emptyForm());
+      setSelectedDate(targetDate);
+      await load(targetDate);
     } catch (e: any) {
       setFormError(e?.message || 'Failed to create reservation');
     } finally {

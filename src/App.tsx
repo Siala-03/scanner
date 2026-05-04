@@ -45,7 +45,7 @@ import type { RestaurantReceiptSettings } from './api/restaurants';
 import { MinimartApp } from './pages/minimart/MinimartApp';
 import { RestaurantSettings } from './pages/manager/RestaurantSettings';
 
-type UserRole = 'customer' | 'waiter' | 'supervisor' | 'manager' | 'kitchen' | 'superadmin' | 'supplier' | null;
+type UserRole = 'customer' | 'waiter' | 'cashier' | 'supervisor' | 'manager' | 'kitchen' | 'superadmin' | 'supplier' | null;
 type ManagerPage = 'dashboard' | 'menu' | 'staff' | 'analytics' | 'performance' | 'qrcodes' | 'inventory' | 'history' | 'expenses' | 'credit' | 'loyalty' | 'promotions' | 'reservations' | 'scheduling' | 'reviews' | 'settings';
 type SupervisorPage = 'dashboard' | 'revenue' | 'staff' | 'qrcodes' | 'inventory' | 'menu' | 'history' | 'expenses' | 'online-orders' | 'payments';
 
@@ -649,7 +649,19 @@ export function App() {
     return <SupplierDashboard user={supplierUser} onLogout={handleBack} />;
   }
 
-  // Minimart portal — all roles on a minimart outlet go through MinimartApp
+  // Cashier is a minimart-only role — route immediately without waiting for outletType fetch
+  if (selectedRole === 'cashier' && authUser && currentRestaurantId) {
+    return (
+      <MinimartApp
+        restaurantId={currentRestaurantId}
+        restaurantName={restaurantName}
+        authUser={authUser}
+        onLogout={handleLogout}
+      />
+    );
+  }
+
+  // Minimart portal — manager/supervisor on a minimart outlet
   if (authUser && outletType === 'minimart' && currentRestaurantId) {
     return (
       <MinimartApp

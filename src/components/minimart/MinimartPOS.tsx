@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { fetchMenu } from '../../api/menu';
 import { createOrder, confirmPayment } from '../../api/orders';
+import { supabase } from '../../lib/supabase';
 import { formatPrice } from '../../utils/currency';
 import type { MenuItem, Staff } from '../../types';
 
@@ -48,6 +49,29 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
   const [checkingOut, setCheckingOut] = useState(false);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
   const [showCart, setShowCart] = useState(false);
+  const [shiftSales, setShiftSales] = useState({ count: 0, total: 0 });
+
+  const loadShiftStats = useCallback(async () => {
+    if (!restaurantId || !cashier?.id) return;
+    try {
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const { data } = await supabase
+        .from('orders')
+        .select('total')
+        .eq('restaurant_id', restaurantId)
+        .eq('payment_status', 'confirmed')
+        .eq('payment_confirmed_by', cashier.id)
+        .gte('created_at', todayStart.toISOString());
+      const rows = data || [];
+      setShiftSales({
+        count: rows.length,
+        total: rows.reduce((s: number, o: any) => s + (o.total || 0), 0),
+      });
+    } catch {
+      // non-fatal
+    }
+  }, [restaurantId, cashier?.id]);
 
   const loadProducts = useCallback(async () => {
     setLoading(true);
@@ -65,6 +89,7 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
   }, []);
 
   useEffect(() => { loadProducts(); }, [loadProducts]);
+  useEffect(() => { loadShiftStats(); }, [loadShiftStats]);
 
   const categories = ['all', ...Array.from(new Set(products.map((p) => p.category))).sort()];
 
@@ -134,6 +159,7 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
       setCart([]);
       setCustomerName('');
       setShowCart(false);
+      loadShiftStats();
     } catch (err) {
       console.error('Checkout failed:', err);
       alert('Checkout failed. Please try again.');
@@ -214,12 +240,13 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
   return (
     <div className="flex flex-col h-screen bg-slate-950 overflow-hidden">
       {/* ── Top bar ── */}
-      <header className="flex items-center gap-3 px-4 py-3 bg-slate-900 border-b border-slate-800 shrink-0">
-        <div className="flex-1 min-w-0">
-          <p className="text-xs text-slate-400 uppercase tracking-wide">Minimart POS</p>
-          <p className="font-semibold text-slate-100 truncate">{restaurantName}</p>
-        </div>
-        <span className="text-xs text-slate-400 hidden sm:block">{cashier?.name}</span>
+      <header className="flex flex-col bg-slate-900 border-b border-slate-800 shrink-0">
+        <div className="flex items-center gap-3 px-4 py-3">
+          <div className="flex-1 min-w-0">
+            <p className="text-xs text-slate-400 uppercase tracking-wide">Minimart POS</p>
+            <p className="font-semibold text-slate-100 truncate">{restaurantName}</p>
+          </div>
+          <span className="text-xs text-slate-400 hidden sm:block">{cashier?.name}</span>
         {/* Cart toggle (mobile) */}
         <button
           onClick={() => setShowCart(true)}
@@ -232,9 +259,16 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
             </span>
           )}
         </button>
-        <button onClick={onLogout} className="p-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors">
-          <LogOutIcon className="w-4 h-4" />
-        </button>
+          <button onClick={onLogout} className="p-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors">
+            <LogOutIcon className="w-4 h-4" />
+          </button>
+        </div>
+        {/* Shift summary */}
+        <div className="flex items-center gap-4 px-4 py-2 bg-slate-800/60 border-t border-slate-800 text-xs text-slate-400">
+          <span>My shift today:</span>
+          <span className="text-slate-200 font-medium">{shiftSales.count} sale{shiftSales.count !== 1 ? 's' : ''}</span>
+          <span className="text-emerald-400 font-semibold">{formatPrice(shiftSales.total)}</span>
+        </div>
       </header>
 
       <div className="flex flex-1 min-h-0">
