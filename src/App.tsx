@@ -44,9 +44,10 @@ import { fetchRestaurantPublic, fetchReceiptSettings, type OutletType } from './
 import type { RestaurantReceiptSettings } from './api/restaurants';
 import { MinimartApp } from './pages/minimart/MinimartApp';
 import { RestaurantSettings } from './pages/manager/RestaurantSettings';
+import { EbmSettings } from './pages/manager/EbmSettings';
 
 type UserRole = 'customer' | 'waiter' | 'cashier' | 'supervisor' | 'manager' | 'kitchen' | 'superadmin' | 'supplier' | null;
-type ManagerPage = 'dashboard' | 'menu' | 'staff' | 'analytics' | 'performance' | 'qrcodes' | 'inventory' | 'history' | 'expenses' | 'credit' | 'loyalty' | 'promotions' | 'reservations' | 'scheduling' | 'reviews' | 'settings';
+type ManagerPage = 'dashboard' | 'menu' | 'staff' | 'analytics' | 'performance' | 'qrcodes' | 'inventory' | 'history' | 'expenses' | 'credit' | 'loyalty' | 'promotions' | 'reservations' | 'scheduling' | 'reviews' | 'settings' | 'ebm';
 type SupervisorPage = 'dashboard' | 'revenue' | 'staff' | 'qrcodes' | 'inventory' | 'menu' | 'history' | 'expenses' | 'online-orders' | 'payments';
 
 const MANAGER_NAV_GROUPS: Array<{
@@ -90,6 +91,7 @@ const MANAGER_NAV_GROUPS: Array<{
       { id: 'qrcodes', label: 'QR Codes' },
       { id: 'inventory', label: 'Inventory' },
       { id: 'settings', label: 'Settings' },
+      { id: 'ebm', label: 'Fiscal (EBM)' },
     ],
   },
 ];
@@ -1022,6 +1024,9 @@ export function App() {
                 onNameChange={(newName) => setRestaurantName(newName)}
                 onSettingsSaved={(s) => setReceiptSettings(s)}
               />
+            )}
+            {managerPage === 'ebm' && currentRestaurantId && (
+              <EbmSettings restaurantId={currentRestaurantId} />
             )}
           </main>
         </div>

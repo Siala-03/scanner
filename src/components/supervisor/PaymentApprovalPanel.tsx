@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { CheckCircleIcon, ClockIcon, BanknoteIcon, CreditCardIcon, SmartphoneIcon, RefreshCwIcon } from 'lucide-react';
 import { fetchOrders, confirmPayment } from '../../api/orders';
+import { fiscalizeOrder } from '../../api/ebm';
 import { formatPrice } from '../../utils/currency';
 import { supabase } from '../../lib/supabase';
 
@@ -83,6 +84,13 @@ export function PaymentApprovalPanel({ restaurantId, staffId, staffName }: Payme
         confirmedByName: staffName,
         restaurantId,
       });
+
+      // Fire-and-forget: skip silently if restaurant has no EBM config
+      if (restaurantId) {
+        fiscalizeOrder(orderId, { restaurantId, paymentType })
+          .catch((err) => console.warn('[EBM] Fiscalization skipped:', err));
+      }
+
       setJustConfirmed((prev) => new Set(prev).add(orderId));
       setTimeout(() => {
         setOrders((prev) => prev.filter((o) => o.id !== orderId));
