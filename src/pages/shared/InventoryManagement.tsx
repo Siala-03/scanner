@@ -1326,30 +1326,30 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                           {isManager && (
                             <td className="px-4 py-3">
                               {isEditing ? (
-                                <div className="flex gap-1">
+                                <div className="flex items-center gap-2">
                                   <button
                                     onClick={() => handleSaveRow(row.item.id, row.item.name)}
-                                    className="p-2 md:p-1.5 text-emerald-400 hover:text-emerald-300 transition"
+                                    className="p-3 md:p-2.5 rounded-lg text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 transition"
                                     title="Save"
                                   >
-                                    <CheckCircleIcon className="w-6 h-6 md:w-5 md:h-5" />
+                                    <CheckCircleIcon className="w-8 h-8 md:w-7 md:h-7" />
                                   </button>
                                   <button
                                     onClick={() => { setEditingRow(null); setEditValues({}); }}
-                                    className="p-2 md:p-1.5 text-slate-400 hover:text-slate-200 transition"
+                                    className="p-3 md:p-2.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-600/20 transition"
                                     title="Cancel"
                                   >
-                                    <XIcon className="w-6 h-6 md:w-5 md:h-5" />
+                                    <XIcon className="w-8 h-8 md:w-7 md:h-7" />
                                   </button>
                                 </div>
                               ) : (
-                                <div className="flex gap-1">
+                                <div className="flex items-center gap-2">
                                   <button
                                     onClick={() => openAuditTrail(row.item.id, row.item.name)}
-                                    className="p-2 md:p-1.5 text-slate-400 hover:text-purple-400 transition"
+                                    className="p-3 md:p-2.5 rounded-lg text-slate-400 hover:text-purple-400 hover:bg-purple-500/10 transition"
                                     title="Cost & stock history"
                                   >
-                                    <ClockIcon className="w-6 h-6 md:w-5 md:h-5" />
+                                    <ClockIcon className="w-8 h-8 md:w-7 md:h-7" />
                                   </button>
                                   <button
                                     onClick={() => {
@@ -1364,10 +1364,10 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                                         location: rec?.location ?? '',
                                       });
                                     }}
-                                    className="p-2 md:p-1.5 text-slate-400 hover:text-amber-400 transition"
+                                    className="p-3 md:p-2.5 rounded-lg text-slate-400 hover:text-amber-400 hover:bg-amber-500/10 transition"
                                     title="Edit"
                                   >
-                                    <EditIcon className="w-6 h-6 md:w-5 md:h-5" />
+                                    <EditIcon className="w-8 h-8 md:w-7 md:h-7" />
                                   </button>
                                   <button
                                     onClick={() => {
@@ -1375,36 +1375,42 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                                       setNewPOItems([{ menuItemId: row.item.id, orderedQty: Math.max((row.rec?.reorderQty ?? 5) - row.stock, 1), unit: '', unitCost: row.rec?.unitCost ?? 0 }]);
                                       setShowNewPO(true);
                                     }}
-                                    className="p-2 md:p-1.5 text-emerald-400 hover:text-emerald-300 transition"
+                                    className="p-3 md:p-2.5 rounded-lg text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 transition"
                                     title="Smart Reorder"
                                   >
-                                    <PlusIcon className="w-6 h-6 md:w-5 md:h-5" />
+                                    <PlusIcon className="w-8 h-8 md:w-7 md:h-7" />
                                   </button>
-                                  {!menuItemMap[row.item.id] && (
-                                    <button
-                                      onClick={() => {
-                                        setAddToMenuItemId(row.item.id);
-                                        setAddToMenuName(row.item.name !== row.item.id ? row.item.name : '');
-                                        setAddToMenuPrice(row.rec?.unitCost ?? 0);
-                                        setAddToMenuCategory(menuCategories.find((c) => c !== 'all') ?? 'Food');
-                                        setShowAddToMenuModal(true);
-                                      }}
-                                      className="p-2 md:p-1.5 text-blue-400 hover:text-blue-300 transition"
-                                      title="Add to Menu"
-                                    >
-                                      <LinkIcon className="w-6 h-6 md:w-5 md:h-5" />
-                                    </button>
-                                  )}
+                                  <button
+                                    onClick={() => {
+                                      if (menuItemMap[row.item.id]) return;
+                                      setAddToMenuItemId(row.item.id);
+                                      setAddToMenuName(row.item.name !== row.item.id ? row.item.name : '');
+                                      setAddToMenuPrice(row.rec?.unitCost ?? 0);
+                                      setAddToMenuCategory(menuCategories.find((c) => c !== 'all') ?? 'Food');
+                                      setShowAddToMenuModal(true);
+                                    }}
+                                    disabled={!!menuItemMap[row.item.id]}
+                                    className={`p-3 md:p-2.5 rounded-lg transition ${
+                                      menuItemMap[row.item.id]
+                                        ? 'text-slate-500 cursor-not-allowed bg-slate-700/20'
+                                        : 'text-blue-400 hover:text-blue-300 hover:bg-blue-500/10'
+                                    }`}
+                                    title={menuItemMap[row.item.id] ? 'Already in Menu' : 'Add to Menu'}
+                                  >
+                                    {menuItemMap[row.item.id]
+                                      ? <CheckCircleIcon className="w-8 h-8 md:w-7 md:h-7" />
+                                      : <LinkIcon className="w-8 h-8 md:w-7 md:h-7" />}
+                                  </button>
                                   <button
                                     onClick={() => {
                                       if (window.confirm(`Delete inventory record for ${row.item.name}? This action cannot be undone.`)) {
                                         handleDeleteInventoryItem(row.item.id);
                                       }
                                     }}
-                                    className="p-2 md:p-1.5 text-red-400 hover:text-red-300 transition"
+                                    className="p-3 md:p-2.5 rounded-lg text-red-400 hover:text-red-300 hover:bg-red-500/10 transition"
                                     title="Delete"
                                   >
-                                    <TrashIcon className="w-6 h-6 md:w-5 md:h-5" />
+                                    <TrashIcon className="w-8 h-8 md:w-7 md:h-7" />
                                   </button>
                                 </div>
                               )}
