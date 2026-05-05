@@ -108,7 +108,6 @@ export function MenuPage({ onAddToCart }: MenuPageProps) {
     activeCategory === 'all' ?
     menuItems :
     menuItems.filter((item) => normalizeCategory(item.category) === normalizeCategory(activeCategory));
-    items = items.filter((item) => item.isAvailable);
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       items = items.filter(
