@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   PackageIcon,
@@ -15,6 +15,9 @@ import {
   MapPinIcon,
   MailIcon,
   XIcon,
+  UploadIcon,
+  DownloadIcon,
+  FileSpreadsheetIcon,
 } from 'lucide-react';
 import { InventoryForecasting } from '../../components/manager/InventoryForecasting';
 import { Card } from '../../components/ui/Card';
@@ -48,6 +51,11 @@ import {
   provisionSupplierPortalAccess,
   type SupplierPortalAccessProvisionResult,
 } from '../../api/supplier';
+import {
+  exportInventoryToCsv,
+  downloadInventoryTemplate,
+  importInventoryFromFile,
+} from '../../utils/inventoryImportExport';
 
 interface InventoryManagementProps {
   role: 'manager' | 'supervisor';
@@ -185,6 +193,9 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
     ];
   }, [menuItems, inventory]);
   const [activeTab, setActiveTab] = useState<Tab>('overview');
+  const [isImportingInventory, setIsImportingInventory] = useState(false);
+  const [isExportInventoryOpen, setIsExportInventoryOpen] = useState(false);
+  const inventoryFileInputRef = useRef<HTMLInputElement>(null);
   const [showAddInventoryModal, setShowAddInventoryModal] = useState(false);
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [editingLocation, setEditingLocation] = useState<typeof locations[number] | null>(null);
@@ -757,6 +768,48 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
   };
 
   // ── Tab definitions ─────────────────────────────────────────────────────
+  React.useEffect(() => {
+    if (!isExportInventoryOpen) return;
+    const close = () => setIsExportInventoryOpen(false);
+    document.addEventListener('click', close);
+    return () => document.removeEventListener('click', close);
+  }, [isExportInventoryOpen]);
+
+  const handleInventoryExportCsv = () => {
+    exportInventoryToCsv(inventoryRows);
+    setIsExportInventoryOpen(false);
+  };
+
+  const handleInventoryImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsImportingInventory(true);
+    try {
+      const rows = await importInventoryFromFile(file);
+      if (rows.length === 0) throw new Error('No valid rows found in file');
+      let updated = 0;
+      for (const row of rows) {
+        await apiUpdateInventoryRecord(row.menuItemId, {
+          stock: row.stock,
+          lowStockThreshold: row.lowStockThreshold,
+          reorderPoint: row.reorderPoint,
+          reorderQty: row.reorderQty,
+          unitCost: row.unitCost,
+          location: row.location,
+          unitMeasurement: row.unitMeasurement,
+        });
+        updated++;
+      }
+      await refresh();
+      alert(`Successfully imported ${updated} inventory record${updated !== 1 ? 's' : ''}.`);
+    } catch (err) {
+      alert(`Import failed: ${getErrorMessage(err)}`);
+    } finally {
+      setIsImportingInventory(false);
+      if (inventoryFileInputRef.current) inventoryFileInputRef.current.value = '';
+    }
+  };
+
   const tabs: { id: Tab; label: string; icon: React.ReactNode; badge?: number }[] = [
     { id: 'overview', label: 'Stock', icon: <PackageIcon className="w-4 h-4" />, badge: lowStockItems.length || undefined },
     { id: 'purchase-orders', label: 'Purchase Orders', icon: <TruckIcon className="w-4 h-4" />, badge: purchaseOrders.filter((po) => po.status !== 'received' && po.status !== 'cancelled').length || undefined },
@@ -786,10 +839,57 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                 <RefreshCcwIcon className="w-4 h-4" />
               </Button>
               {isManager && activeTab === 'overview' && (
-                <Button variant="primary" size="sm" onClick={() => setShowAddInventoryModal(true)}>
-                  <PlusIcon className="w-4 h-4" />
-                  Add Item
-                </Button>
+                <>
+                  {/* Template */}
+                  <Button variant="ghost" size="sm" onClick={downloadInventoryTemplate} title="Download CSV template">
+                    <FileSpreadsheetIcon className="w-4 h-4" />
+                    <span className="hidden sm:inline">Template</span>
+                  </Button>
+                  {/* Import */}
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => inventoryFileInputRef.current?.click()}
+                    isLoading={isImportingInventory}
+                  >
+                    <UploadIcon className="w-4 h-4" />
+                    <span className="hidden sm:inline">Import</span>
+                  </Button>
+                  <input
+                    ref={inventoryFileInputRef}
+                    type="file"
+                    accept=".csv,.xlsx,.xls,.json"
+                    className="hidden"
+                    onChange={handleInventoryImportFile}
+                  />
+                  {/* Export */}
+                  <div className="relative">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => setIsExportInventoryOpen((v) => !v)}
+                    >
+                      <DownloadIcon className="w-4 h-4" />
+                      <span className="hidden sm:inline">Export</span>
+                    </Button>
+                    {isExportInventoryOpen && (
+                      <div className="absolute right-0 mt-2 w-44 bg-slate-800 rounded-md shadow-lg border border-slate-700 z-50">
+                        <button
+                          onClick={handleInventoryExportCsv}
+                          className="w-full px-4 py-2 text-left text-gray-200 hover:bg-slate-700 flex items-center gap-2 text-sm"
+                        >
+                          <FileSpreadsheetIcon className="w-4 h-4" />
+                          Export as CSV
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  {/* Add Item */}
+                  <Button variant="primary" size="sm" onClick={() => setShowAddInventoryModal(true)}>
+                    <PlusIcon className="w-4 h-4" />
+                    Add Item
+                  </Button>
+                </>
               )}
               {isManager && activeTab === 'waste' && (
                 <Button variant="danger" size="sm" onClick={() => setShowWasteModal(true)}>

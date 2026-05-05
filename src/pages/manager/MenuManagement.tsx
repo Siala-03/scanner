@@ -19,7 +19,7 @@ import { Badge } from '../../components/ui/Badge';
 import { MenuItemEditor } from '../../components/manager/MenuItemEditor';
 import { formatPrice } from '../../utils/currency';
 import { useMenu } from '../../hooks/useMenu';
-import { exportMenuToCsv, exportMenuToJson, importMenuFromFile, saveCustomMenu } from '../../utils/menuImportExport';
+import { exportMenuToCsv, exportMenuToJson, importMenuFromFile, saveCustomMenu, downloadMenuTemplate } from '../../utils/menuImportExport';
 
 // Default categories with emojis from dummy data
 const defaultCategories: MenuCategoryInfo[] = [
@@ -273,9 +273,19 @@ export function MenuManagement() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            {/* Template Button */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={downloadMenuTemplate}
+              title="Download CSV template"
+            >
+              <FileSpreadsheetIcon className="w-4 h-4" />
+              <span className="hidden sm:inline">Template</span>
+            </Button>
             {/* Import Button */}
-            <Button 
-              variant="secondary" 
+            <Button
+              variant="secondary"
               size="sm"
               onClick={handleImportClick}
               isLoading={isImporting}

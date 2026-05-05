@@ -83,10 +83,32 @@ export function exportMenuToJson(items: MenuItem[]): void {
 }
 
 /**
+ * Download a blank CSV template users can fill in and re-import
+ */
+export function downloadMenuTemplate(): void {
+  const headers = ['name', 'description', 'price', 'category', 'emoji', 'prepTime', 'isAvailable', 'isPopular', 'requiresKitchen'];
+  const examples = [
+    '"Grilled Chicken","Tender grilled chicken breast with herbs",5500,lunch,🍗,15,true,false,true',
+    '"Coca Cola","Chilled soft drink",800,soft-drinks,🥤,2,true,true,false',
+    '"Beef Burger","Juicy beef patty with fries",7500,lunch,🍔,20,true,false,true',
+  ];
+  const csv = [headers.join(','), ...examples].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'menu-template.csv';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+/**
  * Export menu to CSV file
  */
 export function exportMenuToCsv(items: MenuItem[]): void {
-  const headers = ['id', 'name', 'description', 'price', 'category', 'emoji', 'prepTime', 'isAvailable', 'isPopular'];
+  const headers = ['id', 'name', 'description', 'price', 'category', 'emoji', 'prepTime', 'isAvailable', 'isPopular', 'requiresKitchen'];
   const rows = items.map(item => [
     item.id,
     `"${item.name.replace(/"/g, '""')}"`,
@@ -96,7 +118,8 @@ export function exportMenuToCsv(items: MenuItem[]): void {
     item.emoji,
     item.prepTime.toString(),
     item.isAvailable.toString(),
-    item.isPopular.toString()
+    item.isPopular.toString(),
+    (item.requiresKitchen ?? false).toString(),
   ]);
   
   const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
@@ -180,6 +203,11 @@ function parseCsvContent(content: string): Partial<MenuItem>[] {
         case 'popular':
           item.isPopular = value.toLowerCase() === 'true';
           break;
+        case 'requireskitchen':
+        case 'requires_kitchen':
+        case 'kitchen':
+          (item as any).requiresKitchen = value.toLowerCase() === 'true';
+          break;
       }
     });
 
@@ -228,7 +256,8 @@ function parseExcelContent(arrayBuffer: ArrayBuffer): Partial<MenuItem>[] {
         emoji: row.emoji || row.emoticon || '🍽️',
         prepTime: parseInt(row.preptime || row.prep_time || row.prep || row.prepTime || row.preptime || 15, 10) || 15,
         isAvailable: parseBoolean(row.isavailable ?? row.available ?? row.is_available, true),
-        isPopular: parseBoolean(row.ispopular ?? row.popular ?? row.is_popular, false)
+        isPopular: parseBoolean(row.ispopular ?? row.popular ?? row.is_popular, false),
+        requiresKitchen: parseBoolean(row.requireskitchen ?? row.requires_kitchen ?? row.kitchen, true)
       };
     });
   } catch (err) {
@@ -277,7 +306,8 @@ export async function importMenuFromFile(file: File): Promise<MenuItem[]> {
     emoji: item.emoji || '🍽️',
     prepTime: typeof item.prepTime === 'number' ? item.prepTime : 15,
     isAvailable: item.isAvailable !== false,
-    isPopular: item.isPopular || false
+    isPopular: item.isPopular || false,
+    requiresKitchen: (item as any).requiresKitchen !== false,
   }));
   
   // Save to local storage first (offline backup)
