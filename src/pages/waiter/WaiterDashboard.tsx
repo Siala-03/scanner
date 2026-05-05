@@ -102,6 +102,12 @@ function statusColor(status: string): string {
   }
 }
 
+function getSafeWaiterName(waiter: Staff): string {
+  const rawName = (waiter as any)?.name;
+  if (typeof rawName === 'string' && rawName.trim()) return rawName.trim();
+  return 'Waiter';
+}
+
 function isSameDay(value: Date | string | undefined, today: Date): boolean {
   if (!value) return false;
   const dt = new Date(value);
@@ -621,6 +627,7 @@ export function WaiterDashboard({
   onDismissWaiterCall,
   onLogout,
 }: WaiterDashboardProps) {
+  const waiterName = getSafeWaiterName(waiter);
   type AnalyticsRange = 'weekly' | 'monthly' | 'quarterly' | 'yearly';
 
   const [portalPage, setPortalPage] = useState<'orders' | 'analytics'>('orders');
@@ -725,8 +732,10 @@ export function WaiterDashboard({
     } catch (_e) {}
   }
 
-  function formatResTime(time: string) {
+  function formatResTime(time?: string | null) {
+    if (!time || typeof time !== 'string') return '—';
     const [h, m] = time.split(':').map(Number);
+    if (Number.isNaN(h) || Number.isNaN(m)) return '—';
     const period = h >= 12 ? 'PM' : 'AM';
     return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${period}`;
   }
@@ -978,7 +987,7 @@ export function WaiterDashboard({
           restaurantCity: restaurantInfo?.city,
           restaurantCountry: restaurantInfo?.country,
           taxRate: 18,
-          serverName: waiter.name,
+          serverName: waiterName,
           orderType: order.deliveryAddress ? 'delivery' : 'dine-in',
           paymentMethod: 'Cash',
           paymentStatus: 'paid',
@@ -1034,7 +1043,7 @@ export function WaiterDashboard({
               </div>
               <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
                 <h1 className="text-xl font-bold text-white sm:text-2xl">
-                  {waiter.name.split(' ')[0]}'s service desk
+                  {waiterName.split(' ')[0]}'s service desk
                 </h1>
                 <p className="text-sm text-slate-400">
                   {portalPage === 'orders'
@@ -1383,11 +1392,11 @@ export function WaiterDashboard({
             <div className="rounded-lg border border-slate-700 bg-slate-800 p-4">
               <div className="flex items-center gap-3">
                 <div className="flex h-14 w-14 items-center justify-center rounded-lg border border-amber-500/25 bg-amber-500/10 text-lg font-bold text-amber-300">
-                  {waiter.name.split(' ').slice(0, 2).map((part) => part[0]).join('')}
+                  {waiterName.split(' ').filter(Boolean).slice(0, 2).map((part) => part[0]).join('') || 'W'}
                 </div>
                 <div className="min-w-0">
                   <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Active waiter</p>
-                  <h3 className="truncate text-lg font-semibold text-white">{waiter.name}</h3>
+                  <h3 className="truncate text-lg font-semibold text-white">{waiterName}</h3>
                   <p className="text-sm text-slate-400">{avgRating != null ? `${avgRating} star service rating` : 'No rating yet for this shift'}</p>
                 </div>
               </div>
@@ -1521,7 +1530,7 @@ export function WaiterDashboard({
             restaurantCity: restaurantInfo?.city,
             restaurantCountry: restaurantInfo?.country,
             taxRate: 18,
-            serverName: waiter.name,
+            serverName: waiterName,
             orderType: selectedOrderForShare.deliveryAddress ? 'delivery' : 'dine-in',
             paymentMethod: 'Cash',
             paymentStatus: 'paid',
