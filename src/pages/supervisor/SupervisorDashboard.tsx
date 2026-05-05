@@ -242,7 +242,7 @@ export function SupervisorDashboard({ restaurantName, ordersByHour, statusBreakd
               </div>
               <div className="rounded-lg border border-slate-700 bg-slate-900/50 p-3">
                 <div className="text-xs uppercase tracking-wide text-slate-400">Orders / On-duty</div>
-                <div className="text-2xl font-semibold mt-2">{kpiLoading || onDutyLoading ? '—' : ordersPerOnDuty.toFixed(1)}</div>
+                <div className="text-2xl font-semibold mt-2">{kpiLoading || onDutyLoading ? '—' : Math.round(ordersPerOnDuty)}</div>
                 <div className="text-xs text-slate-400 mt-1">Load per active teammate</div>
               </div>
               <div className="rounded-lg border border-slate-700 bg-slate-900/50 p-3">

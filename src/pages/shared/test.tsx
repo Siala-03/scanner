@@ -986,7 +986,7 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 mb-5">
               {[
                 { label: 'Total Stock Value', value: formatPrice(analytics.totalStockValue), color: 'text-emerald-400' },
-                { label: 'Average Turnover Days', value: analytics.avgTurnoverDays.toFixed(1), color: 'text-blue-400' },
+                { label: 'Average Turnover Days', value: String(Math.round(analytics.avgTurnoverDays)), color: 'text-blue-400' },
                 { label: 'Waste Cost (Last 30d)', value: formatPrice(analytics.wasteCostLast30d), color: 'text-red-400' },
                 { label: 'Pending PO Value', value: formatPrice(analytics.pendingPOValue), color: 'text-amber-400' },
                 { label: 'Items Below Reorder', value: analytics.belowReorderCount, color: 'text-orange-400' },

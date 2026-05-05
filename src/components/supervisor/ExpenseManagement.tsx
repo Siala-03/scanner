@@ -624,7 +624,7 @@ export default function SupervisorExpenseManagement() {
                   {expense.category?.name || categoryNameById.get(expense.categoryId) || expense.categoryId || 'Uncategorized'}
                 </td>
                 <td className="px-6 py-4 text-sm font-medium">
-                  {expense.currency} {Number(expense.amount).toFixed(2)}
+                  {expense.currency} {Math.round(Number(expense.amount)).toLocaleString()}
                 </td>
                 <td className="px-6 py-4">
                   <span
@@ -694,7 +694,7 @@ export default function SupervisorExpenseManagement() {
                 <div>
                   <p className="text-sm text-slate-400">Amount</p>
                   <p className="font-medium">
-                    {selectedExpense.currency} {Number(selectedExpense.amount).toFixed(2)}
+                    {selectedExpense.currency} {Math.round(Number(selectedExpense.amount)).toLocaleString()}
                   </p>
                 </div>
                 <div>

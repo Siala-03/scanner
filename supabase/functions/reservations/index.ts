@@ -9,6 +9,19 @@ const admin = () => createClient(
 
 function uid() { return `res-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`; }
 
+// Convert a snake_case DB row to camelCase for the frontend
+function toCamel(row: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [key, val] of Object.entries(row)) {
+    const camel = key.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
+    out[camel] = val;
+  }
+  return out;
+}
+function rowsToCamel(rows: Record<string, unknown>[]): Record<string, unknown>[] {
+  return rows.map(toCamel);
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return optionsResponse();
   const url = new URL(req.url);
@@ -40,7 +53,7 @@ Deno.serve(async (req: Request) => {
         status: 'pending',
       }).select('*').single();
       if (error) return err(error.message);
-      return cors(data, { status: 201 });
+      return cors(toCamel(data as Record<string, unknown>), { status: 201 });
     }
 
     // GET /reservations/availability — public check
@@ -52,7 +65,7 @@ Deno.serve(async (req: Request) => {
         .eq('restaurant_id', restaurantId)
         .eq('reservation_date', date)
         .not('status', 'in', '("cancelled","no_show")');
-      return cors(data ?? []);
+      return cors(rowsToCamel((data ?? []) as Record<string, unknown>[]));
     }
 
     // Auth required for all remaining routes
@@ -68,7 +81,7 @@ Deno.serve(async (req: Request) => {
       if (status) q = q.eq('status', status);
       const { data, error } = await q;
       if (error) return err(error.message);
-      return cors(data ?? []);
+      return cors(rowsToCamel((data ?? []) as Record<string, unknown>[]));
     }
 
     const idMatch = path.match(/^\/([^/]+)$/);
@@ -83,7 +96,7 @@ Deno.serve(async (req: Request) => {
       const { data, error } = await db.from('reservations').update(update)
         .eq('id', idMatch[1]).eq('restaurant_id', restaurantId).select('*').single();
       if (error) return err(error.message);
-      return cors(data);
+      return cors(toCamel(data as Record<string, unknown>));
     }
 
     // DELETE /reservations/:id

@@ -915,7 +915,7 @@ const CreditManagement: React.FC = () => {
           </div>
           <div className="flex justify-between">
             <span className="text-slate-400">Average Credit Utilization</span>
-            <span className="font-medium text-slate-100">{((summaryView.averageCreditUtilization || 0) * 100).toFixed(1)}%</span>
+            <span className="font-medium text-slate-100">{Math.round((summaryView.averageCreditUtilization || 0) * 100)}%</span>
           </div>
           <div className="flex justify-between">
             <span className="text-slate-400">Accounts Over Limit</span>

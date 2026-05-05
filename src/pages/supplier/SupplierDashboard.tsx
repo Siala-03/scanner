@@ -204,7 +204,7 @@ export function SupplierDashboard({ user, onLogout }: SupplierDashboardProps) {
               </div>
               <div>
                 <p className="text-2xl font-bold text-white">
-                  {stats ? (stats.pending_value / 100).toFixed(0) : 0}
+                  {stats ? Math.round(stats.pending_value / 100).toLocaleString() : 0}
                 </p>
                 <p className="text-xs text-slate-400">Pending Value (RWF)</p>
               </div>
@@ -265,7 +265,7 @@ export function SupplierDashboard({ user, onLogout }: SupplierDashboardProps) {
                   </div>
                   <div className="text-right">
                     <p className="text-xl font-bold text-white">
-                      {(order.total_cost / 100).toFixed(2)} RWF
+                      {Math.round(order.total_cost / 100).toLocaleString()} RWF
                     </p>
                     <p className="text-slate-400 text-sm">
                       {order.items.length} item{order.items.length !== 1 ? 's' : ''}
@@ -360,7 +360,7 @@ export function SupplierDashboard({ user, onLogout }: SupplierDashboardProps) {
                 <div>
                   <p className="text-slate-400">Total</p>
                   <p className="text-white font-bold">
-                    {(selectedOrder.total_cost / 100).toFixed(2)} RWF
+                    {Math.round(selectedOrder.total_cost / 100).toLocaleString()} RWF
                   </p>
                 </div>
               </div>
@@ -383,11 +383,11 @@ export function SupplierDashboard({ user, onLogout }: SupplierDashboardProps) {
                       <div>
                         <p className="text-white">{item.menuItemName}</p>
                         <p className="text-slate-400 text-sm">
-                          {item.orderedQty} x {(item.unitCost / 100).toFixed(2)} RWF
+                          {item.orderedQty} x {Math.round(item.unitCost / 100).toLocaleString()} RWF
                         </p>
                       </div>
                       <p className="text-white font-medium">
-                        {(item.totalCost / 100).toFixed(2)} RWF
+                        {Math.round(item.totalCost / 100).toLocaleString()} RWF
                       </p>
                     </div>
                   ))}

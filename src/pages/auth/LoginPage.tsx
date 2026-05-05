@@ -19,6 +19,10 @@ export function LoginPage({ onLogin, onBack, embedded = false }: LoginPageProps)
   const [showPassword, setShowPassword] = useState(false);
   const [serverStatus, setServerStatus] = useState<'checking' | 'online' | 'offline'>('checking');
 
+  const isMultiAccountConflict =
+    error.toLowerCase().includes('multiple accounts found') ||
+    error.toLowerCase().includes('provide restaurantid');
+
   // Check Supabase connectivity on mount
   useEffect(() => {
     const checkServerStatus = async () => {
@@ -146,6 +150,16 @@ export function LoginPage({ onLogin, onBack, embedded = false }: LoginPageProps)
               {error}
             </motion.p>
           }
+
+          {isMultiAccountConflict && (
+            <motion.div
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200"
+            >
+              This username exists in multiple restaurants. Open the restaurant-specific login link (or ask your manager for the correct restaurant ID) and try again.
+            </motion.div>
+          )}
 
           <Button
             type="submit"

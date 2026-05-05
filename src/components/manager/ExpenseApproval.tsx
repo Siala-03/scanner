@@ -315,7 +315,7 @@ export default function ManagerExpenseApproval() {
                 {expense.category?.name || categories.find(c => c.id === expense.categoryId)?.name || expense.categoryId || 'Uncategorized'}
               </td>
               <td className="px-3 md:px-6 py-4 text-sm md:text-base font-medium text-slate-100">
-                {expense.currency} {Number(expense.amount).toFixed(2)}
+                {expense.currency} {Math.round(Number(expense.amount)).toLocaleString()}
               </td>
               <td className="px-3 md:px-6 py-4 text-sm md:text-base text-slate-100">
                 <span className="inline-block px-2 py-1 bg-amber-900/40 text-amber-200 rounded text-xs border border-amber-700">
@@ -373,7 +373,7 @@ export default function ManagerExpenseApproval() {
               </p>
               <p className="text-2xl md:text-3xl font-bold text-slate-100">{item.count}</p>
               <p className="text-sm text-slate-400 mt-2">
-                RWF {Number(item.total_amount || 0).toFixed(2)}
+                RWF {Math.round(Number(item.total_amount || 0)).toLocaleString()}
               </p>
             </div>
           ))}
@@ -619,7 +619,7 @@ export default function ManagerExpenseApproval() {
                   <p className="text-sm text-slate-400">Amount</p>
                   <p className="font-medium text-slate-100">
                     {selectedExpense.currency}{' '}
-                    {Number(selectedExpense.amount).toFixed(2)}
+                    {Math.round(Number(selectedExpense.amount)).toLocaleString()}
                   </p>
                 </div>
                 <div>

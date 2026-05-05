@@ -633,8 +633,8 @@ export function computeInventoryAnalytics(
   const movements = loadMovements();
   const salesQty = movements.filter((m) => m.type === 'sale').reduce((s, m) => s + Math.abs(m.qty), 0);
   const avgStock = totalStockValue > 0 ? totalStockValue / Math.max(menuItems.length, 1) : 1;
-  const stockTurnoverRate = avgStock > 0 ? parseFloat((salesQty / Math.max(avgStock / 1000, 1)).toFixed(2)) : 0;
-  const avgTurnoverDays = stockTurnoverRate > 0 ? parseFloat((30 / stockTurnoverRate).toFixed(1)) : 0;
+  const stockTurnoverRate = avgStock > 0 ? Math.round(salesQty / Math.max(avgStock / 1000, 1)) : 0;
+  const avgTurnoverDays = stockTurnoverRate > 0 ? Math.round(30 / stockTurnoverRate) : 0;
 
   return {
     totalStockValue,

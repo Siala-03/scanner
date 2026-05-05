@@ -5,6 +5,7 @@ import { useStaffKPIs } from '../../hooks/useKPIs';
 import { KPICard } from '../../components/supervisor/KPICard';
 import { fetchKitchenOrders as fetchKitchenOrdersFromDb, updateOrderStatus as updateOrderStatusApi } from '../../api/orders';
 import { fetchRestaurantPublic } from '../../api/restaurants';
+import { apiRequest } from '../../api/http';
 
 interface KitchenOrder {
   id: string;
@@ -27,6 +28,18 @@ interface KitchenStats {
   preparingOrders: number;
   readyOrders: number;
   itemCounts: { name: string; count: number }[];
+}
+
+interface BackendAnalytics {
+  totalOrders: number;
+  completedOrders: number;
+  pendingOrders: number;
+  preparingOrders: number;
+  readyOrders: number;
+  avgPrepTime: number;
+  popularItems: { name: string; count: number }[];
+  hourlyDistribution: { hour: number; count: number }[];
+  totalRevenue: number;
 }
 
 const STATUS_CONFIG = {
@@ -131,24 +144,24 @@ function getMenuItemName(itemId: string): string {
   return MENU_ITEM_NAMES[itemId] || `Item ${itemId}`;
 }
 
-// Calculate stats from orders
-function calculateStats(orders: KitchenOrder[], completedToday: number[]): KitchenStats {
+// Calculate live queue stats from active orders (session-only item counts)
+function calculateStats(orders: KitchenOrder[]): KitchenStats {
   const itemCounts: Record<string, number> = {};
   orders.forEach(order => {
     order.items.forEach(item => {
       itemCounts[item.name] = (itemCounts[item.name] || 0) + item.quantity;
     });
   });
-  
+
   const itemCountsArray = Object.entries(itemCounts)
     .map(([name, count]) => ({ name, count }))
     .sort((a, b) => b.count - a.count)
     .slice(0, 5);
 
   return {
-    totalOrders: orders.length + completedToday.length,
-    completedOrders: completedToday.length,
-    avgPrepTime: 12, // Demo value
+    totalOrders: orders.length,
+    completedOrders: 0,
+    avgPrepTime: 0,
     pendingOrders: orders.filter(o => o.status === 'pending' || o.status === 'verified').length,
     preparingOrders: orders.filter(o => o.status === 'preparing').length,
     readyOrders: orders.filter(o => o.status === 'ready').length,
@@ -159,6 +172,7 @@ function calculateStats(orders: KitchenOrder[], completedToday: number[]): Kitch
 export function KitchenDisplay({ onLogout, restaurantId, restaurantName }: { onLogout?: () => void; restaurantId?: string; restaurantName?: string } = {}) {
   const [orders, setOrders] = useState<KitchenOrder[]>([]);
   const [completedToday, setCompletedToday] = useState<number[]>([]);
+  const [backendAnalytics, setBackendAnalytics] = useState<BackendAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState(new Date());
   const [viewMode, setViewMode] = useState<'orders' | 'analytics'>('orders');
@@ -367,10 +381,22 @@ export function KitchenDisplay({ onLogout, restaurantId, restaurantName }: { onL
     window.print();
   };
 
-  const stats: KitchenStats = calculateStats(orders, completedToday);
+  const liveStats: KitchenStats = calculateStats(orders);
+  const stats: KitchenStats = backendAnalytics
+    ? {
+        totalOrders: backendAnalytics.totalOrders,
+        completedOrders: backendAnalytics.completedOrders,
+        avgPrepTime: backendAnalytics.avgPrepTime,
+        pendingOrders: liveStats.pendingOrders,
+        preparingOrders: liveStats.preparingOrders,
+        readyOrders: liveStats.readyOrders,
+        itemCounts: backendAnalytics.popularItems.length > 0 ? backendAnalytics.popularItems : liveStats.itemCounts,
+      }
+    : liveStats;
 
   const now = Date.now();
-  const throughputLastHour = completedToday.filter((ts) => now - ts <= 60 * 60 * 1000).length;
+  const sessionThroughputLastHour = completedToday.filter((ts) => now - ts <= 60 * 60 * 1000).length;
+  const throughputLastHour = backendAnalytics ? backendAnalytics.completedOrders : sessionThroughputLastHour;
   const urgentOrdersCount = orders.filter((o) => getAgeMinutes(o.createdAt) > 15).length;
   const averageQueueAge = orders.length > 0
     ? Math.round(orders.reduce((sum, order) => sum + getAgeMinutes(order.createdAt), 0) / orders.length)
@@ -434,11 +460,29 @@ export function KitchenDisplay({ onLogout, restaurantId, restaurantName }: { onL
     setLoading(false);
   }, [restaurantId]);
 
+  const loadAnalytics = useCallback(async () => {
+    if (!restaurantId) return;
+    try {
+      const data = await apiRequest<BackendAnalytics>(
+        `/api/orders/kitchen/analytics?restaurantId=${restaurantId}`
+      );
+      setBackendAnalytics(data);
+    } catch {
+      // silently fail — analytics are non-critical
+    }
+  }, [restaurantId]);
+
   useEffect(() => {
     loadOrders();
     const interval = setInterval(loadOrders, 3000);
     return () => clearInterval(interval);
   }, [loadOrders]);
+
+  useEffect(() => {
+    loadAnalytics();
+    const interval = setInterval(loadAnalytics, 30000);
+    return () => clearInterval(interval);
+  }, [loadAnalytics]);
 
   const handleStatusChange = async (orderId: string, newStatus: 'pending' | 'preparing' | 'ready') => {
     try {
@@ -558,7 +602,7 @@ export function KitchenDisplay({ onLogout, restaurantId, restaurantName }: { onL
             <StatCard title="Active Queue" value={orders.length.toString()} color="blue" />
             <StatCard title="Ready For Handoff" value={readyOrders.length.toString()} color="green" />
             <StatCard title="Avg Queue Age" value={formatDuration(averageQueueAge)} color="amber" />
-            <StatCard title="Completed (1h)" value={throughputLastHour.toString()} color="purple" />
+            <StatCard title={backendAnalytics ? 'Completed Today' : 'Completed (1h)'} value={throughputLastHour.toString()} color="purple" />
           </div>
         </div>
 
