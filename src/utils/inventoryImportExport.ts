@@ -128,8 +128,8 @@ function parseCsvRows(content: string): InventoryImportRow[] {
     const id = row.itemid || row.menuitemid || row.menuitemid || row.id || '';
     if (!id) continue;
 
-    const stock = parseInt(row.currentqty ?? row.stock ?? row.qtystart ?? '0', 10) || 0;
-    const qtyStart = parseInt(row.qtystart ?? String(stock), 10) || stock;
+    const stock = parseFloat(row.currentqty ?? row.stock ?? row.qtystart ?? '0') || 0;
+    const qtyStart = parseFloat(row.qtystart ?? String(stock)) || stock;
 
     results.push({
       menuItemId: id,
@@ -138,9 +138,9 @@ function parseCsvRows(content: string): InventoryImportRow[] {
       purchaseDate: row.purchasedate ?? '',
       qtyStart,
       stock,
-      lowStockThreshold: parseInt(row.lowstockthreshold ?? row.threshold ?? '5', 10) || 5,
-      reorderPoint: parseInt(row.reorderpoint ?? '10', 10) || 10,
-      reorderQty: parseInt(row.reorderqty ?? '20', 10) || 20,
+      lowStockThreshold: parseFloat(row.lowstockthreshold ?? row.threshold ?? '5') || 5,
+      reorderPoint: parseFloat(row.reorderpoint ?? '10') || 10,
+      reorderQty: parseFloat(row.reorderqty ?? '20') || 20,
       unitCost: parseFloat(row.cost ?? row.unitcost ?? '0') || 0,
       price: parseFloat(row.price ?? '0') || 0,
       location: row.location ?? '',

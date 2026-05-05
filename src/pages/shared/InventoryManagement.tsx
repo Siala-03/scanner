@@ -128,6 +128,11 @@ function normalizeInventoryRecord(rec: any): InventoryRecord {
     reorderPoint: rec.reorderPoint ?? rec.reorder_point ?? 0,
     reorderQty: rec.reorderQty ?? rec.reorder_qty ?? 0,
     unitCost: rec.unitCost ?? rec.unit_cost ?? 0,
+    description: rec.description ?? rec.item_description ?? '',
+    expiryDate: rec.expiryDate ?? rec.expiry_date ?? '',
+    purchaseDate: rec.purchaseDate ?? rec.purchase_date ?? '',
+    qtyStart: rec.qtyStart ?? rec.qty_start ?? rec.stock ?? 0,
+    price: rec.price ?? 0,
     supplierId: rec.supplierId ?? rec.supplier_id,
     location: rec.location ?? '',
     updatedAt: rec.updatedAt ?? rec.updated_at ?? new Date().toISOString(),
@@ -1178,16 +1183,20 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                 <table className="w-full">
                   <thead className="bg-slate-700/40 border-b border-slate-700/50">
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Item</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Item ID</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Description</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Expiry Date</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Purchase Date</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Age</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Start Qty</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Current Qty</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Unit Cost</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Price</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Location</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Stock</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Low Threshold</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Reorder Point</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Reorder Qty</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Unit Cost</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Stock Value</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Age</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Status</th>
                       {isManager && <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Actions</th>}
                     </tr>
                   </thead>
@@ -1195,6 +1204,10 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                     {inventoryRows.map((row) => {
                       const isEditing = editingRow === row.item.id;
                       const maxStock = Math.max(row.rec?.reorderQty ?? row.stock * 2, row.stock, 1);
+                      const purchaseDate = row.rec?.purchaseDate ? new Date(row.rec.purchaseDate) : null;
+                      const ageDays = purchaseDate && !Number.isNaN(purchaseDate.getTime())
+                        ? Math.max(0, Math.floor((Date.now() - purchaseDate.getTime()) / (1000 * 60 * 60 * 24)))
+                        : null;
                       return (
                         <tr
                           key={row.item.id}
@@ -1207,9 +1220,9 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                               title="View item movement details"
                             >
                               <div>
-                                <p className="text-white font-medium text-sm hover:text-amber-300 underline underline-offset-2">{row.item.name}</p>
+                                <p className="text-white font-medium text-sm hover:text-amber-300 underline underline-offset-2">{row.item.id}</p>
                                 <div className="flex items-center gap-1.5 mt-0.5">
-                                  <p className="text-xs text-slate-500">{row.item.id} · {row.item.category.replace(/-/g, ' ')}</p>
+                                  <p className="text-xs text-slate-500">{row.item.category.replace(/-/g, ' ')}</p>
                                   {menuItemMap[row.item.id] && row.rec && (
                                     <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs bg-blue-500/15 text-blue-300 border border-blue-500/20">
                                       <LinkIcon className="w-2.5 h-2.5" />
@@ -1219,6 +1232,64 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                                 </div>
                               </div>
                             </button>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-slate-300">{row.rec?.description || row.item.name || '—'}</td>
+                          <td className="px-4 py-3 text-sm text-slate-300">{row.rec?.expiryDate || '—'}</td>
+                          <td className="px-4 py-3 text-sm text-slate-300">{row.rec?.purchaseDate || '—'}</td>
+                          <td className="px-4 py-3 text-sm text-slate-300">{ageDays !== null ? `${ageDays}d` : '—'}</td>
+                          <td className="px-4 py-3 text-sm text-slate-300">{row.rec?.qtyStart ?? row.stock}</td>
+                          <td className="px-4 py-3 min-w-[140px]">
+                            <div className="space-y-1">
+                              <div className="flex items-center justify-between">
+                                {isEditing ? (
+                                  <input
+                                    type="number"
+                                    placeholder="0"
+                                    value={(editValues.stock ?? row.stock) === 0 ? '' : (editValues.stock ?? row.stock)}
+                                    onChange={(e) => setEditValues((v) => ({ ...v, stock: parseFloat(e.target.value || '0') }))}
+                                    step="0.01"
+                                    className="w-20 px-2 py-1 rounded bg-slate-900 border border-slate-600 text-white text-sm focus:outline-none focus:ring-1 focus:ring-amber-500"
+                                    min={0}
+                                  />
+                                ) : (
+                                  <span className={`text-sm font-bold ${row.isOut ? 'text-red-400' : row.isLow ? 'text-amber-400' : 'text-white'}`}>
+                                    {row.stock}
+                                  </span>
+                                )}
+                                <span className="text-xs text-slate-500">/ {maxStock}</span>
+                              </div>
+                              <StockBar stock={row.stock} threshold={row.threshold} max={maxStock} />
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            {isEditing ? (
+                              <input
+                                type="number"
+                                placeholder="0"
+                                value={(editValues.unitCost ?? row.rec?.unitCost ?? 0) === 0 ? '' : (editValues.unitCost ?? row.rec?.unitCost ?? 0)}
+                                onChange={(e) => setEditValues((v) => ({ ...v, unitCost: parseFloat(e.target.value || '0') }))}
+                                step="0.01"
+                                className="w-24 px-2 py-1 rounded bg-slate-900 border border-slate-600 text-white text-xs focus:outline-none focus:ring-1 focus:ring-amber-500"
+                                min={0}
+                              />
+                            ) : (
+                              <span className="text-sm text-slate-300">{formatPrice(row.rec?.unitCost ?? 0)}</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            {isEditing ? (
+                              <input
+                                type="number"
+                                placeholder="0"
+                                value={(editValues.price ?? row.rec?.price ?? 0) === 0 ? '' : (editValues.price ?? row.rec?.price ?? 0)}
+                                onChange={(e) => setEditValues((v) => ({ ...v, price: parseFloat(e.target.value || '0') }))}
+                                step="0.01"
+                                className="w-24 px-2 py-1 rounded bg-slate-900 border border-slate-600 text-white text-xs focus:outline-none focus:ring-1 focus:ring-amber-500"
+                                min={0}
+                              />
+                            ) : (
+                              <span className="text-sm text-slate-300">{formatPrice(row.rec?.price ?? 0)}</span>
+                            )}
                           </td>
                           <td className="px-4 py-3">
                             {isEditing ? (
@@ -1239,35 +1310,14 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                               </span>
                             )}
                           </td>
-                          <td className="px-4 py-3 min-w-[140px]">
-                            <div className="space-y-1">
-                              <div className="flex items-center justify-between">
-                                {isEditing ? (
-                                  <input
-                                    type="number"
-                                    placeholder="0"
-                                    value={(editValues.stock ?? row.stock) === 0 ? '' : (editValues.stock ?? row.stock)}
-                                    onChange={(e) => setEditValues((v) => ({ ...v, stock: parseInt(e.target.value || '0', 10) }))}
-                                    className="w-20 px-2 py-1 rounded bg-slate-900 border border-slate-600 text-white text-sm focus:outline-none focus:ring-1 focus:ring-amber-500"
-                                    min={0}
-                                  />
-                                ) : (
-                                  <span className={`text-sm font-bold ${row.isOut ? 'text-red-400' : row.isLow ? 'text-amber-400' : 'text-white'}`}>
-                                    {row.stock}
-                                  </span>
-                                )}
-                                <span className="text-xs text-slate-500">/ {maxStock}</span>
-                              </div>
-                              <StockBar stock={row.stock} threshold={row.threshold} max={maxStock} />
-                            </div>
-                          </td>
                           <td className="px-4 py-3 text-center">
                             {isEditing ? (
                               <input
                                 type="number"
                                 placeholder="0"
                                 value={(editValues.lowStockThreshold ?? row.rec?.lowStockThreshold ?? 0) === 0 ? '' : (editValues.lowStockThreshold ?? row.rec?.lowStockThreshold ?? 0)}
-                                onChange={(e) => setEditValues((v) => ({ ...v, lowStockThreshold: parseInt(e.target.value || '0', 10) }))}
+                                onChange={(e) => setEditValues((v) => ({ ...v, lowStockThreshold: parseFloat(e.target.value || '0') }))}
+                                step="0.01"
                                 className="w-16 px-2 py-1 rounded bg-slate-900 border border-slate-600 text-white text-xs focus:outline-none focus:ring-1 focus:ring-amber-500"
                                 min={0}
                               />
@@ -1281,7 +1331,8 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                                 type="number"
                                 placeholder="0"
                                 value={(editValues.reorderPoint ?? row.rec?.reorderPoint ?? 0) === 0 ? '' : (editValues.reorderPoint ?? row.rec?.reorderPoint ?? 0)}
-                                onChange={(e) => setEditValues((v) => ({ ...v, reorderPoint: parseInt(e.target.value || '0', 10) }))}
+                                onChange={(e) => setEditValues((v) => ({ ...v, reorderPoint: parseFloat(e.target.value || '0') }))}
+                                step="0.01"
                                 className="w-16 px-2 py-1 rounded bg-slate-900 border border-slate-600 text-white text-xs focus:outline-none focus:ring-1 focus:ring-amber-500"
                                 min={0}
                               />
@@ -1295,7 +1346,8 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                                 type="number"
                                 placeholder="0"
                                 value={(editValues.reorderQty ?? row.rec?.reorderQty ?? 0) === 0 ? '' : (editValues.reorderQty ?? row.rec?.reorderQty ?? 0)}
-                                onChange={(e) => setEditValues((v) => ({ ...v, reorderQty: parseInt(e.target.value || '0', 10) }))}
+                                onChange={(e) => setEditValues((v) => ({ ...v, reorderQty: parseFloat(e.target.value || '0') }))}
+                                step="0.01"
                                 className="w-16 px-2 py-1 rounded bg-slate-900 border border-slate-600 text-white text-xs focus:outline-none focus:ring-1 focus:ring-amber-500"
                                 min={0}
                               />
@@ -1303,34 +1355,7 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                               <span className="text-xs text-slate-300">{row.rec?.reorderQty ?? 0}</span>
                             )}
                           </td>
-                          <td className="px-4 py-3">
-                            {isEditing ? (
-                              <input
-                                type="number"
-                                placeholder="0"
-                                value={(editValues.unitCost ?? row.rec?.unitCost ?? 0) === 0 ? '' : (editValues.unitCost ?? row.rec?.unitCost ?? 0)}
-                                onChange={(e) => setEditValues((v) => ({ ...v, unitCost: parseFloat(e.target.value || '0') }))}
-                                step="0.01"
-                                className="w-24 px-2 py-1 rounded bg-slate-900 border border-slate-600 text-white text-xs focus:outline-none focus:ring-1 focus:ring-amber-500"
-                                min={0}
-                              />
-                            ) : (
-                              <span className="text-sm text-slate-300">{formatPrice(row.rec?.unitCost ?? 0)}</span>
-                            )}
-                          </td>
                           <td className="px-4 py-3 text-sm text-slate-300">{formatPrice((row.rec?.unitCost ?? 0) * row.stock)}</td>
-                          <td className="px-4 py-3 text-sm text-slate-300">
-                            {row.lastUpdatedDays !== null ? `${row.lastUpdatedDays}d` : '—'}
-                          </td>
-                          <td className="px-4 py-3">
-                            {row.isOut ? (
-                              <span className="px-2 py-1 rounded-full text-xs font-semibold bg-red-500/15 text-red-300 border border-red-500/30">Out of Stock</span>
-                            ) : row.isLow ? (
-                              <span className="px-2 py-1 rounded-full text-xs font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30">Low Stock</span>
-                            ) : (
-                              <span className="px-2 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">In Stock</span>
-                            )}
-                          </td>
                           {isManager && (
                             <td className="px-4 py-3">
                               {isEditing ? (
@@ -1369,6 +1394,7 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                                         reorderPoint: rec?.reorderPoint ?? 0,
                                         reorderQty: rec?.reorderQty ?? 0,
                                         unitCost: rec?.unitCost ?? 0,
+                                        price: rec?.price ?? 0,
                                         location: rec?.location ?? '',
                                       });
                                     }}
@@ -2424,9 +2450,9 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                   <label className="block text-sm text-slate-300">
                     Current stock
                     <input
-                      type="number" min={0}
+                      type="number" min={0} step="0.01"
                       value={newInventoryItemStock === 0 ? '' : newInventoryItemStock}
-                      onChange={(e) => setNewInventoryItemStock(parseInt(e.target.value || '0', 10))}
+                      onChange={(e) => setNewInventoryItemStock(parseFloat(e.target.value || '0'))}
                       className="mt-1 w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
                     />
                   </label>
@@ -2442,9 +2468,9 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                   <label className="block text-sm text-slate-300">
                     Low-stock alert below
                     <input
-                      type="number" min={0}
+                      type="number" min={0} step="0.01"
                       value={newInventoryItemLowThreshold === 0 ? '' : newInventoryItemLowThreshold}
-                      onChange={(e) => setNewInventoryItemLowThreshold(parseInt(e.target.value || '0', 10))}
+                      onChange={(e) => setNewInventoryItemLowThreshold(parseFloat(e.target.value || '0'))}
                       className="mt-1 w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
                     />
                   </label>
@@ -2463,18 +2489,18 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                   <label className="block text-sm text-slate-300">
                     Reorder point
                     <input
-                      type="number" min={0}
+                      type="number" min={0} step="0.01"
                       value={newInventoryItemReorderPoint === 0 ? '' : newInventoryItemReorderPoint}
-                      onChange={(e) => setNewInventoryItemReorderPoint(parseInt(e.target.value || '0', 10))}
+                      onChange={(e) => setNewInventoryItemReorderPoint(parseFloat(e.target.value || '0'))}
                       className="mt-1 w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
                     />
                   </label>
                   <label className="block text-sm text-slate-300">
                     Reorder qty
                     <input
-                      type="number" min={0}
+                      type="number" min={0} step="0.01"
                       value={newInventoryItemReorderQty === 0 ? '' : newInventoryItemReorderQty}
-                      onChange={(e) => setNewInventoryItemReorderQty(parseInt(e.target.value || '0', 10))}
+                      onChange={(e) => setNewInventoryItemReorderQty(parseFloat(e.target.value || '0'))}
                       className="mt-1 w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
                     />
                   </label>
