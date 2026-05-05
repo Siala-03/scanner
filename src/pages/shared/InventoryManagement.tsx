@@ -170,6 +170,7 @@ function parseCostChangeNote(note?: string): { oldCost: number; newCost: number 
 // ── Main Component ───────────────────────────────────────────────────────────
 
 export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryManagementProps) {
+  const isMinimartScope = inventoryScope === 'minimart';
   const { menuItems: contextMenuItems } = useMenu();
   const menuItems = useMemo(() => {
     if (inventoryScope !== 'minimart') return contextMenuItems;
@@ -248,7 +249,7 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
   const [newInventoryItemUnitCost, setNewInventoryItemUnitCost] = useState(0);
   const [newInventoryItemUnitMeasurement, setNewInventoryItemUnitMeasurement] = useState('units');
 
-  // ── Add to Menu modal state ─────────────────────────────────────────────
+  // ── Link inventory to product/menu modal state ──────────────────────────
   const [showAddToMenuModal, setShowAddToMenuModal] = useState(false);
   const [addToMenuItemId, setAddToMenuItemId] = useState(''); // existing inventory record's menuItemId
   const [addToMenuName, setAddToMenuName] = useState('');
@@ -533,24 +534,30 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
 
   const handleAddToMenu = async () => {
     if (!addToMenuItemId) { alert('Inventory item is missing'); return; }
-    if (!addToMenuName.trim()) { alert('Please enter a menu item name'); return; }
+    if (!addToMenuName.trim()) { alert(`Please enter a ${isMinimartScope ? 'product' : 'menu item'} name`); return; }
     if (addToMenuPrice <= 0) { alert('Please enter a valid price'); return; }
     if (!addToMenuCategory.trim()) { alert('Please select a category'); return; }
     setIsAddingToMenu(true);
     try {
-      const newItem = await createMenuItem({
+      const payload: any = {
         name: addToMenuName.trim(),
         price: addToMenuPrice,
         category: addToMenuCategory,
         is_available: true,
-      });
+      };
+      if (isMinimartScope) {
+        payload.requires_kitchen = false;
+        payload.prep_time = 0;
+      }
+
+      const newItem = await createMenuItem(payload);
       await apiRelinkInventoryRecord(addToMenuItemId, newItem.id);
       await refresh();
       closeAddToMenuModal();
-      alert(`"${newItem.name}" added to menu and linked to inventory.`);
+      alert(`"${newItem.name}" added to ${isMinimartScope ? 'products' : 'menu'} and linked to inventory. Sales will auto-deduct stock from this item.`);
     } catch (err) {
-      console.error('Failed to add to menu', err);
-      alert(`Failed to add to menu: ${getErrorMessage(err)}`);
+      console.error(`Failed to add to ${isMinimartScope ? 'products' : 'menu'}`, err);
+      alert(`Failed to add to ${isMinimartScope ? 'products' : 'menu'}: ${getErrorMessage(err)}`);
     } finally {
       setIsAddingToMenu(false);
     }
@@ -1180,7 +1187,7 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
             {/* Table */}
             <Card className="bg-slate-800/50 border border-slate-700/50" padding="none">
               <div className="overflow-x-auto">
-                <table className="w-full">
+                <table className="w-full min-w-[1900px]">
                   <thead className="bg-slate-700/40 border-b border-slate-700/50">
                     <tr>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Item ID</th>
@@ -1419,8 +1426,8 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                                       if (menuItemMap[row.item.id]) return;
                                       setAddToMenuItemId(row.item.id);
                                       setAddToMenuName(row.item.name !== row.item.id ? row.item.name : '');
-                                      setAddToMenuPrice(row.rec?.unitCost ?? 0);
-                                      setAddToMenuCategory(menuCategories.find((c) => c !== 'all') ?? 'Food');
+                                      setAddToMenuPrice(row.rec?.price ?? row.rec?.unitCost ?? 0);
+                                      setAddToMenuCategory(menuCategories.find((c) => c !== 'all') ?? (isMinimartScope ? 'General' : 'Food'));
                                       setShowAddToMenuModal(true);
                                     }}
                                     disabled={!!menuItemMap[row.item.id]}
@@ -1429,7 +1436,7 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                                         ? 'text-slate-400 cursor-not-allowed bg-slate-600/30 border-slate-500/40'
                                         : 'text-blue-100 bg-blue-500/22 border-blue-500/55 hover:bg-blue-500/35'
                                     }`}
-                                    title={menuItemMap[row.item.id] ? 'Already in Menu' : 'Add to Menu'}
+                                    title={menuItemMap[row.item.id] ? `Already linked to ${isMinimartScope ? 'Product' : 'Menu Item'}` : `Add to ${isMinimartScope ? 'Products' : 'Menu'}`}
                                   >
                                     {menuItemMap[row.item.id]
                                       ? <CheckCircleIcon className="w-4 h-4" />
@@ -1567,24 +1574,26 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
           </Modal>
         )}
 
-        {/* ── ADD TO MENU MODAL ── */}
+        {/* ── LINK INVENTORY ITEM MODAL ── */}
         <Modal isOpen={showAddToMenuModal} onClose={closeAddToMenuModal}>
           <div className="p-5 space-y-4 max-w-md">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-bold text-white flex items-center gap-2">
                 <LinkIcon className="w-5 h-5 text-blue-400" />
-                Add to Menu
+                {isMinimartScope ? 'Add to Products' : 'Add to Menu'}
               </h3>
               <button onClick={closeAddToMenuModal} className="text-slate-400 hover:text-white">
                 <XIcon className="w-4 h-4" />
               </button>
             </div>
             <p className="text-sm text-slate-400">
-              Create a menu item linked to this inventory record. Once linked, placing an order for this item will automatically deduct from stock.
+              {isMinimartScope
+                ? 'Create a product linked to this inventory record. Once linked, minimart sales will automatically deduct stock for this item.'
+                : 'Create a menu item linked to this inventory record. Once linked, placing an order for this item will automatically deduct from stock.'}
             </p>
             <div className="space-y-3">
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">Menu Item Name *</label>
+                <label className="block text-xs font-medium text-slate-300 mb-1">{isMinimartScope ? 'Product Name *' : 'Menu Item Name *'}</label>
                 <input
                   type="text"
                   value={addToMenuName}
@@ -1633,7 +1642,7 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                 className="flex-1 bg-blue-600 hover:bg-blue-500"
               >
                 <LinkIcon className="w-4 h-4" />
-                Add to Menu
+                {isMinimartScope ? 'Add to Products' : 'Add to Menu'}
               </Button>
             </div>
           </div>
