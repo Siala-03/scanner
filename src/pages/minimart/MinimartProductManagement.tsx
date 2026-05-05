@@ -574,16 +574,7 @@ export function MinimartProductManagement() {
                 required
               />
             </div>
-            <div>
-              <label className="block text-xs text-slate-400 mb-1">Emoji</label>
-              <input
-                value={addForm.emoji}
-                onChange={(e) => setAddForm((p) => ({ ...p, emoji: e.target.value }))}
-                placeholder="ðŸ“¦"
-                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500"
-                maxLength={4}
-              />
-            </div>
+
             <div className="sm:col-span-2 lg:col-span-3">
               <label className="block text-xs text-slate-400 mb-1">Description</label>
               <input
@@ -694,31 +685,19 @@ export function MinimartProductManagement() {
                         className="accent-amber-500 w-4 h-4"
                       />
                     </td>
-                    {/* Name + emoji */}
+                    {/* Name */}
                     <td className="px-4 py-3">
                       {isEditing ? (
-                        <div className="flex gap-2">
-                          <input
-                            value={editForm.emoji}
-                            onChange={(e) => setEditForm((f) => ({ ...f, emoji: e.target.value }))}
-                            className="w-12 px-2 py-1 bg-slate-800 border border-amber-500 rounded text-sm text-center focus:outline-none"
-                            maxLength={4}
-                            placeholder="ðŸ“¦"
-                          />
-                          <input
-                            value={editForm.name}
-                            onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
-                            className="flex-1 px-2 py-1 bg-slate-800 border border-amber-500 rounded text-sm text-slate-100 focus:outline-none"
-                            autoFocus
-                          />
-                        </div>
+                        <input
+                          value={editForm.name}
+                          onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
+                          className="w-full px-2 py-1 bg-slate-800 border border-amber-500 rounded text-sm text-slate-100 focus:outline-none"
+                          autoFocus
+                        />
                       ) : (
-                        <div className="flex items-center gap-2">
-                          <span className="text-base">{(p as any).emoji || 'ðŸ“¦'}</span>
-                          <span className={`font-medium ${isAvailable ? 'text-slate-200' : 'text-slate-500 line-through'}`}>
-                            {p.name}
-                          </span>
-                        </div>
+                        <span className={`font-medium ${isAvailable ? 'text-slate-200' : 'text-slate-500 line-through'}`}>
+                          {p.name}
+                        </span>
                       )}
                     </td>
                     {/* Category */}

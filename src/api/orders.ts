@@ -294,7 +294,8 @@ export async function createOrder(order: CreateOrderInput): Promise<Order> {
 
   // Decrement inventory stock for each ordered item (best-effort, does not block order creation)
   decrementInventoryForOrder(
-    order.items.map(item => ({ menuItemId: item.menuItemId, quantity: item.quantity }))
+    order.items.map(item => ({ menuItemId: item.menuItemId, quantity: item.quantity })),
+    { reference: orderNumber, performedBy: staffId || undefined }
   ).catch(err => console.warn('[createOrder] Inventory decrement failed:', err));
 
   return result.data as Order;

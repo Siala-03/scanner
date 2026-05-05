@@ -314,7 +314,7 @@ export function buildReceiptHtml(receipt: ReceiptData): string {
   <style>
     @page { size: 80mm auto; margin: 0; }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Courier New', Courier, monospace; font-size: 9pt; color: #000; line-height: 1.4; }
+    body { font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif; font-size: 10pt; color: #000; line-height: 1.45; }
 
     @media screen {
       body { background: #c8c8c8; display: flex; flex-direction: column; align-items: center; padding: 20px 12px 40px; }
@@ -324,50 +324,51 @@ export function buildReceiptHtml(receipt: ReceiptData): string {
       html, body { background: #fff; }
       .paper { padding: 3mm 4mm 8mm; }
       .no-print { display: none !important; }
+      * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     }
 
     .hdr { text-align: center; padding-bottom: 8px; }
     .logo { max-height: 60px; max-width: 150px; object-fit: contain; display: block; margin: 0 auto 6px; }
-    .brand { font-size: 14pt; font-weight: 900; letter-spacing: 2px; text-transform: uppercase; }
-    .addr { font-size: 8pt; color: #444; margin-top: 3px; line-height: 1.5; }
-    .rbadge { display: inline-block; margin-top: 7px; padding: 2px 10px; border: 1px solid #000; font-size: 7pt; letter-spacing: 2px; text-transform: uppercase; }
+    .brand { font-size: 15pt; font-weight: 900; letter-spacing: 2px; text-transform: uppercase; }
+    .addr { font-size: 9pt; color: #333; margin-top: 3px; line-height: 1.5; }
+    .rbadge { display: inline-block; margin-top: 7px; padding: 2px 10px; border: 1.5px solid #000; font-size: 8pt; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; }
 
-    .solid  { border: none; border-top: 1.5px solid #000; margin: 8px 0; }
-    .dashed { border: none; border-top: 1px dashed #888; margin: 6px 0; }
+    .solid  { border: none; border-top: 2px solid #000; margin: 8px 0; }
+    .dashed { border: none; border-top: 1px dashed #666; margin: 6px 0; }
 
-    .meta { width: 100%; border-collapse: collapse; font-size: 8pt; }
+    .meta { width: 100%; border-collapse: collapse; font-size: 9pt; }
     .meta td { padding: 2px 0; vertical-align: top; }
-    .meta td:first-child { color: #555; width: 42%; }
+    .meta td:first-child { color: #333; width: 42%; }
     .meta td:last-child  { font-weight: 700; text-align: right; }
 
-    .items { width: 100%; border-collapse: collapse; font-size: 9pt; }
-    .items th { font-size: 7pt; letter-spacing: 1px; text-transform: uppercase; color: #555; padding: 0 0 4px; border-bottom: 1px solid #ccc; text-align: left; }
+    .items { width: 100%; border-collapse: collapse; font-size: 10pt; }
+    .items th { font-size: 8pt; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #333; padding: 0 0 4px; border-bottom: 1.5px solid #000; text-align: left; }
     .items th:last-child { text-align: right; }
-    .items td { padding: 5px 0; vertical-align: top; border-bottom: 1px dotted #ddd; }
-    .items .qty   { width: 22px; color: #555; font-size: 8pt; }
+    .items td { padding: 5px 0; vertical-align: top; border-bottom: 1px dotted #bbb; }
+    .items .qty   { width: 24px; color: #333; font-size: 9pt; }
     .items .name  { padding-right: 6px; }
-    .items .price { text-align: right; font-weight: 700; white-space: nowrap; font-size: 8pt; }
-    .note { font-size: 7pt; color: #777; font-style: italic; margin-top: 1px; }
+    .items .price { text-align: right; font-weight: 700; white-space: nowrap; font-size: 9pt; }
+    .note { font-size: 8pt; color: #555; font-style: italic; margin-top: 1px; }
 
-    .totals { width: 100%; border-collapse: collapse; font-size: 9pt; }
+    .totals { width: 100%; border-collapse: collapse; font-size: 10pt; }
     .totals td { padding: 3px 0; }
     .totals td:last-child { text-align: right; }
-    .grand td { font-size: 12pt; font-weight: 900; border-top: 1.5px solid #000; padding-top: 6px; }
+    .grand td { font-size: 13pt; font-weight: 900; border-top: 2px solid #000; padding-top: 7px; }
 
-    .pay-row { display: flex; justify-content: space-between; font-size: 8pt; padding: 2px 0; }
-    .sbadge { display: inline-block; padding: 1px 8px; border-radius: 12px; font-size: 7pt; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+    .pay-row { display: flex; justify-content: space-between; font-size: 9pt; padding: 2px 0; }
+    .sbadge { display: inline-block; padding: 2px 9px; border-radius: 12px; font-size: 8pt; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
     .s-paid    { background: #d1fae5; color: #065f46; }
     .s-pending { background: #fef3c7; color: #92400e; }
 
-    .notes-box { border: 1px dashed #bbb; border-radius: 3px; padding: 5px 7px; font-size: 8pt; color: #444; font-style: italic; line-height: 1.5; }
+    .notes-box { border: 1px dashed #888; border-radius: 3px; padding: 5px 7px; font-size: 9pt; color: #333; font-style: italic; line-height: 1.5; }
 
-    .loyalty-box { border: 1px dashed #b8952a; border-radius: 3px; padding: 7px; text-align: center; background: #fffbf0; }
-    .loyalty-box .pts { font-size: 14pt; font-weight: 900; color: #92400e; }
-    .loyalty-box .lbl { font-size: 7pt; color: #92400e; letter-spacing: 1px; text-transform: uppercase; }
+    .loyalty-box { border: 1.5px dashed #b8952a; border-radius: 3px; padding: 7px; text-align: center; background: #fffbf0; }
+    .loyalty-box .pts { font-size: 15pt; font-weight: 900; color: #92400e; }
+    .loyalty-box .lbl { font-size: 8pt; font-weight: 700; color: #92400e; letter-spacing: 1px; text-transform: uppercase; }
 
-    .footer { text-align: center; font-size: 8pt; color: #444; line-height: 1.7; }
-    .thanks { font-size: 10pt; font-weight: 900; color: #000; letter-spacing: 1px; margin-bottom: 3px; }
-    .powered { font-size: 7pt; color: #999; margin-top: 6px; letter-spacing: 1px; }
+    .footer { text-align: center; font-size: 9pt; color: #333; line-height: 1.7; }
+    .thanks { font-size: 11pt; font-weight: 900; color: #000; letter-spacing: 1px; margin-bottom: 3px; }
+    .powered { font-size: 8pt; color: #777; margin-top: 6px; letter-spacing: 1px; }
 
     .print-btn { margin-top: 16px; padding: 8px 28px; background: #111; color: #fff; border: none; border-radius: 3px; font-family: inherit; font-size: 12px; cursor: pointer; }
     .print-btn:hover { background: #333; }
@@ -558,7 +559,7 @@ export function buildExpenseReceiptHtml(
   <style>
     @page { size: 80mm auto; margin: 0; }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Courier New', Courier, monospace; font-size: 9pt; color: #000; line-height: 1.4; }
+    body { font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif; font-size: 10pt; color: #000; line-height: 1.45; }
 
     @media screen {
       body { background: #c8c8c8; display: flex; flex-direction: column; align-items: center; padding: 20px 12px 40px; }
@@ -568,43 +569,45 @@ export function buildExpenseReceiptHtml(
       html, body { background: #fff; }
       .paper { padding: 3mm 4mm 8mm; }
       .no-print { display: none !important; }
+      * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     }
 
     .hdr { text-align: center; padding-bottom: 8px; }
     .logo { max-height: 60px; max-width: 150px; object-fit: contain; display: block; margin: 0 auto 6px; }
-    .brand { font-size: 14pt; font-weight: 900; letter-spacing: 2px; text-transform: uppercase; }
-    .sub { font-size: 8pt; color: #444; margin-top: 3px; line-height: 1.5; }
-    .rbadge { display: inline-block; margin-top: 7px; padding: 2px 10px; border: 1px solid #000; font-size: 7pt; letter-spacing: 2px; text-transform: uppercase; }
+    .brand { font-size: 15pt; font-weight: 900; letter-spacing: 2px; text-transform: uppercase; }
+    .sub { font-size: 9pt; color: #333; margin-top: 3px; line-height: 1.5; }
+    .rbadge { display: inline-block; margin-top: 7px; padding: 2px 10px; border: 1.5px solid #000; font-size: 8pt; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; }
 
-    .solid  { border: none; border-top: 1.5px solid #000; margin: 8px 0; }
-    .dashed { border: none; border-top: 1px dashed #888; margin: 6px 0; }
+    .solid  { border: none; border-top: 2px solid #000; margin: 8px 0; }
+    .dashed { border: none; border-top: 1px dashed #666; margin: 6px 0; }
 
-    .meta { width: 100%; border-collapse: collapse; font-size: 8pt; }
+    .meta { width: 100%; border-collapse: collapse; font-size: 9pt; }
     .meta td { padding: 2px 0; vertical-align: top; }
     .meta td:first-child { color: #555; width: 45%; }
     .meta td:last-child  { font-weight: 700; text-align: right; }
 
     .desc-lbl { font-size: 7pt; letter-spacing: 1.5px; text-transform: uppercase; color: #555; margin-bottom: 3px; }
-    .desc-box { font-size: 8pt; line-height: 1.5; color: #333; border-top: 1px dotted #ddd; border-bottom: 1px dotted #ddd; padding: 6px 0; margin: 3px 0; }
+    .desc-lbl { font-size: 8pt; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: #333; margin-bottom: 3px; }
+    .desc-box { font-size: 9pt; line-height: 1.5; color: #000; border-top: 1px dotted #bbb; border-bottom: 1px dotted #bbb; padding: 6px 0; margin: 3px 0; }
 
-    .totals { width: 100%; border-collapse: collapse; font-size: 9pt; }
+    .totals { width: 100%; border-collapse: collapse; font-size: 10pt; }
     .totals td { padding: 3px 0; }
     .totals td:last-child { text-align: right; }
-    .grand td { font-size: 12pt; font-weight: 900; border-top: 1.5px solid #000; padding-top: 6px; }
+    .grand td { font-size: 13pt; font-weight: 900; border-top: 2px solid #000; padding-top: 7px; }
 
-    .pay-row { display: flex; justify-content: space-between; font-size: 8pt; padding: 2px 0; }
-    .sbadge { display: inline-block; padding: 1px 8px; border-radius: 12px; font-size: 7pt; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+    .pay-row { display: flex; justify-content: space-between; font-size: 9pt; padding: 2px 0; }
+    .sbadge { display: inline-block; padding: 2px 9px; border-radius: 12px; font-size: 8pt; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
     .s-paid     { background: #d1fae5; color: #065f46; }
     .s-pending  { background: #fef3c7; color: #92400e; }
     .s-approved { background: #d1fae5; color: #065f46; }
     .s-rejected { background: #fee2e2; color: #991b1b; }
     .s-draft    { background: #f1f5f9; color: #475569; }
 
-    .notes-box { border: 1px dashed #bbb; border-radius: 3px; padding: 5px 7px; font-size: 8pt; color: #444; font-style: italic; line-height: 1.5; }
+    .notes-box { border: 1px dashed #888; border-radius: 3px; padding: 5px 7px; font-size: 9pt; color: #333; font-style: italic; line-height: 1.5; }
 
-    .footer { text-align: center; font-size: 8pt; color: #444; line-height: 1.7; }
-    .thanks { font-size: 10pt; font-weight: 900; color: #000; letter-spacing: 1px; margin-bottom: 3px; }
-    .powered { font-size: 7pt; color: #999; margin-top: 6px; letter-spacing: 1px; }
+    .footer { text-align: center; font-size: 9pt; color: #333; line-height: 1.7; }
+    .thanks { font-size: 11pt; font-weight: 900; color: #000; letter-spacing: 1px; margin-bottom: 3px; }
+    .powered { font-size: 8pt; color: #777; margin-top: 6px; letter-spacing: 1px; }
 
     .print-btn { margin-top: 16px; padding: 8px 28px; background: #111; color: #fff; border: none; border-radius: 3px; font-family: inherit; font-size: 12px; cursor: pointer; }
     .print-btn:hover { background: #333; }

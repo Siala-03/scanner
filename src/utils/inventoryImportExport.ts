@@ -2,25 +2,30 @@ import * as XLSX from 'xlsx';
 
 export interface InventoryImportRow {
   menuItemId: string;
+  description?: string;
+  expiryDate?: string;
+  purchaseDate?: string;
+  qtyStart?: number;
   stock: number;
   lowStockThreshold: number;
   reorderPoint: number;
   reorderQty: number;
   unitCost: number;
+  price?: number;
   location: string;
   unitMeasurement: string;
 }
 
 const CSV_HEADERS = [
-  'item_name',
-  'menu_item_id',
-  'stock',
-  'low_stock_threshold',
-  'reorder_point',
-  'reorder_qty',
-  'unit_cost',
-  'location',
-  'unit_measurement',
+  'Item_ID',
+  'Description',
+  'Expiry_Date',
+  'Purchase_Date',
+  'Qty_Start',
+  'Current_Qty',
+  'Cost',
+  'Price',
+  'Location',
 ];
 
 function csvEsc(val: unknown): string {
@@ -43,9 +48,16 @@ function dl(blob: Blob, name: string) {
 
 export function exportInventoryToCsv(
   rows: {
-    item: { id: string; name: string };
+    item: { id: string; name: string; price?: number };
     rec?: {
       stock: number;
+      description?: string;
+      qtyStart?: number;
+      currentQty?: number;
+      cost?: number;
+      price?: number;
+      expiryDate?: string;
+      purchaseDate?: string;
       lowStockThreshold: number;
       reorderPoint: number;
       reorderQty: number;
@@ -59,15 +71,15 @@ export function exportInventoryToCsv(
     CSV_HEADERS.join(','),
     ...rows.map((r) =>
       [
-        csvEsc(r.item.name),
         csvEsc(r.item.id),
-        r.rec?.stock ?? 0,
-        r.rec?.lowStockThreshold ?? 5,
-        r.rec?.reorderPoint ?? 10,
-        r.rec?.reorderQty ?? 20,
-        r.rec?.unitCost ?? 0,
+        csvEsc(r.rec?.description ?? r.item.name),
+        csvEsc(r.rec?.expiryDate ?? ''),
+        csvEsc(r.rec?.purchaseDate ?? ''),
+        r.rec?.qtyStart ?? r.rec?.stock ?? 0,
+        r.rec?.currentQty ?? r.rec?.stock ?? 0,
+        r.rec?.cost ?? r.rec?.unitCost ?? 0,
+        r.rec?.price ?? r.item.price ?? 0,
         csvEsc(r.rec?.location ?? ''),
-        csvEsc(r.rec?.unitMeasurement ?? 'units'),
       ].join(',')
     ),
   ].join('\n');
@@ -80,9 +92,9 @@ export function exportInventoryToCsv(
 
 export function downloadInventoryTemplate(): void {
   const examples = [
-    'Coca Cola,item-example-001,24,5,10,20,500,Bar Fridge,units',
-    'Heineken Beer,item-example-002,48,10,20,50,1200,Fridge 2,bottles',
-    'Tomatoes,item-example-003,10,3,5,20,200,Dry Store,kg',
+    'item-example-001,Coca Cola,2026-12-31,2026-05-01,24,24,500,700,Bar Fridge',
+    'item-example-002,Heineken Beer,2027-02-28,2026-05-01,48,48,1200,1700,Fridge 2',
+    'item-example-003,Tomatoes,2026-05-10,2026-05-02,10,10,200,350,Dry Store',
   ];
   const csv = [CSV_HEADERS.join(','), ...examples].join('\n');
   dl(new Blob([csv], { type: 'text/csv' }), 'inventory-template.csv');
@@ -113,16 +125,24 @@ function parseCsvRows(content: string): InventoryImportRow[] {
     const row: Record<string, string> = {};
     headers.forEach((h, idx) => { row[h] = values[idx] ?? ''; });
 
-    const id = row.menuitemid || row.itemid || row.id || '';
+    const id = row.itemid || row.menuitemid || row.menuitemid || row.id || '';
     if (!id) continue;
+
+    const stock = parseInt(row.currentqty ?? row.stock ?? row.qtystart ?? '0', 10) || 0;
+    const qtyStart = parseInt(row.qtystart ?? String(stock), 10) || stock;
 
     results.push({
       menuItemId: id,
-      stock: parseInt(row.stock ?? '0', 10) || 0,
+      description: row.description ?? row.itemname ?? '',
+      expiryDate: row.expirydate ?? '',
+      purchaseDate: row.purchasedate ?? '',
+      qtyStart,
+      stock,
       lowStockThreshold: parseInt(row.lowstockthreshold ?? row.threshold ?? '5', 10) || 5,
       reorderPoint: parseInt(row.reorderpoint ?? '10', 10) || 10,
       reorderQty: parseInt(row.reorderqty ?? '20', 10) || 20,
-      unitCost: parseFloat(row.unitcost ?? row.cost ?? '0') || 0,
+      unitCost: parseFloat(row.cost ?? row.unitcost ?? '0') || 0,
+      price: parseFloat(row.price ?? '0') || 0,
       location: row.location ?? '',
       unitMeasurement: row.unitmeasurement ?? row.unit ?? 'units',
     });
@@ -143,13 +163,22 @@ function parseExcelRows(buffer: ArrayBuffer): InventoryImportRow[] {
       );
       const id = String(row.menuitemid || row.itemid || row.id || '');
       if (!id) return null;
+
+      const stock = Number(row.currentqty ?? row.stock ?? row.qtystart ?? 0);
+      const qtyStart = Number(row.qtystart ?? stock);
+
       return {
         menuItemId: id,
-        stock: Number(row.stock ?? 0),
+        description: String(row.description ?? row.itemname ?? ''),
+        expiryDate: String(row.expirydate ?? ''),
+        purchaseDate: String(row.purchasedate ?? ''),
+        qtyStart,
+        stock,
         lowStockThreshold: Number(row.lowstockthreshold ?? row.threshold ?? 5),
         reorderPoint: Number(row.reorderpoint ?? 10),
         reorderQty: Number(row.reorderqty ?? 20),
-        unitCost: Number(row.unitcost ?? row.cost ?? 0),
+        unitCost: Number(row.cost ?? row.unitcost ?? 0),
+        price: Number(row.price ?? 0),
         location: String(row.location ?? ''),
         unitMeasurement: String(row.unitmeasurement ?? row.unit ?? 'units'),
       } as InventoryImportRow;
@@ -173,11 +202,16 @@ export async function importInventoryFromFile(file: File): Promise<InventoryImpo
     if (!Array.isArray(data)) throw new Error('JSON must be an array of objects');
     return (data as any[]).map((r, i) => ({
       menuItemId: String(r.menu_item_id || r.menuItemId || r.id || `row-${i}`),
-      stock: Number(r.stock ?? 0),
+      description: String(r.description ?? ''),
+      expiryDate: String(r.expiry_date ?? r.expiryDate ?? ''),
+      purchaseDate: String(r.purchase_date ?? r.purchaseDate ?? ''),
+      qtyStart: Number(r.qty_start ?? r.qtyStart ?? r.current_qty ?? r.currentQty ?? r.stock ?? 0),
+      stock: Number(r.current_qty ?? r.currentQty ?? r.stock ?? 0),
       lowStockThreshold: Number(r.low_stock_threshold ?? r.lowStockThreshold ?? 5),
       reorderPoint: Number(r.reorder_point ?? r.reorderPoint ?? 10),
       reorderQty: Number(r.reorder_qty ?? r.reorderQty ?? 20),
-      unitCost: Number(r.unit_cost ?? r.unitCost ?? 0),
+      unitCost: Number(r.cost ?? r.unit_cost ?? r.unitCost ?? 0),
+      price: Number(r.price ?? r.selling_price ?? r.sellingPrice ?? 0),
       location: String(r.location ?? ''),
       unitMeasurement: String(r.unit_measurement ?? r.unitMeasurement ?? 'units'),
     }));

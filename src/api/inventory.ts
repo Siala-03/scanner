@@ -47,17 +47,64 @@ function getStaffId(): string {
 // ── Normalizers ──────────────────────────────────────────────────────────────
 
 function normalizeInventoryRecord(raw: any): InventoryRecord {
+  const currentQty = raw.current_qty ?? raw.currentQty ?? raw.stock ?? 0;
+  const cost = raw.cost ?? raw.unit_cost ?? raw.unitCost ?? 0;
+  const price = raw.price ?? raw.selling_price ?? raw.sellingPrice ?? 0;
   return {
     menuItemId:        raw.menu_item_id   ?? raw.menuItemId   ?? '',
-    stock:             raw.stock           ?? 0,
+    stock:             currentQty,
     lowStockThreshold: raw.low_stock_threshold ?? raw.lowStockThreshold ?? 5,
     reorderPoint:      raw.reorder_point   ?? raw.reorderPoint ?? 10,
     reorderQty:        raw.reorder_qty     ?? raw.reorderQty   ?? 20,
-    unitCost:          raw.unit_cost       ?? raw.unitCost     ?? 0,
+    unitCost:          cost,
     supplierId:        raw.supplier_id     ?? raw.supplierId   ?? undefined,
     location:          raw.location        ?? '',
     updatedAt:         raw.updated_at      ?? raw.updatedAt    ?? new Date().toISOString(),
+    // Extended fields for minimart inventory sheet format.
+    description:       raw.description     ?? raw.item_description ?? '',
+    expiryDate:        raw.expiry_date     ?? raw.expiryDate ?? '',
+    purchaseDate:      raw.purchase_date   ?? raw.purchaseDate ?? '',
+    qtyStart:          raw.qty_start       ?? raw.qtyStart ?? currentQty,
+    currentQty,
+    cost,
+    price,
   };
+}
+
+async function recordCostChangeAudit(params: {
+  menuItemId: string;
+  restaurantId: string;
+  performedBy: string;
+  oldCost: number;
+  newCost: number;
+  stockBefore: number;
+  stockAfter: number;
+}): Promise<void> {
+  if (params.oldCost === params.newCost) return;
+
+  const movementId = `mov-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  const note = `COST_CHANGE|old=${params.oldCost}|new=${params.newCost}`;
+
+  const { error } = await supabase
+    .from('stock_movements')
+    .insert({
+      id: movementId,
+      menu_item_id: params.menuItemId,
+      menu_item_name: params.menuItemId,
+      type: 'adjustment',
+      qty: 0,
+      stock_before: params.stockBefore,
+      balance_after: params.stockAfter,
+      unit_cost: params.newCost,
+      reference: 'COST_CHANGE',
+      performed_by: params.performedBy,
+      notes: note,
+      restaurant_id: params.restaurantId,
+    });
+
+  if (error) {
+    console.warn('[recordCostChangeAudit] Failed to persist cost-change audit:', error.message);
+  }
 }
 
 function normalizeSupplier(raw: any): Supplier {
@@ -189,6 +236,11 @@ export async function createInventoryRecord(record: Partial<InventoryRecord>): P
       unit_cost:           record.unitCost            ?? 0,
       supplier_id:         record.supplierId          ?? null,
       location:            record.location            ?? '',
+      description:         record.description         ?? '',
+      expiry_date:         record.expiryDate          ?? null,
+      purchase_date:       record.purchaseDate        ?? null,
+      qty_start:           record.qtyStart            ?? record.stock ?? 0,
+      price:               record.price               ?? 0,
       restaurant_id:       restaurantId,
     })
     .select()
@@ -214,6 +266,10 @@ export async function updateInventoryRecord(
     .eq('restaurant_id', restaurantId)
     .maybeSingle();
 
+  const newCostValueRaw = record.unitCost ?? record.unit_cost ?? record.cost;
+  const hasNewCostValue = newCostValueRaw !== undefined && newCostValueRaw !== null && !Number.isNaN(Number(newCostValueRaw));
+  const previousCost = Number(previous?.unit_cost ?? 0);
+
   // Accept both camelCase (from UI) and snake_case (from direct callers)
   const updateFields: Record<string, any> = {
     updated_at: new Date().toISOString(),
@@ -228,11 +284,20 @@ export async function updateInventoryRecord(
   if (record.reorder_qty         !== undefined) updateFields.reorder_qty         = record.reorder_qty;
   if (record.unitCost            !== undefined) updateFields.unit_cost           = record.unitCost;
   if (record.unit_cost           !== undefined) updateFields.unit_cost           = record.unit_cost;
+  if (record.cost                !== undefined) updateFields.unit_cost           = record.cost;
   if (record.unitMeasurement    !== undefined) updateFields.unit_measurement   = record.unitMeasurement;
   if (record.unit_measurement !== undefined) updateFields.unit_measurement = record.unit_measurement;
   if (record.supplierId          !== undefined) updateFields.supplier_id         = record.supplierId;
   if (record.supplier_id         !== undefined) updateFields.supplier_id         = record.supplier_id;
   if (record.location            !== undefined) updateFields.location            = record.location;
+  if (record.description         !== undefined) updateFields.description         = record.description;
+  if (record.expiryDate          !== undefined) updateFields.expiry_date         = record.expiryDate   || null;
+  if (record.expiry_date         !== undefined) updateFields.expiry_date         = record.expiry_date  || null;
+  if (record.purchaseDate        !== undefined) updateFields.purchase_date       = record.purchaseDate  || null;
+  if (record.purchase_date       !== undefined) updateFields.purchase_date       = record.purchase_date || null;
+  if (record.qtyStart            !== undefined) updateFields.qty_start           = record.qtyStart;
+  if (record.qty_start           !== undefined) updateFields.qty_start           = record.qty_start;
+  if (record.price               !== undefined) updateFields.price               = record.price;
 
   // Try UPDATE first (existing record)
   const { data: updated, error: updateError } = await supabase
@@ -248,6 +313,17 @@ export async function updateInventoryRecord(
 
   if (!updateError && updated && updated.length > 0) {
     const normalized = normalizeInventoryRecord(updated[0]);
+    if (hasNewCostValue) {
+      await recordCostChangeAudit({
+        menuItemId,
+        restaurantId,
+        performedBy: getStaffId(),
+        oldCost: previousCost,
+        newCost: Number(newCostValueRaw),
+        stockBefore: Number(previous?.stock ?? updated[0]?.stock ?? 0),
+        stockAfter: Number(updated[0]?.stock ?? 0),
+      });
+    }
     await maybeAutoReorder({
       menuItemId,
       restaurantId,
@@ -274,6 +350,11 @@ export async function updateInventoryRecord(
       unit_cost:           record.unitCost            ?? record.unit_cost           ?? 0,
       supplier_id:         record.supplierId          ?? record.supplier_id         ?? null,
       location:            record.location            ?? '',
+      description:         record.description         ?? '',
+      expiry_date:         record.expiryDate          ?? record.expiry_date         ?? null,
+      purchase_date:       record.purchaseDate        ?? record.purchase_date       ?? null,
+      qty_start:           record.qtyStart            ?? record.qty_start           ?? record.stock ?? 0,
+      price:               record.price               ?? 0,
       updated_at:          new Date().toISOString(),
     })
     .select()
@@ -406,10 +487,12 @@ export async function deleteInventoryRecord(menuItemId: string): Promise<void> {
  * Failures are logged but do NOT throw — order creation takes priority over inventory sync.
  */
 export async function decrementInventoryForOrder(
-  items: Array<{ menuItemId: string; quantity: number }>
+  items: Array<{ menuItemId: string; quantity: number }>,
+  options?: { reference?: string; performedBy?: string }
 ): Promise<void> {
   const restaurantId = getRestaurantId();
   if (!restaurantId || !items.length) return;
+  const performedBy = options?.performedBy || getStaffId();
 
   await Promise.allSettled(
     items.map(async ({ menuItemId, quantity }) => {
@@ -431,6 +514,27 @@ export async function decrementInventoryForOrder(
 
       if (updateErr) {
         console.warn(`[decrementInventoryForOrder] Failed to decrement stock for ${menuItemId}:`, updateErr.message);
+        return;
+      }
+
+      const { error: movementErr } = await supabase
+        .from('stock_movements')
+        .insert({
+          id: `mov-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          menu_item_id: menuItemId,
+          menu_item_name: menuItemId,
+          type: 'sale',
+          qty: -Math.abs(quantity),
+          stock_before: rec.stock ?? 0,
+          balance_after: newStock,
+          performed_by: performedBy,
+          reference: options?.reference ?? null,
+          notes: options?.reference ? `Sale for ${options.reference}` : 'Sale inventory deduction',
+          restaurant_id: restaurantId,
+        });
+
+      if (movementErr) {
+        console.warn(`[decrementInventoryForOrder] Failed to log movement for ${menuItemId}:`, movementErr.message);
       }
     })
   );
@@ -529,13 +633,13 @@ export async function createSupplier(supplier: Partial<Supplier>): Promise<Suppl
     .insert({
       id,
       name:           supplier.name,
-      contact_person: supplier.contactPerson  ?? supplier.contact_person ?? '',
+      contact_person: supplier.contactPerson  ?? '',
       email:          supplier.email          ?? '',
       phone:          supplier.phone          ?? '',
       address:        supplier.address        ?? '',
       categories:     supplier.categories     ?? [],
-      lead_time_days: supplier.leadTimeDays   ?? supplier.lead_time_days ?? 7,
-      payment_terms:  supplier.paymentTerms   ?? supplier.payment_terms ?? 'Net 30',
+      lead_time_days: supplier.leadTimeDays   ?? 7,
+      payment_terms:  supplier.paymentTerms   ?? 'Net 30',
       rating:         supplier.rating         ?? 3,
       is_active:      supplier.isActive       !== false,
       notes:          supplier.notes          ?? '',
@@ -808,6 +912,14 @@ export async function fetchMovements(filters?: {
   return (data || []).map(normalizeMovement);
 }
 
+/**
+ * Convenience wrapper: fetch all stock movements for a single item, newest first.
+ * Includes cost-change audit entries (reference = 'COST_CHANGE').
+ */
+export async function fetchItemMovements(menuItemId: string, limit = 100): Promise<StockMovement[]> {
+  return fetchMovements({ menu_item_id: menuItemId, limit });
+}
+
 // ── Waste Entries ────────────────────────────────────────────────────────────
 
 export async function fetchWasteEntries(filters?: {
@@ -891,7 +1003,7 @@ export async function recordWaste(waste: {
 // ── Analytics ────────────────────────────────────────────────────────────────
 
 export async function computeInventoryAnalytics(): Promise<InventoryAnalytics> {
-  const [inventory, movements, waste, pos] = await Promise.all([
+  const [inventory, _movements, waste, pos] = await Promise.all([
     fetchInventory(),
     fetchMovements({ limit: 200 }),
     fetchWasteEntries({ limit: 200 }),

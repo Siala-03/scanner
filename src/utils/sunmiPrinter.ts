@@ -164,7 +164,7 @@ function printViaHtmlPopup(textLines: string[]): void {
 <style>
   @page { size: 80mm auto; margin: 0; }
   * { margin:0; padding:0; box-sizing:border-box; }
-  body { font-family: 'Courier New', Courier, monospace; font-size: 9pt; color: #000; }
+  body { font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif; font-size: 10pt; color: #000; }
   @media screen {
     body { background: #c8c8c8; display: flex; justify-content: center; padding: 20px; }
     pre { background: #fff; padding: 8px 10px; box-shadow: 0 2px 10px rgba(0,0,0,.2); width: 80mm; }

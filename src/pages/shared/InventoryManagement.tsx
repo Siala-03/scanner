@@ -148,6 +148,16 @@ function generatePortalPassword(length = 12): string {
   return out;
 }
 
+function parseCostChangeNote(note?: string): { oldCost: number; newCost: number } | null {
+  if (!note || !note.includes('COST_CHANGE|')) return null;
+  const oldMatch = note.match(/old=([^|]+)/);
+  const newMatch = note.match(/new=([^|]+)/);
+  const oldCost = oldMatch ? Number(oldMatch[1]) : Number.NaN;
+  const newCost = newMatch ? Number(newMatch[1]) : Number.NaN;
+  if (Number.isNaN(oldCost) || Number.isNaN(newCost)) return null;
+  return { oldCost, newCost };
+}
+
 // ── Main Component ───────────────────────────────────────────────────────────
 
 export function InventoryManagement({ role }: InventoryManagementProps) {
@@ -214,7 +224,6 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
     temperatureRange: '',
   });
   const [newInventoryItemName, setNewInventoryItemName] = useState('');
-  const [newInventoryItemCategory, setNewInventoryItemCategory] = useState('Other');
   const [newInventoryItemLocation, setNewInventoryItemLocation] = useState('');
   const [newInventoryItemStock, setNewInventoryItemStock] = useState(0);
   const [newInventoryItemLowThreshold, setNewInventoryItemLowThreshold] = useState(5);
@@ -498,7 +507,7 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
         name: addToMenuName.trim(),
         price: addToMenuPrice,
         category: addToMenuCategory,
-        isAvailable: true,
+        is_available: true,
       });
       await apiRelinkInventoryRecord(addToMenuItemId, newItem.id);
       await refresh();
@@ -862,13 +871,19 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
       let updated = 0;
       for (const row of rows) {
         await apiUpdateInventoryRecord(row.menuItemId, {
-          stock: row.stock,
+          stock:             row.stock,
           lowStockThreshold: row.lowStockThreshold,
-          reorderPoint: row.reorderPoint,
-          reorderQty: row.reorderQty,
-          unitCost: row.unitCost,
-          location: row.location,
-          unitMeasurement: row.unitMeasurement,
+          reorderPoint:      row.reorderPoint,
+          reorderQty:        row.reorderQty,
+          unitCost:          row.unitCost,
+          cost:              row.unitCost,
+          price:             row.price,
+          location:          row.location,
+          unitMeasurement:   row.unitMeasurement,
+          description:       row.description,
+          expiryDate:        row.expiryDate,
+          purchaseDate:      row.purchaseDate,
+          qtyStart:          row.qtyStart,
         });
         updated++;
       }
@@ -913,7 +928,7 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
               {isManager && activeTab === 'overview' && (
                 <>
                   {/* Template */}
-                  <Button variant="ghost" size="sm" onClick={downloadInventoryTemplate} title="Download CSV template">
+                  <Button variant="ghost" size="sm" onClick={downloadInventoryTemplate}>
                     <FileSpreadsheetIcon className="w-4 h-4" />
                     <span className="hidden sm:inline">Template</span>
                   </Button>
@@ -1488,6 +1503,35 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                       ))}
                     {movements.filter((m) => m.menuItemId === selectedItemDetails.item.id).length === 0 && (
                       <p className="text-slate-400 text-xs">No movements recorded yet.</p>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="text-xs uppercase tracking-wider text-slate-400 mb-2">Cost Audit Trail</h4>
+                  <div className="space-y-2 max-h-56 overflow-y-auto">
+                    {movements
+                      .filter((m) => m.menuItemId === selectedItemDetails.item.id)
+                      .filter((m) => m.reference === 'COST_CHANGE' || m.notes?.includes('COST_CHANGE|'))
+                      .slice(0, 8)
+                      .map((m) => {
+                        const parsed = parseCostChangeNote(m.notes);
+                        return (
+                          <div key={`cost-${m.id}`} className="flex items-center justify-between bg-slate-850/70 p-2 rounded-lg text-xs">
+                            <div>
+                              <p className="text-slate-200">
+                                Cost {parsed ? `${formatPrice(parsed.oldCost)} -> ${formatPrice(parsed.newCost)}` : 'updated'}
+                              </p>
+                              <p className="text-slate-400">{new Date(m.timestamp).toLocaleString()}</p>
+                            </div>
+                            <span className="text-slate-300">{m.performedBy || 'system'}</span>
+                          </div>
+                        );
+                      })}
+                    {movements
+                      .filter((m) => m.menuItemId === selectedItemDetails.item.id)
+                      .filter((m) => m.reference === 'COST_CHANGE' || m.notes?.includes('COST_CHANGE|')).length === 0 && (
+                      <p className="text-slate-400 text-xs">No cost changes recorded yet.</p>
                     )}
                   </div>
                 </div>

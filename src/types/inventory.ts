@@ -9,6 +9,14 @@ export interface InventoryRecord {
   reorderPoint: number;
   reorderQty: number;
   unitCost: number; // cost per unit in RWF
+  // Optional fields for minimart inventory sheet format.
+  description?: string;
+  expiryDate?: string;
+  purchaseDate?: string;
+  qtyStart?: number;
+  currentQty?: number;
+  cost?: number;
+  price?: number;
   unitMeasurement?: string; // e.g. "kg", "L", "boxes", "units"
   supplierId?: string;
   location?: string; // e.g. "Bar Fridge", "Dry Store"
