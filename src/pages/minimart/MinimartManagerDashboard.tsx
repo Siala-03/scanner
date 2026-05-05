@@ -710,7 +710,7 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
 
         {/* ── Inventory ── */}
         {page === 'inventory' && (
-          <InventoryManagement role="manager" />
+          <InventoryManagement role="manager" inventoryScope="minimart" />
         )}
 
         {/* ── Cashiers ── */}

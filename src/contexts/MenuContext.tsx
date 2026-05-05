@@ -22,6 +22,11 @@ function getRestaurantId(): string | null {
   return localStorage.getItem('restaurantId') || getRestaurantIdFromUrl() || null;
 }
 
+function isMinimartRoute(): boolean {
+  if (typeof window === 'undefined') return false;
+  return window.location.pathname.toLowerCase().includes('minimart');
+}
+
 interface MenuContextValue {
   menuItems: MenuItem[];
   categories: string[];
@@ -75,12 +80,15 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
       const menu = await fetchMenu();
       if (menu.length > 0) {
         setMenuItems(menu.map(normalizeMenuItem));
-      } else if (!loadFallbackMenu()) {
+      } else if (!isMinimartRoute() && !loadFallbackMenu()) {
         setMenuItems(defaultMenuItems);
+      } else if (isMinimartRoute()) {
+        setMenuItems([]);
       }
       setError(null);
     } catch (err) {
-      if (!loadFallbackMenu()) setMenuItems(defaultMenuItems);
+      if (!isMinimartRoute() && !loadFallbackMenu()) setMenuItems(defaultMenuItems);
+      if (isMinimartRoute()) setMenuItems([]);
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setIsLoading(false);
@@ -113,13 +121,16 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
         if (!isMounted) return;
         if (items.length > 0) {
           setMenuItems(items.map(normalizeMenuItem));
-        } else if (!loadFallbackMenu()) {
+        } else if (!isMinimartRoute() && !loadFallbackMenu()) {
           setMenuItems(defaultMenuItems);
+        } else if (isMinimartRoute()) {
+          setMenuItems([]);
         }
         setError(null);
       } catch {
         if (!isMounted) return;
-        if (!loadFallbackMenu()) setMenuItems(defaultMenuItems);
+        if (!isMinimartRoute() && !loadFallbackMenu()) setMenuItems(defaultMenuItems);
+        if (isMinimartRoute()) setMenuItems([]);
         setError(null); // don't show error — we have a fallback
       } finally {
         if (isMounted) setIsLoading(false);

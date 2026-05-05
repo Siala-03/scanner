@@ -65,6 +65,7 @@ import {
 
 interface InventoryManagementProps {
   role: 'manager' | 'supervisor';
+  inventoryScope?: 'all' | 'minimart';
 }
 
 type Tab = 'overview' | 'purchase-orders' | 'suppliers' | 'waste' | 'forecasting' | 'locations';
@@ -163,8 +164,15 @@ function parseCostChangeNote(note?: string): { oldCost: number; newCost: number 
 
 // ── Main Component ───────────────────────────────────────────────────────────
 
-export function InventoryManagement({ role }: InventoryManagementProps) {
-  const { menuItems } = useMenu();
+export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryManagementProps) {
+  const { menuItems: contextMenuItems } = useMenu();
+  const menuItems = useMemo(() => {
+    if (inventoryScope !== 'minimart') return contextMenuItems;
+    return contextMenuItems.filter((m: any) => {
+      const rk = m?.requiresKitchen ?? m?.requires_kitchen;
+      return rk === false;
+    });
+  }, [contextMenuItems, inventoryScope]);
   const {
     inventory,
     lowStockItems,
@@ -1326,30 +1334,30 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                           {isManager && (
                             <td className="px-4 py-3">
                               {isEditing ? (
-                                <div className="flex items-center gap-2.5 whitespace-nowrap">
+                                <div className="flex items-center gap-1.5 whitespace-nowrap">
                                   <button
                                     onClick={() => handleSaveRow(row.item.id, row.item.name)}
-                                    className="p-2.5 rounded-xl border border-emerald-500/50 bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/35 transition shadow-sm"
+                                    className="p-1.5 sm:p-2 rounded-lg border border-emerald-500/45 bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/30 transition"
                                     title="Save"
                                   >
-                                    <CheckCircleIcon className="w-9 h-9" />
+                                    <CheckCircleIcon className="w-5 h-5 sm:w-6 sm:h-6" />
                                   </button>
                                   <button
                                     onClick={() => { setEditingRow(null); setEditValues({}); }}
-                                    className="p-2.5 rounded-xl border border-slate-500/50 bg-slate-600/30 text-slate-100 hover:bg-slate-500/45 transition shadow-sm"
+                                    className="p-1.5 sm:p-2 rounded-lg border border-slate-500/45 bg-slate-600/30 text-slate-100 hover:bg-slate-500/45 transition"
                                     title="Cancel"
                                   >
-                                    <XIcon className="w-9 h-9" />
+                                    <XIcon className="w-5 h-5 sm:w-6 sm:h-6" />
                                   </button>
                                 </div>
                               ) : (
-                                <div className="flex items-center gap-2.5 flex-wrap">
+                                <div className="grid grid-cols-3 sm:flex sm:flex-wrap items-center gap-1.5">
                                   <button
                                     onClick={() => openAuditTrail(row.item.id, row.item.name)}
-                                    className="p-2.5 rounded-xl border border-purple-500/55 bg-purple-500/20 text-purple-100 hover:bg-purple-500/35 transition shadow-sm"
+                                    className="p-1.5 sm:p-2 rounded-lg border border-purple-500/50 bg-purple-500/20 text-purple-100 hover:bg-purple-500/32 transition"
                                     title="Cost & stock history"
                                   >
-                                    <ClockIcon className="w-9 h-9" />
+                                    <ClockIcon className="w-5 h-5 sm:w-6 sm:h-6" />
                                   </button>
                                   <button
                                     onClick={() => {
@@ -1364,10 +1372,10 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                                         location: rec?.location ?? '',
                                       });
                                     }}
-                                    className="p-2.5 rounded-xl border border-amber-500/55 bg-amber-500/20 text-amber-100 hover:bg-amber-500/35 transition shadow-sm"
+                                    className="p-1.5 sm:p-2 rounded-lg border border-amber-500/50 bg-amber-500/20 text-amber-100 hover:bg-amber-500/32 transition"
                                     title="Edit"
                                   >
-                                    <EditIcon className="w-9 h-9" />
+                                    <EditIcon className="w-5 h-5 sm:w-6 sm:h-6" />
                                   </button>
                                   <button
                                     onClick={() => {
@@ -1375,10 +1383,10 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                                       setNewPOItems([{ menuItemId: row.item.id, orderedQty: Math.max((row.rec?.reorderQty ?? 5) - row.stock, 1), unit: '', unitCost: row.rec?.unitCost ?? 0 }]);
                                       setShowNewPO(true);
                                     }}
-                                    className="p-2.5 rounded-xl border border-emerald-500/55 bg-emerald-500/20 text-emerald-100 hover:bg-emerald-500/35 transition shadow-sm"
+                                    className="p-1.5 sm:p-2 rounded-lg border border-emerald-500/50 bg-emerald-500/20 text-emerald-100 hover:bg-emerald-500/32 transition"
                                     title="Smart Reorder"
                                   >
-                                    <PlusIcon className="w-9 h-9" />
+                                    <PlusIcon className="w-5 h-5 sm:w-6 sm:h-6" />
                                   </button>
                                   <button
                                     onClick={() => {
@@ -1390,7 +1398,7 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                                       setShowAddToMenuModal(true);
                                     }}
                                     disabled={!!menuItemMap[row.item.id]}
-                                    className={`p-2.5 rounded-xl border transition shadow-sm ${
+                                    className={`p-1.5 sm:p-2 rounded-lg border transition ${
                                       menuItemMap[row.item.id]
                                         ? 'text-slate-400 cursor-not-allowed bg-slate-600/30 border-slate-500/40'
                                         : 'text-blue-100 bg-blue-500/22 border-blue-500/55 hover:bg-blue-500/35'
@@ -1398,8 +1406,8 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                                     title={menuItemMap[row.item.id] ? 'Already in Menu' : 'Add to Menu'}
                                   >
                                     {menuItemMap[row.item.id]
-                                      ? <CheckCircleIcon className="w-9 h-9" />
-                                      : <LinkIcon className="w-9 h-9" />}
+                                      ? <CheckCircleIcon className="w-5 h-5 sm:w-6 sm:h-6" />
+                                      : <LinkIcon className="w-5 h-5 sm:w-6 sm:h-6" />}
                                   </button>
                                   <button
                                     onClick={() => {
@@ -1407,10 +1415,10 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                                         handleDeleteInventoryItem(row.item.id);
                                       }
                                     }}
-                                    className="p-2.5 rounded-xl border border-red-500/55 bg-red-500/20 text-red-100 hover:bg-red-500/35 transition shadow-sm"
+                                    className="p-1.5 sm:p-2 rounded-lg border border-red-500/50 bg-red-500/20 text-red-100 hover:bg-red-500/32 transition"
                                     title="Delete"
                                   >
-                                    <TrashIcon className="w-9 h-9" />
+                                    <TrashIcon className="w-5 h-5 sm:w-6 sm:h-6" />
                                   </button>
                                 </div>
                               )}
