@@ -469,6 +469,15 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
     if (editValues.location !== undefined && editValues.location !== current.location) {
       updatePayload.location = editValues.location;
     }
+    if (isMinimartScope && editValues.description !== undefined && editValues.description !== (current as any).description) {
+      updatePayload.description = editValues.description;
+    }
+    if (editValues.expiryDate !== undefined && editValues.expiryDate !== (current as any).expiryDate) {
+      updatePayload.expiryDate = editValues.expiryDate || null;
+    }
+    if (editValues.purchaseDate !== undefined && editValues.purchaseDate !== (current as any).purchaseDate) {
+      updatePayload.purchaseDate = editValues.purchaseDate || null;
+    }
 
     if (Object.keys(updatePayload).length === 0) {
       alert('No changes made');
@@ -922,7 +931,7 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
           price:             row.price,
           location:          row.location,
           unitMeasurement:   row.unitMeasurement,
-          description:       row.description,
+          ...(isMinimartScope ? { description: row.description } : {}),
           expiryDate:        row.expiryDate,
           purchaseDate:      row.purchaseDate,
           qtyStart:          row.qtyStart,
@@ -1191,7 +1200,7 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                   <thead className="bg-slate-700/40 border-b border-slate-700/50">
                     <tr>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Item ID</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Description</th>
+                      {isMinimartScope && <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Description</th>}
                       <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Expiry Date</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Purchase Date</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Age</th>
@@ -1240,9 +1249,44 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                               </div>
                             </button>
                           </td>
-                          <td className="px-4 py-3 text-sm text-slate-300">{row.rec?.description || row.item.name || '—'}</td>
-                          <td className="px-4 py-3 text-sm text-slate-300">{row.rec?.expiryDate || '—'}</td>
-                          <td className="px-4 py-3 text-sm text-slate-300">{row.rec?.purchaseDate || '—'}</td>
+                          {isMinimartScope && (
+                          <td className="px-4 py-3 text-sm text-slate-300">
+                            {isEditing ? (
+                              <input
+                                type="text"
+                                value={editValues.description ?? row.rec?.description ?? row.item.name ?? ''}
+                                onChange={(e) => setEditValues((v) => ({ ...v, description: e.target.value }))}
+                                className="w-36 px-2 py-1 rounded bg-slate-900 border border-slate-600 text-white text-xs focus:outline-none focus:ring-1 focus:ring-amber-500"
+                              />
+                            ) : (
+                              row.rec?.description || row.item.name || '—'
+                            )}
+                          </td>
+                          )}
+                          <td className="px-4 py-3 text-sm text-slate-300">
+                            {isEditing ? (
+                              <input
+                                type="date"
+                                value={editValues.expiryDate ?? row.rec?.expiryDate ?? ''}
+                                onChange={(e) => setEditValues((v) => ({ ...v, expiryDate: e.target.value }))}
+                                className="w-36 px-2 py-1 rounded bg-slate-900 border border-slate-600 text-white text-xs focus:outline-none focus:ring-1 focus:ring-amber-500"
+                              />
+                            ) : (
+                              row.rec?.expiryDate || '—'
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-slate-300">
+                            {isEditing ? (
+                              <input
+                                type="date"
+                                value={editValues.purchaseDate ?? row.rec?.purchaseDate ?? ''}
+                                onChange={(e) => setEditValues((v) => ({ ...v, purchaseDate: e.target.value }))}
+                                className="w-36 px-2 py-1 rounded bg-slate-900 border border-slate-600 text-white text-xs focus:outline-none focus:ring-1 focus:ring-amber-500"
+                              />
+                            ) : (
+                              row.rec?.purchaseDate || '—'
+                            )}
+                          </td>
                           <td className="px-4 py-3 text-sm text-slate-300">{ageDays !== null ? `${ageDays}d` : '—'}</td>
                           <td className="px-4 py-3 text-sm text-slate-300">{row.rec?.qtyStart ?? row.stock}</td>
                           <td className="px-4 py-3 min-w-[140px]">

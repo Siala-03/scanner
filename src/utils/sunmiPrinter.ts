@@ -170,8 +170,8 @@ function printViaHtmlPopup(textLines: string[]): void {
     pre { background: #fff; padding: 8px 10px; box-shadow: 0 2px 10px rgba(0,0,0,.2); width: 80mm; }
   }
   @media print {
-    html, body { background: #fff; }
-    body { padding: 3mm 4mm 8mm; width: 80mm; }
+    html, body { background: #fff; display: block; }
+    body { padding: 3mm 4mm 14mm; width: 80mm; }
     .no-print { display: none !important; }
   }
   pre { white-space: pre-wrap; word-break: break-all; line-height: 1.4; }

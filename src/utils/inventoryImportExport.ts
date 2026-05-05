@@ -128,8 +128,8 @@ function parseCsvRows(content: string): InventoryImportRow[] {
     const id = row.itemid || row.menuitemid || row.menuitemid || row.id || '';
     if (!id) continue;
 
-    const stock = parseFloat(row.currentqty ?? row.stock ?? row.qtystart ?? '0') || 0;
-    const qtyStart = parseFloat(row.qtystart ?? String(stock)) || stock;
+    const stock = Math.round(parseFloat(row.currentqty ?? row.stock ?? row.qtystart ?? '0') || 0);
+    const qtyStart = Math.round(parseFloat(row.qtystart ?? String(stock)) || stock);
 
     results.push({
       menuItemId: id,
@@ -138,9 +138,9 @@ function parseCsvRows(content: string): InventoryImportRow[] {
       purchaseDate: row.purchasedate ?? '',
       qtyStart,
       stock,
-      lowStockThreshold: parseFloat(row.lowstockthreshold ?? row.threshold ?? '5') || 5,
-      reorderPoint: parseFloat(row.reorderpoint ?? '10') || 10,
-      reorderQty: parseFloat(row.reorderqty ?? '20') || 20,
+      lowStockThreshold: Math.round(parseFloat(row.lowstockthreshold ?? row.threshold ?? '5') || 5),
+      reorderPoint: Math.round(parseFloat(row.reorderpoint ?? '10') || 10),
+      reorderQty: Math.round(parseFloat(row.reorderqty ?? '20') || 20),
       unitCost: parseFloat(row.cost ?? row.unitcost ?? '0') || 0,
       price: parseFloat(row.price ?? '0') || 0,
       location: row.location ?? '',
@@ -164,8 +164,8 @@ function parseExcelRows(buffer: ArrayBuffer): InventoryImportRow[] {
       const id = String(row.menuitemid || row.itemid || row.id || '');
       if (!id) return null;
 
-      const stock = Number(row.currentqty ?? row.stock ?? row.qtystart ?? 0);
-      const qtyStart = Number(row.qtystart ?? stock);
+      const stock = Math.round(Number(row.currentqty ?? row.stock ?? row.qtystart ?? 0));
+      const qtyStart = Math.round(Number(row.qtystart ?? stock));
 
       return {
         menuItemId: id,
@@ -174,9 +174,9 @@ function parseExcelRows(buffer: ArrayBuffer): InventoryImportRow[] {
         purchaseDate: String(row.purchasedate ?? ''),
         qtyStart,
         stock,
-        lowStockThreshold: Number(row.lowstockthreshold ?? row.threshold ?? 5),
-        reorderPoint: Number(row.reorderpoint ?? 10),
-        reorderQty: Number(row.reorderqty ?? 20),
+        lowStockThreshold: Math.round(Number(row.lowstockthreshold ?? row.threshold ?? 5)),
+        reorderPoint: Math.round(Number(row.reorderpoint ?? 10)),
+        reorderQty: Math.round(Number(row.reorderqty ?? 20)),
         unitCost: Number(row.cost ?? row.unitcost ?? 0),
         price: Number(row.price ?? 0),
         location: String(row.location ?? ''),
@@ -205,11 +205,11 @@ export async function importInventoryFromFile(file: File): Promise<InventoryImpo
       description: String(r.description ?? ''),
       expiryDate: String(r.expiry_date ?? r.expiryDate ?? ''),
       purchaseDate: String(r.purchase_date ?? r.purchaseDate ?? ''),
-      qtyStart: Number(r.qty_start ?? r.qtyStart ?? r.current_qty ?? r.currentQty ?? r.stock ?? 0),
-      stock: Number(r.current_qty ?? r.currentQty ?? r.stock ?? 0),
-      lowStockThreshold: Number(r.low_stock_threshold ?? r.lowStockThreshold ?? 5),
-      reorderPoint: Number(r.reorder_point ?? r.reorderPoint ?? 10),
-      reorderQty: Number(r.reorder_qty ?? r.reorderQty ?? 20),
+      qtyStart: Math.round(Number(r.qty_start ?? r.qtyStart ?? r.current_qty ?? r.currentQty ?? r.stock ?? 0)),
+      stock: Math.round(Number(r.current_qty ?? r.currentQty ?? r.stock ?? 0)),
+      lowStockThreshold: Math.round(Number(r.low_stock_threshold ?? r.lowStockThreshold ?? 5)),
+      reorderPoint: Math.round(Number(r.reorder_point ?? r.reorderPoint ?? 10)),
+      reorderQty: Math.round(Number(r.reorder_qty ?? r.reorderQty ?? 20)),
       unitCost: Number(r.cost ?? r.unit_cost ?? r.unitCost ?? 0),
       price: Number(r.price ?? r.selling_price ?? r.sellingPrice ?? 0),
       location: String(r.location ?? ''),

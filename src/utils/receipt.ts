@@ -336,8 +336,9 @@ export function buildReceiptHtml(receipt: ReceiptData): string {
       .paper { background: #fff; width: 80mm; padding: 6mm 5mm 10mm; box-shadow: 0 3px 16px rgba(0,0,0,.22); }
     }
     @media print {
-      html, body { background: #fff; }
-      .paper { padding: 3mm 4mm 8mm; }
+      html, body { background: #fff; display: block; }
+      .paper { padding: 3mm 4mm 14mm; }
+      .footer { page-break-inside: avoid; }
       .no-print { display: none !important; }
       * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     }
@@ -589,8 +590,9 @@ export function buildExpenseReceiptHtml(
       .paper { background: #fff; width: 80mm; padding: 6mm 5mm 10mm; box-shadow: 0 3px 16px rgba(0,0,0,.22); }
     }
     @media print {
-      html, body { background: #fff; }
-      .paper { padding: 3mm 4mm 8mm; }
+      html, body { background: #fff; display: block; }
+      .paper { padding: 3mm 4mm 14mm; }
+      .footer { page-break-inside: avoid; }
       .no-print { display: none !important; }
       * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     }

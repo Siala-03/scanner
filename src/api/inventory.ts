@@ -230,18 +230,18 @@ export async function fetchInventoryById(menuItemId: string): Promise<InventoryR
 export async function createInventoryRecord(record: Partial<InventoryRecord>): Promise<InventoryRecord> {
   const restaurantId = getRestaurantId();
   const id = `inv-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  const stock = toDbDecimal(record.stock, 0);
-  const lowStockThreshold = toDbDecimal(record.lowStockThreshold, 5);
-  const reorderPoint = toDbDecimal(record.reorderPoint, 10);
-  const reorderQty = toDbDecimal(record.reorderQty, 20);
+  const stock = Math.round(Number(record.stock) || 0);
+  const lowStockThreshold = Math.round(Number(record.lowStockThreshold) || 5);
+  const reorderPoint = Math.round(Number(record.reorderPoint) || 10);
+  const reorderQty = Math.round(Number(record.reorderQty) || 20);
   const unitCost = toDbDecimal(record.unitCost, 0);
-  const qtyStart = toDbDecimal(record.qtyStart ?? record.stock, stock);
+  const qtyStart = Math.round(Number(record.qtyStart ?? record.stock) || stock);
   const price = toDbDecimal(record.price, 0);
 
   const insertPayload: Record<string, any> = {
     id,
     menu_item_id:        record.menuItemId,
-    description:         record.description          ?? '',
+    description:         record.description         ?? '',
     stock,
     low_stock_threshold: lowStockThreshold,
     reorder_point:       reorderPoint,
@@ -311,13 +311,13 @@ export async function updateInventoryRecord(
     updated_at: new Date().toISOString(),
   };
 
-  if (record.stock               !== undefined) updateFields.stock               = toDbDecimal(record.stock, 0);
-  if (record.lowStockThreshold   !== undefined) updateFields.low_stock_threshold = toDbDecimal(record.lowStockThreshold, 5);
-  if (record.low_stock_threshold !== undefined) updateFields.low_stock_threshold = toDbDecimal(record.low_stock_threshold, 5);
-  if (record.reorderPoint        !== undefined) updateFields.reorder_point       = toDbDecimal(record.reorderPoint, 10);
-  if (record.reorder_point       !== undefined) updateFields.reorder_point       = toDbDecimal(record.reorder_point, 10);
-  if (record.reorderQty          !== undefined) updateFields.reorder_qty         = toDbDecimal(record.reorderQty, 20);
-  if (record.reorder_qty         !== undefined) updateFields.reorder_qty         = toDbDecimal(record.reorder_qty, 20);
+  if (record.stock               !== undefined) updateFields.stock               = Math.round(Number(record.stock) || 0);
+  if (record.lowStockThreshold   !== undefined) updateFields.low_stock_threshold = Math.round(Number(record.lowStockThreshold) || 5);
+  if (record.low_stock_threshold !== undefined) updateFields.low_stock_threshold = Math.round(Number(record.low_stock_threshold) || 5);
+  if (record.reorderPoint        !== undefined) updateFields.reorder_point       = Math.round(Number(record.reorderPoint) || 10);
+  if (record.reorder_point       !== undefined) updateFields.reorder_point       = Math.round(Number(record.reorder_point) || 10);
+  if (record.reorderQty          !== undefined) updateFields.reorder_qty         = Math.round(Number(record.reorderQty) || 20);
+  if (record.reorder_qty         !== undefined) updateFields.reorder_qty         = Math.round(Number(record.reorder_qty) || 20);
   if (record.unitCost            !== undefined) updateFields.unit_cost           = toDbDecimal(record.unitCost, 0);
   if (record.unit_cost           !== undefined) updateFields.unit_cost           = toDbDecimal(record.unit_cost, 0);
   if (record.cost                !== undefined) updateFields.unit_cost           = toDbDecimal(record.cost, 0);
@@ -331,8 +331,8 @@ export async function updateInventoryRecord(
   if (record.expiry_date         !== undefined) updateFields.expiry_date         = record.expiry_date  || null;
   if (record.purchaseDate        !== undefined) updateFields.purchase_date       = record.purchaseDate  || null;
   if (record.purchase_date       !== undefined) updateFields.purchase_date       = record.purchase_date || null;
-  if (record.qtyStart            !== undefined) updateFields.qty_start           = toDbDecimal(record.qtyStart, 0);
-  if (record.qty_start           !== undefined) updateFields.qty_start           = toDbDecimal(record.qty_start, 0);
+  if (record.qtyStart            !== undefined) updateFields.qty_start           = Math.round(Number(record.qtyStart) || 0);
+  if (record.qty_start           !== undefined) updateFields.qty_start           = Math.round(Number(record.qty_start) || 0);
   if (record.price               !== undefined) updateFields.price               = toDbDecimal(record.price, 0);
 
   // Try UPDATE first (existing record)
@@ -393,18 +393,18 @@ export async function updateInventoryRecord(
 
   // No existing row — INSERT with a generated id
   const id = `inv-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  const stock = toDbDecimal(record.stock, 0);
-  const lowStockThreshold = toDbDecimal(record.lowStockThreshold ?? record.low_stock_threshold, 5);
-  const reorderPoint = toDbDecimal(record.reorderPoint ?? record.reorder_point, 10);
-  const reorderQty = toDbDecimal(record.reorderQty ?? record.reorder_qty, 20);
+  const stock = Math.round(Number(record.stock) || 0);
+  const lowStockThreshold = Math.round(Number(record.lowStockThreshold ?? record.low_stock_threshold) || 5);
+  const reorderPoint = Math.round(Number(record.reorderPoint ?? record.reorder_point) || 10);
+  const reorderQty = Math.round(Number(record.reorderQty ?? record.reorder_qty) || 20);
   const unitCost = toDbDecimal(record.unitCost ?? record.unit_cost, 0);
-  const qtyStart = toDbDecimal(record.qtyStart ?? record.qty_start ?? record.stock, stock);
+  const qtyStart = Math.round(Number(record.qtyStart ?? record.qty_start ?? record.stock) || stock);
   const price = toDbDecimal(record.price, 0);
   const insertPayload: Record<string, any> = {
     id,
     menu_item_id:        menuItemId,
     restaurant_id:       restaurantId,
-    description:         record.description          ?? '',
+    description:         record.description         ?? '',
     stock,
     low_stock_threshold: lowStockThreshold,
     reorder_point:       reorderPoint,
