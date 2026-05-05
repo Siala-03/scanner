@@ -1,4 +1,3 @@
-import { supabase } from '../lib/supabase';
 import { apiRequest } from './http';
 import { StaffSchedule } from '../types';
 
@@ -19,22 +18,13 @@ function rowToSchedule(row: Record<string, unknown>): StaffSchedule {
 }
 
 export async function getSchedules(
-  restaurantId: string,
+  _restaurantId: string,
   startDate: string,
   endDate: string
 ): Promise<StaffSchedule[]> {
-  // Use Supabase client directly (same as fetchStaff) so this works even when
-  // VITE_API_URL is unset. FK migration 044 ensures the schema cache join works.
-  const { data, error } = await supabase
-    .from('staff_schedules')
-    .select('*')
-    .eq('restaurant_id', restaurantId)
-    .gte('shift_date', startDate)
-    .lte('shift_date', endDate)
-    .order('shift_date', { ascending: true })
-    .order('start_time', { ascending: true });
-
-  if (error) throw error;
+  const data = await apiRequest<any[]>(
+    `/api/schedules?startDate=${startDate}&endDate=${endDate}`
+  );
   return (data || []).map(rowToSchedule);
 }
 
@@ -47,48 +37,31 @@ export async function createSchedule(data: {
   role?: string;
   notes?: string;
 }): Promise<StaffSchedule> {
-  const id = `sch_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
-  const { data: row, error } = await supabase
-    .from('staff_schedules')
-    .insert({
-      id,
-      restaurant_id: data.restaurantId,
-      staff_id: data.staffId,
-      shift_date: data.shiftDate,
-      start_time: data.startTime,
-      end_time: data.endTime,
+  const row = await apiRequest<any>('/api/schedules', {
+    method: 'POST',
+    json: {
+      staffId: data.staffId,
+      shiftDate: data.shiftDate,
+      startTime: data.startTime,
+      endTime: data.endTime,
       role: data.role ?? null,
       notes: data.notes ?? null,
-    })
-    .select()
-    .single();
-
-  if (error) throw error;
-  return rowToSchedule(row as Record<string, unknown>);
+    },
+  });
+  return rowToSchedule(row);
 }
 
 export async function updateSchedule(
   id: string,
   data: { startTime?: string; endTime?: string; role?: string; notes?: string }
 ): Promise<StaffSchedule> {
-  const updates: Record<string, unknown> = {};
-  if (data.startTime !== undefined) updates.start_time = data.startTime;
-  if (data.endTime !== undefined) updates.end_time = data.endTime;
-  if (data.role !== undefined) updates.role = data.role;
-  if (data.notes !== undefined) updates.notes = data.notes;
-
-  const { data: row, error } = await supabase
-    .from('staff_schedules')
-    .update(updates)
-    .eq('id', id)
-    .select()
-    .single();
-
-  if (error) throw error;
-  return rowToSchedule(row as Record<string, unknown>);
+  const row = await apiRequest<any>(`/api/schedules/${id}`, {
+    method: 'PUT',
+    json: data,
+  });
+  return rowToSchedule(row);
 }
 
 export async function deleteSchedule(id: string): Promise<void> {
-  const { error } = await supabase.from('staff_schedules').delete().eq('id', id);
-  if (error) throw error;
+  await apiRequest<void>(`/api/schedules/${id}`, { method: 'DELETE' });
 }

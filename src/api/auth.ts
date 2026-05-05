@@ -51,9 +51,10 @@ export async function loginStaff(
   password: string,
   restaurantId?: string
 ): Promise<Staff> {
+  const resolvedRestaurantId = restaurantId || getRestaurantId();
   const raw = await callEdgeFn('staff-login', {
     method: 'POST',
-    body: { action: 'login', username, password, restaurantId },
+    body: { action: 'login', username, password, restaurantId: resolvedRestaurantId },
   });
 
   const staff = normalizeStaff(raw);

@@ -56,12 +56,14 @@ Deno.serve(async (req) => {
       });
     }
 
+    const requestedRestaurantId = String(restaurantId ?? '').trim();
+
     let query = db
       .from('staff_credentials')
       .select('staff_id, password_hash, restaurant_id')
       .eq('username', username);
 
-    if (restaurantId) query = query.eq('restaurant_id', restaurantId);
+    if (requestedRestaurantId) query = query.eq('restaurant_id', requestedRestaurantId);
 
     const { data: credentials, error: credError } = await query;
 
@@ -72,16 +74,25 @@ Deno.serve(async (req) => {
       });
     }
 
-    const cred =
-      credentials.find((c: any) => c.restaurant_id === 'default_restaurant') ||
-      credentials[0];
+    const matchingCreds = credentials.filter((c: any) => c.password_hash === password);
 
-    if (cred.password_hash !== password) {
+    if (matchingCreds.length === 0) {
       return new Response(JSON.stringify({ error: 'Invalid username or password' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+
+    if (matchingCreds.length > 1 && !requestedRestaurantId) {
+      return new Response(JSON.stringify({ error: 'Multiple accounts found for this username. Please log in from a restaurant-specific link or provide restaurantId.' }), {
+        status: 409,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const cred = requestedRestaurantId
+      ? matchingCreds.find((c: any) => c.restaurant_id === requestedRestaurantId) || matchingCreds[0]
+      : matchingCreds[0];
 
     const { data: staff, error: staffError } = await db
       .from('staff')

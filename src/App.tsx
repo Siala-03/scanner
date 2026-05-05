@@ -48,7 +48,7 @@ import { EbmSettings } from './pages/manager/EbmSettings';
 
 type UserRole = 'customer' | 'waiter' | 'cashier' | 'supervisor' | 'manager' | 'kitchen' | 'superadmin' | 'supplier' | null;
 type ManagerPage = 'dashboard' | 'menu' | 'staff' | 'analytics' | 'performance' | 'qrcodes' | 'inventory' | 'history' | 'expenses' | 'credit' | 'loyalty' | 'promotions' | 'reservations' | 'scheduling' | 'reviews' | 'settings' | 'ebm';
-type SupervisorPage = 'dashboard' | 'revenue' | 'staff' | 'qrcodes' | 'inventory' | 'menu' | 'history' | 'expenses' | 'online-orders' | 'payments';
+type SupervisorPage = 'dashboard' | 'revenue' | 'staff' | 'qrcodes' | 'inventory' | 'menu' | 'history' | 'expenses' | 'online-orders' | 'payments' | 'schedule';
 
 const MANAGER_NAV_GROUPS: Array<{
   id: string;
@@ -814,6 +814,13 @@ export function App() {
                 <span className="absolute -top-1 -right-1 w-2 h-2 bg-amber-500 rounded-full animate-pulse" />
               )}
             </Button>
+            <Button
+              variant={supervisorPage === 'schedule' ? 'primary' : 'ghost'}
+              size="sm"
+              onClick={() => setSupervisorPage('schedule')}
+            >
+              Schedule
+            </Button>
           </div>
         </div>
 
@@ -843,6 +850,7 @@ export function App() {
         {supervisorPage === 'expenses' && <SupervisorExpenseManagement />}
         {supervisorPage === 'online-orders' && <OnlineOrdersPage />}
         {supervisorPage === 'menu' && <MenuManagement />}
+        {supervisorPage === 'schedule' && <SchedulingPage />}
         {supervisorPage === 'payments' && (
           <div className="p-4 md:p-6">
             <PaymentApprovalPanel

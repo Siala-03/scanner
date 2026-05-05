@@ -102,8 +102,8 @@ router.post('/', authenticate, requireSuperadmin, async (req: AuthenticatedReque
       throw new HttpError(400, 'Manager details are required');
     }
 
-    const restaurantId = `restaurant_${Date.now().toString(36)}`;
-    const managerId = `manager_${Date.now().toString(36)}`;
+    const restaurantId = Math.random().toString(36).slice(2, 8).toUpperCase();
+    const managerId = `mgr_${Math.random().toString(36).slice(2, 8)}`;
 
     await pool.query('BEGIN');
 

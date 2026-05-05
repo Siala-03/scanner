@@ -61,7 +61,7 @@ export async function fetchRestaurant(restaurantId: string): Promise<Restaurant>
 
 export async function createRestaurant(restaurant: Partial<Restaurant>): Promise<Restaurant> {
   console.log('Creating restaurant:', restaurant);
-  const id = `restaurant-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  const id = Math.random().toString(36).slice(2, 8).toUpperCase();
 
   const { data, error } = await supabase
     .from('restaurants')
