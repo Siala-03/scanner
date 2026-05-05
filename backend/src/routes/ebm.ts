@@ -579,4 +579,73 @@ router.get('/invoices/:id', async (req: Request, res: Response) => {
   }
 });
 
+// ─── Local VSDC batch sync result ────────────────────────────────────────────
+// Called by the local sync script after it has processed pending invoices
+// POST /api/ebm/sync-result
+router.post('/sync-result', async (req: Request, res: Response) => {
+  try {
+    const { restaurantId, results } = req.body;
+    if (!restaurantId || !Array.isArray(results)) {
+      return res.status(400).json({ error: 'restaurantId and results[] are required' });
+    }
+
+    const updated: string[] = [];
+    const failed: string[] = [];
+
+    for (const r of results) {
+      const { invoiceId, vsdcResult } = r as { invoiceId: string; vsdcResult: any };
+      if (!invoiceId || !vsdcResult) continue;
+
+      if (vsdcResult.resultCd === '000') {
+        const d = vsdcResult.data || {};
+        await pool.query(
+          `UPDATE ebm_invoices
+           SET status='success', rcpt_no=$1, intrl_data=$2, rcpt_sign=$3,
+               sdc_id=$4, tot_rcpt_no=$5, raw_response=$6, fiscalized_at=now()
+           WHERE id=$7 AND restaurant_id=$8`,
+          [d.rcptNo, d.intrlData, d.rcptSign, d.sdcId, d.totRcptNo,
+           JSON.stringify(vsdcResult), invoiceId, restaurantId]
+        );
+        // Stamp the order too
+        await pool.query(
+          `UPDATE orders
+           SET ebm_invoice_id=$1, ebm_rcpt_sign=$2, ebm_rcpt_no=$3, ebm_fiscalized_at=now(), updated_at=now()
+           WHERE id = (SELECT order_id FROM ebm_invoices WHERE id=$1)`,
+          [invoiceId, d.rcptSign, d.rcptNo]
+        );
+        updated.push(invoiceId);
+      } else {
+        await pool.query(
+          `UPDATE ebm_invoices SET status='failed', error_msg=$1, raw_response=$2 WHERE id=$3 AND restaurant_id=$4`,
+          [vsdcResult.resultMsg, JSON.stringify(vsdcResult), invoiceId, restaurantId]
+        );
+        failed.push(invoiceId);
+      }
+    }
+
+    res.json({ updated: updated.length, failed: failed.length, updatedIds: updated });
+  } catch (err) {
+    console.error('POST /ebm/sync-result error:', err);
+    res.status(500).json({ error: 'Failed to process sync results' });
+  }
+});
+
+// GET /api/ebm/pending?restaurantId= – lightweight list for sync script
+router.get('/pending', async (req: Request, res: Response) => {
+  try {
+    const restaurantId = requireRestaurantId(req, res);
+    if (!restaurantId) return;
+    const result = await pool.query(
+      `SELECT id, cis_invc_no, org_invc_no, invoice_type, raw_request
+       FROM ebm_invoices
+       WHERE restaurant_id = $1 AND status = 'pending'
+       ORDER BY created_at ASC LIMIT 100`,
+      [restaurantId]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch pending invoices' });
+  }
+});
+
 export const ebmRouter = router;

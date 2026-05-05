@@ -1,0 +1,77 @@
+# SERVV EBM Auto-Sync — generated installer
+# Do not edit manually. Re-download from SERVV EBM Settings if credentials change.
+
+$CONFIG = @{
+    ServvApiUrl  = '{{SERVV_API_URL}}'
+    RestaurantId = '{{RESTAURANT_ID}}'
+    VsdcUrl      = '{{VSDC_URL}}'
+    LogFile      = "$env:APPDATA\ServvEBMSync\sync.log"
+}
+
+function Write-Log($msg) {
+    $line = "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')  $msg"
+    Write-Host $line
+    Add-Content -Path $CONFIG.LogFile -Value $line -Encoding UTF8 -ErrorAction SilentlyContinue
+}
+
+# Ensure log directory exists
+New-Item -ItemType Directory -Force -Path (Split-Path $CONFIG.LogFile) | Out-Null
+
+Write-Log "--- SERVV EBM Sync started ---"
+
+# 1. Fetch pending invoices from SERVV
+try {
+    $pending = Invoke-RestMethod `
+        -Uri "$($CONFIG.ServvApiUrl)/api/ebm/pending?restaurantId=$([Uri]::EscapeDataString($CONFIG.RestaurantId))" `
+        -Method GET `
+        -ContentType 'application/json' `
+        -ErrorAction Stop
+} catch {
+    Write-Log "ERROR: Cannot reach SERVV API: $($_.Exception.Message)"
+    exit 1
+}
+
+if ($pending.Count -eq 0) {
+    Write-Log "No pending invoices. Done."
+    exit 0
+}
+
+Write-Log "Found $($pending.Count) pending invoice(s). Sending to VSDC..."
+
+# 2. Send each invoice to local VSDC
+$results = @()
+foreach ($inv in $pending) {
+    $body = $inv.raw_request | ConvertTo-Json -Depth 20 -Compress
+    try {
+        $vsdcResult = Invoke-RestMethod `
+            -Uri "$($CONFIG.VsdcUrl)/trnsSales/saveSales" `
+            -Method POST `
+            -Body $body `
+            -ContentType 'application/json' `
+            -ErrorAction Stop
+
+        if ($vsdcResult.resultCd -eq '000') {
+            Write-Log "  OK  $($inv.cis_invc_no)  rcptNo=$($vsdcResult.data.rcptNo)"
+        } else {
+            Write-Log "  FAIL $($inv.cis_invc_no)  $($vsdcResult.resultCd): $($vsdcResult.resultMsg)"
+        }
+        $results += @{ invoiceId = $inv.id; vsdcResult = $vsdcResult }
+    } catch {
+        Write-Log "  ERR  $($inv.cis_invc_no)  $($_.Exception.Message)"
+        $results += @{ invoiceId = $inv.id; vsdcResult = @{ resultCd = 'ERR'; resultMsg = $_.Exception.Message } }
+    }
+}
+
+# 3. Report results back to SERVV
+try {
+    $payload = @{ restaurantId = $CONFIG.RestaurantId; results = $results } | ConvertTo-Json -Depth 20 -Compress
+    $report = Invoke-RestMethod `
+        -Uri "$($CONFIG.ServvApiUrl)/api/ebm/sync-result" `
+        -Method POST `
+        -Body $payload `
+        -ContentType 'application/json' `
+        -ErrorAction Stop
+    Write-Log "Sync complete: $($report.updated) succeeded, $($report.failed) failed."
+} catch {
+    Write-Log "ERROR: Failed to report results to SERVV: $($_.Exception.Message)"
+}

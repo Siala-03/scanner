@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import {
   SaveIcon, RefreshCwIcon, CheckCircle2Icon, XCircleIcon,
   AlertTriangleIcon, ServerIcon, FileTextIcon, ChevronDownIcon, ChevronUpIcon,
+  GlobeIcon, HardDriveIcon, InfoIcon, DownloadIcon,
 } from 'lucide-react';
 import {
   getEbmConfig, saveEbmConfig, initializeEbmDevice,
@@ -31,6 +32,15 @@ function StatusBadge({ status }: { status: EbmInvoice['status'] }) {
   );
 }
 
+const ONLINE_EBM_URL  = 'https://ebm.rra.gov.rw';
+const LOCAL_VSDC_URL  = 'http://localhost:8088';
+
+type VsdcMode = 'online' | 'local';
+
+function inferMode(url: string): VsdcMode {
+  return url.startsWith('http://localhost') || url.startsWith('http://127.') ? 'local' : 'online';
+}
+
 export function EbmSettings({ restaurantId }: EbmSettingsProps) {
   const [config, setConfig] = useState<EbmConfig | null>(null);
   const [form, setForm] = useState<EbmConfigInput>({
@@ -38,9 +48,10 @@ export function EbmSettings({ restaurantId }: EbmSettingsProps) {
     tpin: '',
     bhfId: '000',
     dvcSrlNo: '',
-    baseUrl: 'http://localhost:8088',
-    env: 'sandbox',
+    baseUrl: ONLINE_EBM_URL,
+    env: 'production',
   });
+  const [vsdcMode, setVsdcMode] = useState<VsdcMode>('online');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [initializing, setInitializing] = useState(false);
@@ -59,6 +70,7 @@ export function EbmSettings({ restaurantId }: EbmSettingsProps) {
       const data = await getEbmConfig(restaurantId);
       if (data) {
         setConfig(data);
+        setVsdcMode(inferMode(data.base_url));
         setForm({
           restaurantId,
           tpin: data.tpin,
@@ -167,6 +179,51 @@ export function EbmSettings({ restaurantId }: EbmSettingsProps) {
               className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500"
             />
           </div>
+          {/* VSDC Mode selector */}
+          <div className="sm:col-span-2">
+            <label className="block text-xs text-slate-400 mb-2">Connection Mode</label>
+            <div className="grid grid-cols-2 gap-2">
+              {([
+                {
+                  mode: 'online' as VsdcMode,
+                  icon: GlobeIcon,
+                  title: 'Online EBM',
+                  desc: 'RRA cloud server — no local install needed',
+                  url: ONLINE_EBM_URL,
+                  env: 'production' as const,
+                },
+                {
+                  mode: 'local' as VsdcMode,
+                  icon: HardDriveIcon,
+                  title: 'Local VSDC',
+                  desc: 'Self-hosted VSDC WAR on your server',
+                  url: LOCAL_VSDC_URL,
+                  env: 'sandbox' as const,
+                },
+              ] as const).map(({ mode, icon: Icon, title, desc, url, env }) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => {
+                    setVsdcMode(mode);
+                    setForm((f) => ({ ...f, baseUrl: url, env }));
+                  }}
+                  className={`flex items-start gap-3 p-3 rounded-lg border text-left transition-colors ${
+                    vsdcMode === mode
+                      ? 'border-indigo-500 bg-indigo-500/10'
+                      : 'border-slate-600 bg-slate-700/50 hover:border-slate-500'
+                  }`}
+                >
+                  <Icon className={`w-4 h-4 mt-0.5 shrink-0 ${vsdcMode === mode ? 'text-indigo-400' : 'text-slate-400'}`} />
+                  <div>
+                    <p className={`text-sm font-medium ${vsdcMode === mode ? 'text-indigo-300' : 'text-slate-300'}`}>{title}</p>
+                    <p className="text-xs text-slate-500 mt-0.5">{desc}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div>
             <label className="block text-xs text-slate-400 mb-1">Environment</label>
             <select
@@ -174,22 +231,33 @@ export function EbmSettings({ restaurantId }: EbmSettingsProps) {
               onChange={(e) => setForm({ ...form, env: e.target.value as 'sandbox' | 'production' })}
               className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-indigo-500"
             >
+              <option value="production">Production (live billing)</option>
               <option value="sandbox">Sandbox (testing)</option>
-              <option value="production">Production (live)</option>
             </select>
           </div>
-          <div className="sm:col-span-2">
-            <label className="block text-xs text-slate-400 mb-1">VSDC Base URL</label>
+
+          <div>
+            <label className="block text-xs text-slate-400 mb-1">
+              {vsdcMode === 'online' ? 'RRA Server URL' : 'Local VSDC URL'}
+            </label>
             <input
               value={form.baseUrl}
               onChange={(e) => setForm({ ...form, baseUrl: e.target.value })}
-              placeholder="http://localhost:8088"
+              placeholder={vsdcMode === 'online' ? ONLINE_EBM_URL : LOCAL_VSDC_URL}
               className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500"
             />
-            <p className="text-xs text-slate-500 mt-1">
-              Sandbox: <code className="text-slate-400">http://localhost:8088</code> &nbsp;·&nbsp;
-              Production: <code className="text-slate-400">https://ebm.rra.gov.rw</code>
-            </p>
+          </div>
+
+          {/* Info banner */}
+          <div className={`sm:col-span-2 flex items-start gap-2 p-3 rounded-lg border text-xs ${
+            vsdcMode === 'online'
+              ? 'bg-sky-900/30 border-sky-700/40 text-sky-300'
+              : 'bg-amber-900/30 border-amber-700/40 text-amber-300'
+          }`}>
+            <InfoIcon className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+            {vsdcMode === 'online'
+              ? 'Online EBM sends receipts directly to RRA\'s servers over the internet. Your RRA account must be activated for online EBM before initializing.'
+              : 'Local VSDC requires the RRA-provided VSDC WAR file running on the same server as SERVV backend. Typically used for sandbox/testing.'}
           </div>
         </div>
 
@@ -226,6 +294,125 @@ export function EbmSettings({ restaurantId }: EbmSettingsProps) {
             </span>
           )}
         </div>
+
+        {/* Local VSDC: auto-installer */}
+        {vsdcMode === 'local' && config && (
+          <div className="mt-4 p-4 bg-slate-700/50 border border-slate-600 rounded-lg space-y-3">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-medium text-slate-200">Automatic Background Sync</p>
+                <p className="text-xs text-slate-400 mt-1">
+                  Download this one-click installer, run it once on the Windows PC where VSDC is installed.
+                  It sets up a background task that syncs pending invoices to VSDC every 2 hours automatically —
+                  no ongoing action needed from staff.
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  const apiUrl = (import.meta.env.VITE_API_URL || window.location.origin).replace(/\/$/, '');
+                  const syncScript = [
+                    `$CONFIG = @{`,
+                    `    ServvApiUrl  = '${apiUrl}'`,
+                    `    RestaurantId = '${restaurantId}'`,
+                    `    VsdcUrl      = '${form.baseUrl}'`,
+                    `    LogFile      = "$env:APPDATA\\ServvEBMSync\\sync.log"`,
+                    `}`,
+                    `function Write-Log($msg) {`,
+                    `    $line = "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')  $msg"`,
+                    `    Add-Content -Path $CONFIG.LogFile -Value $line -Encoding UTF8 -ErrorAction SilentlyContinue`,
+                    `}`,
+                    `New-Item -ItemType Directory -Force -Path (Split-Path $CONFIG.LogFile) | Out-Null`,
+                    `Write-Log "--- SERVV EBM Sync started ---"`,
+                    `try {`,
+                    `    $pending = Invoke-RestMethod -Uri "$($CONFIG.ServvApiUrl)/api/ebm/pending?restaurantId=$([Uri]::EscapeDataString($CONFIG.RestaurantId))" -Method GET -ContentType 'application/json' -ErrorAction Stop`,
+                    `} catch { Write-Log "ERROR: Cannot reach SERVV API: $($_.Exception.Message)"; exit 1 }`,
+                    `if ($pending.Count -eq 0) { Write-Log "No pending invoices."; exit 0 }`,
+                    `Write-Log "Found $($pending.Count) pending invoice(s)."`,
+                    `$results = @()`,
+                    `foreach ($inv in $pending) {`,
+                    `    $body = $inv.raw_request | ConvertTo-Json -Depth 20 -Compress`,
+                    `    try {`,
+                    `        $vr = Invoke-RestMethod -Uri "$($CONFIG.VsdcUrl)/trnsSales/saveSales" -Method POST -Body $body -ContentType 'application/json' -ErrorAction Stop`,
+                    `        Write-Log "  $(if($vr.resultCd -eq '000'){'OK  '}else{'FAIL'}) $($inv.cis_invc_no) $($vr.resultMsg)"`,
+                    `        $results += @{ invoiceId = $inv.id; vsdcResult = $vr }`,
+                    `    } catch {`,
+                    `        Write-Log "  ERR  $($inv.cis_invc_no) $($_.Exception.Message)"`,
+                    `        $results += @{ invoiceId = $inv.id; vsdcResult = @{ resultCd = 'ERR'; resultMsg = $_.Exception.Message } }`,
+                    `    }`,
+                    `}`,
+                    `try {`,
+                    `    $payload = @{ restaurantId = $CONFIG.RestaurantId; results = $results } | ConvertTo-Json -Depth 20 -Compress`,
+                    `    $rep = Invoke-RestMethod -Uri "$($CONFIG.ServvApiUrl)/api/ebm/sync-result" -Method POST -Body $payload -ContentType 'application/json' -ErrorAction Stop`,
+                    `    Write-Log "Done: $($rep.updated) succeeded, $($rep.failed) failed."`,
+                    `} catch { Write-Log "ERROR reporting results: $($_.Exception.Message)" }`,
+                  ].join('\r\n');
+
+                  const installer = [
+                    `@echo off`,
+                    `echo SERVV EBM Auto-Sync Installer`,
+                    `echo ================================`,
+                    `echo.`,
+                    ``,
+                    `:: Create sync directory`,
+                    `if not exist "%APPDATA%\\ServvEBMSync" mkdir "%APPDATA%\\ServvEBMSync"`,
+                    ``,
+                    `:: Write the PowerShell sync script`,
+                    `powershell -NoProfile -Command "Set-Content -Path '$env:APPDATA\\ServvEBMSync\\sync.ps1' -Value @'\r\n${syncScript.replace(/'/g, "''")}\r\n'@ -Encoding UTF8"`,
+                    ``,
+                    `:: Remove existing task if present`,
+                    `schtasks /delete /tn "SERVV EBM Sync" /f >nul 2>&1`,
+                    ``,
+                    `:: Register scheduled task — runs every 2 hours, hidden window`,
+                    `schtasks /create /tn "SERVV EBM Sync" /tr "powershell -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File \\"%APPDATA%\\ServvEBMSync\\sync.ps1\\"" /sc hourly /mo 2 /ru "%USERNAME%" /f`,
+                    ``,
+                    `if %ERRORLEVEL% neq 0 (`,
+                    `    echo.`,
+                    `    echo ERROR: Could not create scheduled task.`,
+                    `    echo Please right-click this file and choose "Run as administrator".`,
+                    `    pause`,
+                    `    exit /b 1`,
+                    `)`,
+                    ``,
+                    `echo.`,
+                    `echo Installation complete!`,
+                    `echo SERVV EBM will now sync automatically every 2 hours.`,
+                    `echo Logs: %APPDATA%\\ServvEBMSync\\sync.log`,
+                    `echo.`,
+                    ``,
+                    `:: Run once immediately to verify`,
+                    `echo Running first sync now...`,
+                    `powershell -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "%APPDATA%\\ServvEBMSync\\sync.ps1"`,
+                    `echo First sync complete. Check logs if any errors.`,
+                    `echo.`,
+                    `pause`,
+                  ].join('\r\n');
+
+                  const blob = new Blob([installer], { type: 'text/plain' });
+                  const a = document.createElement('a');
+                  a.href = URL.createObjectURL(blob);
+                  a.download = 'ServvEBM-Install.bat';
+                  a.click();
+                }}
+                className="flex items-center gap-2 px-3 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-medium transition-colors shrink-0"
+              >
+                <DownloadIcon className="w-4 h-4" />
+                Download Installer
+              </button>
+            </div>
+
+            <ol className="text-xs text-slate-400 space-y-1 list-decimal list-inside">
+              <li>Download the installer above</li>
+              <li>Copy it to the Windows PC where VSDC is running</li>
+              <li>Right-click → <span className="text-slate-300">Run as administrator</span></li>
+              <li>Done — syncs automatically every 2 hours from now on</li>
+            </ol>
+
+            <p className="text-xs text-slate-500">
+              Logs saved to <code className="text-slate-400">%APPDATA%\ServvEBMSync\sync.log</code> on the Windows PC.
+              No Node.js or extra software required.
+            </p>
+          </div>
+        )}
 
         {/* Init result banner */}
         {initResult && (
