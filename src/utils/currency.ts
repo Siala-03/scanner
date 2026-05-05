@@ -26,5 +26,10 @@ export function setCurrency(code: CurrencyCode): void {
 
 export function formatPrice(amount: number): string {
   const code = getCurrency();
-  return `${CURRENCIES[code].symbol} ${Math.round(amount).toLocaleString()}`;
+  const numeric = Number(amount || 0);
+  const hasDecimals = Math.abs(numeric % 1) > 0.000001;
+  return `${CURRENCIES[code].symbol} ${numeric.toLocaleString('en-US', {
+    minimumFractionDigits: hasDecimals ? 2 : 0,
+    maximumFractionDigits: 2,
+  })}`;
 }

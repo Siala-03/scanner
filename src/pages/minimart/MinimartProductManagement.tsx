@@ -567,7 +567,7 @@ export function MinimartProductManagement() {
             <div>
               <label className="block text-xs text-slate-400 mb-1">Price (RWF) *</label>
               <input
-                type="number" min="0" step="1" value={addForm.price}
+                type="number" min="0" step="0.01" value={addForm.price}
                 onChange={(e) => setAddForm((p) => ({ ...p, price: e.target.value }))}
                 placeholder="0"
                 className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500"
@@ -712,7 +712,7 @@ export function MinimartProductManagement() {
                     <td className="px-4 py-3 text-right">
                       {isEditing ? (
                         <input
-                          type="number" min="0" step="1" value={editForm.price}
+                          type="number" min="0" step="0.01" value={editForm.price}
                           onChange={(e) => setEditForm((f) => ({ ...f, price: e.target.value }))}
                           className="w-24 px-2 py-1 bg-slate-800 border border-amber-500 rounded text-sm text-slate-100 text-right focus:outline-none"
                         />
