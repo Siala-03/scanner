@@ -1,8 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   LogOutIcon, RefreshCwIcon, TrendingUpIcon, ReceiptIcon,
   ShoppingBagIcon, UsersIcon, PlusIcon, TrashIcon, EyeIcon, EyeOffIcon,
-  PackageIcon,
+  PackageIcon, DownloadIcon, TagIcon, ZapIcon, BarChart2Icon,
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -12,6 +12,7 @@ import { supabase } from '../../lib/supabase';
 import { signUpStaff, deleteStaff, fetchAllStaff } from '../../api/auth';
 import { formatPrice } from '../../utils/currency';
 import { InventoryManagement } from '../shared/InventoryManagement';
+import { exportTransactionsToCsv } from '../../utils/minimartProductImportExport';
 import { MinimartProductManagement } from './MinimartProductManagement';
 import type { Staff } from '../../types';
 
@@ -42,8 +43,11 @@ interface Summary {
   revenue: number;
   transactions: number;
   avgSale: number;
+  totalItems: number;
+  peakDay: string;
   byCashier: Record<string, { count: number; revenue: number }>;
   byPayment: Record<string, { count: number; revenue: number }>;
+  byCategory: Record<string, { qty: number; revenue: number }>;
   dailyBars: DailyBar[];
   topProducts: ProductStat[];
 }
@@ -97,8 +101,8 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
   const [dateFilter, setDateFilter] = useState<DateFilter>('7d');
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [summary, setSummary] = useState<Summary>({
-    revenue: 0, transactions: 0, avgSale: 0,
-    byCashier: {}, byPayment: {}, dailyBars: [], topProducts: [],
+    revenue: 0, transactions: 0, avgSale: 0, totalItems: 0, peakDay: '',
+    byCashier: {}, byPayment: {}, byCategory: {}, dailyBars: [], topProducts: [],
   });
   const [loading, setLoading] = useState(true);
 
@@ -111,6 +115,9 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
   const [addError, setAddError] = useState('');
   const [addSaving, setAddSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // Transactions tab search
+  const [txnSearch, setTxnSearch] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -152,7 +159,9 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
 
       const byCashier: Record<string, { count: number; revenue: number }> = {};
       const byPayment: Record<string, { count: number; revenue: number }> = {};
+      const byCategory: Record<string, { qty: number; revenue: number }> = {};
       const productMap: Record<string, { qty: number; revenue: number }> = {};
+      let totalItems = 0;
 
       txns.forEach((t) => {
         if (!byCashier[t.cashierName]) byCashier[t.cashierName] = { count: 0, revenue: 0 };
@@ -167,10 +176,15 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
         t.items.forEach((item: any) => {
           const name = item.menu_item_name || item.menuItemName || item.name || 'Unknown';
           const qty = item.quantity || 1;
-          const rev = item.total_price || item.totalPrice || item.unit_price * qty || 0;
+          const rev = item.total_price || item.totalPrice || (item.unit_price || 0) * qty || 0;
+          const cat = item.category || 'Uncategorized';
           if (!productMap[name]) productMap[name] = { qty: 0, revenue: 0 };
           productMap[name].qty += qty;
           productMap[name].revenue += rev;
+          if (!byCategory[cat]) byCategory[cat] = { qty: 0, revenue: 0 };
+          byCategory[cat].qty += qty;
+          byCategory[cat].revenue += rev;
+          totalItems += qty;
         });
       });
 
@@ -181,13 +195,16 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
 
       const days = dateFilter === 'today' ? 1 : dateFilter === '7d' ? 7 : 30;
       const dailyBars = buildDailyBars(txns, days);
+      const peakBar = dailyBars.reduce((best, b) => b.revenue > best.revenue ? b : best, { day: '', revenue: 0 });
 
       setTransactions(txns);
       setSummary({
         revenue,
         transactions: txns.length,
         avgSale: txns.length > 0 ? revenue / txns.length : 0,
-        byCashier, byPayment, dailyBars, topProducts,
+        totalItems,
+        peakDay: peakBar.day,
+        byCashier, byPayment, byCategory, dailyBars, topProducts,
       });
     } catch (err) {
       console.error('Failed to load minimart transactions:', err);
@@ -254,6 +271,17 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
 
   const maxBarRevenue = Math.max(...summary.dailyBars.map((b) => b.revenue), 1);
 
+  const filteredTxns = useMemo(() => {
+    if (!txnSearch.trim()) return transactions;
+    const q = txnSearch.toLowerCase();
+    return transactions.filter(
+      (t) =>
+        t.orderNumber.toLowerCase().includes(q) ||
+        t.cashierName.toLowerCase().includes(q) ||
+        t.paymentMethod.toLowerCase().includes(q),
+    );
+  }, [transactions, txnSearch]);
+
   return (
     <div className="flex flex-col min-h-screen bg-slate-950 text-slate-100">
       {/* Header */}
@@ -319,25 +347,34 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
             ) : (
               <div className="space-y-6">
                 {/* KPI cards */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
-                    <div className="flex items-center gap-2 text-slate-400 text-xs uppercase tracking-wide mb-2">
-                      <TrendingUpIcon className="w-3.5 h-3.5" /> Revenue
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4">
+                    <div className="flex items-center gap-1.5 text-slate-400 text-xs uppercase tracking-wide mb-2">
+                      <TrendingUpIcon className="w-3.5 h-3.5 text-amber-400" /> Revenue
                     </div>
-                    <p className="text-2xl font-bold">{formatPrice(summary.revenue)}</p>
-                    <p className="text-xs text-slate-500 mt-1">Confirmed sales only</p>
+                    <p className="text-xl font-bold text-slate-100">{formatPrice(summary.revenue)}</p>
+                    <p className="text-xs text-slate-500 mt-1">Confirmed sales</p>
                   </div>
-                  <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
-                    <div className="flex items-center gap-2 text-slate-400 text-xs uppercase tracking-wide mb-2">
-                      <ReceiptIcon className="w-3.5 h-3.5" /> Transactions
+                  <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4">
+                    <div className="flex items-center gap-1.5 text-slate-400 text-xs uppercase tracking-wide mb-2">
+                      <ReceiptIcon className="w-3.5 h-3.5 text-blue-400" /> Transactions
                     </div>
-                    <p className="text-2xl font-bold">{summary.transactions}</p>
+                    <p className="text-xl font-bold text-slate-100">{summary.transactions}</p>
+                    <p className="text-xs text-slate-500 mt-1">Avg {formatPrice(summary.avgSale)}</p>
                   </div>
-                  <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
-                    <div className="flex items-center gap-2 text-slate-400 text-xs uppercase tracking-wide mb-2">
-                      <ShoppingBagIcon className="w-3.5 h-3.5" /> Avg. Sale
+                  <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4">
+                    <div className="flex items-center gap-1.5 text-slate-400 text-xs uppercase tracking-wide mb-2">
+                      <ShoppingBagIcon className="w-3.5 h-3.5 text-emerald-400" /> Items Sold
                     </div>
-                    <p className="text-2xl font-bold">{formatPrice(summary.avgSale)}</p>
+                    <p className="text-xl font-bold text-slate-100">{summary.totalItems}</p>
+                    <p className="text-xs text-slate-500 mt-1">Total units</p>
+                  </div>
+                  <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4">
+                    <div className="flex items-center gap-1.5 text-slate-400 text-xs uppercase tracking-wide mb-2">
+                      <ZapIcon className="w-3.5 h-3.5 text-purple-400" /> Peak Day
+                    </div>
+                    <p className="text-base font-bold text-slate-100 truncate">{summary.peakDay || '—'}</p>
+                    <p className="text-xs text-slate-500 mt-1">Highest revenue</p>
                   </div>
                 </div>
 
@@ -446,11 +483,46 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
                           <div key={name} className="flex items-center justify-between">
                             <div>
                               <p className="text-sm font-medium text-slate-200">{name}</p>
-                              <p className="text-xs text-slate-500">{stats.count} transaction{stats.count !== 1 ? 's' : ''}</p>
+                              <p className="text-xs text-slate-500">
+                                {stats.count} transaction{stats.count !== 1 ? 's' : ''}
+                                {' · '}avg {formatPrice(stats.revenue / (stats.count || 1))}
+                              </p>
                             </div>
                             <p className="text-sm font-semibold text-amber-400">{formatPrice(stats.revenue)}</p>
                           </div>
                         ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Sales by category */}
+                {Object.keys(summary.byCategory).length > 0 && (
+                  <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+                    <div className="flex items-center gap-2 text-slate-400 text-xs uppercase tracking-wide mb-4">
+                      <BarChart2Icon className="w-3.5 h-3.5" /> Sales by Category
+                    </div>
+                    <div className="space-y-3">
+                      {Object.entries(summary.byCategory)
+                        .sort((a, b) => b[1].revenue - a[1].revenue)
+                        .map(([cat, stats]) => {
+                          const pct = summary.revenue > 0 ? (stats.revenue / summary.revenue) * 100 : 0;
+                          return (
+                            <div key={cat}>
+                              <div className="flex justify-between text-xs mb-1">
+                                <span className="text-slate-300 flex items-center gap-1.5">
+                                  <TagIcon className="w-3 h-3 text-amber-400" />{cat}
+                                </span>
+                                <span className="text-slate-400">{stats.qty} sold · {formatPrice(stats.revenue)}</span>
+                              </div>
+                              <div className="h-1.5 bg-slate-800 rounded-full">
+                                <div
+                                  className="h-1.5 bg-amber-500/70 rounded-full transition-all"
+                                  style={{ width: `${pct}%` }}
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
                     </div>
                   </div>
                 )}
@@ -469,18 +541,36 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
         {/* ── Transactions ── */}
         {page === 'transactions' && (
           <>
-            <div className="flex gap-2 mb-6">
-              {(['today', '7d', '30d'] as DateFilter[]).map((f) => (
+            <div className="flex flex-wrap items-center gap-2 mb-6">
+              <div className="flex gap-2">
+                {(['today', '7d', '30d'] as DateFilter[]).map((f) => (
+                  <button
+                    key={f}
+                    onClick={() => setDateFilter(f)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                      dateFilter === f ? 'bg-amber-500 text-slate-900 font-medium' : 'bg-slate-800 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    {f === 'today' ? 'Today' : f === '7d' ? 'Last 7 days' : 'Last 30 days'}
+                  </button>
+                ))}
+              </div>
+              <div className="ml-auto flex items-center gap-2">
+                <input
+                  value={txnSearch}
+                  onChange={(e) => setTxnSearch(e.target.value)}
+                  placeholder="Search order, cashier…"
+                  className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500 w-44"
+                />
+                <span className="text-xs text-slate-500">{filteredTxns.length} records</span>
                 <button
-                  key={f}
-                  onClick={() => setDateFilter(f)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                    dateFilter === f ? 'bg-amber-500 text-slate-900 font-medium' : 'bg-slate-800 text-slate-400 hover:text-slate-200'
-                  }`}
+                  onClick={() => exportTransactionsToCsv(filteredTxns)}
+                  disabled={filteredTxns.length === 0}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-300 text-xs font-medium transition-colors"
                 >
-                  {f === 'today' ? 'Today' : f === '7d' ? 'Last 7 days' : 'Last 30 days'}
+                  <DownloadIcon className="w-3.5 h-3.5" /> Export CSV
                 </button>
-              ))}
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -488,13 +578,13 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
                 <div className="flex items-center justify-center h-40 text-slate-400">
                   <RefreshCwIcon className="w-5 h-5 animate-spin mr-2" /> Loading…
                 </div>
-              ) : transactions.length === 0 ? (
+              ) : filteredTxns.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-40 text-slate-500">
                   <ReceiptIcon className="w-8 h-8 mb-2 opacity-30" />
-                  <p className="text-sm">No transactions found</p>
+                  <p className="text-sm">{transactions.length === 0 ? 'No transactions found' : 'No matches for your search'}</p>
                 </div>
               ) : (
-                transactions.map((t) => (
+                filteredTxns.map((t) => (
                   <div key={t.id} className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex items-center gap-4">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">

@@ -4,7 +4,7 @@
 //   2. Web Serial API           – USB ESC/POS (Chrome 89+ on desktop)
 //   3. HTML print fallback      – opens a thermal-optimised popup window
 //
-// Paper: 58 mm → 32 chars per line at Font A (12 × 24 dots, 203 dpi)
+// Paper: 80 mm → 48 chars per line at Font A (12 × 24 dots, 203 dpi)
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { ReceiptData } from './receipt';
@@ -12,7 +12,7 @@ import { formatCurrency, formatDateTime } from './receipt';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const COLS = 32;
+const COLS = 48;
 
 // ── ESC/POS command bytes ─────────────────────────────────────────────────────
 
@@ -116,10 +116,28 @@ function printViaBridge(textLines: string[]): boolean {
 
 // ── Strategy 2: Web Serial API (ESC/POS) ──────────────────────────────────────
 
+// Cache the port so we don't prompt the user on every print
+let _cachedSerialPort: any = null;
+
 async function printViaSerial(escposBytes: number[]): Promise<boolean> {
   if (!('serial' in navigator)) return false;
   try {
-    const port = await (navigator as any).serial.requestPort({ filters: [] });
+    const serial = (navigator as any).serial;
+
+    // Reuse a previously authorised port without prompting
+    if (!_cachedSerialPort) {
+      const ports = await serial.getPorts();
+      if (ports.length > 0) {
+        _cachedSerialPort = ports[0];
+      }
+    }
+
+    // First use: ask the user to select a port (one-time permission grant)
+    if (!_cachedSerialPort) {
+      _cachedSerialPort = await serial.requestPort({ filters: [] });
+    }
+
+    const port = _cachedSerialPort;
     await port.open({ baudRate: 9600 });
     const writer = port.writable.getWriter();
     await writer.write(new Uint8Array(escposBytes));
@@ -127,6 +145,7 @@ async function printViaSerial(escposBytes: number[]): Promise<boolean> {
     await port.close();
     return true;
   } catch {
+    _cachedSerialPort = null; // reset on error so next attempt can re-select
     return false;
   }
 }
@@ -143,25 +162,39 @@ function printViaHtmlPopup(textLines: string[]): void {
 <head>
 <meta charset="UTF-8">
 <style>
+  @page { size: 80mm auto; margin: 0; }
   * { margin:0; padding:0; box-sizing:border-box; }
-  body {
-    font-family: 'Courier New', Courier, monospace;
-    font-size: 12px;
-    background: #fff;
-    padding: 4px;
-    width: ${COLS}ch;
+  body { font-family: 'Courier New', Courier, monospace; font-size: 9pt; color: #000; }
+  @media screen {
+    body { background: #c8c8c8; display: flex; justify-content: center; padding: 20px; }
+    pre { background: #fff; padding: 8px 10px; box-shadow: 0 2px 10px rgba(0,0,0,.2); width: 80mm; }
+  }
+  @media print {
+    html, body { background: #fff; }
+    body { padding: 3mm 4mm 8mm; width: 80mm; }
+    .no-print { display: none !important; }
   }
   pre { white-space: pre-wrap; word-break: break-all; line-height: 1.4; }
-  @media print { @page { margin: 4mm; } }
 </style>
 </head>
 <body>
 <pre>${escaped}</pre>
-<script>window.onload=function(){setTimeout(function(){window.print();},200);}<\/script>
+<script>
+  if (window.opener || window.name === 'receipt_print') {
+    window.addEventListener('load', function() {
+      setTimeout(function() {
+        window.print();
+        window.addEventListener('afterprint', function() {
+          setTimeout(function() { window.close(); }, 300);
+        });
+      }, 300);
+    });
+  }
+<\/script>
 </body>
 </html>`;
 
-  const win = window.open('', '_blank', `width=${COLS * 10},height=700`);
+  const win = window.open('', 'receipt_print', 'width=302,height=700,toolbar=0,scrollbars=1,status=0');
   if (!win) { window.print(); return; }
   win.document.open();
   win.document.write(html);

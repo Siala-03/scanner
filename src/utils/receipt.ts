@@ -58,10 +58,10 @@ export interface LoyaltyPointsResult {
  * Rule: 1 point for every 1,000 RWF above 5,000 RWF threshold
  */
 export function calculateLoyaltyPoints(orderAmountRWF: number): LoyaltyPointsResult {
-  const threshold = 5000; // Minimum order amount to earn points
-  const pointsPerUnit = 1; // 1 point per 1,000 RWF
+  const threshold = 5000;
+  const pointsPerUnit = 1;
   const unitAmount = 1000;
-  
+
   if (orderAmountRWF <= threshold) {
     return {
       orderAmountRWF,
@@ -69,10 +69,10 @@ export function calculateLoyaltyPoints(orderAmountRWF: number): LoyaltyPointsRes
       calculationNote: `No points for orders at or below ${formatCurrency(threshold, 'RWF')}`
     };
   }
-  
+
   const eligibleAmount = orderAmountRWF - threshold;
   const pointsEarned = Math.floor(eligibleAmount / unitAmount) * pointsPerUnit;
-  
+
   return {
     orderAmountRWF,
     pointsEarned,
@@ -122,7 +122,7 @@ export interface ReceiptData {
   // Financials
   currency: 'USD' | 'RWF';
   subtotal: number;
-  taxRate: number; // Configurable by manager (e.g., 18 for 18%)
+  taxRate: number;
   taxAmount: number;
   discount?: number;
   discountDescription?: string;
@@ -159,10 +159,10 @@ export interface BuildReceiptOptions {
   restaurantAddress: string;
   restaurantPhone: string;
   restaurantEmail?: string;
-  restaurantLogo?: string;    // base64 data URL or https URL
+  restaurantLogo?: string;
   restaurantCity?: string;
   restaurantCountry?: string;
-  taxRate: number; // e.g., 18 for 18%
+  taxRate: number;
   serverName: string;
   orderType?: 'dine-in' | 'takeout' | 'delivery';
   customerName?: string;
@@ -174,18 +174,13 @@ export interface BuildReceiptOptions {
   notes?: string;
 }
 
-/**
- * Convert an Order object to ReceiptData
- */
 export function orderToReceiptData(
   order: Order,
   options: BuildReceiptOptions
 ): ReceiptData {
   const orderNumber = order.orderNumber || order.id;
-  // Receipt ID == Order ID (no separate generated ID)
   const receiptId = orderNumber;
 
-  // Convert order items to receipt items
   const items: ReceiptItemData[] = order.items.map(item => {
     const unitPrice = item.unitPrice ?? item.menuItem?.price ?? 0;
     const name = item.menuItemName ?? item.menuItem?.name ?? 'Unknown Item';
@@ -200,10 +195,8 @@ export function orderToReceiptData(
     };
   });
 
-  // Use the order's actual total (already tax-inclusive) — no recalculation
   const total = order.total ?? items.reduce((s, i) => s + i.totalPrice, 0);
 
-  // Loyalty points based on RWF total
   const loyaltyCalc = calculateLoyaltyPoints(total);
   const loyaltyPoints = options.customerPointsBalance !== undefined ? {
     ...loyaltyCalc,
@@ -226,7 +219,7 @@ export function orderToReceiptData(
     orderType,
     tableNumber: order.tableNumber,
     serverName: options.serverName,
-    orderDate: new Date(), // generation time, not order creation time
+    orderDate: new Date(),
 
     customerName: options.customerName || order.customerName,
     customerId: order.customerId,
@@ -234,7 +227,7 @@ export function orderToReceiptData(
     items,
 
     currency: 'RWF',
-    subtotal: total,   // total is tax-inclusive; no separate subtotal/tax split
+    subtotal: total,
     taxRate: 0,
     taxAmount: 0,
     total,
@@ -261,8 +254,9 @@ export function orderToReceiptData(
 // ============================================
 
 /**
- * Generate a professional HTML receipt for printing.
- * Designed for 80 mm thermal printers and screen display.
+ * Generate an 80mm thermal-optimised HTML receipt.
+ * Uses @page { size: 80mm auto } so XPrinter / any 80mm USB printer
+ * via window.print() gets the correct paper width automatically.
  */
 export function buildReceiptHtml(receipt: ReceiptData): string {
   const {
@@ -296,282 +290,107 @@ export function buildReceiptHtml(receipt: ReceiptData): string {
     specialInstructions
   } = receipt;
 
-  // Format order type for display
-  const orderTypeDisplay = (orderType ?? 'dine-in').split('-').map(word => 
-    word.charAt(0).toUpperCase() + word.slice(1)
+  // RWF: no decimals; other currencies: standard formatting
+  const fmt = (v: number) => currency === 'RWF'
+    ? 'RWF ' + Math.round(v).toLocaleString('en-US')
+    : formatCurrency(v, currency);
+
+  const orderTypeDisplay = (orderType ?? 'dine-in').split('-').map((w: string) =>
+    w.charAt(0).toUpperCase() + w.slice(1)
   ).join(' ');
 
-  // Generate items HTML
   const itemsHtml = items.map(item => `
-    <tr class="item-row">
-      <td class="item-qty">${item.quantity}x</td>
-      <td class="item-name">
-        ${item.name}
-        ${item.specialInstructions ? `<div class="item-note">- ${item.specialInstructions}</div>` : ''}
-      </td>
-      <td class="item-price">${formatCurrency(item.totalPrice, currency)}</td>
-    </tr>
-  `).join('');
-
-  // Generate tax line
-  const taxLine = taxRate > 0 ? `
     <tr>
-      <td colspan="2">Tax (${taxRate}%)</td>
-      <td class="text-right">${formatCurrency(taxAmount, currency)}</td>
-    </tr>
-  ` : '';
-
-  // Generate payment info
-  const paymentInfo = `
-    <tr>
-      <td colspan="2">Payment Method</td>
-      <td class="text-right">${paymentMethod}${cardLast4 ? ` (****${cardLast4})` : ''}</td>
-    </tr>
-    <tr>
-      <td colspan="2">Status</td>
-      <td class="text-right">${paymentStatus.toUpperCase()}</td>
-    </tr>
-    ${amountPaid ? `
-    <tr>
-      <td colspan="2">Amount Paid</td>
-      <td class="text-right">${formatCurrency(amountPaid, currency)}</td>
-    </tr>
-    ` : ''}
-    ${change !== undefined && change > 0 ? `
-    <tr>
-      <td colspan="2">Change</td>
-      <td class="text-right">${formatCurrency(change, currency)}</td>
-    </tr>
-    ` : ''}
-  `;
-
-  // Generate delivery info
-  const deliveryInfo = deliveryAddress ? `
-    <div class="section">
-      <div class="section-title">Delivery Information</div>
-      <div class="info-row">
-        <span class="label">Address:</span>
-        <span class="value">${deliveryAddress}</span>
-      </div>
-      ${receipt.deliveryProvider ? `
-      <div class="info-row">
-        <span class="label">Provider:</span>
-        <span class="value">${receipt.deliveryProvider}</span>
-      </div>
-      ` : ''}
-    </div>
-  ` : '';
-
-  // Generate loyalty points section
-  const loyaltySection = loyaltyPoints ? `
-    <div class="section loyalty-section">
-      <div class="section-title">★ Loyalty Points ★</div>
-      <div class="info-row">
-        <span class="label">Order Amount:</span>
-        <span class="value">${formatCurrency(loyaltyPoints.orderAmountRWF, 'RWF')}</span>
-      </div>
-      <div class="info-row highlight">
-        <span class="label">Points Earned:</span>
-        <span class="value">+${loyaltyPoints.pointsEarned} pts</span>
-      </div>
-      <div class="info-row small">
-        <span class="label">${loyaltyPoints.calculationNote}</span>
-      </div>
-      <div class="info-row">
-        <span class="label">Total Balance:</span>
-        <span class="value">${loyaltyPoints.pointsBalance} pts</span>
-      </div>
-    </div>
-  ` : '';
-
-  // Generate notes section
-  const notesSection = notes || specialInstructions ? `
-    <div class="section">
-      <div class="section-title">Notes</div>
-      <div class="notes-content">
-        ${notes || ''}
-        ${specialInstructions ? `<div>${specialInstructions}</div>` : ''}
-      </div>
-    </div>
-  ` : '';
-
-  const dashedLine = '- '.repeat(24);
-  const solidLine  = '─'.repeat(48);
-
-  const itemsHtmlNew = items.map(item => `
-    <tr>
-      <td class="qty">${item.quantity}×</td>
-      <td class="name">
-        ${item.name}
-        ${item.specialInstructions ? `<div class="note">↳ ${item.specialInstructions}</div>` : ''}
-      </td>
-      <td class="price">${formatCurrency(item.totalPrice, currency)}</td>
+      <td class="qty">${item.quantity}&times;</td>
+      <td class="name">${item.name}${item.specialInstructions ? `<div class="note">&#8627; ${item.specialInstructions}</div>` : ''}</td>
+      <td class="price">${fmt(item.totalPrice)}</td>
     </tr>`).join('');
 
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Receipt #${orderNumber}</title>
   <style>
+    @page { size: 80mm auto; margin: 0; }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Courier New', Courier, monospace; font-size: 9pt; color: #000; line-height: 1.4; }
 
-    body {
-      font-family: 'Courier New', Courier, monospace;
-      font-size: 13px;
-      background: #f0f0f0;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 24px 12px 40px;
-      color: #111;
+    @media screen {
+      body { background: #c8c8c8; display: flex; flex-direction: column; align-items: center; padding: 20px 12px 40px; }
+      .paper { background: #fff; width: 80mm; padding: 6mm 5mm 10mm; box-shadow: 0 3px 16px rgba(0,0,0,.22); }
     }
-
-    /* ── Paper ── */
-    .receipt {
-      width: 100%;
-      max-width: 380px;
-      background: #fff;
-      padding: 28px 24px 24px;
-      box-shadow: 0 4px 24px rgba(0,0,0,.12);
-      border-radius: 4px;
-    }
-
-    /* ── Header ── */
-    .header { text-align: center; padding-bottom: 16px; }
-    .logo   { max-height: 72px; max-width: 180px; object-fit: contain; margin: 0 auto 10px; display: block; }
-    .brand  { font-size: 22px; font-weight: 900; letter-spacing: 3px; text-transform: uppercase; }
-    .sub    { font-size: 11px; color: #555; margin-top: 4px; line-height: 1.5; }
-    .badge  {
-      display: inline-block;
-      margin-top: 10px;
-      padding: 3px 12px;
-      border: 1px solid #111;
-      font-size: 10px;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-    }
-
-    /* ── Dividers ── */
-    .line-solid  { border: none; border-top: 2px solid #111; margin: 14px 0; }
-    .line-dashed { border: none; border-top: 1px dashed #999; margin: 12px 0; }
-
-    /* ── Meta grid ── */
-    .meta { width: 100%; font-size: 12px; border-collapse: collapse; }
-    .meta td { padding: 3px 0; vertical-align: top; }
-    .meta td:first-child { color: #555; width: 50%; }
-    .meta td:last-child  { font-weight: 600; text-align: right; }
-
-    /* ── Items ── */
-    .items { width: 100%; border-collapse: collapse; font-size: 13px; }
-    .items th {
-      text-align: left; font-size: 10px; letter-spacing: 1.5px;
-      text-transform: uppercase; color: #555;
-      padding: 0 0 6px; border-bottom: 1px solid #ddd;
-    }
-    .items th:last-child { text-align: right; }
-    .items td { padding: 7px 0; vertical-align: top; border-bottom: 1px dotted #e5e5e5; }
-    .items .qty   { width: 28px; color: #555; }
-    .items .name  { padding-right: 8px; }
-    .items .price { text-align: right; font-weight: 600; white-space: nowrap; }
-    .note { font-size: 11px; color: #888; font-style: italic; margin-top: 2px; }
-
-    /* ── Totals ── */
-    .totals { width: 100%; border-collapse: collapse; font-size: 13px; }
-    .totals td { padding: 4px 0; }
-    .totals td:last-child { text-align: right; }
-    .totals .grand td {
-      font-size: 16px; font-weight: 900;
-      border-top: 2px solid #111; padding-top: 10px; margin-top: 6px;
-      letter-spacing: .5px;
-    }
-
-    /* ── Payment badge ── */
-    .payment-row { display: flex; justify-content: space-between; align-items: center; font-size: 12px; padding: 3px 0; }
-    .status-badge {
-      display: inline-block;
-      padding: 2px 10px;
-      border-radius: 20px;
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 1px;
-      text-transform: uppercase;
-    }
-    .status-paid    { background: #d1fae5; color: #065f46; }
-    .status-pending { background: #fef3c7; color: #92400e; }
-
-    /* ── Notes ── */
-    .notes-box {
-      background: #fafafa;
-      border: 1px dashed #ccc;
-      border-radius: 4px;
-      padding: 8px 10px;
-      font-size: 11px;
-      color: #555;
-      font-style: italic;
-      line-height: 1.5;
-    }
-
-    /* ── Loyalty ── */
-    .loyalty-box {
-      border: 1px dashed #c0a060;
-      border-radius: 4px;
-      padding: 10px;
-      text-align: center;
-      background: #fffbf0;
-    }
-    .loyalty-box .pts { font-size: 18px; font-weight: 900; color: #92400e; }
-    .loyalty-box .lbl { font-size: 10px; color: #92400e; letter-spacing: 1px; text-transform: uppercase; }
-
-    /* ── Footer ── */
-    .footer { text-align: center; font-size: 11px; color: #555; line-height: 1.7; }
-    .footer .thanks { font-size: 14px; font-weight: 800; color: #111; letter-spacing: 1px; margin-bottom: 4px; }
-    .powered { font-size: 10px; color: #bbb; margin-top: 8px; letter-spacing: 1px; }
-
-    /* ── Screen-only print button ── */
-    .print-btn {
-      margin-top: 20px;
-      padding: 10px 32px;
-      background: #111;
-      color: #fff;
-      border: none;
-      border-radius: 4px;
-      font-family: inherit;
-      font-size: 13px;
-      cursor: pointer;
-      letter-spacing: 1px;
-    }
-    .print-btn:hover { background: #333; }
-
     @media print {
-      body { background: #fff; padding: 0; }
-      .receipt { box-shadow: none; max-width: 100%; padding: 8px; border-radius: 0; }
+      html, body { background: #fff; }
+      .paper { padding: 3mm 4mm 8mm; }
       .no-print { display: none !important; }
     }
+
+    .hdr { text-align: center; padding-bottom: 8px; }
+    .logo { max-height: 60px; max-width: 150px; object-fit: contain; display: block; margin: 0 auto 6px; }
+    .brand { font-size: 14pt; font-weight: 900; letter-spacing: 2px; text-transform: uppercase; }
+    .addr { font-size: 8pt; color: #444; margin-top: 3px; line-height: 1.5; }
+    .rbadge { display: inline-block; margin-top: 7px; padding: 2px 10px; border: 1px solid #000; font-size: 7pt; letter-spacing: 2px; text-transform: uppercase; }
+
+    .solid  { border: none; border-top: 1.5px solid #000; margin: 8px 0; }
+    .dashed { border: none; border-top: 1px dashed #888; margin: 6px 0; }
+
+    .meta { width: 100%; border-collapse: collapse; font-size: 8pt; }
+    .meta td { padding: 2px 0; vertical-align: top; }
+    .meta td:first-child { color: #555; width: 42%; }
+    .meta td:last-child  { font-weight: 700; text-align: right; }
+
+    .items { width: 100%; border-collapse: collapse; font-size: 9pt; }
+    .items th { font-size: 7pt; letter-spacing: 1px; text-transform: uppercase; color: #555; padding: 0 0 4px; border-bottom: 1px solid #ccc; text-align: left; }
+    .items th:last-child { text-align: right; }
+    .items td { padding: 5px 0; vertical-align: top; border-bottom: 1px dotted #ddd; }
+    .items .qty   { width: 22px; color: #555; font-size: 8pt; }
+    .items .name  { padding-right: 6px; }
+    .items .price { text-align: right; font-weight: 700; white-space: nowrap; font-size: 8pt; }
+    .note { font-size: 7pt; color: #777; font-style: italic; margin-top: 1px; }
+
+    .totals { width: 100%; border-collapse: collapse; font-size: 9pt; }
+    .totals td { padding: 3px 0; }
+    .totals td:last-child { text-align: right; }
+    .grand td { font-size: 12pt; font-weight: 900; border-top: 1.5px solid #000; padding-top: 6px; }
+
+    .pay-row { display: flex; justify-content: space-between; font-size: 8pt; padding: 2px 0; }
+    .sbadge { display: inline-block; padding: 1px 8px; border-radius: 12px; font-size: 7pt; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+    .s-paid    { background: #d1fae5; color: #065f46; }
+    .s-pending { background: #fef3c7; color: #92400e; }
+
+    .notes-box { border: 1px dashed #bbb; border-radius: 3px; padding: 5px 7px; font-size: 8pt; color: #444; font-style: italic; line-height: 1.5; }
+
+    .loyalty-box { border: 1px dashed #b8952a; border-radius: 3px; padding: 7px; text-align: center; background: #fffbf0; }
+    .loyalty-box .pts { font-size: 14pt; font-weight: 900; color: #92400e; }
+    .loyalty-box .lbl { font-size: 7pt; color: #92400e; letter-spacing: 1px; text-transform: uppercase; }
+
+    .footer { text-align: center; font-size: 8pt; color: #444; line-height: 1.7; }
+    .thanks { font-size: 10pt; font-weight: 900; color: #000; letter-spacing: 1px; margin-bottom: 3px; }
+    .powered { font-size: 7pt; color: #999; margin-top: 6px; letter-spacing: 1px; }
+
+    .print-btn { margin-top: 16px; padding: 8px 28px; background: #111; color: #fff; border: none; border-radius: 3px; font-family: inherit; font-size: 12px; cursor: pointer; }
+    .print-btn:hover { background: #333; }
   </style>
 </head>
 <body>
 
-<div class="receipt">
+<div class="paper">
 
-  <!-- ── HEADER ── -->
-  <div class="header">
-    ${restaurantLogo ? `<img src="${restaurantLogo}" alt="${restaurantName} logo" class="logo">` : ''}
+  <div class="hdr">
+    ${restaurantLogo ? `<img src="${restaurantLogo}" alt="${restaurantName}" class="logo">` : ''}
     <div class="brand">${restaurantName}</div>
-    <div class="sub">
+    <div class="addr">
       ${[restaurantAddress, restaurantCity, restaurantCountry].filter(Boolean).join(', ')}<br>
       ${restaurantPhone}${restaurantEmail ? `<br>${restaurantEmail}` : ''}
     </div>
-    <div class="badge">Official Receipt</div>
+    <div class="rbadge">Official Receipt</div>
   </div>
 
-  <hr class="line-solid">
+  <hr class="solid">
 
-  <!-- ── ORDER META ── -->
   <table class="meta">
     <tr><td>Order #</td>         <td>${orderNumber}</td></tr>
-    <tr><td>Receipt ID</td>      <td>${receiptId}</td></tr>
     <tr><td>Date &amp; Time</td> <td>${formatDateTime(orderDate)}</td></tr>
     <tr><td>Type</td>            <td>${orderTypeDisplay}</td></tr>
     ${tableNumber  ? `<tr><td>Table</td><td>${tableNumber}</td></tr>` : ''}
@@ -579,88 +398,79 @@ export function buildReceiptHtml(receipt: ReceiptData): string {
     ${customerName ? `<tr><td>Customer</td><td>${customerName}</td></tr>` : ''}
   </table>
 
-  <hr class="line-dashed">
+  <hr class="dashed">
 
-  <!-- ── ITEMS ── -->
   <table class="items">
-    <thead>
-      <tr>
-        <th>Qty</th>
-        <th>Item</th>
-        <th style="text-align:right">Price</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${itemsHtmlNew}
-    </tbody>
+    <thead><tr><th>Qty</th><th>Item</th><th style="text-align:right">Price</th></tr></thead>
+    <tbody>${itemsHtml}</tbody>
   </table>
 
-  <hr class="line-dashed">
+  <hr class="dashed">
 
-  <!-- ── TOTALS ── -->
   <table class="totals">
+    ${taxRate > 0 ? `
+    <tr><td style="color:#555">Subtotal</td><td>${fmt(receipt.subtotal)}</td></tr>
+    <tr><td style="color:#555">Tax (${taxRate}%)</td><td>${fmt(taxAmount)}</td></tr>` : ''}
     <tr class="grand">
-      <td>TOTAL <span style="font-size:10px;font-weight:400;color:#555">(Tax Incl.)</span></td>
-      <td>${formatCurrency(total, currency)}</td>
+      <td>TOTAL <span style="font-size:7pt;font-weight:400;color:#555">(Tax Incl.)</span></td>
+      <td>${fmt(total)}</td>
     </tr>
   </table>
 
-  <hr class="line-dashed">
+  <hr class="dashed">
 
-  <!-- ── PAYMENT ── -->
-  <div class="payment-row">
-    <span style="color:#555">Payment</span>
-    <span>${paymentMethod}${cardLast4 ? ` ····${cardLast4}` : ''}</span>
-  </div>
-  <div class="payment-row">
+  <div class="pay-row"><span style="color:#555">Payment</span><span>${paymentMethod}${cardLast4 ? ` ····${cardLast4}` : ''}</span></div>
+  <div class="pay-row">
     <span style="color:#555">Status</span>
-    <span class="status-badge ${paymentStatus === 'paid' ? 'status-paid' : 'status-pending'}">${paymentStatus}</span>
+    <span class="sbadge ${paymentStatus === 'paid' ? 's-paid' : 's-pending'}">${paymentStatus}</span>
   </div>
-  ${amountPaid && amountPaid !== total ? `
-  <div class="payment-row"><span style="color:#555">Amount Paid</span><span>${formatCurrency(amountPaid, currency)}</span></div>
-  ` : ''}
-  ${change !== undefined && change > 0 ? `
-  <div class="payment-row"><span style="color:#555">Change</span><span>${formatCurrency(change, currency)}</span></div>
-  ` : ''}
+  ${amountPaid && amountPaid !== total ? `<div class="pay-row"><span style="color:#555">Amount Paid</span><span>${fmt(amountPaid)}</span></div>` : ''}
+  ${change !== undefined && change > 0 ? `<div class="pay-row"><span style="color:#555">Change</span><span>${fmt(change)}</span></div>` : ''}
 
-  <!-- ── DELIVERY ── -->
   ${deliveryAddress ? `
-  <hr class="line-dashed">
-  <div style="font-size:11px;color:#555;line-height:1.6">
-    <strong style="color:#111;text-transform:uppercase;letter-spacing:1px;font-size:10px">Delivery</strong><br>
-    ${receipt.deliveryProvider ? `${receipt.deliveryProvider} · ` : ''}${deliveryAddress}
+  <hr class="dashed">
+  <div style="font-size:8pt;color:#444;line-height:1.6">
+    <strong style="color:#000;text-transform:uppercase;letter-spacing:1px;font-size:7pt">Delivery</strong><br>
+    ${receipt.deliveryProvider ? `${receipt.deliveryProvider} &middot; ` : ''}${deliveryAddress}
   </div>` : ''}
 
-  <!-- ── NOTES ── -->
   ${notes || specialInstructions ? `
-  <hr class="line-dashed">
-  <div class="notes-box">
-    <strong>Note:</strong> ${notes || specialInstructions}
-  </div>` : ''}
+  <hr class="dashed">
+  <div class="notes-box"><strong>Note:</strong> ${notes || specialInstructions}</div>` : ''}
 
-  <!-- ── LOYALTY ── -->
   ${loyaltyPoints && loyaltyPoints.pointsEarned > 0 ? `
-  <hr class="line-dashed">
+  <hr class="dashed">
   <div class="loyalty-box">
     <div class="lbl">Points Earned This Visit</div>
     <div class="pts">+${loyaltyPoints.pointsEarned} pts</div>
-    <div style="font-size:11px;color:#92400e;margin-top:4px">Balance: ${loyaltyPoints.pointsBalance} pts</div>
+    <div style="font-size:8pt;color:#92400e;margin-top:3px">Balance: ${loyaltyPoints.pointsBalance} pts</div>
   </div>` : ''}
 
-  <hr class="line-solid">
+  <hr class="solid">
 
-  <!-- ── FOOTER ── -->
   <div class="footer">
     <div class="thanks">Thank you for dining with us!</div>
     We hope to see you again soon.<br>
-    <span style="font-size:10px;color:#aaa">${receiptId} · ${new Date().toLocaleString()}</span>
+    <span style="font-size:7pt;color:#aaa">${receiptId} &middot; ${new Date().toLocaleString()}</span>
     <div class="powered">Powered by SERVV IQ</div>
   </div>
 
 </div>
 
-<!-- Screen-only print button -->
 <button class="print-btn no-print" onclick="window.print()">Print Receipt</button>
+
+<script>
+  if (window.opener || window.name === 'receipt_print') {
+    window.addEventListener('load', function() {
+      setTimeout(function() {
+        window.print();
+        window.addEventListener('afterprint', function() {
+          setTimeout(function() { window.close(); }, 300);
+        });
+      }, 300);
+    });
+  }
+<\/script>
 
 </body>
 </html>`;
@@ -671,33 +481,23 @@ export function buildReceiptHtml(receipt: ReceiptData): string {
 // ============================================
 
 /**
- * Open receipt in a new window and trigger print
+ * Open receipt in a named 80mm-wide window.
+ * The embedded script auto-prints and auto-closes when opened this way.
  */
 export function printReceipt(html: string): void {
-  const printWindow = window.open('', '_blank', 'width=450,height=800');
+  const printWindow = window.open('', 'receipt_print', 'width=302,height=700,toolbar=0,scrollbars=1,status=0');
   if (!printWindow) {
     throw new Error('Unable to open print window. Please allow pop-ups.');
   }
-
   printWindow.document.open();
   printWindow.document.write(html);
   printWindow.document.close();
-
-  // Wait for content to load before printing
-  printWindow.onload = () => {
-    setTimeout(() => {
-      printWindow.print();
-    }, 250);
-  };
 }
 
 // ============================================
 // CONVENIENCE FUNCTION
 // ============================================
 
-/**
- * Build and print receipt from an order in one step
- */
 export function printOrderReceipt(
   order: Order,
   options: BuildReceiptOptions
@@ -729,7 +529,7 @@ export interface ExpenseReceiptData {
 }
 
 /**
- * Build HTML receipt for an expense — matches the order receipt thermal-paper style.
+ * Build HTML receipt for an expense — 80mm thermal-optimised, matches order receipt style.
  */
 export function buildExpenseReceiptHtml(
   expense: ExpenseReceiptData,
@@ -746,130 +546,82 @@ export function buildExpenseReceiptHtml(
   const paymentMethod = (expense.paymentMethod || 'cash').replace(/_/g, ' ');
   const approvalStatus = expense.approvalStatus;
 
+  const fmt = (v: number) => expense.currency === 'RWF'
+    ? 'RWF ' + Math.round(v).toLocaleString('en-US')
+    : `${expense.currency} ${v.toFixed(2)}`;
+
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Expense Receipt #${receiptRef}</title>
   <style>
+    @page { size: 80mm auto; margin: 0; }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: 'Courier New', Courier, monospace;
-      font-size: 13px;
-      background: #f0f0f0;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 24px 12px 40px;
-      color: #111;
+    body { font-family: 'Courier New', Courier, monospace; font-size: 9pt; color: #000; line-height: 1.4; }
+
+    @media screen {
+      body { background: #c8c8c8; display: flex; flex-direction: column; align-items: center; padding: 20px 12px 40px; }
+      .paper { background: #fff; width: 80mm; padding: 6mm 5mm 10mm; box-shadow: 0 3px 16px rgba(0,0,0,.22); }
     }
-    .receipt {
-      width: 100%;
-      max-width: 380px;
-      background: #fff;
-      padding: 28px 24px 24px;
-      box-shadow: 0 4px 24px rgba(0,0,0,.12);
-      border-radius: 4px;
-    }
-    .header { text-align: center; padding-bottom: 16px; }
-    .logo { max-height: 72px; max-width: 180px; object-fit: contain; margin: 0 auto 10px; display: block; }
-    .brand { font-size: 22px; font-weight: 900; letter-spacing: 3px; text-transform: uppercase; }
-    .sub { font-size: 11px; color: #555; margin-top: 4px; line-height: 1.5; }
-    .badge {
-      display: inline-block;
-      margin-top: 10px;
-      padding: 3px 12px;
-      border: 1px solid #111;
-      font-size: 10px;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-    }
-    .line-solid  { border: none; border-top: 2px solid #111; margin: 14px 0; }
-    .line-dashed { border: none; border-top: 1px dashed #999; margin: 12px 0; }
-    .meta { width: 100%; font-size: 12px; border-collapse: collapse; }
-    .meta td { padding: 3px 0; vertical-align: top; }
-    .meta td:first-child { color: #555; width: 45%; }
-    .meta td:last-child  { font-weight: 600; text-align: right; }
-    .desc-box {
-      font-size: 12px;
-      line-height: 1.5;
-      color: #333;
-      border-top: 1px dotted #ddd;
-      border-bottom: 1px dotted #ddd;
-      padding: 8px 0;
-      margin: 4px 0;
-    }
-    .desc-label { font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; color: #555; margin-bottom: 4px; }
-    .totals { width: 100%; border-collapse: collapse; font-size: 13px; }
-    .totals td { padding: 4px 0; }
-    .totals td:last-child { text-align: right; }
-    .totals .grand td {
-      font-size: 16px; font-weight: 900;
-      border-top: 2px solid #111; padding-top: 10px;
-    }
-    .payment-row { display: flex; justify-content: space-between; align-items: center; font-size: 12px; padding: 3px 0; }
-    .status-badge {
-      display: inline-block;
-      padding: 2px 10px;
-      border-radius: 20px;
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 1px;
-      text-transform: uppercase;
-    }
-    .status-paid     { background: #d1fae5; color: #065f46; }
-    .status-pending  { background: #fef3c7; color: #92400e; }
-    .status-approved { background: #d1fae5; color: #065f46; }
-    .status-rejected { background: #fee2e2; color: #991b1b; }
-    .status-draft    { background: #f1f5f9; color: #475569; }
-    .notes-box {
-      background: #fafafa;
-      border: 1px dashed #ccc;
-      border-radius: 4px;
-      padding: 8px 10px;
-      font-size: 11px;
-      color: #555;
-      font-style: italic;
-      line-height: 1.5;
-    }
-    .footer { text-align: center; font-size: 11px; color: #555; line-height: 1.7; }
-    .footer .thanks { font-size: 14px; font-weight: 800; color: #111; letter-spacing: 1px; margin-bottom: 4px; }
-    .powered { font-size: 10px; color: #bbb; margin-top: 8px; letter-spacing: 1px; }
-    .print-btn {
-      margin-top: 20px;
-      padding: 10px 32px;
-      background: #111;
-      color: #fff;
-      border: none;
-      border-radius: 4px;
-      font-family: inherit;
-      font-size: 13px;
-      cursor: pointer;
-      letter-spacing: 1px;
-    }
-    .print-btn:hover { background: #333; }
     @media print {
-      body { background: #fff; padding: 0; }
-      .receipt { box-shadow: none; max-width: 100%; padding: 8px; border-radius: 0; }
+      html, body { background: #fff; }
+      .paper { padding: 3mm 4mm 8mm; }
       .no-print { display: none !important; }
     }
+
+    .hdr { text-align: center; padding-bottom: 8px; }
+    .logo { max-height: 60px; max-width: 150px; object-fit: contain; display: block; margin: 0 auto 6px; }
+    .brand { font-size: 14pt; font-weight: 900; letter-spacing: 2px; text-transform: uppercase; }
+    .sub { font-size: 8pt; color: #444; margin-top: 3px; line-height: 1.5; }
+    .rbadge { display: inline-block; margin-top: 7px; padding: 2px 10px; border: 1px solid #000; font-size: 7pt; letter-spacing: 2px; text-transform: uppercase; }
+
+    .solid  { border: none; border-top: 1.5px solid #000; margin: 8px 0; }
+    .dashed { border: none; border-top: 1px dashed #888; margin: 6px 0; }
+
+    .meta { width: 100%; border-collapse: collapse; font-size: 8pt; }
+    .meta td { padding: 2px 0; vertical-align: top; }
+    .meta td:first-child { color: #555; width: 45%; }
+    .meta td:last-child  { font-weight: 700; text-align: right; }
+
+    .desc-lbl { font-size: 7pt; letter-spacing: 1.5px; text-transform: uppercase; color: #555; margin-bottom: 3px; }
+    .desc-box { font-size: 8pt; line-height: 1.5; color: #333; border-top: 1px dotted #ddd; border-bottom: 1px dotted #ddd; padding: 6px 0; margin: 3px 0; }
+
+    .totals { width: 100%; border-collapse: collapse; font-size: 9pt; }
+    .totals td { padding: 3px 0; }
+    .totals td:last-child { text-align: right; }
+    .grand td { font-size: 12pt; font-weight: 900; border-top: 1.5px solid #000; padding-top: 6px; }
+
+    .pay-row { display: flex; justify-content: space-between; font-size: 8pt; padding: 2px 0; }
+    .sbadge { display: inline-block; padding: 1px 8px; border-radius: 12px; font-size: 7pt; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+    .s-paid     { background: #d1fae5; color: #065f46; }
+    .s-pending  { background: #fef3c7; color: #92400e; }
+    .s-approved { background: #d1fae5; color: #065f46; }
+    .s-rejected { background: #fee2e2; color: #991b1b; }
+    .s-draft    { background: #f1f5f9; color: #475569; }
+
+    .notes-box { border: 1px dashed #bbb; border-radius: 3px; padding: 5px 7px; font-size: 8pt; color: #444; font-style: italic; line-height: 1.5; }
+
+    .footer { text-align: center; font-size: 8pt; color: #444; line-height: 1.7; }
+    .thanks { font-size: 10pt; font-weight: 900; color: #000; letter-spacing: 1px; margin-bottom: 3px; }
+    .powered { font-size: 7pt; color: #999; margin-top: 6px; letter-spacing: 1px; }
+
+    .print-btn { margin-top: 16px; padding: 8px 28px; background: #111; color: #fff; border: none; border-radius: 3px; font-family: inherit; font-size: 12px; cursor: pointer; }
+    .print-btn:hover { background: #333; }
   </style>
 </head>
 <body>
-<div class="receipt">
+<div class="paper">
 
-  <!-- HEADER -->
-  <div class="header">
+  <div class="hdr">
     ${restaurantLogo ? `<img src="${restaurantLogo}" alt="${restaurantName}" class="logo">` : ''}
     <div class="brand">${restaurantName}</div>
     ${restaurantAddress || restaurantPhone ? `<div class="sub">${[restaurantAddress, restaurantPhone].filter(Boolean).join('<br>')}</div>` : ''}
-    <div class="badge">Expense Receipt</div>
+    <div class="rbadge">Expense Receipt</div>
   </div>
 
-  <hr class="line-solid">
+  <hr class="solid">
 
-  <!-- META -->
   <table class="meta">
     <tr><td>Receipt #</td>  <td>${receiptRef}</td></tr>
     <tr><td>Date</td>       <td>${new Date(expense.expenseDate).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</td></tr>
@@ -878,69 +630,65 @@ export function buildExpenseReceiptHtml(
     ${expense.vendorName ? `<tr><td>Vendor</td><td>${expense.vendorName}</td></tr>` : ''}
   </table>
 
-  <hr class="line-dashed">
+  <hr class="dashed">
 
-  <!-- DESCRIPTION -->
-  <div class="desc-label">Description</div>
+  <div class="desc-lbl">Description</div>
   <div class="desc-box">${expense.description}</div>
 
-  <hr class="line-dashed">
+  <hr class="dashed">
 
-  <!-- TOTALS -->
   <table class="totals">
-    <tr>
-      <td style="color:#555">Subtotal</td>
-      <td>${expense.currency} ${Number(expense.amount).toFixed(2)}</td>
-    </tr>
-    ${taxAmount > 0 ? `
-    <tr>
-      <td style="color:#555">Tax (${expense.taxRate}%)</td>
-      <td>${expense.currency} ${Number(taxAmount).toFixed(2)}</td>
-    </tr>` : ''}
-    <tr class="grand">
-      <td>TOTAL</td>
-      <td>${expense.currency} ${Number(total).toFixed(2)}</td>
-    </tr>
+    <tr><td style="color:#555">Subtotal</td><td>${fmt(expense.amount)}</td></tr>
+    ${taxAmount > 0 ? `<tr><td style="color:#555">Tax (${expense.taxRate}%)</td><td>${fmt(taxAmount)}</td></tr>` : ''}
+    <tr class="grand"><td>TOTAL</td><td>${fmt(total)}</td></tr>
   </table>
 
-  <hr class="line-dashed">
+  <hr class="dashed">
 
-  <!-- PAYMENT -->
-  <div class="payment-row">
+  <div class="pay-row">
     <span style="color:#555">Payment</span>
     <span style="text-transform:capitalize">${paymentMethod}</span>
   </div>
-  <div class="payment-row">
+  <div class="pay-row">
     <span style="color:#555">Payment Status</span>
-    <span class="status-badge status-${expense.paymentStatus}">${expense.paymentStatus}</span>
+    <span class="sbadge s-${expense.paymentStatus}">${expense.paymentStatus}</span>
   </div>
-  <div class="payment-row">
+  <div class="pay-row">
     <span style="color:#555">Approval</span>
-    <span class="status-badge status-${approvalStatus}">${approvalStatus.replace(/_/g, ' ')}</span>
+    <span class="sbadge s-${approvalStatus}">${approvalStatus.replace(/_/g, ' ')}</span>
   </div>
 
   ${expense.notes ? `
-  <hr class="line-dashed">
+  <hr class="dashed">
   <div class="notes-box"><strong>Note:</strong> ${expense.notes}</div>` : ''}
 
-  <hr class="line-solid">
+  <hr class="solid">
 
-  <!-- FOOTER -->
   <div class="footer">
     <div class="thanks">Thank you!</div>
-    <span style="font-size:10px;color:#aaa">${receiptRef} · ${new Date().toLocaleString()}</span>
+    <span style="font-size:7pt;color:#aaa">${receiptRef} &middot; ${new Date().toLocaleString()}</span>
     <div class="powered">Powered by SERVV IQ</div>
   </div>
 
 </div>
 <button class="print-btn no-print" onclick="window.print()">Print Receipt</button>
+
+<script>
+  if (window.opener || window.name === 'receipt_print') {
+    window.addEventListener('load', function() {
+      setTimeout(function() {
+        window.print();
+        window.addEventListener('afterprint', function() {
+          setTimeout(function() { window.close(); }, 300);
+        });
+      }, 300);
+    });
+  }
+<\/script>
 </body>
 </html>`;
 }
 
-/**
- * Print an expense receipt
- */
 export function downloadExpenseReceiptHtml(html: string, filename?: string): void {
   const blob = new Blob([html], { type: 'text/html' });
   const url = URL.createObjectURL(blob);
@@ -954,11 +702,10 @@ export function downloadExpenseReceiptHtml(html: string, filename?: string): voi
 }
 
 export function printExpenseReceipt(html: string): void {
-  const printWindow = window.open('', '_blank', 'width=700,height=900');
+  const printWindow = window.open('', 'receipt_print', 'width=302,height=700,toolbar=0,scrollbars=1,status=0');
   if (!printWindow) {
     throw new Error('Unable to open print window. Please allow pop-ups.');
   }
-
   printWindow.document.open();
   printWindow.document.write(html);
   printWindow.document.close();
