@@ -104,6 +104,45 @@ function nk(k: string): string {
   return k.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
+/** Normalise any common date string to YYYY-MM-DD for Postgres.
+ *  Handles: DD/MM/YYYY, DD-MM-YYYY, MM/DD/YYYY (ambiguous — assumes DD/MM when day≤12),
+ *  YYYY/MM/DD, Excel serial numbers, and already-correct YYYY-MM-DD. */
+function normaliseDate(raw: unknown): string {
+  if (!raw) return '';
+  const s = String(raw).trim();
+  if (!s) return '';
+
+  // Already ISO format YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+
+  // Excel serial number (e.g. 45765)
+  if (/^\d{5}$/.test(s)) {
+    // Excel epoch is 1899-12-30
+    const d = new Date((Number(s) - 25569) * 86400 * 1000);
+    if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
+  }
+
+  // DD/MM/YYYY or DD-MM-YYYY
+  const dmy = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (dmy) {
+    const [, d, m, y] = dmy;
+    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+  }
+
+  // YYYY/MM/DD
+  const ymd = s.match(/^(\d{4})[\/\-](\d{2})[\/\-](\d{2})$/);
+  if (ymd) {
+    const [, y, m, d] = ymd;
+    return `${y}-${m}-${d}`;
+  }
+
+  // Fallback — let the JS Date parser try
+  const parsed = new Date(s);
+  if (!isNaN(parsed.getTime())) return parsed.toISOString().split('T')[0];
+
+  return '';
+}
+
 function parseCsvRows(content: string): InventoryImportRow[] {
   const lines = content.trim().split('\n');
   if (lines.length < 2) return [];
@@ -134,8 +173,8 @@ function parseCsvRows(content: string): InventoryImportRow[] {
     results.push({
       menuItemId: id,
       description: row.description ?? row.itemname ?? '',
-      expiryDate: row.expirydate ?? '',
-      purchaseDate: row.purchasedate ?? '',
+      expiryDate: normaliseDate(row.expirydate),
+      purchaseDate: normaliseDate(row.purchasedate),
       qtyStart,
       stock,
       lowStockThreshold: Math.round(parseFloat(row.lowstockthreshold ?? row.threshold ?? '5') || 5),
@@ -170,8 +209,8 @@ function parseExcelRows(buffer: ArrayBuffer): InventoryImportRow[] {
       return {
         menuItemId: id,
         description: String(row.description ?? row.itemname ?? ''),
-        expiryDate: String(row.expirydate ?? ''),
-        purchaseDate: String(row.purchasedate ?? ''),
+        expiryDate: normaliseDate(row.expirydate),
+        purchaseDate: normaliseDate(row.purchasedate),
         qtyStart,
         stock,
         lowStockThreshold: Math.round(Number(row.lowstockthreshold ?? row.threshold ?? 5)),
@@ -203,8 +242,8 @@ export async function importInventoryFromFile(file: File): Promise<InventoryImpo
     return (data as any[]).map((r, i) => ({
       menuItemId: String(r.menu_item_id || r.menuItemId || r.id || `row-${i}`),
       description: String(r.description ?? ''),
-      expiryDate: String(r.expiry_date ?? r.expiryDate ?? ''),
-      purchaseDate: String(r.purchase_date ?? r.purchaseDate ?? ''),
+      expiryDate: normaliseDate(r.expiry_date ?? r.expiryDate),
+      purchaseDate: normaliseDate(r.purchase_date ?? r.purchaseDate),
       qtyStart: Math.round(Number(r.qty_start ?? r.qtyStart ?? r.current_qty ?? r.currentQty ?? r.stock ?? 0)),
       stock: Math.round(Number(r.current_qty ?? r.currentQty ?? r.stock ?? 0)),
       lowStockThreshold: Math.round(Number(r.low_stock_threshold ?? r.lowStockThreshold ?? 5)),

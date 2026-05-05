@@ -469,6 +469,9 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
     if (editValues.location !== undefined && editValues.location !== current.location) {
       updatePayload.location = editValues.location;
     }
+    if (editValues.qtyStart !== undefined && editValues.qtyStart !== (current as any).qtyStart) {
+      updatePayload.qtyStart = editValues.qtyStart;
+    }
     if (isMinimartScope && editValues.description !== undefined && editValues.description !== (current as any).description) {
       updatePayload.description = editValues.description;
     }
@@ -1288,7 +1291,20 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                             )}
                           </td>
                           <td className="px-4 py-3 text-sm text-slate-300">{ageDays !== null ? `${ageDays}d` : '—'}</td>
-                          <td className="px-4 py-3 text-sm text-slate-300">{row.rec?.qtyStart ?? row.stock}</td>
+                          <td className="px-4 py-3 text-sm text-slate-300">
+                            {isEditing ? (
+                              <input
+                                type="number"
+                                placeholder="0"
+                                value={editValues.qtyStart ?? row.rec?.qtyStart ?? row.stock}
+                                onChange={(e) => setEditValues((v) => ({ ...v, qtyStart: Math.round(parseFloat(e.target.value || '0')) }))}
+                                className="w-20 px-2 py-1 rounded bg-slate-900 border border-slate-600 text-white text-xs focus:outline-none focus:ring-1 focus:ring-amber-500"
+                                min={0}
+                              />
+                            ) : (
+                              row.rec?.qtyStart ?? row.stock
+                            )}
+                          </td>
                           <td className="px-4 py-3 min-w-[140px]">
                             <div className="space-y-1">
                               <div className="flex items-center justify-between">
