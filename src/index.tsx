@@ -5,6 +5,7 @@ import { App } from "./App";
 import { MenuProvider } from "./contexts/MenuContext";
 import { OrdersProvider } from "./contexts/OrdersContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import { supabase } from "./lib/supabase";
 
 // Error boundary to catch unhandled errors
 class ErrorBoundary extends React.Component<
@@ -48,16 +49,27 @@ class ErrorBoundary extends React.Component<
   }
 }
 
-render(
-  <ErrorBoundary>
-    <ThemeProvider>
-      <MenuProvider>
-        <OrdersProvider>
-          <App />
-        </OrdersProvider>
-      </MenuProvider>
-    </ThemeProvider>
-  </ErrorBoundary>,
-  document.getElementById("root")
-);
+async function bootstrap() {
+  const token = localStorage.getItem("token");
+  if (token) {
+    await supabase.auth
+      .setSession({ access_token: token, refresh_token: "" })
+      .catch(() => {});
+  }
+
+  render(
+    <ErrorBoundary>
+      <ThemeProvider>
+        <MenuProvider>
+          <OrdersProvider>
+            <App />
+          </OrdersProvider>
+        </MenuProvider>
+      </ThemeProvider>
+    </ErrorBoundary>,
+    document.getElementById("root")
+  );
+}
+
+bootstrap();
 
