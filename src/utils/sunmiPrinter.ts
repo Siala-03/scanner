@@ -249,19 +249,21 @@ function buildOrderReceiptLines(receipt: ReceiptData): string[] {
   }
   add(twoCol('** TOTAL **', formatCurrency(receipt.total, receipt.currency)));
 
-  if (receipt.amountPaid && receipt.amountPaid !== receipt.total) {
-    add(twoCol('Paid:', formatCurrency(receipt.amountPaid, receipt.currency)));
-  }
-  if (receipt.change && receipt.change > 0) {
-    add(twoCol('Change:', formatCurrency(receipt.change, receipt.currency)));
-  }
-
   add(divider('-'));
 
   // Payment
-  const payMethod = `${receipt.paymentMethod}${receipt.cardLast4 ? ` ****${receipt.cardLast4}` : ''}`;
-  add(twoCol('Payment:', payMethod));
+  for (const p of receipt.payments) {
+    const label = p.reference ? `${p.method} (${p.reference})` : p.method;
+    add(twoCol(label + ':', formatCurrency(p.amount, receipt.currency)));
+  }
+  if (receipt.payments.length > 1) {
+    const totalPaid = receipt.payments.reduce((s, p) => s + p.amount, 0);
+    add(twoCol('Total Paid:', formatCurrency(totalPaid, receipt.currency)));
+  }
   add(twoCol('Status:', receipt.paymentStatus.toUpperCase()));
+  if (receipt.change && receipt.change > 0) {
+    add(twoCol('Change:', formatCurrency(receipt.change, receipt.currency)));
+  }
 
   // Delivery
   if (receipt.deliveryAddress) {

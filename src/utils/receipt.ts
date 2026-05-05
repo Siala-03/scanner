@@ -81,6 +81,16 @@ export function calculateLoyaltyPoints(orderAmountRWF: number): LoyaltyPointsRes
 }
 
 // ============================================
+// PAYMENT TYPES
+// ============================================
+
+export interface PaymentEntry {
+  method: string;    // 'Cash', 'Mobile Money', 'Card', 'Bank Transfer', etc.
+  amount: number;
+  reference?: string; // MOMO transaction ID, card last 4, etc.
+}
+
+// ============================================
 // RECEIPT DATA TYPES
 // ============================================
 
@@ -129,11 +139,9 @@ export interface ReceiptData {
   total: number;
 
   // Payment
-  paymentMethod: string;
+  payments: PaymentEntry[];
   paymentStatus: 'paid' | 'pending' | 'partial';
-  amountPaid?: number;
   change?: number;
-  cardLast4?: string;
 
   // Delivery Info (if applicable)
   deliveryAddress?: string;
@@ -166,10 +174,12 @@ export interface BuildReceiptOptions {
   serverName: string;
   orderType?: 'dine-in' | 'takeout' | 'delivery';
   customerName?: string;
-  paymentMethod?: string;
+  payments?: PaymentEntry[];       // preferred: full split-payment list
+  paymentMethod?: string;          // legacy: single method name
   paymentStatus?: 'paid' | 'pending' | 'partial';
-  amountPaid?: number;
-  cardLast4?: string;
+  amountPaid?: number;             // legacy: single amount paid
+  cardLast4?: string;              // legacy: card reference
+  change?: number;                 // explicit change override (auto-computed if omitted)
   customerPointsBalance?: number;
   notes?: string;
 }
@@ -232,11 +242,18 @@ export function orderToReceiptData(
     taxAmount: 0,
     total,
 
-    paymentMethod: options.paymentMethod || 'Cash',
+    payments: options.payments ?? [{
+      method: options.paymentMethod || 'Cash',
+      amount: options.amountPaid ?? total,
+      reference: options.cardLast4 ? `****${options.cardLast4}` : undefined,
+    }],
     paymentStatus: options.paymentStatus || 'paid',
-    amountPaid: options.amountPaid || total,
-    change: options.amountPaid ? options.amountPaid - total : undefined,
-    cardLast4: options.cardLast4,
+    change: (() => {
+      if (options.change !== undefined) return options.change;
+      const pmts = options.payments ?? [{ amount: options.amountPaid ?? total }];
+      const paid = pmts.reduce((s, p) => s + p.amount, 0);
+      return paid > total ? paid - total : undefined;
+    })(),
 
     deliveryAddress: order.deliveryAddress,
     deliveryProvider: order.deliveryProvider,
@@ -279,11 +296,9 @@ export function buildReceiptHtml(receipt: ReceiptData): string {
     taxRate,
     taxAmount,
     total,
-    paymentMethod,
+    payments,
     paymentStatus,
-    amountPaid,
     change,
-    cardLast4,
     deliveryAddress,
     loyaltyPoints,
     notes,
@@ -420,13 +435,21 @@ export function buildReceiptHtml(receipt: ReceiptData): string {
 
   <hr class="dashed">
 
-  <div class="pay-row"><span style="color:#555">Payment</span><span>${paymentMethod}${cardLast4 ? ` ····${cardLast4}` : ''}</span></div>
+  ${payments.map(p => `
   <div class="pay-row">
-    <span style="color:#555">Status</span>
+    <span style="color:#333">${p.method}${p.reference ? ` <span style="font-size:8pt;color:#555">(${p.reference})</span>` : ''}</span>
+    <span style="font-weight:700">${fmt(p.amount)}</span>
+  </div>`).join('')}
+  ${payments.length > 1 ? `
+  <div class="pay-row" style="border-top:1px solid #ccc;margin-top:3px;padding-top:4px;font-weight:700">
+    <span>Total Paid</span>
+    <span>${fmt(payments.reduce((s, p) => s + p.amount, 0))}</span>
+  </div>` : ''}
+  <div class="pay-row" style="margin-top:3px">
+    <span style="color:#333">Status</span>
     <span class="sbadge ${paymentStatus === 'paid' ? 's-paid' : 's-pending'}">${paymentStatus}</span>
   </div>
-  ${amountPaid && amountPaid !== total ? `<div class="pay-row"><span style="color:#555">Amount Paid</span><span>${fmt(amountPaid)}</span></div>` : ''}
-  ${change !== undefined && change > 0 ? `<div class="pay-row"><span style="color:#555">Change</span><span>${fmt(change)}</span></div>` : ''}
+  ${change !== undefined && change > 0 ? `<div class="pay-row"><span style="color:#333">Change</span><span style="font-weight:700">${fmt(change)}</span></div>` : ''}
 
   ${deliveryAddress ? `
   <hr class="dashed">
@@ -451,9 +474,9 @@ export function buildReceiptHtml(receipt: ReceiptData): string {
 
   <div class="footer">
     <div class="thanks">Thank you for dining with us!</div>
-    We hope to see you again soon.<br>
-    <span style="font-size:7pt;color:#aaa">${receiptId} &middot; ${new Date().toLocaleString()}</span>
-    <div class="powered">Powered by SERVV IQ</div>
+    <div>We hope to see you again soon.</div>
+    <div style="font-size:8pt;color:#555;margin-top:4px">${receiptId}</div>
+    <div class="powered">Powered by SERVV</div>
   </div>
 
 </div>
@@ -669,8 +692,8 @@ export function buildExpenseReceiptHtml(
 
   <div class="footer">
     <div class="thanks">Thank you!</div>
-    <span style="font-size:7pt;color:#aaa">${receiptRef} &middot; ${new Date().toLocaleString()}</span>
-    <div class="powered">Powered by SERVV IQ</div>
+    <div style="font-size:8pt;color:#555;margin-top:4px">${receiptRef}</div>
+    <div class="powered">Powered by SERVV</div>
   </div>
 
 </div>

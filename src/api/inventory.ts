@@ -10,6 +10,7 @@ import type {
   InventoryForecast,
   PurchaseOrderStatus,
 } from '../types/inventory';
+export type { InventoryRecord };
 import { apiRequest } from './http';
 
 const API_BASE = import.meta.env.VITE_API_URL

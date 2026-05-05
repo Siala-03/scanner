@@ -30,8 +30,10 @@ import { QRScanner } from '../../components/waiter/QRScanner';
 import { WaiterOrderEntry } from '../../components/waiter/WaiterOrderEntry';
 import { loadReviews } from '../../utils/reviewsStorage';
 import { useStaffKPIs } from '../../hooks/useKPIs';
-import { buildReceiptHtml, orderToReceiptData } from '../../utils/receipt';
+import { buildReceiptHtml, orderToReceiptData, printReceipt } from '../../utils/receipt';
+import type { PaymentEntry } from '../../utils/receipt';
 import { ReceiptShareModal } from '../../components/ui/ReceiptShareModal';
+import { PaymentCaptureModal } from '../../components/ui/PaymentCaptureModal';
 import { supabase } from '../../lib/supabase';
 import { markTableSessionPendingCloseFromReceipt } from '../../utils/tableSessions';
 import { ThemeToggle } from '../../components/ui/ThemeToggle';
@@ -643,6 +645,7 @@ export function WaiterDashboard({
   const [socketCalls, setSocketCalls] = useState<{ tableNumber: number; timestamp: Date }[]>([]);
   const [showShareModal, setShowShareModal] = useState(false);
   const [selectedOrderForShare, setSelectedOrderForShare] = useState<Order | null>(null);
+  const [paymentCaptureOrder, setPaymentCaptureOrder] = useState<Order | null>(null);
   const [todayReservations, setTodayReservations] = useState<Reservation[]>([]);
   const [reservationsExpanded, setReservationsExpanded] = useState(true);
   // Track order IDs we've already seen so we can detect truly new ones
@@ -995,7 +998,14 @@ export function WaiterDashboard({
     onUpdateOrderStatus(orderId, 'served', { assignedWaiterId: waiter.id });
   };
 
-  const handlePrintReceipt = async (order: Order) => {
+  const handlePrintReceipt = (order: Order) => {
+    setPaymentCaptureOrder(order);
+  };
+
+  const handlePaymentConfirmed = async (payments: PaymentEntry[], change: number) => {
+    const order = paymentCaptureOrder;
+    if (!order) return;
+    setPaymentCaptureOrder(null);
     try {
       const html = buildReceiptHtml(
         orderToReceiptData(order, {
@@ -1006,16 +1016,15 @@ export function WaiterDashboard({
           restaurantLogo: restaurantInfo?.logo,
           restaurantCity: restaurantInfo?.city,
           restaurantCountry: restaurantInfo?.country,
-          taxRate: 18,
+          taxRate: 0,
           serverName: waiterName,
           orderType: order.deliveryAddress ? 'delivery' : 'dine-in',
-          paymentMethod: 'Cash',
+          payments,
           paymentStatus: 'paid',
-          amountPaid: order.total,
+          change,
         })
       );
-      const win = window.open('', '_blank', 'width=450,height=900');
-      if (win) { win.document.open(); win.document.write(html); win.document.close(); }
+      printReceipt(html);
       if (order.tableNumber != null) {
         await markTableSessionPendingCloseFromReceipt(order.tableNumber);
       }
@@ -1023,7 +1032,6 @@ export function WaiterDashboard({
       if (order.tableNumber != null) {
         await markTableSessionPendingCloseFromReceipt(order.tableNumber);
       }
-      window.print();
     }
   };
 
@@ -1644,13 +1652,22 @@ export function WaiterDashboard({
             restaurantLogo: restaurantInfo?.logo,
             restaurantCity: restaurantInfo?.city,
             restaurantCountry: restaurantInfo?.country,
-            taxRate: 18,
+            taxRate: 0,
             serverName: waiterName,
             orderType: selectedOrderForShare.deliveryAddress ? 'delivery' : 'dine-in',
             paymentMethod: 'Cash',
             paymentStatus: 'paid',
             amountPaid: selectedOrderForShare.total,
           })}
+        />
+      )}
+
+      {paymentCaptureOrder && (
+        <PaymentCaptureModal
+          total={paymentCaptureOrder.total ?? 0}
+          currency="RWF"
+          onConfirm={handlePaymentConfirmed}
+          onCancel={() => setPaymentCaptureOrder(null)}
         />
       )}
 

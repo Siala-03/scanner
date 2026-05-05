@@ -4,6 +4,7 @@ import {
   ShoppingBagIcon, UsersIcon, PlusIcon, TrashIcon, EyeIcon, EyeOffIcon,
   PackageIcon, DownloadIcon, TagIcon, ZapIcon, BarChart2Icon,
 } from 'lucide-react';
+import { ClockIcon, ChevronDownIcon, ChevronUpIcon } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Cell,
@@ -45,6 +46,7 @@ interface Summary {
   avgSale: number;
   totalItems: number;
   peakDay: string;
+  hourlyBars: Array<{ hour: string; revenue: number; count: number }>;
   byCashier: Record<string, { count: number; revenue: number }>;
   byPayment: Record<string, { count: number; revenue: number }>;
   byCategory: Record<string, { qty: number; revenue: number }>;
@@ -102,6 +104,7 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [summary, setSummary] = useState<Summary>({
     revenue: 0, transactions: 0, avgSale: 0, totalItems: 0, peakDay: '',
+    hourlyBars: [],
     byCashier: {}, byPayment: {}, byCategory: {}, dailyBars: [], topProducts: [],
   });
   const [loading, setLoading] = useState(true);
@@ -118,6 +121,7 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
 
   // Transactions tab search
   const [txnSearch, setTxnSearch] = useState('');
+  const [expandedTxnId, setExpandedTxnId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -134,18 +138,19 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
 
       const { data, error } = await supabase
         .from('orders')
-        .select('id, order_number, total, payment_type, items, created_at, payment_confirmed_by_name')
+        .select('id, order_number, total, payment_type, items, created_at, payment_confirmed_by_name, payment_confirmed_by, payment_status')
         .eq('restaurant_id', restaurantId)
-        .eq('payment_status', 'confirmed')
         .gte('created_at', from.toISOString())
         .order('created_at', { ascending: false });
 
       if (error) throw error;
 
-      const txns: Transaction[] = (data || []).map((o: any) => ({
+      const txns: Transaction[] = (data || [])
+        .filter((o: any) => ['confirmed', 'paid', 'completed'].includes((o.payment_status || '').toLowerCase()))
+        .map((o: any) => ({
         id: o.id,
         orderNumber: o.order_number || o.id.slice(-6).toUpperCase(),
-        cashierName: o.payment_confirmed_by_name || 'Cashier',
+        cashierName: o.payment_confirmed_by_name || o.payment_confirmed_by || 'Cashier',
         total: o.total || 0,
         paymentMethod: PAYMENT_LABEL[o.payment_type] || o.payment_type || 'Cash',
         itemCount: Array.isArray(o.items)
@@ -197,6 +202,21 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
       const dailyBars = buildDailyBars(txns, days);
       const peakBar = dailyBars.reduce((best, b) => b.revenue > best.revenue ? b : best, { day: '', revenue: 0 });
 
+      // Hourly breakdown (only meaningful for today filter)
+      const hourlyMap: Record<number, { revenue: number; count: number }> = {};
+      for (let h = 0; h < 24; h++) hourlyMap[h] = { revenue: 0, count: 0 };
+      txns.forEach((t) => {
+        const h = new Date(t.createdAt).getHours();
+        hourlyMap[h].revenue += t.total;
+        hourlyMap[h].count += 1;
+      });
+      // Collect hours that have sales
+      const hourlyBarsFinal = Array.from({ length: 24 }, (_, h) => ({
+        hour: `${String(h).padStart(2, '0')}:00`,
+        revenue: hourlyMap[h].revenue,
+        count: hourlyMap[h].count,
+      })).filter((b) => b.count > 0);
+
       setTransactions(txns);
       setSummary({
         revenue,
@@ -204,6 +224,7 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
         avgSale: txns.length > 0 ? revenue / txns.length : 0,
         totalItems,
         peakDay: peakBar.day,
+        hourlyBars: hourlyBarsFinal,
         byCashier, byPayment, byCategory, dailyBars, topProducts,
       });
     } catch (err) {
@@ -285,14 +306,19 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
   return (
     <div className="flex flex-col min-h-screen bg-slate-950 text-slate-100">
       {/* Header */}
-      <header className="sticky top-0 z-40 bg-slate-900 border-b border-slate-800">
+      <header className="sticky top-0 z-40 bg-slate-900 border-b border-emerald-900/60">
+        {/* Distinct minimart identity strip — prevents confusion with lounge/restaurant portal */}
+        <div className="bg-emerald-950/80 border-b border-emerald-900/50 px-4 py-1.5 flex items-center gap-2">
+          <ShoppingBagIcon className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+          <span className="text-xs font-bold text-emerald-400 uppercase tracking-widest">Minimart Portal</span>
+          <span className="text-emerald-700 text-xs hidden sm:inline">&mdash; {restaurantName}</span>
+        </div>
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
           <div>
-            <p className="text-xs text-amber-400 uppercase tracking-wide font-medium">Minimart Manager</p>
             <p className="font-semibold text-slate-100 truncate">{restaurantName}</p>
+            <p className="text-xs text-slate-400">{manager.name} &middot; <span className="capitalize">{manager.role}</span></p>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-sm text-slate-400 hidden sm:block">{manager.name}</span>
             <button
               onClick={load}
               className="p-2 rounded-lg bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors"
@@ -311,7 +337,7 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
               key={p}
               onClick={() => setPage(p)}
               className={`shrink-0 px-4 py-1.5 rounded-full text-sm font-medium capitalize transition-colors ${
-                page === p ? 'bg-amber-500 text-slate-900 font-semibold' : 'text-slate-400 hover:text-slate-200'
+                page === p ? 'bg-emerald-600 text-white font-semibold' : 'text-slate-400 hover:text-slate-200'
               }`}
             >
               {p}
@@ -413,6 +439,31 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
                               />
                             ))}
                           </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                )}
+
+                {/* Hourly sales chart */}
+                {summary.hourlyBars.length > 0 && (
+                  <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+                    <div className="flex items-center gap-2 text-slate-400 text-xs uppercase tracking-wide mb-4">
+                      <ClockIcon className="w-3.5 h-3.5 text-blue-400" /> Sales by Hour
+                    </div>
+                    <div className="h-40">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={summary.hourlyBars} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.3} vertical={false} />
+                          <XAxis dataKey="hour" stroke="#64748b" fontSize={9} tickLine={false} axisLine={false} />
+                          <YAxis stroke="#64748b" fontSize={9} tickLine={false} axisLine={false}
+                            tickFormatter={(v) => v >= 1000 ? `${(v / 1000).toFixed(0)}K` : `${v}`} />
+                          <Tooltip
+                            contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #3b82f6', borderRadius: 10, color: '#fff' }}
+                            formatter={(v: number, name: string) => [name === 'revenue' ? formatPrice(v) : v, name === 'revenue' ? 'Revenue' : 'Sales']}
+                            labelStyle={{ color: '#93c5fd' }}
+                          />
+                          <Bar dataKey="revenue" fill="#3b82f6" radius={[3, 3, 0, 0]} />
                         </BarChart>
                       </ResponsiveContainer>
                     </div>
@@ -585,18 +636,41 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
                 </div>
               ) : (
                 filteredTxns.map((t) => (
-                  <div key={t.id} className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex items-center gap-4">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="text-sm font-semibold text-slate-100">#{t.orderNumber}</p>
-                        <span className="text-xs bg-amber-900/40 text-amber-300 px-2 py-0.5 rounded-full">{t.paymentMethod}</span>
+                  <div key={t.id} className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+                    <button
+                      onClick={() => setExpandedTxnId(expandedTxnId === t.id ? null : t.id)}
+                      className="w-full flex items-center gap-4 p-4 text-left hover:bg-slate-800/50 transition-colors"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="text-sm font-semibold text-slate-100">#{t.orderNumber}</p>
+                          <span className="text-xs bg-amber-900/40 text-amber-300 px-2 py-0.5 rounded-full">{t.paymentMethod}</span>
+                        </div>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          {t.cashierName} · {t.itemCount} item{t.itemCount !== 1 ? 's' : ''} ·{' '}
+                          {new Date(t.createdAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                        </p>
                       </div>
-                      <p className="text-xs text-slate-500 mt-0.5">
-                        {t.cashierName} · {t.itemCount} item{t.itemCount !== 1 ? 's' : ''} ·{' '}
-                        {new Date(t.createdAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
-                      </p>
-                    </div>
-                    <p className="text-sm font-bold text-emerald-400 shrink-0">{formatPrice(t.total)}</p>
+                      <p className="text-sm font-bold text-emerald-400 shrink-0">{formatPrice(t.total)}</p>
+                      {expandedTxnId === t.id
+                        ? <ChevronUpIcon className="w-4 h-4 text-slate-400 shrink-0" />
+                        : <ChevronDownIcon className="w-4 h-4 text-slate-400 shrink-0" />}
+                    </button>
+                    {expandedTxnId === t.id && t.items.length > 0 && (
+                      <div className="border-t border-slate-800 px-4 py-3 bg-slate-800/30 space-y-1.5">
+                        {t.items.map((item: any, idx: number) => {
+                          const name = item.menu_item_name || item.menuItemName || item.name || 'Item';
+                          const qty = item.quantity || 1;
+                          const price = item.total_price || item.totalPrice || (item.unit_price || 0) * qty;
+                          return (
+                            <div key={idx} className="flex justify-between text-xs">
+                              <span className="text-slate-300">{name} ×{qty}</span>
+                              <span className="text-slate-400">{formatPrice(price)}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 ))
               )}

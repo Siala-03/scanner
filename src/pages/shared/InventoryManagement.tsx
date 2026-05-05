@@ -19,6 +19,7 @@ import {
   DownloadIcon,
   FileSpreadsheetIcon,
   LinkIcon,
+  ClockIcon,
 } from 'lucide-react';
 import { InventoryForecasting } from '../../components/manager/InventoryForecasting';
 import { Card } from '../../components/ui/Card';
@@ -34,6 +35,7 @@ import type {
   PurchaseOrder,
   PurchaseOrderStatus,
   WasteReason,
+  StockMovement,
 } from '../../types/inventory';
 import { createMenuItem } from '../../api/menu';
 import {
@@ -49,6 +51,7 @@ import {
   updatePurchaseOrder as apiUpdatePurchaseOrder,
   receivePurchaseOrder as apiReceivePurchaseOrder,
   recordWaste as apiRecordWaste,
+  fetchItemMovements,
 } from '../../api/inventory';
 import {
   provisionSupplierPortalAccess,
@@ -278,6 +281,11 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
   const [statusFilter, setStatusFilter] = useState<'all' | 'ok' | 'low' | 'out'>('all');
   const [editingRow, setEditingRow] = useState<string | null>(null);
   const [editValues, setEditValues] = useState<Partial<InventoryRecord>>({});
+
+  // Audit trail panel
+  const [auditItem, setAuditItem] = useState<{ id: string; name: string } | null>(null);
+  const [auditMovements, setAuditMovements] = useState<StockMovement[]>([]);
+  const [auditLoading, setAuditLoading] = useState(false);
   const [selectedItemDetails, setSelectedItemDetails] = useState<null | {
     item: any;
     rec?: InventoryRecord;
@@ -494,6 +502,20 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
     setAddToMenuName('');
     setAddToMenuPrice(0);
     setAddToMenuCategory('');
+  };
+
+  const openAuditTrail = async (itemId: string, itemName: string) => {
+    setAuditItem({ id: itemId, name: itemName });
+    setAuditLoading(true);
+    setAuditMovements([]);
+    try {
+      const movements = await fetchItemMovements(itemId, 200);
+      setAuditMovements(movements);
+    } catch (err) {
+      console.error('Failed to fetch audit trail:', err);
+    } finally {
+      setAuditLoading(false);
+    }
   };
 
   const handleAddToMenu = async () => {
@@ -1323,6 +1345,13 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                               ) : (
                                 <div className="flex gap-1">
                                   <button
+                                    onClick={() => openAuditTrail(row.item.id, row.item.name)}
+                                    className="p-2 md:p-1.5 text-slate-400 hover:text-purple-400 transition"
+                                    title="Cost & stock history"
+                                  >
+                                    <ClockIcon className="w-6 h-6 md:w-5 md:h-5" />
+                                  </button>
+                                  <button
                                     onClick={() => {
                                       const rec = inventoryMap[row.item.id];
                                       setEditingRow(row.item.id);
@@ -1392,6 +1421,109 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
               </div>
             </Card>
           </motion.div>
+        )}
+
+        {/* ── AUDIT TRAIL MODAL ── */}
+        {auditItem && (
+          <Modal isOpen={!!auditItem} onClose={() => { setAuditItem(null); setAuditMovements([]); }}>
+            <div className="p-5 w-full max-w-2xl space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                  <ClockIcon className="w-5 h-5 text-purple-400" />
+                  Stock & Cost History
+                </h3>
+                <button onClick={() => { setAuditItem(null); setAuditMovements([]); }} className="text-slate-400 hover:text-white">
+                  <XIcon className="w-4 h-4" />
+                </button>
+              </div>
+              <p className="text-sm text-slate-400">{auditItem.name} <span className="text-slate-600">· {auditItem.id}</span></p>
+
+              {auditLoading ? (
+                <div className="flex items-center justify-center h-32 text-slate-400">
+                  <RefreshCcwIcon className="w-5 h-5 animate-spin mr-2" /> Loading history…
+                </div>
+              ) : auditMovements.length === 0 ? (
+                <div className="text-center py-10 text-slate-500">
+                  <ClockIcon className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                  <p className="text-sm">No movement history found for this item.</p>
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
+                  {/* Cost change summary banner */}
+                  {auditMovements.some(m => m.reference === 'COST_CHANGE') && (
+                    <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg px-4 py-2 text-xs text-amber-300 mb-3">
+                      Cost was changed {auditMovements.filter(m => m.reference === 'COST_CHANGE').length} time(s). Cost-change entries are highlighted below.
+                    </div>
+                  )}
+                  {auditMovements.map((mv) => {
+                    const isCostChange = mv.reference === 'COST_CHANGE';
+                    // Parse old/new cost from notes: "COST_CHANGE|old=X|new=Y"
+                    let oldCost: number | null = null;
+                    let newCost: number | null = null;
+                    if (isCostChange && mv.notes) {
+                      const oldMatch = mv.notes.match(/old=([\d.]+)/);
+                      const newMatch = mv.notes.match(/new=([\d.]+)/);
+                      if (oldMatch) oldCost = Number(oldMatch[1]);
+                      if (newMatch) newCost = Number(newMatch[1]);
+                    }
+                    const ts = new Date(mv.timestamp);
+                    const dateStr = ts.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' });
+                    const timeStr = ts.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    return (
+                      <div
+                        key={mv.id}
+                        className={`rounded-lg border px-4 py-3 text-sm ${
+                          isCostChange
+                            ? 'bg-amber-500/8 border-amber-500/30'
+                            : mv.type === 'sale'
+                            ? 'bg-slate-800/60 border-slate-700/50'
+                            : 'bg-slate-800/40 border-slate-700/30'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                                isCostChange         ? 'bg-amber-500/20 text-amber-300' :
+                                mv.type === 'sale'   ? 'bg-red-500/15 text-red-300' :
+                                mv.type === 'restock'? 'bg-emerald-500/15 text-emerald-300' :
+                                                       'bg-slate-600/50 text-slate-300'
+                              }`}>
+                                {isCostChange ? 'Cost Change' : mv.type.charAt(0).toUpperCase() + mv.type.slice(1)}
+                              </span>
+                              {mv.reference && !isCostChange && (
+                                <span className="text-xs text-slate-500">Ref: {mv.reference}</span>
+                              )}
+                            </div>
+                            {isCostChange ? (
+                              <p className="mt-1 text-slate-200">
+                                {formatPrice(oldCost ?? 0)} → <span className="text-amber-300 font-semibold">{formatPrice(newCost ?? 0)}</span>
+                              </p>
+                            ) : (
+                              <p className="mt-1 text-slate-200">
+                                Qty: <span className={mv.qty < 0 ? 'text-red-300 font-semibold' : 'text-emerald-300 font-semibold'}>
+                                  {mv.qty > 0 ? '+' : ''}{mv.qty}
+                                </span>
+                                {' '}· Balance: <span className="text-slate-300">{mv.balanceAfter}</span>
+                              </p>
+                            )}
+                            {mv.notes && !isCostChange && (
+                              <p className="text-xs text-slate-500 mt-0.5 truncate">{mv.notes}</p>
+                            )}
+                            <p className="text-xs text-slate-500 mt-1">By {mv.performedBy || 'system'}</p>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <p className="text-xs text-slate-400">{dateStr}</p>
+                            <p className="text-xs text-slate-600">{timeStr}</p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </Modal>
         )}
 
         {/* ── ADD TO MENU MODAL ── */}

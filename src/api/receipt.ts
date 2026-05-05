@@ -168,7 +168,7 @@ function formatReceiptAsText(receipt: ReceiptData, customMessage?: string): stri
   lines.push('');
   
   // Payment
-  lines.push(`Payment: ${receipt.paymentMethod}`);
+  receipt.payments.forEach(p => lines.push(`Payment: ${p.method}${p.reference ? ` (${p.reference})` : ''} — ${formatReceiptAmount(p.amount)}`));
   lines.push(`Status: ${receipt.paymentStatus.toUpperCase()}`);
   lines.push('');
   
@@ -270,7 +270,7 @@ function formatReceiptAsHTML(receipt: ReceiptData, customMessage?: string): stri
   </table>
   
   <div style="margin-top: 16px; padding: 8px; background: #f5f5f5; border-radius: 4px;">
-    <p style="margin: 4px 0;"><strong>Payment:</strong> ${receipt.paymentMethod}</p>
+    ${receipt.payments.map(p => `<p style="margin: 4px 0;"><strong>${p.method}${p.reference ? ` (${p.reference})` : ''}:</strong> ${formatReceiptAmount(p.amount)}</p>`).join('')}
     <p style="margin: 4px 0;"><strong>Status:</strong> ${receipt.paymentStatus.toUpperCase()}</p>
   </div>
   

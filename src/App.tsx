@@ -1,4 +1,4 @@
-import { useCallback, useState, useEffect } from 'react';
+import { useCallback, useState, useEffect, useRef } from 'react';
 import { useTheme } from './contexts/ThemeContext';
 import { motion } from 'framer-motion';
 import { ArrowLeftIcon, QrCodeIcon, LogOutIcon, ChevronDownIcon } from 'lucide-react';
@@ -127,6 +127,8 @@ export function App() {
   const [scanningTable, setScanningTable] = useState<number | null>(null);
   const [detectedTable, setDetectedTable] = useState<number | null>(null);
   const [showQRGrid, setShowQRGrid] = useState(false);
+  const [portalSplash, setPortalSplash] = useState<{ name: string; outletType: OutletType } | null>(null);
+  const justLoggedIn = useRef(false);
   const { tables, addTable, removeTable } = useTables();
 
   useEffect(() => {
@@ -606,10 +608,15 @@ export function App() {
     fetchRestaurantPublic(currentRestaurantId)
       .then((restaurant) => {
         if (!active) return;
-        setRestaurantName(restaurant.name || '');
+        const name = restaurant.name || '';
+        setRestaurantName(name);
         const ot = ((restaurant as any).outlet_type || 'restaurant') as OutletType;
         setOutletType(ot);
         localStorage.setItem('outletType', ot);
+        if (justLoggedIn.current) {
+          justLoggedIn.current = false;
+          setPortalSplash({ name, outletType: ot });
+        }
       })
       .catch((err: unknown) => {
         console.warn('Failed to fetch restaurant info:', err);
@@ -629,8 +636,52 @@ export function App() {
     };
   }, [currentRestaurantId]);
 
+  useEffect(() => {
+    if (!portalSplash) return;
+    const timer = setTimeout(() => setPortalSplash(null), 2500);
+    return () => clearTimeout(timer);
+  }, [portalSplash]);
+
   if (!routeResolved) {
     return null;
+  }
+
+  // Portal entry splash — shown briefly after login to identify which portal
+  if (portalSplash) {
+    const isMinimart = portalSplash.outletType === 'minimart';
+    return (
+      <div className={`min-h-screen flex flex-col items-center justify-center gap-6 ${isMinimart ? 'bg-emerald-950' : 'bg-slate-900'}`}>
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="flex flex-col items-center gap-4 text-center"
+        >
+          <div className={`w-20 h-20 rounded-2xl flex items-center justify-center ${isMinimart ? 'bg-emerald-700' : 'bg-amber-600'}`}>
+            {isMinimart ? (
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-10 h-10 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+            ) : (
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-10 h-10 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 2h18l-2 7H5L3 2z"/><circle cx="9" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M5 9l1 9h12l1-9"/></svg>
+            )}
+          </div>
+          <div>
+            <p className={`text-sm font-semibold tracking-widest uppercase mb-1 ${isMinimart ? 'text-emerald-400' : 'text-amber-400'}`}>
+              {isMinimart ? 'Minimart Portal' : 'Lounge Portal'}
+            </p>
+            <h1 className="text-3xl font-bold text-white">{portalSplash.name || 'Welcome'}</h1>
+          </div>
+          <div className="flex gap-1.5 mt-2">
+            {[0, 1, 2].map((i) => (
+              <motion.div
+                key={i}
+                className={`w-2 h-2 rounded-full ${isMinimart ? 'bg-emerald-400' : 'bg-amber-400'}`}
+                animate={{ opacity: [0.3, 1, 0.3] }}
+                transition={{ duration: 1.2, repeat: Infinity, delay: i * 0.2 }}
+              />
+            ))}
+          </div>
+        </motion.div>
+      </div>
+    );
   }
 
   // Customer portal (table already assigned via QR scan)
@@ -1140,6 +1191,7 @@ export function App() {
           <LoginPage
               embedded
               onLogin={(user) => {
+                justLoggedIn.current = true;
                 setAuthUser(user);
                 restoreStaffContextFromAuthUser(user);
                 setSelectedRole(user.role as UserRole);
