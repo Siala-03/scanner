@@ -1357,32 +1357,32 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                           </td>
                           <td className="px-4 py-3 text-sm text-slate-300">{formatPrice((row.rec?.unitCost ?? 0) * row.stock)}</td>
                           {isManager && (
-                            <td className="px-4 py-3">
+                            <td className="px-4 py-3 min-w-[240px]">
                               {isEditing ? (
-                                <div className="flex items-center gap-1.5 whitespace-nowrap">
+                                <div className="flex items-center gap-1 whitespace-nowrap">
                                   <button
                                     onClick={() => handleSaveRow(row.item.id, row.item.name)}
-                                    className="p-1.5 sm:p-2 rounded-lg border border-emerald-500/45 bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/30 transition"
+                                    className="h-7 w-7 inline-flex items-center justify-center rounded-md border border-emerald-500/45 bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/30 transition"
                                     title="Save"
                                   >
-                                    <CheckCircleIcon className="w-5 h-5 sm:w-6 sm:h-6" />
+                                    <CheckCircleIcon className="w-4 h-4" />
                                   </button>
                                   <button
                                     onClick={() => { setEditingRow(null); setEditValues({}); }}
-                                    className="p-1.5 sm:p-2 rounded-lg border border-slate-500/45 bg-slate-600/30 text-slate-100 hover:bg-slate-500/45 transition"
+                                    className="h-7 w-7 inline-flex items-center justify-center rounded-md border border-slate-500/45 bg-slate-600/30 text-slate-100 hover:bg-slate-500/45 transition"
                                     title="Cancel"
                                   >
-                                    <XIcon className="w-5 h-5 sm:w-6 sm:h-6" />
+                                    <XIcon className="w-4 h-4" />
                                   </button>
                                 </div>
                               ) : (
-                                <div className="grid grid-cols-3 sm:flex sm:flex-wrap items-center gap-1.5">
+                                <div className="flex items-center gap-1 whitespace-nowrap">
                                   <button
                                     onClick={() => openAuditTrail(row.item.id, row.item.name)}
-                                    className="p-1.5 sm:p-2 rounded-lg border border-purple-500/50 bg-purple-500/20 text-purple-100 hover:bg-purple-500/32 transition"
+                                    className="h-7 w-7 inline-flex items-center justify-center rounded-md border border-purple-500/50 bg-purple-500/20 text-purple-100 hover:bg-purple-500/32 transition"
                                     title="Cost & stock history"
                                   >
-                                    <ClockIcon className="w-5 h-5 sm:w-6 sm:h-6" />
+                                    <ClockIcon className="w-4 h-4" />
                                   </button>
                                   <button
                                     onClick={() => {
@@ -1398,10 +1398,10 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                                         location: rec?.location ?? '',
                                       });
                                     }}
-                                    className="p-1.5 sm:p-2 rounded-lg border border-amber-500/50 bg-amber-500/20 text-amber-100 hover:bg-amber-500/32 transition"
+                                    className="h-7 w-7 inline-flex items-center justify-center rounded-md border border-amber-500/50 bg-amber-500/20 text-amber-100 hover:bg-amber-500/32 transition"
                                     title="Edit"
                                   >
-                                    <EditIcon className="w-5 h-5 sm:w-6 sm:h-6" />
+                                    <EditIcon className="w-4 h-4" />
                                   </button>
                                   <button
                                     onClick={() => {
@@ -1409,10 +1409,10 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                                       setNewPOItems([{ menuItemId: row.item.id, orderedQty: Math.max((row.rec?.reorderQty ?? 5) - row.stock, 1), unit: '', unitCost: row.rec?.unitCost ?? 0 }]);
                                       setShowNewPO(true);
                                     }}
-                                    className="p-1.5 sm:p-2 rounded-lg border border-emerald-500/50 bg-emerald-500/20 text-emerald-100 hover:bg-emerald-500/32 transition"
+                                    className="h-7 w-7 inline-flex items-center justify-center rounded-md border border-emerald-500/50 bg-emerald-500/20 text-emerald-100 hover:bg-emerald-500/32 transition"
                                     title="Smart Reorder"
                                   >
-                                    <PlusIcon className="w-5 h-5 sm:w-6 sm:h-6" />
+                                    <PlusIcon className="w-4 h-4" />
                                   </button>
                                   <button
                                     onClick={() => {
@@ -1424,7 +1424,7 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                                       setShowAddToMenuModal(true);
                                     }}
                                     disabled={!!menuItemMap[row.item.id]}
-                                    className={`p-1.5 sm:p-2 rounded-lg border transition ${
+                                    className={`h-7 w-7 inline-flex items-center justify-center rounded-md border transition ${
                                       menuItemMap[row.item.id]
                                         ? 'text-slate-400 cursor-not-allowed bg-slate-600/30 border-slate-500/40'
                                         : 'text-blue-100 bg-blue-500/22 border-blue-500/55 hover:bg-blue-500/35'
@@ -1432,8 +1432,8 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                                     title={menuItemMap[row.item.id] ? 'Already in Menu' : 'Add to Menu'}
                                   >
                                     {menuItemMap[row.item.id]
-                                      ? <CheckCircleIcon className="w-5 h-5 sm:w-6 sm:h-6" />
-                                      : <LinkIcon className="w-5 h-5 sm:w-6 sm:h-6" />}
+                                      ? <CheckCircleIcon className="w-4 h-4" />
+                                      : <LinkIcon className="w-4 h-4" />}
                                   </button>
                                   <button
                                     onClick={() => {
@@ -1441,10 +1441,10 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                                         handleDeleteInventoryItem(row.item.id);
                                       }
                                     }}
-                                    className="p-1.5 sm:p-2 rounded-lg border border-red-500/50 bg-red-500/20 text-red-100 hover:bg-red-500/32 transition"
+                                    className="h-7 w-7 inline-flex items-center justify-center rounded-md border border-red-500/50 bg-red-500/20 text-red-100 hover:bg-red-500/32 transition"
                                     title="Delete"
                                   >
-                                    <TrashIcon className="w-5 h-5 sm:w-6 sm:h-6" />
+                                    <TrashIcon className="w-4 h-4" />
                                   </button>
                                 </div>
                               )}
