@@ -234,9 +234,9 @@ export async function createInventoryRecord(record: Partial<InventoryRecord>): P
   const lowStockThreshold = Math.round(Number(record.lowStockThreshold) || 5);
   const reorderPoint = Math.round(Number(record.reorderPoint) || 10);
   const reorderQty = Math.round(Number(record.reorderQty) || 20);
-  const unitCost = toDbDecimal(record.unitCost, 0);
+  const unitCost = Math.round(Number(record.unitCost) || 0);
   const qtyStart = Math.round(Number(record.qtyStart ?? record.stock) || stock);
-  const price = toDbDecimal(record.price, 0);
+  const price = Math.round(Number(record.price) || 0);
 
   const insertPayload: Record<string, any> = {
     id,
@@ -278,8 +278,16 @@ export async function createInventoryRecord(record: Partial<InventoryRecord>): P
     lastError = res.error;
     const msg = String(res.error.message || '');
     const missingCol = msg.match(missingColumnPattern)?.[1] || msg.match(postgresMissingColumnPattern)?.[1];
-    if (!missingCol || !(missingCol in mutablePayload)) break;
-    delete mutablePayload[missingCol];
+    if (missingCol && missingCol in mutablePayload) { delete mutablePayload[missingCol]; continue; }
+    const intTypeMatch = msg.match(/invalid input syntax for type integer:\s*"?([0-9.]+)"?/i);
+    if (intTypeMatch) {
+      const badVal = intTypeMatch[1];
+      for (const k of Object.keys(mutablePayload)) {
+        if (String(mutablePayload[k]) === badVal) { mutablePayload[k] = Math.round(Number(badVal)); break; }
+      }
+      continue;
+    }
+    break;
   }
 
   if (lastError) throw lastError;
@@ -318,9 +326,9 @@ export async function updateInventoryRecord(
   if (record.reorder_point       !== undefined) updateFields.reorder_point       = Math.round(Number(record.reorder_point) || 10);
   if (record.reorderQty          !== undefined) updateFields.reorder_qty         = Math.round(Number(record.reorderQty) || 20);
   if (record.reorder_qty         !== undefined) updateFields.reorder_qty         = Math.round(Number(record.reorder_qty) || 20);
-  if (record.unitCost            !== undefined) updateFields.unit_cost           = toDbDecimal(record.unitCost, 0);
-  if (record.unit_cost           !== undefined) updateFields.unit_cost           = toDbDecimal(record.unit_cost, 0);
-  if (record.cost                !== undefined) updateFields.unit_cost           = toDbDecimal(record.cost, 0);
+  if (record.unitCost            !== undefined) updateFields.unit_cost           = Math.round(Number(record.unitCost) || 0);
+  if (record.unit_cost           !== undefined) updateFields.unit_cost           = Math.round(Number(record.unit_cost) || 0);
+  if (record.cost                !== undefined) updateFields.unit_cost           = Math.round(Number(record.cost) || 0);
   if (record.unitMeasurement    !== undefined) updateFields.unit_measurement   = record.unitMeasurement;
   if (record.unit_measurement !== undefined) updateFields.unit_measurement = record.unit_measurement;
   if (record.supplierId          !== undefined) updateFields.supplier_id         = record.supplierId;
@@ -333,7 +341,7 @@ export async function updateInventoryRecord(
   if (record.purchase_date       !== undefined) updateFields.purchase_date       = record.purchase_date || null;
   if (record.qtyStart            !== undefined) updateFields.qty_start           = Math.round(Number(record.qtyStart) || 0);
   if (record.qty_start           !== undefined) updateFields.qty_start           = Math.round(Number(record.qty_start) || 0);
-  if (record.price               !== undefined) updateFields.price               = toDbDecimal(record.price, 0);
+  if (record.price               !== undefined) updateFields.price               = Math.round(Number(record.price) || 0);
 
   // Try UPDATE first (existing record)
   const missingColumnPattern = /Could not find the '([^']+)' column of 'inventory_records'/i;
@@ -359,8 +367,16 @@ export async function updateInventoryRecord(
     updateError = res.error;
     const msg = String(res.error.message || '');
     const missingCol = msg.match(missingColumnPattern)?.[1] || msg.match(postgresMissingColumnPattern)?.[1];
-    if (!missingCol || !(missingCol in mutableUpdateFields)) break;
-    delete mutableUpdateFields[missingCol];
+    if (missingCol && missingCol in mutableUpdateFields) { delete mutableUpdateFields[missingCol]; continue; }
+    const intTypeMatch = msg.match(/invalid input syntax for type integer:\s*"?([0-9.]+)"?/i);
+    if (intTypeMatch) {
+      const badVal = intTypeMatch[1];
+      for (const k of Object.keys(mutableUpdateFields)) {
+        if (String(mutableUpdateFields[k]) === badVal) { mutableUpdateFields[k] = Math.round(Number(badVal)); break; }
+      }
+      continue;
+    }
+    break;
   }
 
   if (updateError) {
@@ -439,8 +455,16 @@ export async function updateInventoryRecord(
     error = res.error;
     const msg = String(res.error.message || '');
     const missingCol = msg.match(missingColumnPattern)?.[1] || msg.match(postgresMissingColumnPattern)?.[1];
-    if (!missingCol || !(missingCol in mutableInsertPayload)) break;
-    delete mutableInsertPayload[missingCol];
+    if (missingCol && missingCol in mutableInsertPayload) { delete mutableInsertPayload[missingCol]; continue; }
+    const intTypeMatch = msg.match(/invalid input syntax for type integer:\s*"?([0-9.]+)"?/i);
+    if (intTypeMatch) {
+      const badVal = intTypeMatch[1];
+      for (const k of Object.keys(mutableInsertPayload)) {
+        if (String(mutableInsertPayload[k]) === badVal) { mutableInsertPayload[k] = Math.round(Number(badVal)); break; }
+      }
+      continue;
+    }
+    break;
   }
 
   if (error) {

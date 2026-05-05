@@ -472,6 +472,9 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
     if (editValues.qtyStart !== undefined && editValues.qtyStart !== (current as any).qtyStart) {
       updatePayload.qtyStart = editValues.qtyStart;
     }
+    if (isMinimartScope && editValues.price !== undefined && editValues.price !== (current as any).price) {
+      updatePayload.price = editValues.price;
+    }
     if (isMinimartScope && editValues.description !== undefined && editValues.description !== (current as any).description) {
       updatePayload.description = editValues.description;
     }
