@@ -891,32 +891,21 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
       const rows = await importInventoryFromFile(file);
       if (rows.length === 0) throw new Error('No valid rows found in file');
       let updated = 0;
-      const isMinimartContext = window.location.pathname.toLowerCase().includes('minimart');
       for (const row of rows) {
-        const basePayload = {
+        await apiUpdateInventoryRecord(row.menuItemId, {
           stock:             row.stock,
           lowStockThreshold: row.lowStockThreshold,
           reorderPoint:      row.reorderPoint,
           reorderQty:        row.reorderQty,
           unitCost:          row.unitCost,
           cost:              row.unitCost,
+          price:             row.price,
           location:          row.location,
           unitMeasurement:   row.unitMeasurement,
-        };
-
-        const extendedPayload = isMinimartContext
-          ? {}
-          : {
-              price:       row.price,
-              description: row.description,
-              expiryDate:  row.expiryDate,
-              purchaseDate: row.purchaseDate,
-              qtyStart:    row.qtyStart,
-            };
-
-        await apiUpdateInventoryRecord(row.menuItemId, {
-          ...basePayload,
-          ...extendedPayload,
+          description:       row.description,
+          expiryDate:        row.expiryDate,
+          purchaseDate:      row.purchaseDate,
+          qtyStart:          row.qtyStart,
         });
         updated++;
       }

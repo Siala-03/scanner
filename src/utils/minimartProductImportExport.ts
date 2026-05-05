@@ -73,10 +73,58 @@ function parseBool(v: unknown): boolean {
   return s === 'true' || s === '1' || s === 'yes';
 }
 
+function normalizeKey(key: unknown): string {
+  return String(key ?? '')
+    .replace(/^\ufeff/, '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '');
+}
+
+function parseCsvLine(line: string): string[] {
+  const values: string[] = [];
+  let current = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    const next = line[i + 1];
+
+    if (ch === '"') {
+      if (inQuotes && next === '"') {
+        current += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+      continue;
+    }
+
+    if (ch === ',' && !inQuotes) {
+      values.push(current.trim());
+      current = '';
+      continue;
+    }
+
+    current += ch;
+  }
+
+  values.push(current.trim());
+  return values;
+}
+
+function getField(raw: Record<string, unknown>, ...keys: string[]): unknown {
+  for (const key of keys) {
+    const normalized = normalizeKey(key);
+    if (normalized in raw) return raw[normalized];
+  }
+  return undefined;
+}
+
 function normalizeRow(raw: Record<string, unknown>): ProductImportRow | null {
-  const name = String(raw['name'] ?? raw['product_name'] ?? raw['Product Name'] ?? '').trim();
-  const category = String(raw['category'] ?? raw['Category'] ?? '').trim();
-  const priceRaw = raw['price'] ?? raw['Price'];
+  const name = String(getField(raw, 'name', 'product_name', 'product name', 'item_name', 'item name', 'product') ?? '').trim();
+  const category = String(getField(raw, 'category', 'product_category', 'product category', 'group') ?? 'General').trim() || 'General';
+  const priceRaw = getField(raw, 'price', 'selling_price', 'selling price', 'unit_price', 'unit price', 'amount');
   const price = parseFloat(String(priceRaw ?? '0'));
 
   if (!name || !category || isNaN(price) || price < 0) return null;
@@ -85,9 +133,9 @@ function normalizeRow(raw: Record<string, unknown>): ProductImportRow | null {
     name,
     category,
     price,
-    emoji: String(raw['emoji'] ?? raw['Emoji'] ?? '📦').trim() || '📦',
-    description: String(raw['description'] ?? raw['Description'] ?? '').trim(),
-    isAvailable: parseBool(raw['available'] ?? raw['Available'] ?? raw['is_available'] ?? true),
+    emoji: String(getField(raw, 'emoji') ?? '📦').trim() || '📦',
+    description: String(getField(raw, 'description', 'desc', 'details') ?? '').trim(),
+    isAvailable: parseBool(getField(raw, 'available', 'is_available', 'active', 'enabled') ?? true),
   };
 }
 
@@ -95,13 +143,13 @@ export async function importProductsFromFile(file: File): Promise<ProductImportR
   const name = file.name.toLowerCase();
 
   if (name.endsWith('.csv')) {
-    const text = await file.text();
-    const lines = text.split('\n').filter((l) => l.trim());
+    const text = (await file.text()).replace(/^\ufeff/, '');
+    const lines = text.split(/\r?\n/).filter((l) => l.trim());
     if (lines.length < 2) throw new Error('CSV is empty or has no data rows.');
-    const headers = lines[0].split(',').map((h) => h.trim().replace(/^"|"$/g, '').toLowerCase());
+    const headers = parseCsvLine(lines[0]).map((h) => normalizeKey(h));
     const rows: ProductImportRow[] = [];
     for (let i = 1; i < lines.length; i++) {
-      const values = lines[i].split(',').map((v) => v.trim().replace(/^"|"$/g, ''));
+      const values = parseCsvLine(lines[i]);
       const raw: Record<string, string> = {};
       headers.forEach((h, j) => { raw[h] = values[j] ?? ''; });
       const row = normalizeRow(raw);
@@ -116,7 +164,10 @@ export async function importProductsFromFile(file: File): Promise<ProductImportR
     const wb = XLSX.read(buffer, { type: 'array' });
     const ws = wb.Sheets[wb.SheetNames[0]];
     const raw: Record<string, unknown>[] = XLSX.utils.sheet_to_json(ws);
-    const rows = raw.map(normalizeRow).filter((r): r is ProductImportRow => r !== null);
+    const rows = raw
+      .map((entry) => Object.fromEntries(Object.entries(entry).map(([key, value]) => [normalizeKey(key), value])))
+      .map(normalizeRow)
+      .filter((r): r is ProductImportRow => r !== null);
     if (rows.length === 0) throw new Error('No valid product rows found in spreadsheet.');
     return rows;
   }

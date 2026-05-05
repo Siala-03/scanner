@@ -136,11 +136,13 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
         from.setDate(from.getDate() - 30);
       }
 
-      const baseSelect = 'id, order_number, total, items, created_at, payment_confirmed_by_name, payment_confirmed_by, payment_status';
       const candidateSelects = [
-        `${baseSelect}, payment_type`,
-        `${baseSelect}, payment_method`,
-        `${baseSelect}`,
+        'id, order_number, total, items, created_at, payment_confirmed_by_name, payment_confirmed_by, payment_status, payment_type',
+        'id, order_number, total, items, created_at, payment_confirmed_by_name, payment_confirmed_by, payment_status, payment_method',
+        'id, order_number, total, items, created_at, payment_confirmed_by, payment_status, payment_method',
+        'id, order_number, total, items, created_at, payment_confirmed_by, payment_status',
+        'id, order_number, total, items, created_at, payment_status',
+        'id, order_number, total, items, created_at',
       ];
 
       let data: any[] | null = null;
@@ -161,7 +163,7 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
         error = res.error;
 
         const msg = String(res.error.message || '').toLowerCase();
-        if (!(msg.includes('column') && (msg.includes('payment_type') || msg.includes('payment_method')))) {
+        if (!msg.includes('column') && !msg.includes('does not exist')) {
           break;
         }
       }

@@ -139,8 +139,11 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
     try {
       const todayStart = new Date();
       todayStart.setHours(0, 0, 0, 0);
-      const baseSelect = 'id, order_number, total, items, created_at';
-      const candidateSelects = [`${baseSelect}, payment_type`, `${baseSelect}, payment_method`, baseSelect];
+      const candidateSelects = [
+        'id, order_number, total, items, created_at, payment_type',
+        'id, order_number, total, items, created_at, payment_method',
+        'id, order_number, total, items, created_at',
+      ];
       let data: any[] = [];
 
       for (const selectCols of candidateSelects) {
@@ -159,7 +162,7 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
         }
 
         const msg = String(res.error.message || '').toLowerCase();
-        if (!(msg.includes('column') && (msg.includes('payment_type') || msg.includes('payment_method')))) {
+        if (!msg.includes('column') && !msg.includes('does not exist')) {
           data = [];
           break;
         }

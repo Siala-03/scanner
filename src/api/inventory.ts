@@ -228,6 +228,7 @@ export async function createInventoryRecord(record: Partial<InventoryRecord>): P
   const insertPayload: Record<string, any> = {
     id,
     menu_item_id:        record.menuItemId,
+    description:         record.description          ?? '',
     stock:               record.stock               ?? 0,
     low_stock_threshold: record.lowStockThreshold   ?? 5,
     reorder_point:       record.reorderPoint        ?? 10,
@@ -311,6 +312,7 @@ export async function updateInventoryRecord(
   if (record.unit_measurement !== undefined) updateFields.unit_measurement = record.unit_measurement;
   if (record.supplierId          !== undefined) updateFields.supplier_id         = record.supplierId;
   if (record.supplier_id         !== undefined) updateFields.supplier_id         = record.supplier_id;
+  if (record.description         !== undefined) updateFields.description         = record.description;
   if (record.location            !== undefined) updateFields.location            = record.location;
   if (record.expiryDate          !== undefined) updateFields.expiry_date         = record.expiryDate   || null;
   if (record.expiry_date         !== undefined) updateFields.expiry_date         = record.expiry_date  || null;
@@ -382,6 +384,7 @@ export async function updateInventoryRecord(
     id,
     menu_item_id:        menuItemId,
     restaurant_id:       restaurantId,
+    description:         record.description          ?? '',
     stock:               record.stock               ?? 0,
     low_stock_threshold: record.lowStockThreshold   ?? record.low_stock_threshold ?? 5,
     reorder_point:       record.reorderPoint        ?? record.reorder_point       ?? 10,
