@@ -180,8 +180,8 @@ function parseCsvRows(content: string): InventoryImportRow[] {
       lowStockThreshold: Math.round(parseFloat(row.lowstockthreshold ?? row.threshold ?? '5') || 5),
       reorderPoint: Math.round(parseFloat(row.reorderpoint ?? '10') || 10),
       reorderQty: Math.round(parseFloat(row.reorderqty ?? '20') || 20),
-      unitCost: Math.round(parseFloat(row.cost ?? row.unitcost ?? '0') || 0),
-      price: Math.round(parseFloat(row.price ?? '0') || 0),
+      unitCost: Math.round((parseFloat(row.cost ?? row.unitcost ?? '0') || 0) * 100) / 100,
+      price: Math.round((parseFloat(row.price ?? '0') || 0) * 100) / 100,
       location: row.location ?? '',
       unitMeasurement: row.unitmeasurement ?? row.unit ?? 'units',
     });
@@ -216,8 +216,8 @@ function parseExcelRows(buffer: ArrayBuffer): InventoryImportRow[] {
         lowStockThreshold: Math.round(Number(row.lowstockthreshold ?? row.threshold ?? 5)),
         reorderPoint: Math.round(Number(row.reorderpoint ?? 10)),
         reorderQty: Math.round(Number(row.reorderqty ?? 20)),
-        unitCost: Math.round(Number(row.cost ?? row.unitcost ?? 0)),
-        price: Math.round(Number(row.price ?? 0)),
+        unitCost: Math.round((Number(row.cost ?? row.unitcost ?? 0)) * 100) / 100,
+        price: Math.round((Number(row.price ?? 0)) * 100) / 100,
         location: String(row.location ?? ''),
         unitMeasurement: String(row.unitmeasurement ?? row.unit ?? 'units'),
       } as InventoryImportRow;
@@ -249,8 +249,8 @@ export async function importInventoryFromFile(file: File): Promise<InventoryImpo
       lowStockThreshold: Math.round(Number(r.low_stock_threshold ?? r.lowStockThreshold ?? 5)),
       reorderPoint: Math.round(Number(r.reorder_point ?? r.reorderPoint ?? 10)),
       reorderQty: Math.round(Number(r.reorder_qty ?? r.reorderQty ?? 20)),
-      unitCost: Math.round(Number(r.cost ?? r.unit_cost ?? r.unitCost ?? 0)),
-      price: Math.round(Number(r.price ?? r.selling_price ?? r.sellingPrice ?? 0)),
+      unitCost: Math.round((Number(r.cost ?? r.unit_cost ?? r.unitCost ?? 0)) * 100) / 100,
+      price: Math.round((Number(r.price ?? r.selling_price ?? r.sellingPrice ?? 0)) * 100) / 100,
       location: String(r.location ?? ''),
       unitMeasurement: String(r.unit_measurement ?? r.unitMeasurement ?? 'units'),
     }));
