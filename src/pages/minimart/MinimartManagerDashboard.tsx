@@ -328,6 +328,14 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
     );
   }, [transactions, txnSearch]);
 
+  const navItems = [
+    { key: 'dashboard' as Page, label: 'Dashboard', icon: TrendingUpIcon },
+    { key: 'transactions' as Page, label: 'Transactions', icon: ReceiptIcon },
+    { key: 'products' as Page, label: 'Products', icon: PackageIcon },
+    { key: 'inventory' as Page, label: 'Inventory', icon: ShoppingBagIcon },
+    { key: 'cashiers' as Page, label: 'Cashiers', icon: UsersIcon },
+  ];
+
   return (
     <div className="flex flex-col min-h-screen bg-slate-950 text-slate-100">
       {/* Header */}
@@ -338,7 +346,7 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
           <span className="text-xs font-bold text-emerald-400 uppercase tracking-widest">Minimart Portal</span>
           <span className="text-emerald-700 text-xs hidden sm:inline">&mdash; {restaurantName}</span>
         </div>
-        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
+        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
           <div>
             <p className="font-semibold text-slate-100 truncate">{restaurantName}</p>
             <p className="text-xs text-slate-400">{manager.name} &middot; <span className="capitalize">{manager.role}</span></p>
@@ -355,23 +363,34 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
             </button>
           </div>
         </div>
-
-        <div className="max-w-5xl mx-auto px-4 pb-3 flex gap-1 overflow-x-auto">
-          {(['dashboard', 'transactions', 'products', 'inventory', 'cashiers'] as Page[]).map((p) => (
-            <button
-              key={p}
-              onClick={() => setPage(p)}
-              className={`shrink-0 px-4 py-1.5 rounded-full text-sm font-medium capitalize transition-colors ${
-                page === p ? 'bg-emerald-600 text-white font-semibold' : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              {p}
-            </button>
-          ))}
-        </div>
       </header>
 
-      <main className="flex-1 max-w-5xl mx-auto w-full px-4 py-6">
+      <main className="flex-1 max-w-7xl mx-auto w-full px-4 py-6">
+        <div className="flex flex-col lg:flex-row gap-4 lg:gap-6">
+          <aside className="lg:w-56 lg:shrink-0">
+            <nav className="bg-slate-900 border border-slate-800 rounded-2xl p-2 lg:sticky lg:top-24">
+              {navItems.map((item) => {
+                const Icon = item.icon;
+                const active = page === item.key;
+                return (
+                  <button
+                    key={item.key}
+                    onClick={() => setPage(item.key)}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors mb-1 last:mb-0 ${
+                      active
+                        ? 'bg-emerald-600 text-white'
+                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                    }`}
+                  >
+                    <Icon className="w-4 h-4 shrink-0" />
+                    <span>{item.label}</span>
+                  </button>
+                );
+              })}
+            </nav>
+          </aside>
+
+          <section className="min-w-0 flex-1">
 
         {/* ── Dashboard ── */}
         {page === 'dashboard' && (
@@ -842,6 +861,8 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
             )}
           </div>
         )}
+          </section>
+        </div>
       </main>
     </div>
   );

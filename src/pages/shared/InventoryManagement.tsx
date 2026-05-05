@@ -295,6 +295,8 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
   const [statusFilter, setStatusFilter] = useState<'all' | 'ok' | 'low' | 'out'>('all');
   const [editingRow, setEditingRow] = useState<string | null>(null);
   const [editValues, setEditValues] = useState<Partial<InventoryRecord>>({});
+  const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
+  const [isBatchDeleting, setIsBatchDeleting] = useState(false);
 
   // Audit trail panel
   const [auditItem, setAuditItem] = useState<{ id: string; name: string } | null>(null);
@@ -523,6 +525,26 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
       console.error('Failed to delete inventory record', err);
       alert(`Failed to delete inventory item: ${getErrorMessage(err)}`);
     }
+  };
+
+  const handleBatchDelete = async () => {
+    if (selectedRows.size === 0) return;
+    if (!window.confirm(`Delete ${selectedRows.size} selected item(s)? This cannot be undone.`)) return;
+    setIsBatchDeleting(true);
+    const ids = Array.from(selectedRows);
+    let failed = 0;
+    for (const id of ids) {
+      try {
+        await apiDeleteInventoryRecord(id);
+        removeInventoryRecord(id);
+      } catch {
+        failed++;
+      }
+    }
+    setSelectedRows(new Set());
+    setIsBatchDeleting(false);
+    await refresh();
+    if (failed > 0) alert(`${ids.length - failed} deleted, ${failed} failed.`);
   };
 
   const closeAddToMenuModal = () => {
@@ -1199,12 +1221,50 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
               </div>
             </div>
 
+            {/* Batch delete toolbar */}
+            {isMinimartScope && isManager && selectedRows.size > 0 && (
+              <div className="flex items-center gap-3 mb-3 px-4 py-2.5 rounded-lg bg-red-500/10 border border-red-500/30">
+                <span className="text-sm text-red-300 font-medium">{selectedRows.size} item{selectedRows.size !== 1 ? 's' : ''} selected</span>
+                <button
+                  onClick={handleBatchDelete}
+                  disabled={isBatchDeleting}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-red-500/20 border border-red-500/40 text-red-200 text-sm font-medium hover:bg-red-500/30 transition disabled:opacity-50"
+                >
+                  <TrashIcon className="w-3.5 h-3.5" />
+                  {isBatchDeleting ? 'Deleting…' : 'Delete Selected'}
+                </button>
+                <button
+                  onClick={() => setSelectedRows(new Set())}
+                  className="text-xs text-slate-400 hover:text-white transition"
+                >
+                  Clear selection
+                </button>
+              </div>
+            )}
+
             {/* Table */}
             <Card className="bg-slate-800/50 border border-slate-700/50" padding="none">
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[1900px]">
                   <thead className="bg-slate-700/40 border-b border-slate-700/50">
                     <tr>
+                      {isMinimartScope && isManager && (
+                        <th className="px-3 py-3 w-10">
+                          <input
+                            type="checkbox"
+                            checked={inventoryRows.length > 0 && inventoryRows.every((r) => selectedRows.has(r.item.id))}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedRows(new Set(inventoryRows.map((r) => r.item.id)));
+                              } else {
+                                setSelectedRows(new Set());
+                              }
+                            }}
+                            className="w-4 h-4 rounded border-slate-600 bg-slate-800 accent-red-500 cursor-pointer"
+                            title="Select all"
+                          />
+                        </th>
+                      )}
                       <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Item ID</th>
                       {isMinimartScope && <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Description</th>}
                       <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Expiry Date</th>
@@ -1235,6 +1295,23 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                           key={row.item.id}
                           className={`transition-colors ${row.isOut ? 'bg-red-500/5' : row.isLow ? 'bg-amber-500/5' : 'hover:bg-slate-700/20'}`}
                         >
+                          {isMinimartScope && isManager && (
+                            <td className="px-3 py-3 w-10">
+                              <input
+                                type="checkbox"
+                                checked={selectedRows.has(row.item.id)}
+                                onChange={(e) => {
+                                  setSelectedRows((prev) => {
+                                    const next = new Set(prev);
+                                    if (e.target.checked) next.add(row.item.id);
+                                    else next.delete(row.item.id);
+                                    return next;
+                                  });
+                                }}
+                                className="w-4 h-4 rounded border-slate-600 bg-slate-800 accent-red-500 cursor-pointer"
+                              />
+                            </td>
+                          )}
                           <td className="px-4 py-3">
                             <button
                               onClick={() => setSelectedItemDetails(row)}

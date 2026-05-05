@@ -340,60 +340,73 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
     }
   };
 
+  const cashierInitials = (cashier?.name ?? 'C').split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
+
   // ── History Modal ──────────────────────────────────────────────────────────
   if (showHistory) {
     return (
       <div className="fixed inset-0 bg-slate-950 flex flex-col z-50">
-        <div className="flex items-center gap-3 px-4 py-3 bg-slate-900 border-b border-slate-800 shrink-0">
-          <button onClick={() => setShowHistory(false)} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800">
-            <XIcon className="w-5 h-5" />
+        <div className="flex items-center gap-3 px-4 py-4 bg-slate-900 border-b border-slate-800/80 shrink-0">
+          <button
+            onClick={() => setShowHistory(false)}
+            className="p-2 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
+          >
+            <XIcon className="w-4 h-4" />
           </button>
-          <div className="flex-1">
-            <p className="font-semibold text-slate-100 text-sm">Today's Sales</p>
-            <p className="text-xs text-slate-400">{shiftTxns.length} transactions · {formatPrice(shiftSales.total)}</p>
+          <div className="flex-1 min-w-0">
+            <p className="font-bold text-white text-sm">Today's Sales</p>
+            <p className="text-xs text-slate-400 mt-0.5">{shiftTxns.length} transaction{shiftTxns.length !== 1 ? 's' : ''} · {formatPrice(shiftSales.total)}</p>
           </div>
           <button
             onClick={loadShiftTxns}
-            className="p-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-slate-200"
+            className="p-2 rounded-xl bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors"
           >
             <RefreshCwIcon className={`w-4 h-4 ${txnsLoading ? 'animate-spin' : ''}`} />
           </button>
         </div>
         <div className="flex-1 overflow-y-auto p-4 space-y-2">
           {txnsLoading ? (
-            <div className="flex items-center justify-center h-32 text-slate-400">
+            <div className="flex items-center justify-center h-40 text-slate-400">
               <RefreshCwIcon className="w-5 h-5 animate-spin mr-2" /> Loading…
             </div>
           ) : shiftTxns.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-40 text-slate-500">
-              <HistoryIcon className="w-8 h-8 mb-2 opacity-30" />
-              <p className="text-sm">No sales yet today</p>
+            <div className="flex flex-col items-center justify-center h-48 text-slate-500">
+              <div className="w-14 h-14 rounded-2xl bg-slate-800/80 flex items-center justify-center mb-3">
+                <HistoryIcon className="w-7 h-7 opacity-40" />
+              </div>
+              <p className="text-sm font-medium">No sales yet today</p>
+              <p className="text-xs text-slate-600 mt-1">Completed sales will appear here</p>
             </div>
           ) : (
             shiftTxns.map((t) => (
-              <div key={t.id} className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+              <div key={t.id} className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
                 <button
                   onClick={() => setExpandedTxn(expandedTxn === t.id ? null : t.id)}
-                  className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-slate-800/60 transition-colors"
+                  className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-slate-800/50 transition-colors"
                 >
+                  <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0">
+                    <CheckCircleIcon className="w-4 h-4 text-emerald-400" />
+                  </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <p className="text-sm font-semibold text-slate-100">#{t.orderNumber}</p>
-                      <span className="text-[10px] bg-amber-900/40 text-amber-300 px-2 py-0.5 rounded-full">{t.paymentLabel}</span>
+                      <p className="text-sm font-semibold text-white">#{t.orderNumber}</p>
+                      <span className="text-[10px] bg-slate-800 text-slate-400 border border-slate-700 px-2 py-0.5 rounded-full">{t.paymentLabel}</span>
                     </div>
                     <p className="text-xs text-slate-500 mt-0.5">
                       {t.itemCount} item{t.itemCount !== 1 ? 's' : ''} · {t.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </p>
                   </div>
                   <p className="text-sm font-bold text-emerald-400 shrink-0">{formatPrice(t.total)}</p>
-                  {expandedTxn === t.id ? <ChevronUpIcon className="w-4 h-4 text-slate-400 shrink-0" /> : <ChevronDownIcon className="w-4 h-4 text-slate-400 shrink-0" />}
+                  {expandedTxn === t.id
+                    ? <ChevronUpIcon className="w-4 h-4 text-slate-500 shrink-0" />
+                    : <ChevronDownIcon className="w-4 h-4 text-slate-500 shrink-0" />}
                 </button>
                 {expandedTxn === t.id && (
-                  <div className="border-t border-slate-800 px-4 py-3 space-y-1.5 bg-slate-800/30">
+                  <div className="border-t border-slate-800 px-4 py-3 space-y-1.5 bg-slate-800/20">
                     {t.items.map((item, idx) => (
                       <div key={idx} className="flex justify-between text-xs">
-                        <span className="text-slate-300">{item.name} ×{item.qty}</span>
-                        <span className="text-slate-400">{formatPrice(item.price)}</span>
+                        <span className="text-slate-300">{item.name} <span className="text-slate-500">×{item.qty}</span></span>
+                        <span className="text-slate-400 font-medium">{formatPrice(item.price)}</span>
                       </div>
                     ))}
                   </div>
@@ -409,70 +422,66 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
   // ── Receipt Modal ──────────────────────────────────────────────────────────
   if (receipt) {
     return (
-      <div className="fixed inset-0 bg-slate-950 flex items-center justify-center p-4 z-50">
-        <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-sm p-6 space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-emerald-400">
-              <CheckCircleIcon className="w-5 h-5" />
-              <span className="font-semibold">Sale Complete</span>
+      <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+        <div className="bg-slate-900 border border-slate-700/60 rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden">
+          {/* Success header */}
+          <div className="bg-gradient-to-br from-emerald-500/20 to-emerald-600/5 border-b border-emerald-500/20 px-6 py-5 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center">
+              <CheckCircleIcon className="w-5 h-5 text-emerald-400" />
             </div>
-            <button
-              onClick={() => setReceipt(null)}
-              className="text-slate-400 hover:text-slate-200"
-            >
-              <XIcon className="w-5 h-5" />
+            <div className="flex-1">
+              <p className="font-bold text-white text-sm">Sale Complete</p>
+              <p className="text-xs text-emerald-400 mt-0.5">{formatPrice(receipt.total)} received</p>
+            </div>
+            <button onClick={() => setReceipt(null)} className="text-slate-500 hover:text-slate-300 transition-colors">
+              <XIcon className="w-4 h-4" />
             </button>
           </div>
 
           {/* Receipt body */}
-          <div className="bg-slate-800 rounded-xl p-4 space-y-3 text-sm font-mono">
-            <div className="text-center">
-              <p className="font-bold text-slate-100">{restaurantName}</p>
-              <p className="text-slate-400 text-xs">#{receipt.orderNumber}</p>
-              <p className="text-slate-400 text-xs">
-                {receipt.timestamp.toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
-              </p>
-            </div>
-            <div className="border-t border-dashed border-slate-600 pt-2 space-y-1">
-              {receipt.lines.map((l) => (
-                <div key={l.item.id} className="flex justify-between text-slate-300">
-                  <span className="truncate mr-2">{l.item.name} ×{l.qty}</span>
-                  <span className="shrink-0">{formatPrice(l.item.price * l.qty)}</span>
-                </div>
-              ))}
-            </div>
-            <div className="border-t border-dashed border-slate-600 pt-2 flex justify-between font-bold text-slate-100">
-              <span>TOTAL</span>
-              <span>{formatPrice(receipt.total)}</span>
-            </div>
-            <div className="text-slate-400 text-xs flex justify-between">
-              <span>Payment</span>
-              <span>{receipt.payments.map(p => p.method).join(' + ')}</span>
-            </div>
-            {receipt.change > 0 && (
-              <div className="text-slate-400 text-xs flex justify-between">
-                <span>Change</span>
-                <span className="text-amber-300">{formatPrice(receipt.change)}</span>
+          <div className="p-5 space-y-4">
+            <div className="bg-slate-800/60 rounded-2xl p-4 space-y-3">
+              <div className="text-center border-b border-dashed border-slate-700 pb-3">
+                <p className="font-bold text-slate-100 text-sm">{restaurantName}</p>
+                <p className="text-slate-500 text-xs mt-0.5">
+                  #{receipt.orderNumber} · {receipt.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </p>
               </div>
-            )}
-            {receipt.lines[0] && (
-              <div className="text-slate-500 text-xs text-center">Cashier: {receipt.cashierName}</div>
-            )}
-          </div>
+              <div className="space-y-1.5 max-h-36 overflow-y-auto">
+                {receipt.lines.map((l) => (
+                  <div key={l.item.id} className="flex justify-between text-xs text-slate-300">
+                    <span className="truncate mr-2">{l.item.name} <span className="text-slate-500">×{l.qty}</span></span>
+                    <span className="shrink-0 font-medium">{formatPrice(l.item.price * l.qty)}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="border-t border-slate-700 pt-2.5 flex justify-between items-center">
+                <span className="text-xs text-slate-400">TOTAL</span>
+                <span className="text-base font-bold text-white">{formatPrice(receipt.total)}</span>
+              </div>
+              <div className="flex justify-between text-xs text-slate-500">
+                <span>{receipt.payments.map((p) => p.method).join(' + ')}</span>
+                {receipt.change > 0 && (
+                  <span className="text-amber-400 font-medium">Change: {formatPrice(receipt.change)}</span>
+                )}
+              </div>
+              <p className="text-xs text-slate-600 text-center">Cashier: {receipt.cashierName}</p>
+            </div>
 
-          <div className="flex gap-2">
-            <button
-              onClick={handlePrint}
-              className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm transition-colors"
-            >
-              <PrinterIcon className="w-4 h-4" /> Print
-            </button>
-            <button
-              onClick={() => setReceipt(null)}
-              className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium transition-colors"
-            >
-              New Sale
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={handlePrint}
+                className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-medium transition-colors border border-slate-700"
+              >
+                <PrinterIcon className="w-4 h-4" /> Print
+              </button>
+              <button
+                onClick={() => setReceipt(null)}
+                className="flex-1 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition-colors"
+              >
+                New Sale
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -483,51 +492,82 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
     <>
     <div className="flex flex-col h-screen bg-slate-950 overflow-hidden">
       {/* ── Top bar ── */}
-      <header className="flex flex-col bg-slate-900 border-b border-slate-800 shrink-0">
-        <div className="flex items-center gap-3 px-4 py-3">
-          <div className="flex-1 min-w-0">
-            <p className="text-xs text-slate-400 uppercase tracking-wide">Minimart POS</p>
-            <p className="font-semibold text-slate-100 truncate">{restaurantName}</p>
+      <header className="shrink-0 bg-slate-900 border-b border-slate-800/80">
+        <div className="flex items-center gap-3 px-4 pt-3 pb-2">
+          {/* Brand */}
+          <div className="flex items-center gap-2.5 flex-1 min-w-0">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center shrink-0 shadow-lg shadow-amber-500/20">
+              <ShoppingCartIcon className="w-4 h-4 text-slate-900" />
+            </div>
+            <div className="min-w-0">
+              <p className="font-bold text-white text-sm truncate leading-tight">{restaurantName}</p>
+              <p className="text-[10px] text-slate-500 uppercase tracking-wider leading-tight">Cashier POS</p>
+            </div>
           </div>
-          <span className="text-xs text-slate-400 hidden sm:block">{cashier?.name}</span>
-          {/* History button */}
+
+          {/* Cashier badge (desktop) */}
+          <div className="hidden sm:flex items-center gap-2 bg-slate-800/60 border border-slate-700/50 rounded-xl px-3 py-1.5">
+            <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-[10px] font-bold text-white">
+              {cashierInitials}
+            </div>
+            <span className="text-xs text-slate-300 font-medium">{cashier?.name}</span>
+          </div>
+
+          {/* Action buttons */}
           <button
             onClick={() => { setShowHistory(true); loadShiftTxns(); }}
-            className="p-2 rounded-lg bg-slate-800 text-slate-400 hover:text-amber-400 transition-colors"
-            title="View today's sales"
+            className="p-2 rounded-xl bg-slate-800 text-slate-400 hover:text-amber-400 hover:bg-slate-700 transition-colors border border-slate-700/50"
+            title="Today's sales"
           >
             <HistoryIcon className="w-4 h-4" />
           </button>
-        {/* Cart toggle (mobile) */}
-        <button
-          onClick={() => setShowCart(true)}
-          className="relative sm:hidden p-2 rounded-lg bg-slate-800 text-slate-300"
-        >
-          <ShoppingCartIcon className="w-5 h-5" />
-          {cartCount > 0 && (
-            <span className="absolute -top-1 -right-1 bg-amber-500 text-slate-900 text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
-              {cartCount}
-            </span>
-          )}
-        </button>
-          <button onClick={onLogout} className="p-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors">
+
+          {/* Cart toggle (mobile) */}
+          <button
+            onClick={() => setShowCart(true)}
+            className="relative sm:hidden p-2 rounded-xl bg-slate-800 text-slate-300 border border-slate-700/50"
+          >
+            <ShoppingCartIcon className="w-4 h-4" />
+            {cartCount > 0 && (
+              <span className="absolute -top-1 -right-1 bg-amber-500 text-slate-900 text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
+                {cartCount}
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={onLogout}
+            className="p-2 rounded-xl text-slate-500 hover:text-slate-200 hover:bg-slate-800 transition-colors"
+            title="Logout"
+          >
             <LogOutIcon className="w-4 h-4" />
           </button>
         </div>
-        {/* Shift summary */}
-        <div className="flex items-center gap-4 px-4 py-2 bg-slate-800/60 border-t border-slate-800 text-xs text-slate-400">
-          <span>Shift:</span>
-          <span className="text-slate-200 font-medium">{shiftSales.count} sale{shiftSales.count !== 1 ? 's' : ''}</span>
-          <span className="text-emerald-400 font-semibold">{formatPrice(shiftSales.total)}</span>
-          {shiftSales.count > 0 && (
-            <span className="text-slate-500 hidden sm:inline">avg {formatPrice(Math.round(shiftSales.total / shiftSales.count))}</span>
-          )}
+
+        {/* Shift stats strip */}
+        <div className="flex items-center gap-1 px-4 py-2">
+          <div className="flex items-center gap-2.5 flex-1">
+            <div className="flex items-center gap-2 bg-slate-800/50 border border-slate-700/40 rounded-xl px-3 py-1.5">
+              <span className="text-[10px] text-slate-500 uppercase tracking-wide">Sales</span>
+              <span className="text-xs font-bold text-slate-200">{shiftSales.count}</span>
+            </div>
+            <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-3 py-1.5">
+              <span className="text-[10px] text-emerald-600 uppercase tracking-wide">Revenue</span>
+              <span className="text-xs font-bold text-emerald-400">{formatPrice(shiftSales.total)}</span>
+            </div>
+            {shiftSales.count > 0 && (
+              <div className="hidden sm:flex items-center gap-2 bg-slate-800/50 border border-slate-700/40 rounded-xl px-3 py-1.5">
+                <span className="text-[10px] text-slate-500 uppercase tracking-wide">Avg</span>
+                <span className="text-xs font-bold text-slate-300">{formatPrice(Math.round(shiftSales.total / shiftSales.count))}</span>
+              </div>
+            )}
+          </div>
           {holdCart && (
             <button
               onClick={recallHeldCart}
-              className="ml-auto flex items-center gap-1 text-amber-400 hover:text-amber-300 font-medium"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-400 text-xs font-semibold hover:bg-amber-500/25 transition-colors"
             >
-              <BookmarkCheckIcon className="w-3.5 h-3.5" /> Recall held order
+              <BookmarkCheckIcon className="w-3 h-3" /> Recall Hold
             </button>
           )}
         </div>
@@ -535,40 +575,41 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
 
       <div className="flex flex-1 min-h-0">
         {/* ── Product panel ── */}
-        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-slate-950">
           {/* Search + refresh */}
-          <div className="flex gap-2 px-4 py-3 border-b border-slate-800 shrink-0">
+          <div className="flex gap-2 px-4 py-3 shrink-0 bg-slate-900/50 border-b border-slate-800/60">
             <div className="relative flex-1">
-              <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
               <input
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search products…"
-                className="w-full pl-9 pr-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500"
+                className="w-full pl-9 pr-3 py-2.5 bg-slate-800 border border-slate-700/60 rounded-xl text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-amber-500/70 focus:ring-1 focus:ring-amber-500/20 transition-all"
               />
             </div>
             <button
               onClick={loadProducts}
-              className="p-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-400 hover:text-slate-200 transition-colors"
+              className="p-2.5 rounded-xl bg-slate-800 border border-slate-700/60 text-slate-500 hover:text-slate-200 hover:border-slate-600 transition-colors"
+              title="Refresh products"
             >
               <RefreshCwIcon className="w-4 h-4" />
             </button>
           </div>
 
           {/* Category tabs */}
-          <div className="flex gap-1.5 px-4 py-2.5 overflow-x-auto shrink-0 scrollbar-none border-b border-slate-800">
+          <div className="flex gap-1.5 px-4 py-2.5 overflow-x-auto shrink-0 scrollbar-none border-b border-slate-800/60">
             {categories.map((cat) => (
               <button
                 key={cat}
                 onClick={() => setActiveCategory(cat)}
-                className={`shrink-0 px-3 py-1 rounded-full text-xs font-medium capitalize transition-colors ${
+                className={`shrink-0 px-3.5 py-1.5 rounded-xl text-xs font-semibold capitalize transition-all ${
                   activeCategory === cat
-                    ? 'bg-amber-500 text-slate-900 font-semibold'
-                    : 'bg-slate-800 text-slate-400 hover:text-slate-200'
+                    ? 'bg-amber-500 text-slate-900 shadow-md shadow-amber-500/20'
+                    : 'bg-slate-800/80 text-slate-500 hover:text-slate-300 hover:bg-slate-800 border border-slate-700/50'
                 }`}
               >
-                {cat === 'all' ? 'All' : cat}
+                {cat === 'all' ? 'All Products' : cat}
               </button>
             ))}
           </div>
@@ -576,12 +617,17 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
           {/* Product grid */}
           <div className="flex-1 overflow-y-auto p-4">
             {loading ? (
-              <div className="flex items-center justify-center h-40 text-slate-400">
-                <RefreshCwIcon className="w-5 h-5 animate-spin mr-2" /> Loading…
+              <div className="flex flex-col items-center justify-center h-48 text-slate-400 gap-2">
+                <RefreshCwIcon className="w-6 h-6 animate-spin text-amber-500" />
+                <span className="text-sm">Loading products…</span>
               </div>
             ) : filtered.length === 0 ? (
-              <div className="flex items-center justify-center h-40 text-slate-500 text-sm">
-                No products found
+              <div className="flex flex-col items-center justify-center h-48 text-slate-500 gap-2">
+                <div className="w-14 h-14 rounded-2xl bg-slate-800/80 flex items-center justify-center">
+                  <SearchIcon className="w-6 h-6 opacity-40" />
+                </div>
+                <p className="text-sm font-medium">No products found</p>
+                <p className="text-xs text-slate-600">Try a different search or category</p>
               </div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
@@ -595,34 +641,44 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
                       key={product.id}
                       onClick={() => !outOfStock && addToCart(product)}
                       disabled={outOfStock}
-                      className={`flex flex-col items-start p-3 rounded-xl border text-left transition-all active:scale-95 ${
+                      className={`relative flex flex-col items-start p-3.5 rounded-2xl border text-left transition-all duration-150 active:scale-95 ${
                         outOfStock
-                          ? 'border-slate-700 bg-slate-800/30 opacity-50 cursor-not-allowed'
+                          ? 'border-slate-800 bg-slate-800/20 opacity-40 cursor-not-allowed'
                           : inCart
-                          ? 'border-amber-500 bg-amber-500/10'
-                          : 'border-slate-700 bg-slate-800/60 hover:border-slate-600 hover:bg-slate-800'
+                          ? 'border-amber-500/70 bg-amber-500/8 shadow-lg shadow-amber-500/10 ring-1 ring-amber-500/20'
+                          : 'border-slate-800 bg-slate-900/80 hover:border-slate-700 hover:bg-slate-800/80 hover:shadow-md'
                       }`}
                     >
-                      <div className="w-full flex items-start justify-between mb-1.5 gap-1">
-                        <span className="text-2xl">{product.emoji || '📦'}</span>
-                        {outOfStock ? (
-                          <span className="flex items-center gap-0.5 text-[9px] bg-red-900/50 text-red-400 px-1.5 py-0.5 rounded-full font-semibold shrink-0">
+                      {/* Stock badge */}
+                      {!outOfStock && (
+                        <div className="absolute top-2.5 right-2.5">
+                          {lowStock ? (
+                            <span className="flex items-center gap-0.5 text-[9px] bg-amber-900/60 text-amber-400 px-1.5 py-0.5 rounded-full font-bold border border-amber-500/20">
+                              <AlertTriangleIcon className="w-2.5 h-2.5" /> {stock}
+                            </span>
+                          ) : stock !== null ? (
+                            <span className="text-[9px] text-slate-600 font-medium">{stock}</span>
+                          ) : null}
+                        </div>
+                      )}
+                      {outOfStock && (
+                        <div className="absolute top-2.5 right-2.5">
+                          <span className="flex items-center gap-0.5 text-[9px] bg-red-900/60 text-red-400 px-1.5 py-0.5 rounded-full font-bold border border-red-500/20">
                             <PackageXIcon className="w-2.5 h-2.5" /> Out
                           </span>
-                        ) : lowStock ? (
-                          <span className="flex items-center gap-0.5 text-[9px] bg-amber-900/50 text-amber-400 px-1.5 py-0.5 rounded-full font-semibold shrink-0">
-                            <AlertTriangleIcon className="w-2.5 h-2.5" /> {stock}
-                          </span>
-                        ) : stock !== null ? (
-                          <span className="text-[9px] text-slate-500">{stock}</span>
-                        ) : null}
+                        </div>
+                      )}
+
+                      <div className="w-8 h-8 rounded-xl bg-slate-700/60 border border-slate-600/40 flex items-center justify-center mb-2 shrink-0 text-xs font-bold text-slate-400">
+                        {product.name.charAt(0).toUpperCase()}
                       </div>
-                      <p className="text-xs font-medium text-slate-200 line-clamp-2 leading-snug">{product.name}</p>
-                      <p className="text-xs text-amber-400 font-semibold mt-1">{formatPrice(product.price)}</p>
+                      <p className="text-xs font-semibold text-slate-200 line-clamp-2 leading-snug pr-6">{product.name}</p>
+                      <p className="text-sm font-bold text-amber-400 mt-1.5">{formatPrice(product.price)}</p>
+
                       {inCart && (
-                        <span className="mt-1.5 text-[10px] bg-amber-500 text-slate-900 px-1.5 py-0.5 rounded-full font-semibold">
-                          ×{inCart.qty} in cart
-                        </span>
+                        <div className="absolute bottom-2.5 right-2.5 w-5 h-5 rounded-full bg-amber-500 flex items-center justify-center">
+                          <span className="text-[9px] font-bold text-slate-900">{inCart.qty}</span>
+                        </div>
                       )}
                     </button>
                   );
@@ -632,84 +688,98 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
           </div>
         </div>
 
-        {/* ── Cart sidebar (desktop always visible, mobile as overlay) ── */}
+        {/* ── Cart sidebar ── */}
         <div
           className={`
             fixed inset-0 z-40 sm:static sm:z-auto sm:flex
             flex-col w-full sm:w-80 xl:w-96
-            bg-slate-900 border-l border-slate-800
+            bg-slate-900 border-l border-slate-800/80
             transition-transform duration-200
             ${showCart ? 'flex' : 'hidden sm:flex'}
           `}
         >
           {/* Cart header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800 shrink-0">
-            <div className="flex items-center gap-2">
-              <ShoppingCartIcon className="w-4 h-4 text-slate-400" />
-              <span className="font-semibold text-slate-100 text-sm">Cart</span>
-              {cartCount > 0 && (
-                <span className="bg-amber-500 text-slate-900 text-xs font-bold px-1.5 py-0.5 rounded-full">{cartCount}</span>
-              )}
+          <div className="flex items-center justify-between px-4 py-3.5 border-b border-slate-800/80 shrink-0">
+            <div className="flex items-center gap-2.5">
+              <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${cartCount > 0 ? 'bg-amber-500/20 border border-amber-500/30' : 'bg-slate-800 border border-slate-700'}`}>
+                <ShoppingCartIcon className={`w-4 h-4 ${cartCount > 0 ? 'text-amber-400' : 'text-slate-500'}`} />
+              </div>
+              <div>
+                <span className="font-bold text-white text-sm">Cart</span>
+                {cartCount > 0 && (
+                  <span className="ml-2 text-[10px] bg-amber-500 text-slate-900 font-bold px-1.5 py-0.5 rounded-full">{cartCount} item{cartCount !== 1 ? 's' : ''}</span>
+                )}
+              </div>
             </div>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1.5">
               {cart.length > 0 && (
                 <button
                   onClick={holdCurrentCart}
                   title="Hold this cart"
-                  className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-slate-400 hover:text-amber-400 hover:bg-slate-800 transition-colors"
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs text-slate-400 hover:text-amber-400 hover:bg-slate-800 transition-colors border border-transparent hover:border-slate-700"
                 >
                   <BookmarkIcon className="w-3.5 h-3.5" /> Hold
                 </button>
               )}
               <button
                 onClick={() => setShowCart(false)}
-                className="sm:hidden p-1 text-slate-400 hover:text-slate-200"
+                className="sm:hidden p-1.5 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
               >
-                <XIcon className="w-5 h-5" />
+                <XIcon className="w-4 h-4" />
               </button>
             </div>
           </div>
 
           {/* Cart lines */}
-          <div className="flex-1 overflow-y-auto px-4 py-2">
+          <div className="flex-1 overflow-y-auto px-3 py-2">
             {cart.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-32 text-slate-500 text-sm">
-                <ShoppingCartIcon className="w-8 h-8 mb-2 opacity-30" />
-                Cart is empty
+              <div className="flex flex-col items-center justify-center h-40 text-slate-500">
+                <div className="w-12 h-12 rounded-2xl bg-slate-800/60 flex items-center justify-center mb-3">
+                  <ShoppingCartIcon className="w-5 h-5 opacity-30" />
+                </div>
+                <p className="text-sm font-medium">Cart is empty</p>
+                <p className="text-xs text-slate-600 mt-1">Tap a product to add it</p>
               </div>
             ) : (
               <div className="space-y-2 py-2">
                 {cart.map((line) => (
-                  <div key={line.item.id} className="bg-slate-800 rounded-xl p-2.5 space-y-1.5">
-                    <div className="flex items-center gap-2">
-                      <span className="text-lg">{line.item.emoji || '📦'}</span>
+                  <div key={line.item.id} className="bg-slate-800/60 border border-slate-700/40 rounded-2xl p-3 space-y-2">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-7 h-7 rounded-lg bg-slate-700 border border-slate-600/40 flex items-center justify-center shrink-0 text-xs font-bold text-slate-400">
+                        {line.item.name.charAt(0).toUpperCase()}
+                      </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs font-medium text-slate-200 truncate">{line.item.name}</p>
-                        <p className="text-xs text-amber-400">{formatPrice(line.item.price * line.qty)}</p>
+                        <p className="text-xs font-semibold text-slate-200 truncate">{line.item.name}</p>
+                        <p className="text-xs text-amber-400 font-bold mt-0.5">{formatPrice(line.item.price * line.qty)}</p>
                       </div>
                       <div className="flex items-center gap-1">
                         <button
                           onClick={() => setQty(line.item.id, line.qty - 1)}
-                          className="w-6 h-6 rounded-full bg-slate-700 flex items-center justify-center text-slate-300 hover:bg-slate-600"
+                          className="w-7 h-7 rounded-xl bg-slate-700 border border-slate-600/50 flex items-center justify-center text-slate-300 hover:bg-slate-600 transition-colors"
                         >
                           <MinusIcon className="w-3 h-3" />
                         </button>
-                        <span className="w-5 text-center text-xs text-slate-200 font-medium">{line.qty}</span>
+                        <span className="w-6 text-center text-xs text-white font-bold">{line.qty}</span>
                         <button
                           onClick={() => setQty(line.item.id, line.qty + 1)}
-                          className="w-6 h-6 rounded-full bg-slate-700 flex items-center justify-center text-slate-300 hover:bg-slate-600"
+                          className="w-7 h-7 rounded-xl bg-slate-700 border border-slate-600/50 flex items-center justify-center text-slate-300 hover:bg-slate-600 transition-colors"
                         >
                           <PlusIcon className="w-3 h-3" />
                         </button>
                         <button
                           onClick={() => setQty(line.item.id, 0)}
-                          className="w-6 h-6 rounded-full bg-slate-700 flex items-center justify-center text-red-400 hover:bg-red-900/30 ml-0.5"
+                          className="w-7 h-7 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400 hover:bg-red-500/20 transition-colors ml-1"
+                          title="Remove"
                         >
                           <TrashIcon className="w-3 h-3" />
                         </button>
                         <button
                           onClick={() => setNote(line.item.id, line.note !== undefined ? undefined as any : '')}
-                          className={`w-6 h-6 rounded-full flex items-center justify-center transition-colors ${line.note !== undefined ? 'bg-amber-500/20 text-amber-400' : 'bg-slate-700 text-slate-400 hover:text-slate-200'}`}
+                          className={`w-7 h-7 rounded-xl border flex items-center justify-center transition-colors ${
+                            line.note !== undefined
+                              ? 'bg-amber-500/20 border-amber-500/30 text-amber-400'
+                              : 'bg-slate-700 border-slate-600/50 text-slate-500 hover:text-slate-300'
+                          }`}
                           title="Add note"
                         >
                           <MessageSquareIcon className="w-3 h-3" />
@@ -721,8 +791,8 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
                         type="text"
                         value={line.note}
                         onChange={(e) => setNote(line.item.id, e.target.value)}
-                        placeholder="Note (e.g. no ice)…"
-                        className="w-full px-2 py-1 bg-slate-700 border border-slate-600 rounded-lg text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500"
+                        placeholder="e.g. no ice, extra bag…"
+                        className="w-full px-2.5 py-1.5 bg-slate-700/60 border border-slate-600/50 rounded-xl text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-amber-500/50 transition-colors"
                         autoFocus
                       />
                     )}
@@ -733,27 +803,24 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
           </div>
 
           {/* Checkout section */}
-          <div className="border-t border-slate-800 p-4 space-y-3 shrink-0">
-            {/* Customer name (optional) */}
+          <div className="border-t border-slate-800/80 p-4 space-y-3 shrink-0 bg-slate-900/80">
             <input
               type="text"
               value={customerName}
               onChange={(e) => setCustomerName(e.target.value)}
               placeholder="Customer name (optional)"
-              className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500"
+              className="w-full px-3 py-2.5 bg-slate-800 border border-slate-700/60 rounded-xl text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-amber-500/70 focus:ring-1 focus:ring-amber-500/20 transition-all"
             />
 
-            {/* Total */}
-            <div className="flex justify-between items-center py-2 border-t border-slate-700">
-              <span className="text-sm text-slate-400">Total</span>
-              <span className="text-lg font-bold text-slate-100">{formatPrice(cartTotal)}</span>
+            <div className="flex justify-between items-center px-1">
+              <span className="text-xs text-slate-500 font-medium uppercase tracking-wide">Total</span>
+              <span className={`text-xl font-black ${cartCount > 0 ? 'text-white' : 'text-slate-600'}`}>{formatPrice(cartTotal)}</span>
             </div>
 
-            {/* Checkout button */}
             <button
               onClick={() => cart.length > 0 && setShowPaymentModal(true)}
               disabled={cart.length === 0 || checkingOut}
-              className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold text-sm transition-colors flex items-center justify-center gap-2"
+              className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 disabled:opacity-30 disabled:cursor-not-allowed disabled:from-slate-700 disabled:to-slate-700 text-white font-bold text-sm transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2"
             >
               {checkingOut ? (
                 <>
