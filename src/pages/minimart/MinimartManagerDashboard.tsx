@@ -136,12 +136,35 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
         from.setDate(from.getDate() - 30);
       }
 
-      const { data, error } = await supabase
-        .from('orders')
-        .select('id, order_number, total, payment_type, items, created_at, payment_confirmed_by_name, payment_confirmed_by, payment_status')
-        .eq('restaurant_id', restaurantId)
-        .gte('created_at', from.toISOString())
-        .order('created_at', { ascending: false });
+      const baseSelect = 'id, order_number, total, items, created_at, payment_confirmed_by_name, payment_confirmed_by, payment_status';
+      const candidateSelects = [
+        `${baseSelect}, payment_type`,
+        `${baseSelect}, payment_method`,
+        `${baseSelect}`,
+      ];
+
+      let data: any[] | null = null;
+      let error: any = null;
+      for (const selectCols of candidateSelects) {
+        const res = await supabase
+          .from('orders')
+          .select(selectCols)
+          .eq('restaurant_id', restaurantId)
+          .gte('created_at', from.toISOString())
+          .order('created_at', { ascending: false });
+
+        if (!res.error) {
+          data = res.data || [];
+          error = null;
+          break;
+        }
+        error = res.error;
+
+        const msg = String(res.error.message || '').toLowerCase();
+        if (!(msg.includes('column') && (msg.includes('payment_type') || msg.includes('payment_method')))) {
+          break;
+        }
+      }
 
       if (error) throw error;
 
@@ -152,7 +175,7 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
         orderNumber: o.order_number || o.id.slice(-6).toUpperCase(),
         cashierName: o.payment_confirmed_by_name || o.payment_confirmed_by || 'Cashier',
         total: o.total || 0,
-        paymentMethod: PAYMENT_LABEL[o.payment_type] || o.payment_type || 'Cash',
+        paymentMethod: PAYMENT_LABEL[o.payment_type || o.payment_method] || o.payment_type || o.payment_method || 'Cash',
         itemCount: Array.isArray(o.items)
           ? o.items.reduce((s: number, i: any) => s + (i.quantity || 1), 0)
           : 0,

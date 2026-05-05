@@ -243,6 +243,7 @@ export async function createInventoryRecord(record: Partial<InventoryRecord>): P
   };
 
   const missingColumnPattern = /Could not find the '([^']+)' column of 'inventory_records'/i;
+  const postgresMissingColumnPattern = /column\s+"?([a-zA-Z0-9_]+)"?\s+of\s+relation\s+"?inventory_records"?\s+does\s+not\s+exist/i;
   let data: any = null;
   let lastError: any = null;
   const mutablePayload = { ...insertPayload };
@@ -261,8 +262,8 @@ export async function createInventoryRecord(record: Partial<InventoryRecord>): P
     }
 
     lastError = res.error;
-    const match = String(res.error.message || '').match(missingColumnPattern);
-    const missingCol = match?.[1];
+    const msg = String(res.error.message || '');
+    const missingCol = msg.match(missingColumnPattern)?.[1] || msg.match(postgresMissingColumnPattern)?.[1];
     if (!missingCol || !(missingCol in mutablePayload)) break;
     delete mutablePayload[missingCol];
   }
@@ -321,6 +322,7 @@ export async function updateInventoryRecord(
 
   // Try UPDATE first (existing record)
   const missingColumnPattern = /Could not find the '([^']+)' column of 'inventory_records'/i;
+  const postgresMissingColumnPattern = /column\s+"?([a-zA-Z0-9_]+)"?\s+of\s+relation\s+"?inventory_records"?\s+does\s+not\s+exist/i;
   let updated: any[] | null = null;
   let updateError: any = null;
   const mutableUpdateFields: Record<string, any> = { ...updateFields };
@@ -340,8 +342,8 @@ export async function updateInventoryRecord(
     }
 
     updateError = res.error;
-    const match = String(res.error.message || '').match(missingColumnPattern);
-    const missingCol = match?.[1];
+    const msg = String(res.error.message || '');
+    const missingCol = msg.match(missingColumnPattern)?.[1] || msg.match(postgresMissingColumnPattern)?.[1];
     if (!missingCol || !(missingCol in mutableUpdateFields)) break;
     delete mutableUpdateFields[missingCol];
   }
@@ -412,8 +414,8 @@ export async function updateInventoryRecord(
     }
 
     error = res.error;
-    const match = String(res.error.message || '').match(missingColumnPattern);
-    const missingCol = match?.[1];
+    const msg = String(res.error.message || '');
+    const missingCol = msg.match(missingColumnPattern)?.[1] || msg.match(postgresMissingColumnPattern)?.[1];
     if (!missingCol || !(missingCol in mutableInsertPayload)) break;
     delete mutableInsertPayload[missingCol];
   }

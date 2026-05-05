@@ -139,20 +139,37 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
     try {
       const todayStart = new Date();
       todayStart.setHours(0, 0, 0, 0);
-      const { data } = await supabase
-        .from('orders')
-        .select('id, order_number, total, payment_type, items, created_at')
-        .eq('restaurant_id', restaurantId)
-        .eq('payment_status', 'confirmed')
-        .eq('payment_confirmed_by', cashier.id)
-        .gte('created_at', todayStart.toISOString())
-        .order('created_at', { ascending: false });
+      const baseSelect = 'id, order_number, total, items, created_at';
+      const candidateSelects = [`${baseSelect}, payment_type`, `${baseSelect}, payment_method`, baseSelect];
+      let data: any[] = [];
+
+      for (const selectCols of candidateSelects) {
+        const res = await supabase
+          .from('orders')
+          .select(selectCols)
+          .eq('restaurant_id', restaurantId)
+          .eq('payment_status', 'confirmed')
+          .eq('payment_confirmed_by', cashier.id)
+          .gte('created_at', todayStart.toISOString())
+          .order('created_at', { ascending: false });
+
+        if (!res.error) {
+          data = res.data || [];
+          break;
+        }
+
+        const msg = String(res.error.message || '').toLowerCase();
+        if (!(msg.includes('column') && (msg.includes('payment_type') || msg.includes('payment_method')))) {
+          data = [];
+          break;
+        }
+      }
       const PLABEL: Record<string, string> = { '01': 'Cash', '02': 'Card', '04': 'Mobile Money' };
       const rows: ShiftTxn[] = (data || []).map((o: any) => ({
         id: o.id,
         orderNumber: o.order_number || o.id.slice(-6).toUpperCase(),
         total: o.total || 0,
-        paymentLabel: PLABEL[o.payment_type] || o.payment_type || 'Cash',
+        paymentLabel: PLABEL[o.payment_type || o.payment_method] || o.payment_type || o.payment_method || 'Cash',
         itemCount: Array.isArray(o.items) ? o.items.reduce((s: number, i: any) => s + (i.quantity || 1), 0) : 0,
         items: Array.isArray(o.items)
           ? o.items.map((i: any) => ({
