@@ -20,6 +20,8 @@ import {
   UsersIcon,
   ClockIcon,
   MapPinIcon,
+  PencilIcon,
+  XIcon,
 } from 'lucide-react';
 import { formatPrice } from '../../utils/currency';
 import { Order, Staff, CartItem, OrderItem, Reservation } from '../../types';
@@ -34,6 +36,7 @@ import { supabase } from '../../lib/supabase';
 import { markTableSessionPendingCloseFromReceipt } from '../../utils/tableSessions';
 import { ThemeToggle } from '../../components/ui/ThemeToggle';
 import { OnlineOrdersForWaiter } from '../../components/waiter/OnlineOrdersSection';
+import { useTables } from '../../hooks/useTables';
 
 // ─── Kitchen detection ────────────────────────────────────────────────────────
 // Blacklist: these categories are bar/beverage only — everything else goes to kitchen.
@@ -635,6 +638,7 @@ export function WaiterDashboard({
   const [activeTab, setActiveTab] = useState<'incoming' | 'kitchen' | 'ready' | 'served' | 'online'>('incoming');
   const [showQRScanner, setShowQRScanner] = useState(false);
   const [showOrderEntry, setShowOrderEntry] = useState(false);
+  const [showTablePicker, setShowTablePicker] = useState(false);
   const [selectedTableNumber, setSelectedTableNumber] = useState<number | null>(null);
   const [socketCalls, setSocketCalls] = useState<{ tableNumber: number; timestamp: Date }[]>([]);
   const [showShareModal, setShowShareModal] = useState(false);
@@ -645,6 +649,22 @@ export function WaiterDashboard({
   const knownOrderIdsRef = useRef<Set<string>>(new Set());
 
   const { kpis } = useStaffKPIs();
+  const { tables: allTables } = useTables();
+
+  // Compute which tables have active orders from the live orders prop
+  const tableOccupancy = useMemo(() => {
+    const map: Record<number, 'occupied' | 'urgent'> = {};
+    const now = Date.now();
+    orders.forEach((o) => {
+      if (!['pending', 'verified', 'preparing', 'ready'].includes(o.status)) return;
+      const tNum = o.tableNumber ?? (o as any).table_number;
+      if (tNum == null || tNum === 999) return;
+      const age = (now - new Date(o.createdAt).getTime()) / 60000;
+      const next: 'occupied' | 'urgent' = age > 15 ? 'urgent' : 'occupied';
+      if (!map[tNum] || (map[tNum] === 'occupied' && next === 'urgent')) map[tNum] = next;
+    });
+    return map;
+  }, [orders]);
 
   // fetchOrders returns raw DB rows — check both camelCase and snake_case
   const isOnline = (o: Order) =>
@@ -1062,13 +1082,21 @@ export function WaiterDashboard({
             </div>
 
             <div className="flex items-center gap-2 self-start md:self-auto">
-              {/* Take table order */}
+              {/* Take order — QR scan */}
               <button
                 onClick={() => setShowQRScanner(true)}
                 className="hidden items-center gap-2 rounded-lg bg-amber-500 px-3.5 py-2.5 text-sm font-semibold text-slate-900 transition-colors hover:bg-amber-400 sm:flex"
               >
                 <QrCodeIcon className="w-4 h-4" />
-                <span>Take Order</span>
+                <span>QR Order</span>
+              </button>
+              {/* Take order — manual table pick */}
+              <button
+                onClick={() => setShowTablePicker(true)}
+                className="hidden items-center gap-2 rounded-lg border border-slate-600 bg-slate-700 px-3.5 py-2.5 text-sm font-semibold text-slate-100 transition-colors hover:bg-slate-600 sm:flex"
+              >
+                <PencilIcon className="w-4 h-4" />
+                <span>New Order</span>
               </button>
               <ThemeToggle />
               <button
@@ -1493,6 +1521,74 @@ export function WaiterDashboard({
       </div>
 
       {/* ── Modals ── */}
+
+      {/* Manual table picker */}
+      {showTablePicker && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center bg-black/60 p-4">
+          <div className="w-full max-w-md rounded-2xl border border-slate-700 bg-slate-900 p-5 shadow-2xl">
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-white">Select Table</h3>
+                <p className="text-xs text-slate-400 mt-0.5">Pick a table to place an order manually</p>
+              </div>
+              <button onClick={() => setShowTablePicker(false)}>
+                <XIcon className="w-5 h-5 text-slate-400" />
+              </button>
+            </div>
+
+            {/* Legend */}
+            <div className="mb-3 flex gap-3 text-xs text-slate-400">
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" />Free</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-400 inline-block" />Occupied</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-400 inline-block" />Urgent</span>
+            </div>
+
+            {/* Bar/Walk-up */}
+            <button
+              onClick={() => {
+                setSelectedTableNumber(0);
+                setShowTablePicker(false);
+                setShowOrderEntry(true);
+              }}
+              className="mb-3 w-full rounded-xl border-2 border-dashed border-amber-500/50 bg-amber-500/10 py-3 text-sm font-semibold text-amber-300 hover:bg-amber-500/20 transition-colors"
+            >
+              Bar / Walk-up (no table)
+            </button>
+
+            {/* Table grid */}
+            <div className="grid grid-cols-5 gap-2 max-h-64 overflow-y-auto">
+              {[...allTables].sort((a, b) => a - b).map((tNum) => {
+                const status = tableOccupancy[tNum];
+                const cls = status === 'urgent'
+                  ? 'border-red-500 bg-red-500/15 text-red-200'
+                  : status === 'occupied'
+                    ? 'border-amber-500 bg-amber-500/15 text-amber-200'
+                    : 'border-slate-600 bg-slate-800 text-slate-300 hover:border-emerald-500 hover:text-white';
+                const dot = status === 'urgent' ? 'bg-red-400' : status === 'occupied' ? 'bg-amber-400' : 'bg-emerald-400';
+                return (
+                  <button
+                    key={tNum}
+                    onClick={() => {
+                      setSelectedTableNumber(tNum);
+                      setShowTablePicker(false);
+                      setShowOrderEntry(true);
+                    }}
+                    className={`relative flex flex-col items-center justify-center rounded-xl border-2 py-3 font-bold text-sm transition-all ${cls}`}
+                  >
+                    <span className={`absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full ${dot}`} />
+                    {tNum}
+                  </button>
+                );
+              })}
+            </div>
+
+            {allTables.length === 0 && (
+              <p className="py-6 text-center text-sm text-slate-500">No tables configured</p>
+            )}
+          </div>
+        </div>
+      )}
+
       {showQRScanner && (
         <QRScanner
           onScan={(tableNumber) => {
@@ -1512,7 +1608,26 @@ export function WaiterDashboard({
           onClose={() => { setShowOrderEntry(false); setSelectedTableNumber(null); }}
           onSubmitOrder={async (items, notes) => {
             if (!onCreateOrder) { alert('Order creation not available.'); return; }
-            await onCreateOrder(selectedTableNumber, items, notes);
+            // 0 = Bar/Walk-up (no table number) — pass as undefined via a special value
+            if (selectedTableNumber === 0) {
+              const { createOrder } = await import('../../api/orders');
+              const staffId = localStorage.getItem('staffId') ||
+                (() => { try { return JSON.parse(localStorage.getItem('authUser') || '{}')?.id; } catch { return null; } })();
+              await createOrder({
+                tableNumber: undefined,
+                items: items.map((i) => ({
+                  menuItemId: i.menuItem?.id ?? '',
+                  menuItemName: i.menuItem?.name ?? '',
+                  quantity: i.quantity,
+                  unitPrice: i.menuItem?.price ?? 0,
+                  notes: i.specialInstructions,
+                })),
+                notes: notes,
+                createdBy: staffId ?? undefined,
+              } as any);
+            } else {
+              await onCreateOrder(selectedTableNumber, items, notes);
+            }
           }}
         />
       )}
@@ -1539,13 +1654,23 @@ export function WaiterDashboard({
         />
       )}
 
-      <button
-        onClick={() => setShowQRScanner(true)}
-        className="fixed bottom-5 right-4 z-20 flex items-center gap-2 rounded-full bg-amber-500 px-4 py-3 text-sm font-semibold text-slate-900 shadow-[0_16px_40px_-18px_rgba(245,158,11,0.9)] transition-colors hover:bg-amber-400 sm:hidden"
-      >
-        <QrCodeIcon className="h-4 w-4" />
-        Take Order
-      </button>
+      {/* Mobile FABs */}
+      <div className="fixed bottom-5 right-4 z-20 flex flex-col gap-2 sm:hidden">
+        <button
+          onClick={() => setShowTablePicker(true)}
+          className="flex items-center gap-2 rounded-full border border-slate-600 bg-slate-800 px-4 py-3 text-sm font-semibold text-slate-100 shadow-lg transition-colors hover:bg-slate-700"
+        >
+          <PencilIcon className="h-4 w-4" />
+          New Order
+        </button>
+        <button
+          onClick={() => setShowQRScanner(true)}
+          className="flex items-center gap-2 rounded-full bg-amber-500 px-4 py-3 text-sm font-semibold text-slate-900 shadow-[0_16px_40px_-18px_rgba(245,158,11,0.9)] transition-colors hover:bg-amber-400"
+        >
+          <QrCodeIcon className="h-4 w-4" />
+          QR Order
+        </button>
+      </div>
     </div>
   );
 }

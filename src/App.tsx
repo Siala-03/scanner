@@ -45,10 +45,11 @@ import type { RestaurantReceiptSettings } from './api/restaurants';
 import { MinimartApp } from './pages/minimart/MinimartApp';
 import { RestaurantSettings } from './pages/manager/RestaurantSettings';
 import { EbmSettings } from './pages/manager/EbmSettings';
+import { StaffOrderPage } from './pages/shared/StaffOrderPage';
 
 type UserRole = 'customer' | 'waiter' | 'cashier' | 'supervisor' | 'manager' | 'kitchen' | 'superadmin' | 'supplier' | null;
 type ManagerPage = 'dashboard' | 'menu' | 'staff' | 'analytics' | 'performance' | 'qrcodes' | 'inventory' | 'history' | 'expenses' | 'credit' | 'loyalty' | 'promotions' | 'reservations' | 'scheduling' | 'reviews' | 'settings' | 'ebm';
-type SupervisorPage = 'dashboard' | 'revenue' | 'staff' | 'qrcodes' | 'inventory' | 'menu' | 'history' | 'expenses' | 'online-orders' | 'payments' | 'schedule';
+type SupervisorPage = 'dashboard' | 'revenue' | 'staff' | 'qrcodes' | 'inventory' | 'menu' | 'history' | 'expenses' | 'online-orders' | 'payments' | 'schedule' | 'take-order';
 
 const MANAGER_NAV_GROUPS: Array<{
   id: string;
@@ -821,6 +822,13 @@ export function App() {
             >
               Schedule
             </Button>
+            <Button
+              variant={supervisorPage === 'take-order' ? 'primary' : 'ghost'}
+              size="sm"
+              onClick={() => setSupervisorPage('take-order')}
+            >
+              Take Order
+            </Button>
           </div>
         </div>
 
@@ -851,6 +859,7 @@ export function App() {
         {supervisorPage === 'online-orders' && <OnlineOrdersPage />}
         {supervisorPage === 'menu' && <MenuManagement />}
         {supervisorPage === 'schedule' && <SchedulingPage />}
+        {supervisorPage === 'take-order' && <StaffOrderPage />}
         {supervisorPage === 'payments' && (
           <div className="p-4 md:p-6">
             <PaymentApprovalPanel

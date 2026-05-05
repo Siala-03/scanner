@@ -57,8 +57,7 @@ export function OnlineOrderingPage({ qrCodeToken, restaurantName }: OnlineOrderi
     [cartItems]
   );
 
-  const tax = useMemo(() => Math.round(subtotal * 0.1), [subtotal]);
-  const total = subtotal + tax;
+  const total = subtotal;
 
   const handleAddToCart = (item: MenuItem, qty: number = 1) => {
     setCartItems((prev) => {
@@ -379,10 +378,6 @@ export function OnlineOrderingPage({ qrCodeToken, restaurantName }: OnlineOrderi
                 <div className="flex justify-between">
                   <span className="text-slate-600 dark:text-slate-400">Subtotal</span>
                   <span className="font-semibold">{formatPrice(subtotal)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-600 dark:text-slate-400">Tax (10%)</span>
-                  <span className="font-semibold">{formatPrice(tax)}</span>
                 </div>
                 <div className="border-t border-slate-200 dark:border-slate-700 pt-2 flex justify-between text-lg font-bold">
                   <span>Total</span>

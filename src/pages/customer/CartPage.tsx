@@ -57,12 +57,11 @@ export function CartPage({
     (sum, item) => sum + (item.adjustedUnitPrice ?? getEffectivePrice(item.menuItem)) * item.quantity,
     0
   );
-  const tax = Math.round(subtotal * 0.15);
   const loyaltyDiscount = appliedReward?.rewardType === 'discount' && appliedReward.discountPercentage
     ? Math.round((subtotal * appliedReward.discountPercentage) / 100)
     : 0;
   const promoDiscount = promoResult?.discountAmount ?? 0;
-  const adjustedTotal = Math.max(0, subtotal + tax - loyaltyDiscount - promoDiscount);
+  const adjustedTotal = Math.max(0, subtotal - loyaltyDiscount - promoDiscount);
 
   const handleApplyPromo = async () => {
     if (!promoCode.trim()) return;
@@ -391,10 +390,6 @@ export function CartPage({
           <div className="flex justify-between text-slate-600">
             <span className="font-medium">Subtotal</span>
             <span className="font-semibold">{formatPrice(subtotal)}</span>
-          </div>
-          <div className="flex justify-between text-slate-600">
-            <span className="font-medium">Tax (15%)</span>
-            <span className="font-semibold">{formatPrice(tax)}</span>
           </div>
           {appliedReward && appliedReward.rewardType === 'discount' && loyaltyDiscount > 0 && (
             <div className="flex justify-between text-amber-600">

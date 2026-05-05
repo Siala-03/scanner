@@ -18,6 +18,7 @@ import {
   UploadIcon,
   DownloadIcon,
   FileSpreadsheetIcon,
+  LinkIcon,
 } from 'lucide-react';
 import { InventoryForecasting } from '../../components/manager/InventoryForecasting';
 import { Card } from '../../components/ui/Card';
@@ -34,9 +35,11 @@ import type {
   PurchaseOrderStatus,
   WasteReason,
 } from '../../types/inventory';
+import { createMenuItem } from '../../api/menu';
 import {
   updateInventoryRecord as apiUpdateInventoryRecord,
   deleteInventoryRecord as apiDeleteInventoryRecord,
+  relinkInventoryRecord as apiRelinkInventoryRecord,
   createSupplier as apiCreateSupplier,
   updateSupplier as apiUpdateSupplier,
   createLocation as apiCreateLocation,
@@ -219,6 +222,14 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
   const [newInventoryItemReorderQty, setNewInventoryItemReorderQty] = useState(20);
   const [newInventoryItemUnitCost, setNewInventoryItemUnitCost] = useState(0);
   const [newInventoryItemUnitMeasurement, setNewInventoryItemUnitMeasurement] = useState('units');
+
+  // ── Add to Menu modal state ─────────────────────────────────────────────
+  const [showAddToMenuModal, setShowAddToMenuModal] = useState(false);
+  const [addToMenuItemId, setAddToMenuItemId] = useState(''); // existing inventory record's menuItemId
+  const [addToMenuName, setAddToMenuName] = useState('');
+  const [addToMenuPrice, setAddToMenuPrice] = useState(0);
+  const [addToMenuCategory, setAddToMenuCategory] = useState('');
+  const [isAddingToMenu, setIsAddingToMenu] = useState(false);
 
   const inventoryMap = useMemo(() => {
     const map: Record<string, InventoryRecord> = {};
@@ -465,6 +476,39 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
     } catch (err) {
       console.error('Failed to delete inventory record', err);
       alert(`Failed to delete inventory item: ${getErrorMessage(err)}`);
+    }
+  };
+
+  const closeAddToMenuModal = () => {
+    setShowAddToMenuModal(false);
+    setAddToMenuItemId('');
+    setAddToMenuName('');
+    setAddToMenuPrice(0);
+    setAddToMenuCategory('');
+  };
+
+  const handleAddToMenu = async () => {
+    if (!addToMenuItemId) { alert('Inventory item is missing'); return; }
+    if (!addToMenuName.trim()) { alert('Please enter a menu item name'); return; }
+    if (addToMenuPrice <= 0) { alert('Please enter a valid price'); return; }
+    if (!addToMenuCategory.trim()) { alert('Please select a category'); return; }
+    setIsAddingToMenu(true);
+    try {
+      const newItem = await createMenuItem({
+        name: addToMenuName.trim(),
+        price: addToMenuPrice,
+        category: addToMenuCategory,
+        isAvailable: true,
+      });
+      await apiRelinkInventoryRecord(addToMenuItemId, newItem.id);
+      await refresh();
+      closeAddToMenuModal();
+      alert(`"${newItem.name}" added to menu and linked to inventory.`);
+    } catch (err) {
+      console.error('Failed to add to menu', err);
+      alert(`Failed to add to menu: ${getErrorMessage(err)}`);
+    } finally {
+      setIsAddingToMenu(false);
     }
   };
 
@@ -1119,7 +1163,15 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                             >
                               <div>
                                 <p className="text-white font-medium text-sm hover:text-amber-300 underline underline-offset-2">{row.item.name}</p>
-                                <p className="text-xs text-slate-500">{row.item.id} · {row.item.category.replace(/-/g, ' ')}</p>
+                                <div className="flex items-center gap-1.5 mt-0.5">
+                                  <p className="text-xs text-slate-500">{row.item.id} · {row.item.category.replace(/-/g, ' ')}</p>
+                                  {menuItemMap[row.item.id] && row.rec && (
+                                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs bg-blue-500/15 text-blue-300 border border-blue-500/20">
+                                      <LinkIcon className="w-2.5 h-2.5" />
+                                      menu
+                                    </span>
+                                  )}
+                                </div>
                               </div>
                             </button>
                           </td>
@@ -1284,6 +1336,21 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                                   >
                                     <PlusIcon className="w-6 h-6 md:w-5 md:h-5" />
                                   </button>
+                                  {!menuItemMap[row.item.id] && (
+                                    <button
+                                      onClick={() => {
+                                        setAddToMenuItemId(row.item.id);
+                                        setAddToMenuName(row.item.name !== row.item.id ? row.item.name : '');
+                                        setAddToMenuPrice(row.rec?.unitCost ?? 0);
+                                        setAddToMenuCategory(menuCategories.find((c) => c !== 'all') ?? 'Food');
+                                        setShowAddToMenuModal(true);
+                                      }}
+                                      className="p-2 md:p-1.5 text-blue-400 hover:text-blue-300 transition"
+                                      title="Add to Menu"
+                                    >
+                                      <LinkIcon className="w-6 h-6 md:w-5 md:h-5" />
+                                    </button>
+                                  )}
                                   <button
                                     onClick={() => {
                                       if (window.confirm(`Delete inventory record for ${row.item.name}? This action cannot be undone.`)) {
@@ -1311,6 +1378,78 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
             </Card>
           </motion.div>
         )}
+
+        {/* ── ADD TO MENU MODAL ── */}
+        <Modal isOpen={showAddToMenuModal} onClose={closeAddToMenuModal}>
+          <div className="p-5 space-y-4 max-w-md">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <LinkIcon className="w-5 h-5 text-blue-400" />
+                Add to Menu
+              </h3>
+              <button onClick={closeAddToMenuModal} className="text-slate-400 hover:text-white">
+                <XIcon className="w-4 h-4" />
+              </button>
+            </div>
+            <p className="text-sm text-slate-400">
+              Create a menu item linked to this inventory record. Once linked, placing an order for this item will automatically deduct from stock.
+            </p>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1">Menu Item Name *</label>
+                <input
+                  type="text"
+                  value={addToMenuName}
+                  onChange={(e) => setAddToMenuName(e.target.value)}
+                  placeholder="e.g. Grilled Chicken"
+                  className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-600 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1">Price (RWF) *</label>
+                <input
+                  type="number"
+                  value={addToMenuPrice || ''}
+                  onChange={(e) => setAddToMenuPrice(parseFloat(e.target.value) || 0)}
+                  placeholder="0"
+                  min={0}
+                  step={100}
+                  className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-600 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1">Category *</label>
+                <select
+                  value={addToMenuCategory}
+                  onChange={(e) => setAddToMenuCategory(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-600 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  {menuCategories.filter((c) => c !== 'all').map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                  <option value="Food">Food</option>
+                  <option value="Beverage">Beverage</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+            </div>
+            <div className="flex gap-2 pt-2">
+              <Button variant="ghost" size="sm" onClick={closeAddToMenuModal} className="flex-1">
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={handleAddToMenu}
+                isLoading={isAddingToMenu}
+                className="flex-1 bg-blue-600 hover:bg-blue-500"
+              >
+                <LinkIcon className="w-4 h-4" />
+                Add to Menu
+              </Button>
+            </div>
+          </div>
+        </Modal>
 
         {selectedItemDetails && (
             <Modal isOpen={!!selectedItemDetails} onClose={() => setSelectedItemDetails(null)}>
