@@ -82,6 +82,7 @@ const PO_STATUS_CONFIG: Record<PurchaseOrderStatus, { label: string; color: stri
 const WASTE_REASONS: WasteReason[] = ['expired', 'spoiled', 'damaged', 'overproduction', 'spillage', 'other'];
 const ALERT_HIDDEN_MS = 30 * 60 * 1000;
 const ALERT_VISIBLE_MS = 30 * 1000;
+const INVENTORY_ROWS_PER_PAGE = 25;
 
 // ── Small reusable components ────────────────────────────────────────────────
 
@@ -293,6 +294,7 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [locationFilter, setLocationFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'ok' | 'low' | 'out'>('all');
+  const [currentPage, setCurrentPage] = useState(1);
   const [editingRow, setEditingRow] = useState<string | null>(null);
   const [editValues, setEditValues] = useState<Partial<InventoryRecord>>({});
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
@@ -389,6 +391,26 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
         return a.item.name.localeCompare(b.item.name);
       });
   }, [query, categoryFilter, locationFilter, statusFilter, inventory, menuItems, menuItemMap]);
+
+  const totalInventoryPages = useMemo(
+    () => Math.max(1, Math.ceil(inventoryRows.length / INVENTORY_ROWS_PER_PAGE)),
+    [inventoryRows.length]
+  );
+
+  const paginatedInventoryRows = useMemo(() => {
+    const start = (currentPage - 1) * INVENTORY_ROWS_PER_PAGE;
+    return inventoryRows.slice(start, start + INVENTORY_ROWS_PER_PAGE);
+  }, [inventoryRows, currentPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [query, categoryFilter, locationFilter, statusFilter]);
+
+  useEffect(() => {
+    if (currentPage > totalInventoryPages) {
+      setCurrentPage(totalInventoryPages);
+    }
+  }, [currentPage, totalInventoryPages]);
 
   // lowStockItems loaded from backend state via fetchLowStockItems() and setLowStockItems()
 
@@ -571,13 +593,23 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
 
   const handleAddToMenu = async () => {
     if (!addToMenuItemId) { alert('Inventory item is missing'); return; }
-    if (!addToMenuName.trim()) { alert(`Please enter a ${isMinimartScope ? 'product' : 'menu item'} name`); return; }
+    const descriptionName = (inventoryMap[addToMenuItemId]?.description || '').trim();
+    const resolvedName = isMinimartScope ? descriptionName : addToMenuName.trim();
+
+    if (!resolvedName) {
+      if (isMinimartScope) {
+        alert('Please add a description for this inventory item before using Add to Products.');
+      } else {
+        alert('Please enter a menu item name');
+      }
+      return;
+    }
     if (addToMenuPrice <= 0) { alert('Please enter a valid price'); return; }
     if (!addToMenuCategory.trim()) { alert('Please select a category'); return; }
     setIsAddingToMenu(true);
     try {
       const payload: any = {
-        name: addToMenuName.trim(),
+        name: resolvedName,
         price: addToMenuPrice,
         category: addToMenuCategory,
         is_available: true,
@@ -1252,12 +1284,20 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                         <th className="px-3 py-3 w-10">
                           <input
                             type="checkbox"
-                            checked={inventoryRows.length > 0 && inventoryRows.every((r) => selectedRows.has(r.item.id))}
+                            checked={paginatedInventoryRows.length > 0 && paginatedInventoryRows.every((r) => selectedRows.has(r.item.id))}
                             onChange={(e) => {
                               if (e.target.checked) {
-                                setSelectedRows(new Set(inventoryRows.map((r) => r.item.id)));
+                                setSelectedRows((prev) => {
+                                  const next = new Set(prev);
+                                  paginatedInventoryRows.forEach((r) => next.add(r.item.id));
+                                  return next;
+                                });
                               } else {
-                                setSelectedRows(new Set());
+                                setSelectedRows((prev) => {
+                                  const next = new Set(prev);
+                                  paginatedInventoryRows.forEach((r) => next.delete(r.item.id));
+                                  return next;
+                                });
                               }
                             }}
                             className="w-4 h-4 rounded border-slate-600 bg-slate-800 accent-red-500 cursor-pointer"
@@ -1283,7 +1323,7 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-700/30">
-                    {inventoryRows.map((row) => {
+                    {paginatedInventoryRows.map((row) => {
                       const isEditing = editingRow === row.item.id;
                       const maxStock = Math.max(row.rec?.reorderQty ?? row.stock * 2, row.stock, 1);
                       const purchaseDate = row.rec?.purchaseDate ? new Date(row.rec.purchaseDate) : null;
@@ -1565,7 +1605,7 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                                     onClick={() => {
                                       if (menuItemMap[row.item.id]) return;
                                       setAddToMenuItemId(row.item.id);
-                                      setAddToMenuName(row.item.name !== row.item.id ? row.item.name : '');
+                                      setAddToMenuName((row.rec?.description || '').trim());
                                       setAddToMenuPrice(row.rec?.price ?? row.rec?.unitCost ?? 0);
                                       setAddToMenuCategory(menuCategories.find((c) => c !== 'all') ?? (isMinimartScope ? 'General' : 'Food'));
                                       setShowAddToMenuModal(true);
@@ -1606,6 +1646,37 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                   <div className="py-12 text-center text-slate-500">No items match your filters.</div>
                 )}
               </div>
+              {inventoryRows.length > 0 && (
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 px-4 py-3 border-t border-slate-700/50 bg-slate-800/30">
+                  <p className="text-xs text-slate-400">
+                    Showing {(currentPage - 1) * INVENTORY_ROWS_PER_PAGE + 1}
+                    {' - '}
+                    {Math.min(currentPage * INVENTORY_ROWS_PER_PAGE, inventoryRows.length)}
+                    {' of '}
+                    {inventoryRows.length}
+                    {' items'}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                      className="px-3 py-1.5 text-xs rounded-md border border-slate-600 text-slate-300 hover:text-white hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Previous
+                    </button>
+                    <span className="text-xs text-slate-300">
+                      Page {currentPage} of {totalInventoryPages}
+                    </span>
+                    <button
+                      onClick={() => setCurrentPage((p) => Math.min(totalInventoryPages, p + 1))}
+                      disabled={currentPage === totalInventoryPages}
+                      className="px-3 py-1.5 text-xs rounded-md border border-slate-600 text-slate-300 hover:text-white hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              )}
             </Card>
           </motion.div>
         )}
@@ -1738,9 +1809,13 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                   type="text"
                   value={addToMenuName}
                   onChange={(e) => setAddToMenuName(e.target.value)}
-                  placeholder="e.g. Grilled Chicken"
+                  placeholder={isMinimartScope ? 'Auto from Description column' : 'e.g. Grilled Chicken'}
+                  readOnly={isMinimartScope}
                   className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-600 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
+                {isMinimartScope && (
+                  <p className="mt-1 text-xs text-slate-400">Auto-filled from the inventory Description field.</p>
+                )}
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-300 mb-1">Price (RWF) *</label>
