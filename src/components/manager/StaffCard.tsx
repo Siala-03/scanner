@@ -9,6 +9,12 @@ interface StaffCardProps {
   onAssignTables?: (staffId: string) => void;
   onViewDetails?: (staff: Staff) => void;
 }
+
+function getInitials(name?: string | null): string {
+  if (!name || typeof name !== 'string') return 'S';
+  return name.split(' ').filter(Boolean).map((part) => part[0]).join('') || 'S';
+}
+
 export function StaffCard({
   staff,
   onAssignTables,
@@ -25,10 +31,7 @@ export function StaffCard({
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 rounded-full bg-slate-600 flex items-center justify-center text-white font-medium text-lg">
-            {staff.name.
-            split(' ').
-            map((n) => n[0]).
-            join('')}
+            {getInitials(staff.name)}
           </div>
           <div>
             <p className="font-semibold text-white">{staff.name}</p>

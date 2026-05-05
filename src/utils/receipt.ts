@@ -297,7 +297,7 @@ export function buildReceiptHtml(receipt: ReceiptData): string {
   } = receipt;
 
   // Format order type for display
-  const orderTypeDisplay = orderType.split('-').map(word => 
+  const orderTypeDisplay = (orderType ?? 'dine-in').split('-').map(word => 
     word.charAt(0).toUpperCase() + word.slice(1)
   ).join(' ');
 

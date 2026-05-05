@@ -26,6 +26,18 @@ interface StaffManagementProps {
   onShowPerformance?: () => void;
 }
 
+function safeName(value?: string | null): string {
+  return typeof value === 'string' && value.trim() ? value.trim() : 'Staff';
+}
+
+function nameInitials(value?: string | null): string {
+  return safeName(value)
+    .split(' ')
+    .filter(Boolean)
+    .map((part) => part[0])
+    .join('') || 'S';
+}
+
 export function StaffManagement({ onShowPerformance }: StaffManagementProps) {
   const { staff: backendStaff, isLoading, refetch } = useStaff();
   const { tables } = useTables();
@@ -396,10 +408,7 @@ export function StaffManagement({ onShowPerformance }: StaffManagementProps) {
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center gap-3">
                       <div className="w-12 h-12 rounded-full bg-slate-700 flex items-center justify-center text-white font-medium text-lg">
-                        {member.name.
-                      split(' ').
-                      map((n) => n[0]).
-                      join('')}
+                        {nameInitials(member.name)}
                       </div>
                       <div>
                         <h3 className="font-semibold text-gray-100">
@@ -577,7 +586,7 @@ export function StaffManagement({ onShowPerformance }: StaffManagementProps) {
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-white text-sm font-medium">
-                      {member.name.split(' ').map(n => n[0]).join('')}
+                      {nameInitials(member.name)}
                     </div>
                     <div className="text-left">
                       <h3 className="text-base font-semibold text-white">{member.name}</h3>

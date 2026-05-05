@@ -21,6 +21,18 @@ interface StaffPerformanceProps {
   onBack?: () => void;
 }
 
+function getSafeStaffName(name?: string | null): string {
+  return typeof name === 'string' && name.trim() ? name.trim() : 'Staff';
+}
+
+function getStaffInitials(name?: string | null): string {
+  return getSafeStaffName(name)
+    .split(' ')
+    .filter(Boolean)
+    .map((part) => part[0])
+    .join('') || 'S';
+}
+
 export function StaffPerformance({ onBack }: StaffPerformanceProps) {
   const { theme } = useTheme();
   const isLight = theme === 'light';
@@ -82,7 +94,7 @@ export function StaffPerformance({ onBack }: StaffPerformanceProps) {
   );
 
   const chartData = waiters.map((w) => ({
-    name: w.name.split(' ')[0],
+    name: getSafeStaffName(w.name).split(' ')[0],
     orders: getPerf(w.id).ordersServed,
     revenue: getPerf(w.id).totalRevenue,
     rating: w.performance?.rating || 0,
@@ -123,7 +135,7 @@ export function StaffPerformance({ onBack }: StaffPerformanceProps) {
                     {index + 1}
                   </div>
                   <div className="w-10 h-10 rounded-full bg-slate-600 flex items-center justify-center text-slate-100 font-medium">
-                    {waiter.name.split(' ').map((n: string) => n[0]).join('')}
+                    {getStaffInitials(waiter.name)}
                   </div>
                   <div className="flex-1">
                     <p className="font-medium text-slate-100">{waiter.name}</p>
@@ -227,7 +239,7 @@ export function StaffPerformance({ onBack }: StaffPerformanceProps) {
               <Card key={waiter.id} className="bg-slate-800">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-12 h-12 rounded-full bg-slate-600 flex items-center justify-center text-white font-medium text-lg">
-                    {waiter.name.split(' ').map((n: string) => n[0]).join('')}
+                    {getStaffInitials(waiter.name)}
                   </div>
                   <div>
                     <p className="font-semibold text-slate-100">{waiter.name}</p>

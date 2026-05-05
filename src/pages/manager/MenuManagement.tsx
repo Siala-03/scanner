@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useRef } from 'react';
+import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   PlusIcon,
@@ -16,10 +16,13 @@ import { Button } from '../../components/ui/Button';
 import { Tabs } from '../../components/ui/Tabs';
 import { SearchBar } from '../../components/ui/SearchBar';
 import { Badge } from '../../components/ui/Badge';
+import { Modal } from '../../components/ui/Modal';
 import { MenuItemEditor } from '../../components/manager/MenuItemEditor';
 import { formatPrice } from '../../utils/currency';
 import { useMenu } from '../../hooks/useMenu';
 import { exportMenuToCsv, exportMenuToJson, importMenuFromFile, saveCustomMenu, downloadMenuTemplate } from '../../utils/menuImportExport';
+import { supabase } from '../../lib/supabase';
+import { updateInventoryRecord as apiUpdateInventoryRecord } from '../../api/inventory';
 
 // Default categories with emojis from dummy data
 const defaultCategories: MenuCategoryInfo[] = [
@@ -62,7 +65,64 @@ export function MenuManagement() {
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const exportButtonRef = useRef<HTMLButtonElement>(null);
+  const exportButtonRef = useRef<HTMLDivElement>(null);
+
+  // ── Inventory tracking ──────────────────────────────────────────────────────
+  type InvEntry = { stock: number; threshold: number };
+  const [invMap, setInvMap] = useState<Record<string, InvEntry>>({});
+  const [trackingItem, setTrackingItem] = useState<MenuItem | null>(null);
+  const [trackStock, setTrackStock] = useState(0);
+  const [trackThreshold, setTrackThreshold] = useState(5);
+  const [trackUnitCost, setTrackUnitCost] = useState(0);
+  const [trackLocation, setTrackLocation] = useState('');
+  const [isSavingTrack, setIsSavingTrack] = useState(false);
+
+  const loadInvMap = useCallback(async () => {
+    const restaurantId = localStorage.getItem('restaurantId');
+    if (!restaurantId) return;
+    const { data } = await supabase
+      .from('inventory_records')
+      .select('menu_item_id, stock, low_stock_threshold')
+      .eq('restaurant_id', restaurantId);
+    if (!data) return;
+    const map: Record<string, InvEntry> = {};
+    data.forEach((r) => {
+      map[r.menu_item_id] = { stock: r.stock, threshold: r.low_stock_threshold };
+    });
+    setInvMap(map);
+  }, []);
+
+  useEffect(() => { loadInvMap(); }, [loadInvMap]);
+
+  const handleOpenTrack = (item: MenuItem) => {
+    const existing = invMap[item.id];
+    setTrackStock(existing?.stock ?? 0);
+    setTrackThreshold(existing?.threshold ?? 5);
+    setTrackUnitCost(0);
+    setTrackLocation('');
+    setTrackingItem(item);
+  };
+
+  const handleSaveTrack = async () => {
+    if (!trackingItem) return;
+    setIsSavingTrack(true);
+    try {
+      await apiUpdateInventoryRecord(trackingItem.id, {
+        stock: trackStock,
+        lowStockThreshold: trackThreshold,
+        unitCost: trackUnitCost,
+        location: trackLocation,
+        reorderPoint: Math.max(1, Math.floor(trackThreshold * 1.5)),
+        reorderQty: Math.max(1, trackThreshold * 4),
+      });
+      await loadInvMap();
+      setTrackingItem(null);
+    } catch (err) {
+      alert('Failed to save: ' + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      setIsSavingTrack(false);
+    }
+  };
 
   // Close export dropdown when clicking outside
   React.useEffect(() => {
@@ -278,7 +338,6 @@ export function MenuManagement() {
               variant="ghost"
               size="sm"
               onClick={downloadMenuTemplate}
-              title="Download CSV template"
             >
               <FileSpreadsheetIcon className="w-4 h-4" />
               <span className="hidden sm:inline">Template</span>
@@ -302,12 +361,11 @@ export function MenuManagement() {
               className="hidden"
             />
             {/* Export Dropdown */}
-            <div className="relative export-dropdown">
-              <Button 
-                variant="secondary" 
+            <div className="relative export-dropdown" ref={exportButtonRef}>
+              <Button
+                variant="secondary"
                 size="sm"
                 onClick={() => setIsExportMenuOpen(!isExportMenuOpen)}
-                ref={exportButtonRef}
               >
                 <DownloadIcon className="w-4 h-4" />
                 <span className="hidden sm:inline">Export</span>
@@ -413,12 +471,42 @@ export function MenuManagement() {
                     {item.description}
                   </p>
 
-                  <div className="flex items-center justify-between text-sm text-slate-400 mb-4">
+                  <div className="flex items-center justify-between text-sm text-slate-400 mb-3">
                     <span>
                       {defaultCategories.find((c) => c.id === item.category)?.name || item.category}
                     </span>
                     <span>{item.prepTime} min prep</span>
                   </div>
+
+                  {/* Stock indicator */}
+                  {invMap[item.id] ? (
+                    <button
+                      onClick={() => handleOpenTrack(item)}
+                      className={`w-full flex items-center justify-between text-xs px-2.5 py-1.5 rounded-md mb-3 border transition-colors ${
+                        invMap[item.id].stock === 0
+                          ? 'bg-red-500/10 border-red-500/30 text-red-400 hover:bg-red-500/20'
+                          : invMap[item.id].stock <= invMap[item.id].threshold
+                          ? 'bg-amber-500/10 border-amber-500/30 text-amber-400 hover:bg-amber-500/20'
+                          : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20'
+                      }`}
+                    >
+                      <span>
+                        {invMap[item.id].stock === 0
+                          ? '● Out of stock'
+                          : invMap[item.id].stock <= invMap[item.id].threshold
+                          ? '● Low stock'
+                          : '● In stock'}
+                      </span>
+                      <span className="font-semibold">{invMap[item.id].stock} units</span>
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => handleOpenTrack(item)}
+                      className="w-full text-xs text-slate-500 border border-dashed border-slate-600 rounded-md px-2.5 py-1.5 mb-3 hover:border-amber-500/60 hover:text-amber-400 transition-colors text-left"
+                    >
+                      + Track stock
+                    </button>
+                  )}
 
                   <div className="flex gap-2">
                     <Button
@@ -474,10 +562,80 @@ export function MenuManagement() {
           onClose={() => setIsEditorOpen(false)}
           onSave={handleSaveItem}
           categories={defaultCategories}
-          onAddCategory={() => {
-            // No-op: categories are auto-detected from menu item categories
-          }}
+          onAddCategory={() => {}}
         />
+
+        {/* Track Stock Modal */}
+        <Modal
+          isOpen={!!trackingItem}
+          onClose={() => setTrackingItem(null)}
+          title={`${invMap[trackingItem?.id ?? ''] ? 'Update Stock' : 'Enable Stock Tracking'} — ${trackingItem?.name ?? ''}`}
+        >
+          <div className="space-y-4">
+            <p className="text-sm text-slate-400">
+              Stock will automatically decrease each time an order containing{' '}
+              <span className="text-slate-200 font-medium">{trackingItem?.name}</span> is placed.
+            </p>
+
+            <div className="grid grid-cols-2 gap-3">
+              <label className="block text-sm text-slate-300">
+                Current stock
+                <input
+                  type="number"
+                  min={0}
+                  value={trackStock}
+                  onChange={(e) => setTrackStock(Math.max(0, Number(e.target.value)))}
+                  className="mt-1 w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                />
+              </label>
+              <label className="block text-sm text-slate-300">
+                Low-stock alert below
+                <input
+                  type="number"
+                  min={0}
+                  value={trackThreshold}
+                  onChange={(e) => setTrackThreshold(Math.max(0, Number(e.target.value)))}
+                  className="mt-1 w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                />
+              </label>
+              <label className="block text-sm text-slate-300">
+                Unit cost (RWF)
+                <input
+                  type="number"
+                  min={0}
+                  value={trackUnitCost}
+                  onChange={(e) => setTrackUnitCost(Math.max(0, Number(e.target.value)))}
+                  className="mt-1 w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                />
+              </label>
+              <label className="block text-sm text-slate-300">
+                Storage location
+                <input
+                  type="text"
+                  value={trackLocation}
+                  onChange={(e) => setTrackLocation(e.target.value)}
+                  placeholder="e.g. Bar Fridge"
+                  className="mt-1 w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                />
+              </label>
+            </div>
+
+            <div className="bg-slate-800/60 border border-slate-700 rounded-lg p-3 text-xs text-slate-400 space-y-1">
+              <p>● Every order placed will deduct from this stock level in real time.</p>
+              <p>● An alert fires when stock drops to or below the low-stock threshold.</p>
+              <p>● You can adjust stock manually anytime from the Inventory page.</p>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-1">
+              <Button variant="ghost" size="sm" onClick={() => setTrackingItem(null)}>
+                Cancel
+              </Button>
+              <Button variant="primary" size="sm" onClick={handleSaveTrack} isLoading={isSavingTrack}>
+                {invMap[trackingItem?.id ?? ''] ? 'Update Stock' : 'Enable Tracking'}
+              </Button>
+            </div>
+          </div>
+        </Modal>
 
       </div>
     </div>

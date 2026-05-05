@@ -45,6 +45,12 @@ export interface KPIMetrics {
   peakHours: Array<{ hour: number; orders: number }>;
 }
 
+function toDateKey(value: unknown): string | null {
+  if (typeof value === 'string' && value.includes('T')) return value.split('T')[0];
+  if (typeof value === 'string' && value.trim()) return value.trim().slice(0, 10);
+  return null;
+}
+
 export async function fetchTodayKPIs(): Promise<KPIMetrics> {
   const restaurantId = getRestaurantId();
   if (!restaurantId) throw new Error('No company selected');
@@ -131,7 +137,8 @@ export async function fetchWeeklyRevenue(): Promise<WeeklyRevenue> {
   const lastWeekMap = buildDayMap(twoWeeksAgo, weekAgo);
 
   list.forEach((o: any) => {
-    const key = o.created_at.split('T')[0];
+    const key = toDateKey(o.created_at);
+    if (!key) return;
     if (thisWeekMap.has(key)) {
       const d = thisWeekMap.get(key)!;
       d.revenue += o.total || 0;
@@ -167,7 +174,8 @@ export async function fetchRevenueByDateRange(startDate: string, endDate: string
 
   const dayMap = new Map<string, RevenueData>();
   (orders || []).forEach((o: any) => {
-    const key = o.created_at.split('T')[0];
+    const key = toDateKey(o.created_at);
+    if (!key) return;
     const cur = dayMap.get(key) || { date: key, revenue: 0, orders: 0 };
     cur.revenue += o.total || 0;
     cur.orders += 1;

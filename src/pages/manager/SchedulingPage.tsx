@@ -40,7 +40,9 @@ function normalizeSchedules(list: StaffSchedule[]): StaffSchedule[] {
 }
 
 function fmtTime(t: string) {
+  if (!t || typeof t !== 'string') return '—';
   const [h, m] = t.split(':').map(Number);
+  if (Number.isNaN(h) || Number.isNaN(m)) return '—';
   const p = h >= 12 ? 'PM' : 'AM';
   return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${p}`;
 }

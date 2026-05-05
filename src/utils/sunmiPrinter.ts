@@ -58,8 +58,8 @@ function divider(char = '-', width = COLS): string {
   return char.repeat(width);
 }
 
-function wrapText(text: string, width = COLS): string[] {
-  const words = text.split(' ');
+function wrapText(text: string | null | undefined, width = COLS): string[] {
+  const words = String(text ?? '').split(' ');
   const lines: string[] = [];
   let current = '';
   for (const word of words) {
