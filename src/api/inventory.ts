@@ -225,29 +225,49 @@ export async function createInventoryRecord(record: Partial<InventoryRecord>): P
   const restaurantId = getRestaurantId();
   const id = `inv-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-  const { data, error } = await supabase
-    .from('inventory_records')
-    .insert({
-      id,
-      menu_item_id:        record.menuItemId,
-      stock:               record.stock               ?? 0,
-      low_stock_threshold: record.lowStockThreshold   ?? 5,
-      reorder_point:       record.reorderPoint        ?? 10,
-      reorder_qty:         record.reorderQty          ?? 20,
-      unit_cost:           record.unitCost            ?? 0,
-      supplier_id:         record.supplierId          ?? null,
-      location:            record.location            ?? '',
-      description:         record.description         ?? '',
-      expiry_date:         record.expiryDate          ?? null,
-      purchase_date:       record.purchaseDate        ?? null,
-      qty_start:           record.qtyStart            ?? record.stock ?? 0,
-      price:               record.price               ?? 0,
-      restaurant_id:       restaurantId,
-    })
-    .select()
-    .single();
+  const insertPayload: Record<string, any> = {
+    id,
+    menu_item_id:        record.menuItemId,
+    stock:               record.stock               ?? 0,
+    low_stock_threshold: record.lowStockThreshold   ?? 5,
+    reorder_point:       record.reorderPoint        ?? 10,
+    reorder_qty:         record.reorderQty          ?? 20,
+    unit_cost:           record.unitCost            ?? 0,
+    supplier_id:         record.supplierId          ?? null,
+    location:            record.location            ?? '',
+    expiry_date:         record.expiryDate          ?? null,
+    purchase_date:       record.purchaseDate        ?? null,
+    qty_start:           record.qtyStart            ?? record.stock ?? 0,
+    price:               record.price               ?? 0,
+    restaurant_id:       restaurantId,
+  };
 
-  if (error) throw error;
+  const missingColumnPattern = /Could not find the '([^']+)' column of 'inventory_records'/i;
+  let data: any = null;
+  let lastError: any = null;
+  const mutablePayload = { ...insertPayload };
+
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const res = await supabase
+      .from('inventory_records')
+      .insert(mutablePayload)
+      .select()
+      .single();
+
+    if (!res.error) {
+      data = res.data;
+      lastError = null;
+      break;
+    }
+
+    lastError = res.error;
+    const match = String(res.error.message || '').match(missingColumnPattern);
+    const missingCol = match?.[1];
+    if (!missingCol || !(missingCol in mutablePayload)) break;
+    delete mutablePayload[missingCol];
+  }
+
+  if (lastError) throw lastError;
   return normalizeInventoryRecord(data);
 }
 
@@ -291,7 +311,6 @@ export async function updateInventoryRecord(
   if (record.supplierId          !== undefined) updateFields.supplier_id         = record.supplierId;
   if (record.supplier_id         !== undefined) updateFields.supplier_id         = record.supplier_id;
   if (record.location            !== undefined) updateFields.location            = record.location;
-  if (record.description         !== undefined) updateFields.description         = record.description;
   if (record.expiryDate          !== undefined) updateFields.expiry_date         = record.expiryDate   || null;
   if (record.expiry_date         !== undefined) updateFields.expiry_date         = record.expiry_date  || null;
   if (record.purchaseDate        !== undefined) updateFields.purchase_date       = record.purchaseDate  || null;
@@ -301,12 +320,31 @@ export async function updateInventoryRecord(
   if (record.price               !== undefined) updateFields.price               = record.price;
 
   // Try UPDATE first (existing record)
-  const { data: updated, error: updateError } = await supabase
-    .from('inventory_records')
-    .update(updateFields)
-    .eq('menu_item_id', menuItemId)
-    .eq('restaurant_id', restaurantId)
-    .select();
+  const missingColumnPattern = /Could not find the '([^']+)' column of 'inventory_records'/i;
+  let updated: any[] | null = null;
+  let updateError: any = null;
+  const mutableUpdateFields: Record<string, any> = { ...updateFields };
+
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const res = await supabase
+      .from('inventory_records')
+      .update(mutableUpdateFields)
+      .eq('menu_item_id', menuItemId)
+      .eq('restaurant_id', restaurantId)
+      .select();
+
+    if (!res.error) {
+      updated = res.data || [];
+      updateError = null;
+      break;
+    }
+
+    updateError = res.error;
+    const match = String(res.error.message || '').match(missingColumnPattern);
+    const missingCol = match?.[1];
+    if (!missingCol || !(missingCol in mutableUpdateFields)) break;
+    delete mutableUpdateFields[missingCol];
+  }
 
   if (updateError) {
     throw new Error(`Failed to update inventory record: ${updateError.message}`);
@@ -338,28 +376,47 @@ export async function updateInventoryRecord(
 
   // No existing row — INSERT with a generated id
   const id = `inv-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  const { data, error } = await supabase
-    .from('inventory_records')
-    .insert({
-      id,
-      menu_item_id:        menuItemId,
-      restaurant_id:       restaurantId,
-      stock:               record.stock               ?? 0,
-      low_stock_threshold: record.lowStockThreshold   ?? record.low_stock_threshold ?? 5,
-      reorder_point:       record.reorderPoint        ?? record.reorder_point       ?? 10,
-      reorder_qty:         record.reorderQty          ?? record.reorder_qty         ?? 20,
-      unit_cost:           record.unitCost            ?? record.unit_cost           ?? 0,
-      supplier_id:         record.supplierId          ?? record.supplier_id         ?? null,
-      location:            record.location            ?? '',
-      description:         record.description         ?? '',
-      expiry_date:         record.expiryDate          ?? record.expiry_date         ?? null,
-      purchase_date:       record.purchaseDate        ?? record.purchase_date       ?? null,
-      qty_start:           record.qtyStart            ?? record.qty_start           ?? record.stock ?? 0,
-      price:               record.price               ?? 0,
-      updated_at:          new Date().toISOString(),
-    })
-    .select()
-    .single();
+  const insertPayload: Record<string, any> = {
+    id,
+    menu_item_id:        menuItemId,
+    restaurant_id:       restaurantId,
+    stock:               record.stock               ?? 0,
+    low_stock_threshold: record.lowStockThreshold   ?? record.low_stock_threshold ?? 5,
+    reorder_point:       record.reorderPoint        ?? record.reorder_point       ?? 10,
+    reorder_qty:         record.reorderQty          ?? record.reorder_qty         ?? 20,
+    unit_cost:           record.unitCost            ?? record.unit_cost           ?? 0,
+    supplier_id:         record.supplierId          ?? record.supplier_id         ?? null,
+    location:            record.location            ?? '',
+    expiry_date:         record.expiryDate          ?? record.expiry_date         ?? null,
+    purchase_date:       record.purchaseDate        ?? record.purchase_date       ?? null,
+    qty_start:           record.qtyStart            ?? record.qty_start           ?? record.stock ?? 0,
+    price:               record.price               ?? 0,
+    updated_at:          new Date().toISOString(),
+  };
+
+  let data: any = null;
+  let error: any = null;
+  const mutableInsertPayload = { ...insertPayload };
+
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const res = await supabase
+      .from('inventory_records')
+      .insert(mutableInsertPayload)
+      .select()
+      .single();
+
+    if (!res.error) {
+      data = res.data;
+      error = null;
+      break;
+    }
+
+    error = res.error;
+    const match = String(res.error.message || '').match(missingColumnPattern);
+    const missingCol = match?.[1];
+    if (!missingCol || !(missingCol in mutableInsertPayload)) break;
+    delete mutableInsertPayload[missingCol];
+  }
 
   if (error) {
     throw new Error(`Failed to insert inventory record: ${error.message}`);

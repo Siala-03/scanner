@@ -891,21 +891,32 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
       const rows = await importInventoryFromFile(file);
       if (rows.length === 0) throw new Error('No valid rows found in file');
       let updated = 0;
+      const isMinimartContext = window.location.pathname.toLowerCase().includes('minimart');
       for (const row of rows) {
-        await apiUpdateInventoryRecord(row.menuItemId, {
+        const basePayload = {
           stock:             row.stock,
           lowStockThreshold: row.lowStockThreshold,
           reorderPoint:      row.reorderPoint,
           reorderQty:        row.reorderQty,
           unitCost:          row.unitCost,
           cost:              row.unitCost,
-          price:             row.price,
           location:          row.location,
           unitMeasurement:   row.unitMeasurement,
-          description:       row.description,
-          expiryDate:        row.expiryDate,
-          purchaseDate:      row.purchaseDate,
-          qtyStart:          row.qtyStart,
+        };
+
+        const extendedPayload = isMinimartContext
+          ? {}
+          : {
+              price:       row.price,
+              description: row.description,
+              expiryDate:  row.expiryDate,
+              purchaseDate: row.purchaseDate,
+              qtyStart:    row.qtyStart,
+            };
+
+        await apiUpdateInventoryRecord(row.menuItemId, {
+          ...basePayload,
+          ...extendedPayload,
         });
         updated++;
       }
@@ -1485,8 +1496,9 @@ export function InventoryManagement({ role }: InventoryManagementProps) {
                             <div className="flex items-center gap-2 flex-wrap">
                               <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
                                 isCostChange         ? 'bg-amber-500/20 text-amber-300' :
-                                mv.type === 'sale'   ? 'bg-red-500/15 text-red-300' :
-                                mv.type === 'restock'? 'bg-emerald-500/15 text-emerald-300' :
+                                mv.type === 'purchase'? 'bg-emerald-500/15 text-emerald-300' :
+                                mv.type === 'waste'  ? 'bg-red-500/15 text-red-300' :
+                                mv.type === 'adjustment' ? 'bg-blue-500/15 text-blue-300' :
                                                        'bg-slate-600/50 text-slate-300'
                               }`}>
                                 {isCostChange ? 'Cost Change' : mv.type.charAt(0).toUpperCase() + mv.type.slice(1)}
