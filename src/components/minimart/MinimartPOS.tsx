@@ -37,6 +37,9 @@ interface ShiftTxn {
   itemCount: number;
   items: Array<{ name: string; qty: number; price: number }>;
   timestamp: Date;
+  refundAmount?: number;
+  refundReason?: string;
+  refundedAt?: string;
 }
 
 type TransactionSort = 'newest' | 'oldest';
@@ -207,21 +210,47 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
         }
       }
       const PLABEL: Record<string, string> = { '01': 'Cash', '02': 'Card', '04': 'Mobile Money' };
-      const rows: ShiftTxn[] = (data || []).map((o: any) => ({
-        id: o.id,
-        orderNumber: o.order_number || o.id.slice(-6).toUpperCase(),
-        total: o.total || 0,
-        paymentLabel: PLABEL[o.payment_type || o.payment_method] || o.payment_type || o.payment_method || 'Cash',
-        itemCount: Array.isArray(o.items) ? o.items.reduce((s: number, i: any) => s + (i.quantity || 1), 0) : 0,
-        items: Array.isArray(o.items)
-          ? o.items.map((i: any) => ({
-              name: i.menu_item_name || i.menuItemName || i.name || 'Item',
-              qty: i.quantity || 1,
-              price: i.total_price || i.totalPrice || (i.unit_price || 0) * (i.quantity || 1),
-            }))
-          : [],
-        timestamp: new Date(o.created_at),
-      }));
+      const orderIds = (data || []).map((o: any) => o.id);
+
+      // Fetch approved refunds for these orders
+      const refundMap: Record<string, { amount: number; reason: string; createdAt: string }> = {};
+      if (orderIds.length > 0) {
+        const { data: refunds } = await supabase
+          .from('minimart_refunds')
+          .select('order_id, refund_amount, reason, created_at')
+          .in('order_id', orderIds);
+        (refunds || []).forEach((r: any) => {
+          if (r.order_id) {
+            refundMap[r.order_id] = {
+              amount: Number(r.refund_amount || 0),
+              reason: r.reason || '',
+              createdAt: r.created_at,
+            };
+          }
+        });
+      }
+
+      const rows: ShiftTxn[] = (data || []).map((o: any) => {
+        const ref = refundMap[o.id];
+        return {
+          id: o.id,
+          orderNumber: o.order_number || o.id.slice(-6).toUpperCase(),
+          total: o.total || 0,
+          paymentLabel: PLABEL[o.payment_type || o.payment_method] || o.payment_type || o.payment_method || 'Cash',
+          itemCount: Array.isArray(o.items) ? o.items.reduce((s: number, i: any) => s + (i.quantity || 1), 0) : 0,
+          items: Array.isArray(o.items)
+            ? o.items.map((i: any) => ({
+                name: i.menu_item_name || i.menuItemName || i.name || 'Item',
+                qty: i.quantity || 1,
+                price: i.total_price || i.totalPrice || (i.unit_price || 0) * (i.quantity || 1),
+              }))
+            : [],
+          timestamp: new Date(o.created_at),
+          refundAmount: ref?.amount,
+          refundReason: ref?.reason,
+          refundedAt: ref?.createdAt,
+        };
+      });
       setShiftTxns(rows);
     } catch {
       // non-fatal
@@ -506,12 +535,18 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
 
   const cashierInitials = (cashier?.name ?? 'C').split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
 
-  // ── History Modal ──────────────────────────────────────────────────────────
+  // ── History / Sales Records ────────────────────────────────────────────────
   if (showHistory) {
+    const grossTotal   = shiftTxns.reduce((s, t) => s + t.total, 0);
+    const totalRefunds = shiftTxns.reduce((s, t) => s + (t.refundAmount ?? 0), 0);
+    const netTotal     = grossTotal - totalRefunds;
+    const refundedCount = shiftTxns.filter((t) => t.refundAmount).length;
+
     return (
       <>
       <div className="fixed inset-0 bg-slate-950 flex flex-col z-50">
-        <div className="flex items-center gap-3 px-4 py-4 bg-slate-900 border-b border-slate-800/80 shrink-0">
+        {/* Header */}
+        <div className="flex items-center gap-3 px-4 py-3.5 bg-slate-900 border-b border-slate-800/80 shrink-0">
           <button
             onClick={() => setShowHistory(false)}
             className="p-2 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
@@ -519,8 +554,11 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
             <XIcon className="w-4 h-4" />
           </button>
           <div className="flex-1 min-w-0">
-            <p className="font-bold text-white text-sm">Today's Sales</p>
-            <p className="text-xs text-slate-400 mt-0.5">{shiftTxns.length} transaction{shiftTxns.length !== 1 ? 's' : ''} · {formatPrice(shiftSales.total)}</p>
+            <p className="font-bold text-white text-sm">Sales Records — Today</p>
+            <p className="text-xs text-slate-400 mt-0.5">
+              {shiftTxns.length} sale{shiftTxns.length !== 1 ? 's' : ''}
+              {refundedCount > 0 ? ` · ${refundedCount} refunded` : ''}
+            </p>
           </div>
           <button
             onClick={loadShiftTxns}
@@ -529,7 +567,27 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
             <RefreshCwIcon className={`w-4 h-4 ${txnsLoading ? 'animate-spin' : ''}`} />
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto p-4 space-y-2">
+
+        {/* Summary bar */}
+        <div className="flex gap-0 shrink-0 border-b border-slate-800/60 bg-slate-900/60">
+          <div className="flex-1 px-4 py-2.5 border-r border-slate-800/60">
+            <p className="text-[10px] text-slate-500 uppercase tracking-wide">Gross Sales</p>
+            <p className="text-sm font-bold text-white mt-0.5">{formatPrice(grossTotal)}</p>
+          </div>
+          {totalRefunds > 0 && (
+            <div className="flex-1 px-4 py-2.5 border-r border-slate-800/60">
+              <p className="text-[10px] text-orange-400/80 uppercase tracking-wide">Refunds</p>
+              <p className="text-sm font-bold text-orange-400 mt-0.5">-{formatPrice(totalRefunds)}</p>
+            </div>
+          )}
+          <div className="flex-1 px-4 py-2.5">
+            <p className="text-[10px] text-emerald-400/80 uppercase tracking-wide">Net Sales</p>
+            <p className="text-sm font-bold text-emerald-400 mt-0.5">{formatPrice(netTotal)}</p>
+          </div>
+        </div>
+
+        {/* Table */}
+        <div className="flex-1 overflow-auto">
           {txnsLoading ? (
             <div className="flex items-center justify-center h-40 text-slate-400">
               <RefreshCwIcon className="w-5 h-5 animate-spin mr-2" /> Loading…
@@ -543,57 +601,104 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
               <p className="text-xs text-slate-600 mt-1">Completed sales will appear here</p>
             </div>
           ) : (
-            shiftTxns.map((t) => (
-              <div key={t.id} className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
-                <button
-                  onClick={() => setExpandedTxn(expandedTxn === t.id ? null : t.id)}
-                  className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-slate-800/50 transition-colors"
-                >
-                  <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0">
-                    <CheckCircleIcon className="w-4 h-4 text-emerald-400" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-semibold text-white">#{t.orderNumber}</p>
-                      <span className="text-[10px] bg-slate-800 text-slate-400 border border-slate-700 px-2 py-0.5 rounded-full">{t.paymentLabel}</span>
-                    </div>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      {t.itemCount} item{t.itemCount !== 1 ? 's' : ''} · {t.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </p>
-                  </div>
-                  <p className="text-sm font-bold text-emerald-400 shrink-0">{formatPrice(t.total)}</p>
-                  {expandedTxn === t.id
-                    ? <ChevronUpIcon className="w-4 h-4 text-slate-500 shrink-0" />
-                    : <ChevronDownIcon className="w-4 h-4 text-slate-500 shrink-0" />}
-                </button>
-                {expandedTxn === t.id && (
-                  <div className="border-t border-slate-800 px-4 py-3 space-y-2 bg-slate-800/20">
-                    <div className="space-y-1.5">
-                      {t.items.map((item, idx) => (
-                        <div key={idx} className="flex justify-between text-xs">
-                          <span className="text-slate-300">{item.name} <span className="text-slate-500">×{item.qty}</span></span>
-                          <span className="text-slate-400 font-medium">{formatPrice(item.price)}</span>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="flex gap-2 pt-1">
-                      <button
-                        onClick={() => handleReprintTxn(t)}
-                        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-700 text-slate-300 hover:text-white text-xs font-medium transition-colors"
-                      >
-                        <PrinterIcon className="w-3 h-3" /> Reprint
-                      </button>
-                      <button
-                        onClick={() => setRefundingTxn({ id: t.id, orderNumber: t.orderNumber, total: t.total, paymentLabel: t.paymentLabel, items: t.items })}
-                        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-orange-500/15 border border-orange-500/25 text-orange-400 hover:bg-orange-500/25 text-xs font-medium transition-colors"
-                      >
-                        <RotateCcwIcon className="w-3 h-3" /> Refund
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))
+            <table className="w-full text-xs">
+              <thead className="sticky top-0 bg-slate-900 border-b border-slate-800/80 z-10">
+                <tr>
+                  <th className="text-left px-4 py-2.5 text-slate-500 font-medium">Time</th>
+                  <th className="text-left px-3 py-2.5 text-slate-500 font-medium">Order #</th>
+                  <th className="text-left px-3 py-2.5 text-slate-500 font-medium hidden sm:table-cell">Items</th>
+                  <th className="text-left px-3 py-2.5 text-slate-500 font-medium hidden sm:table-cell">Payment</th>
+                  <th className="text-right px-3 py-2.5 text-slate-500 font-medium">Amount</th>
+                  <th className="text-right px-3 py-2.5 text-orange-400/70 font-medium">Refund</th>
+                  <th className="text-right px-4 py-2.5 text-emerald-400/70 font-medium">Net</th>
+                  <th className="px-2 py-2.5"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/50">
+                {[...shiftTxns].sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime()).map((t) => {
+                  const isRefunded = !!t.refundAmount;
+                  const net = t.total - (t.refundAmount ?? 0);
+                  return (
+                    <Fragment key={t.id}>
+                      <tr className={`hover:bg-slate-800/30 transition-colors ${isRefunded ? 'bg-orange-950/10' : ''}`}>
+                        <td className="px-4 py-3 text-slate-400 whitespace-nowrap">
+                          {t.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </td>
+                        <td className="px-3 py-3 font-semibold text-white whitespace-nowrap">
+                          #{t.orderNumber}
+                        </td>
+                        <td className="px-3 py-3 text-slate-400 hidden sm:table-cell">
+                          {t.itemCount} item{t.itemCount !== 1 ? 's' : ''}
+                        </td>
+                        <td className="px-3 py-3 hidden sm:table-cell">
+                          <span className="bg-slate-800 text-slate-300 border border-slate-700 px-2 py-0.5 rounded-full text-[10px]">
+                            {t.paymentLabel}
+                          </span>
+                        </td>
+                        <td className="px-3 py-3 text-right font-medium text-white whitespace-nowrap">
+                          {formatPrice(t.total)}
+                        </td>
+                        <td className="px-3 py-3 text-right whitespace-nowrap">
+                          {isRefunded ? (
+                            <span className="text-orange-400 font-medium">-{formatPrice(t.refundAmount!)}</span>
+                          ) : (
+                            <span className="text-slate-700">—</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-right font-bold whitespace-nowrap">
+                          <span className={isRefunded ? 'text-orange-300' : 'text-emerald-400'}>
+                            {formatPrice(net)}
+                          </span>
+                        </td>
+                        <td className="px-2 py-3">
+                          <div className="flex gap-1 justify-end">
+                            <button
+                              onClick={() => handleReprintTxn(t)}
+                              title="Reprint"
+                              className="p-1.5 rounded-lg text-slate-500 hover:text-slate-200 hover:bg-slate-700 transition-colors"
+                            >
+                              <PrinterIcon className="w-3.5 h-3.5" />
+                            </button>
+                            {!isRefunded && (
+                              <button
+                                onClick={() => setRefundingTxn({ id: t.id, orderNumber: t.orderNumber, total: t.total, paymentLabel: t.paymentLabel, items: t.items })}
+                                title="Request refund"
+                                className="p-1.5 rounded-lg text-orange-500/60 hover:text-orange-400 hover:bg-orange-500/10 transition-colors"
+                              >
+                                <RotateCcwIcon className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                      {isRefunded && (
+                        <tr className={`bg-orange-950/10`}>
+                          <td colSpan={8} className="px-4 pb-2 pt-0">
+                            <p className="text-[10px] text-orange-400/80 italic">
+                              Refund approved · {t.refundReason}
+                              {t.refundedAt ? ` · ${new Date(t.refundedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ''}
+                            </p>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  );
+                })}
+              </tbody>
+              <tfoot className="sticky bottom-0 bg-slate-900 border-t border-slate-800">
+                <tr>
+                  <td colSpan={4} className="px-4 py-2.5 text-slate-500 text-xs font-medium">
+                    {shiftTxns.length} transaction{shiftTxns.length !== 1 ? 's' : ''}
+                  </td>
+                  <td className="px-3 py-2.5 text-right font-bold text-white">{formatPrice(grossTotal)}</td>
+                  <td className="px-3 py-2.5 text-right font-bold text-orange-400">
+                    {totalRefunds > 0 ? `-${formatPrice(totalRefunds)}` : '—'}
+                  </td>
+                  <td className="px-4 py-2.5 text-right font-bold text-emerald-400">{formatPrice(netTotal)}</td>
+                  <td></td>
+                </tr>
+              </tfoot>
+            </table>
           )}
         </div>
       </div>

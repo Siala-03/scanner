@@ -83,11 +83,16 @@ type Page = 'dashboard' | 'transactions' | 'shifts' | 'products' | 'inventory' |
 type TransactionSort = 'newest' | 'oldest';
 
 interface MarginStat {
+  id: string;
   name: string;
-  revenue: number;
+  price: number;
   cost: number;
   margin: number;
   marginPct: number;
+  soldQty: number;
+  soldRevenue: number;
+  soldCost: number;
+  stock: number;
 }
 
 interface WasteStat {
@@ -104,6 +109,8 @@ interface Analytics {
   totalRevenue: number;
   totalCostOfGoods: number;
   grossMargin: number;
+  trackedItems: number;
+  soldItems: number;
 }
 
 const PAYMENT_LABEL: Record<string, string> = {
@@ -378,11 +385,11 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
       from.setDate(from.getDate() - 30);
       const fromIso = from.toISOString();
 
-      // Fetch products, inventory costs, and waste entries in parallel
+      // Fetch products, inventory costs/stock, and waste entries in parallel
       const [invRes, wasteRes, productsRes] = await Promise.allSettled([
         supabase
           .from('inventory_records')
-          .select('menu_item_id, unit_cost')
+          .select('menu_item_id, unit_cost, stock')
           .eq('restaurant_id', restaurantId),
         supabase
           .from('waste_entries')
@@ -395,10 +402,15 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
           .eq('restaurant_id', restaurantId),
       ]);
 
-      const costMap: Record<string, number> = {};
+      const invMap: Record<string, { unitCost: number; stock: number }> = {};
       if (invRes.status === 'fulfilled' && !invRes.value.error) {
         (invRes.value.data || []).forEach((r: any) => {
-          if (r.menu_item_id) costMap[r.menu_item_id] = Number(r.unit_cost ?? 0);
+          if (r.menu_item_id) {
+            invMap[r.menu_item_id] = {
+              unitCost: Number(r.unit_cost ?? 0),
+              stock: Number(r.stock ?? 0),
+            };
+          }
         });
       }
 
@@ -415,7 +427,7 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
         });
       }
 
-      // Build margin stats from real product prices vs inventory unit costs
+      // Build price map from menu items
       const products: Array<{ id: string; name: string; price: number }> = [];
       if (productsRes.status === 'fulfilled' && !productsRes.value.error) {
         (productsRes.value.data || []).forEach((p: any) => {
@@ -423,49 +435,71 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
         });
       }
 
-      // Fall back to transaction-derived data if no products fetched
-      const marginStats: MarginStat[] = products.length > 0
-        ? products
-            .map((p) => {
-              const unitCost = costMap[p.id] ?? 0;
-              const margin = p.price - unitCost;
-              const marginPct = p.price > 0 ? Math.round((margin / p.price) * 100) : 0;
-              return { name: p.name, revenue: p.price, cost: unitCost, margin, marginPct };
-            })
-            .filter((m) => m.revenue > 0)
-            .sort((a, b) => b.marginPct - a.marginPct)
-            .slice(0, 15)
-        : (() => {
-            const marginMap: Record<string, { revenue: number; cost: number }> = {};
-            transactions.forEach((t) => {
-              t.items.forEach((item: any) => {
-                const name = item.menu_item_name || item.menuItemName || item.name || 'Unknown';
-                const mid = item.menu_item_id || item.menuItemId || '';
-                const qty = item.quantity || 1;
-                const rev = item.total_price || item.totalPrice || (item.unit_price || 0) * qty || 0;
-                const unitCost = costMap[mid] ?? 0;
-                if (!marginMap[name]) marginMap[name] = { revenue: 0, cost: 0 };
-                marginMap[name].revenue += rev;
-                marginMap[name].cost += unitCost * qty;
-              });
-            });
-            return Object.entries(marginMap)
-              .map(([name, v]) => ({
-                name,
-                revenue: v.revenue,
-                cost: v.cost,
-                margin: v.revenue - v.cost,
-                marginPct: v.revenue > 0 ? Math.round(((v.revenue - v.cost) / v.revenue) * 100) : 0,
-              }))
-              .sort((a, b) => b.revenue - a.revenue)
-              .slice(0, 15);
-          })();
+      const menuMap: Record<string, { name: string; price: number }> = {};
+      const menuNameToId: Record<string, string> = {};
+      products.forEach((p) => {
+        menuMap[p.id] = { name: p.name, price: p.price };
+        menuNameToId[p.name.trim().toLowerCase()] = p.id;
+      });
 
-      const totalRevenue = marginStats.reduce((s, m) => s + m.revenue, 0);
-      const totalCostOfGoods = marginStats.reduce((s, m) => s + m.cost, 0);
+      const soldMap: Record<string, { qty: number; revenue: number }> = {};
+      transactions.forEach((t) => {
+        t.items.forEach((item: any) => {
+          const rawName = item.menu_item_name || item.menuItemName || item.name || '';
+          const directId = item.menu_item_id || item.menuItemId || '';
+          const resolvedId = directId || menuNameToId[String(rawName).trim().toLowerCase()] || '';
+          if (!resolvedId) return;
+
+          const qty = Number(item.quantity || 1);
+          const rev = Number(item.total_price || item.totalPrice || (item.unit_price || 0) * qty || 0);
+          if (!soldMap[resolvedId]) soldMap[resolvedId] = { qty: 0, revenue: 0 };
+          soldMap[resolvedId].qty += qty;
+          soldMap[resolvedId].revenue += rev;
+        });
+      });
+
+      const idSet = new Set<string>([
+        ...Object.keys(menuMap),
+        ...Object.keys(invMap),
+        ...Object.keys(soldMap),
+      ]);
+
+      const marginStats: MarginStat[] = Array.from(idSet)
+        .map((id) => {
+          const menu = menuMap[id];
+          const inv = invMap[id];
+          const sold = soldMap[id] || { qty: 0, revenue: 0 };
+          const price = Number(menu?.price ?? 0);
+          const unitCost = Number(inv?.unitCost ?? 0);
+          const margin = price - unitCost;
+          const marginPct = price > 0 ? Math.round((margin / price) * 100) : 0;
+          const soldCost = sold.qty * unitCost;
+          return {
+            id,
+            name: menu?.name || `Item ${id.slice(0, 8)}`,
+            price,
+            cost: unitCost,
+            margin,
+            marginPct,
+            soldQty: sold.qty,
+            soldRevenue: sold.revenue,
+            soldCost,
+            stock: Number(inv?.stock ?? 0),
+          };
+        })
+        .sort((a, b) => {
+          if (a.soldQty === 0 && b.soldQty > 0) return 1;
+          if (a.soldQty > 0 && b.soldQty === 0) return -1;
+          return a.name.localeCompare(b.name);
+        });
+
+      const totalRevenue = marginStats.reduce((s, m) => s + m.soldRevenue, 0);
+      const totalCostOfGoods = marginStats.reduce((s, m) => s + m.soldCost, 0);
       const grossMargin = totalRevenue > 0
         ? Math.round(((totalRevenue - totalCostOfGoods) / totalRevenue) * 100)
         : 0;
+      const trackedItems = marginStats.length;
+      const soldItems = marginStats.filter((m) => m.soldQty > 0).length;
 
       setAnalytics({
         marginStats,
@@ -474,6 +508,8 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
         totalRevenue,
         totalCostOfGoods,
         grossMargin,
+        trackedItems,
+        soldItems,
       });
     } catch (err) {
       console.error('Failed to load analytics:', err);
@@ -1490,7 +1526,7 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
             ) : (
               <>
                 {/* KPI summary */}
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
                   <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4">
                     <p className="text-[10px] text-slate-500 uppercase tracking-wide mb-1">Revenue</p>
                     <p className="text-lg font-bold text-slate-100">{formatPrice(analytics.totalRevenue)}</p>
@@ -1506,6 +1542,21 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
                     <p className={`text-lg font-bold ${analytics.grossMargin >= 30 ? 'text-emerald-400' : analytics.grossMargin >= 10 ? 'text-amber-400' : 'text-red-400'}`}>{analytics.grossMargin}%</p>
                     <p className="text-xs text-slate-500 mt-0.5">{analytics.totalCostOfGoods > 0 ? 'Based on unit costs' : 'Add unit costs in Inventory'}</p>
                   </div>
+                  <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4">
+                    <p className="text-[10px] text-slate-500 uppercase tracking-wide mb-1">Tracked Items</p>
+                    <p className="text-lg font-bold text-slate-100">{analytics.trackedItems}</p>
+                    <p className="text-xs text-slate-500 mt-0.5">Inventory + menu coverage</p>
+                  </div>
+                  <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4">
+                    <p className="text-[10px] text-slate-500 uppercase tracking-wide mb-1">Items Sold</p>
+                    <p className="text-lg font-bold text-slate-100">{analytics.soldItems}</p>
+                    <p className="text-xs text-slate-500 mt-0.5">Distinct SKUs sold in 30 days</p>
+                  </div>
+                  <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4">
+                    <p className="text-[10px] text-slate-500 uppercase tracking-wide mb-1">Negative Margins</p>
+                    <p className="text-lg font-bold text-red-400">{analytics.marginStats.filter((m) => m.price > 0 && m.cost > m.price).length}</p>
+                    <p className="text-xs text-slate-500 mt-0.5">Cost is above selling price</p>
+                  </div>
                 </div>
 
                 {/* Margin table */}
@@ -1514,24 +1565,39 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
                     <div className="px-5 py-3.5 border-b border-slate-800 flex items-center gap-2">
                       <TrendingUpIcon className="w-3.5 h-3.5 text-amber-400" />
                       <p className="text-xs font-semibold text-slate-300 uppercase tracking-wide">Product Margin Analysis</p>
+                      <span className="ml-auto text-[11px] text-slate-500">{analytics.marginStats.length} items</span>
                     </div>
-                    <div className="divide-y divide-slate-800">
-                      {analytics.marginStats.map((m) => (
-                        <div key={m.name} className="flex items-center gap-3 px-5 py-3">
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm text-slate-200 truncate">{m.name}</p>
-                            <p className="text-xs text-slate-500 mt-0.5">
-                              Price {formatPrice(m.revenue)} · Cost {m.cost > 0 ? formatPrice(m.cost) : <span className="text-slate-600">no cost set</span>}
-                            </p>
-                          </div>
-                          <div className="text-right shrink-0">
-                            <p className={`text-sm font-semibold ${m.marginPct >= 30 ? 'text-emerald-400' : m.marginPct >= 10 ? 'text-amber-400' : m.cost > 0 ? 'text-red-400' : 'text-slate-500'}`}>
-                              {m.cost > 0 ? `${m.marginPct}%` : '—'}
-                            </p>
-                            <p className="text-xs text-slate-600">{m.cost > 0 ? formatPrice(m.margin) : ''}</p>
-                          </div>
-                        </div>
-                      ))}
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full text-xs">
+                        <thead className="bg-slate-900/90 border-b border-slate-800">
+                          <tr>
+                            <th className="px-5 py-2.5 text-left font-semibold uppercase tracking-wide text-slate-400">Product</th>
+                            <th className="px-3 py-2.5 text-right font-semibold uppercase tracking-wide text-slate-400">Price</th>
+                            <th className="px-3 py-2.5 text-right font-semibold uppercase tracking-wide text-slate-400">Unit Cost</th>
+                            <th className="px-3 py-2.5 text-right font-semibold uppercase tracking-wide text-slate-400">Margin</th>
+                            <th className="px-3 py-2.5 text-right font-semibold uppercase tracking-wide text-slate-400">Sold Qty</th>
+                            <th className="px-3 py-2.5 text-right font-semibold uppercase tracking-wide text-slate-400">Sales Value</th>
+                            <th className="px-3 py-2.5 text-right font-semibold uppercase tracking-wide text-slate-400">Stock</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-800">
+                          {analytics.marginStats.map((m) => (
+                            <tr key={m.id} className="hover:bg-slate-800/25 transition-colors">
+                              <td className="px-5 py-2.5 text-slate-200">{m.name}</td>
+                              <td className="px-3 py-2.5 text-right text-slate-300">{m.price > 0 ? formatPrice(m.price) : '—'}</td>
+                              <td className="px-3 py-2.5 text-right text-slate-300">{m.cost > 0 ? formatPrice(m.cost) : '—'}</td>
+                              <td className="px-3 py-2.5 text-right">
+                                <span className={`font-semibold ${m.price === 0 || m.cost === 0 ? 'text-slate-500' : m.marginPct >= 30 ? 'text-emerald-400' : m.marginPct >= 10 ? 'text-amber-400' : 'text-red-400'}`}>
+                                  {m.price === 0 || m.cost === 0 ? '—' : `${m.marginPct}%`}
+                                </span>
+                              </td>
+                              <td className="px-3 py-2.5 text-right text-slate-300">{m.soldQty}</td>
+                              <td className="px-3 py-2.5 text-right text-slate-300">{m.soldRevenue > 0 ? formatPrice(m.soldRevenue) : '—'}</td>
+                              <td className="px-3 py-2.5 text-right text-slate-300">{m.stock}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
                     {analytics.totalCostOfGoods === 0 && (
                       <div className="px-5 py-3 bg-amber-500/5 border-t border-amber-500/15 flex items-center gap-2">
