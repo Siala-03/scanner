@@ -117,6 +117,19 @@ const PAYMENT_LABEL: Record<string, string> = {
   '01': 'Cash', '02': 'Card', '04': 'Mobile Money',
 };
 
+function decodeJwtPayload(token: string): Record<string, any> | null {
+  try {
+    const parts = token.split('.');
+    if (parts.length < 2) return null;
+    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
+    const json = atob(padded);
+    return JSON.parse(json);
+  } catch {
+    return null;
+  }
+}
+
 function buildDailyBars(txns: Transaction[], days: number): DailyBar[] {
   const bars: DailyBar[] = [];
   for (let i = days - 1; i >= 0; i--) {
@@ -139,6 +152,23 @@ function buildDailyBars(txns: Transaction[], days: number): DailyBar[] {
 }
 
 export function MinimartManagerDashboard({ restaurantId, restaurantName, manager, onLogout }: Props) {
+  const [sessionRestaurantId, setSessionRestaurantId] = useState('');
+  const activeRestaurantId = sessionRestaurantId || restaurantId;
+
+  useEffect(() => {
+    let mounted = true;
+    supabase.auth.getSession().then(({ data }) => {
+      if (!mounted) return;
+      const token = data.session?.access_token;
+      const payload = token ? decodeJwtPayload(token) : null;
+      const claim = payload?.restaurant_id;
+      if (typeof claim === 'string' && claim.trim()) {
+        setSessionRestaurantId(claim.trim());
+      }
+    }).catch(() => {});
+    return () => { mounted = false; };
+  }, []);
+
   const [page, setPage] = useState<Page>('dashboard');
   const [dateFilter, setDateFilter] = useState<DateFilter>('7d');
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -226,7 +256,7 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
         const res = await supabase
           .from('orders')
           .select(selectCols)
-          .eq('restaurant_id', restaurantId)
+          .eq('restaurant_id', activeRestaurantId)
           .gte('created_at', from.toISOString())
           .order('created_at', { ascending: false });
 
@@ -251,7 +281,7 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
         const allStaff = await fetchAllStaff();
         cashierNameMap = Object.fromEntries(
           allStaff
-            .filter((s) => s.restaurantId === restaurantId)
+            .filter((s) => s.restaurantId === activeRestaurantId)
             .map((s) => [s.id, s.name])
         );
       } catch {
@@ -338,7 +368,7 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
         const { data: refundData } = await supabase
           .from('minimart_refunds')
           .select('refund_amount')
-          .eq('restaurant_id', restaurantId)
+          .eq('restaurant_id', activeRestaurantId)
           .gte('created_at', from.toISOString());
         totalRefunds = (refundData || []).reduce((s: number, r: any) => s + Number(r.refund_amount ?? 0), 0);
       } catch {
@@ -363,19 +393,19 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
     } finally {
       setLoading(false);
     }
-  }, [restaurantId, dateFilter]);
+  }, [activeRestaurantId, dateFilter]);
 
   const loadCashiers = useCallback(async () => {
     setCashiersLoading(true);
     try {
       const all = await fetchAllStaff();
-      setCashiers(all.filter((s) => s.role === 'cashier' && s.restaurantId === restaurantId));
+      setCashiers(all.filter((s) => s.role === 'cashier' && s.restaurantId === activeRestaurantId));
     } catch (err) {
       console.error('Failed to load cashiers:', err);
     } finally {
       setCashiersLoading(false);
     }
-  }, [restaurantId]);
+  }, [activeRestaurantId]);
 
   const loadAnalytics = useCallback(async () => {
     setAnalyticsLoading(true);
@@ -395,7 +425,7 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
         const res = await supabase
           .from('orders')
           .select(selectCols)
-          .eq('restaurant_id', restaurantId)
+          .eq('restaurant_id', activeRestaurantId)
           .gte('created_at', fromIso)
           .order('created_at', { ascending: false });
         if (!res.error) {
@@ -414,16 +444,16 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
         supabase
           .from('inventory_records')
           .select('menu_item_id, unit_cost, stock')
-          .eq('restaurant_id', restaurantId),
+          .eq('restaurant_id', activeRestaurantId),
         supabase
           .from('waste_entries')
           .select('menu_item_name, qty, unit_cost, total_cost, reason')
-          .eq('restaurant_id', restaurantId)
+          .eq('restaurant_id', activeRestaurantId)
           .gte('timestamp', fromIso),
         supabase
           .from('menu_items')
           .select('id, name, price')
-          .eq('restaurant_id', restaurantId),
+          .eq('restaurant_id', activeRestaurantId),
       ]);
 
       const invMap: Record<string, { unitCost: number; stock: number }> = {};
@@ -541,14 +571,14 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
     } finally {
       setAnalyticsLoading(false);
     }
-  }, [restaurantId]);
+  }, [activeRestaurantId]);
 
   const loadRefundRequests = useCallback(async () => {
     setRefundsLoading(true);
     try {
       const [pending, all] = await Promise.all([
-        fetchRefundRequests(restaurantId, 'pending'),
-        fetchRefundRequests(restaurantId),
+        fetchRefundRequests(activeRestaurantId, 'pending'),
+        fetchRefundRequests(activeRestaurantId),
       ]);
       setPendingRefunds(pending);
       setAllRefunds(all);
@@ -557,11 +587,11 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
     } finally {
       setRefundsLoading(false);
     }
-  }, [restaurantId]);
+  }, [activeRestaurantId]);
 
   const loadSettings = useCallback(async () => {
     try {
-      const s = await getMinimartSettings(restaurantId);
+      const s = await getMinimartSettings(activeRestaurantId);
       setTaxRate(String(s.taxRate));
       setTaxLabel(s.taxLabel);
       setReceiptFooter(s.receiptFooter);
@@ -570,7 +600,7 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
     } finally {
       setSettingsLoading(false);
     }
-  }, [restaurantId]);
+  }, [activeRestaurantId]);
 
   const loadShifts = useCallback(async () => {
     setShiftsLoading(true);
@@ -578,7 +608,7 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
       const { data, error } = await supabase
         .from('cashier_shifts')
         .select('*')
-        .eq('restaurant_id', restaurantId)
+        .eq('restaurant_id', activeRestaurantId)
         .order('opened_at', { ascending: false })
         .limit(60);
       if (error) throw error;
@@ -603,7 +633,7 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
     } finally {
       setShiftsLoading(false);
     }
-  }, [restaurantId]);
+  }, [activeRestaurantId]);
 
   const handleOpenShift = async () => {
     if (!openShiftCashierId) { alert('Please select a cashier.'); return; }
@@ -612,7 +642,7 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
     setShiftSaving(true);
     try {
       await openShift({
-        restaurantId,
+        restaurantId: activeRestaurantId,
         cashierId: openShiftCashierId,
         cashierName: selectedCashier.name,
         openingFloat: parseFloat(openShiftFloat || '0'),
@@ -660,7 +690,7 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
     setSettingsError('');
     setSettingsSaved(false);
     try {
-      await upsertMinimartSettings(restaurantId, {
+      await upsertMinimartSettings(activeRestaurantId, {
         taxRate: parseFloat(taxRate) || 0,
         taxLabel: taxLabel.trim() || 'Tax',
         receiptFooter: receiptFooter.trim(),
@@ -691,7 +721,7 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
         requestId:    req.id,
         reviewedBy:   manager.id,
         reviewNotes:  reviewNotes.trim() || undefined,
-        restaurantId: restaurantId,
+        restaurantId: activeRestaurantId,
         orderId:      req.orderId,
         refundedBy:   manager.id,
         refundAmount: req.refundAmount,
