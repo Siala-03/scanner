@@ -113,6 +113,7 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName }: St
   const staffOptions = useMemo<StaffOption[]>(() => {
     const options = (staff || [])
       .map((member) => {
+        if (member?.role !== 'waiter') return null;
         const name = typeof member?.name === 'string' ? member.name.trim() : '';
         if (!member?.id || !name) return null;
         return { id: member.id, name, role: member.role };
@@ -121,7 +122,7 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName }: St
 
     options.sort((a, b) => a.name.localeCompare(b.name));
     return options;
-  }, [staff, staffName]);
+  }, [staff]);
 
   const selectedStaffName = useMemo(() => {
     return staffOptions.find((option) => option.id === selectedStaffId)?.name ?? '';
@@ -827,7 +828,7 @@ function CartPanel({
 
       <div className="rounded-xl border border-slate-700 bg-slate-900 p-4">
         <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-400">
-          Assign Staff
+          Assign Waiter
         </label>
         <select
           value={selectedStaffId}
@@ -835,7 +836,7 @@ function CartPanel({
           disabled={staffLoading || staffOptions.length === 0}
           className="mb-3 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white placeholder-slate-500 focus:border-amber-500 focus:outline-none"
         >
-          <option value="">{staffLoading ? 'Loading staff...' : 'Select staff member'}</option>
+          <option value="">{staffLoading ? 'Loading waiters...' : 'Select waiter'}</option>
           {staffOptions.map((option) => (
             <option key={option.id} value={option.id}>
               {option.name}{option.role ? ` (${option.role})` : ''}

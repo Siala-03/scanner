@@ -676,18 +676,30 @@ export function WaiterDashboard({
     o.tableNumber === 999 ||
     (o as any).table_number === 999;
 
+  const isAssignedToCurrentWaiter = useCallback((order: Order) => {
+    const waiterIdStr = String(waiter.id).trim();
+    return (
+      String(order.assignedWaiterId ?? '').trim() === waiterIdStr ||
+      String((order as any).assigned_waiter_id ?? '').trim() === waiterIdStr ||
+      String((order as any).assigned_to ?? '').trim() === waiterIdStr
+    );
+  }, [waiter.id]);
+
   // ── Orders scoped to this waiter's assigned tables, excluding online (table 999) ──
   const myOrders = useMemo(() => {
     const assigned = waiter.assignedTables ?? [];
     const tableOrders = orders.filter((o) => !isOnline(o));
-    if (assigned.length === 0) return tableOrders;
+    if (assigned.length === 0) {
+      return tableOrders.filter((o) => isAssignedToCurrentWaiter(o));
+    }
     return tableOrders.filter(
       (o) => {
+        if (isAssignedToCurrentWaiter(o)) return true;
         const tNum = o.tableNumber ?? (o as any).table_number;
         return tNum != null && assigned.includes(tNum);
       }
     );
-  }, [orders, waiter.assignedTables]);
+  }, [orders, waiter.assignedTables, isAssignedToCurrentWaiter]);
 
   // ── Derive waiter-call notifications from new pending orders (polling-safe) ──
   // Only notify about orders from this waiter's assigned tables.
