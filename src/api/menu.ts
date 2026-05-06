@@ -1,5 +1,15 @@
 import { supabase, type MenuItem } from '../lib/supabase';
 
+function isMissingColumnError(error: any, column: string): boolean {
+  const msg = String(error?.message || '').toLowerCase();
+  const col = column.toLowerCase();
+  return (
+    msg.includes(`could not find the '${col}' column`) ||
+    (msg.includes('column') && msg.includes(col) && msg.includes('does not exist')) ||
+    (msg.includes('schema cache') && msg.includes(col))
+  );
+}
+
 export function generateSku(name: string, sequence: number): string {
   const prefix = name
     .toUpperCase()
@@ -126,25 +136,42 @@ export async function createMenuItem(item: Partial<MenuItem> & { sku?: string })
       .eq('restaurant_id', restaurantId);
     sku = generateSku(item.name, (count ?? 0) + 1);
     // Ensure uniqueness — if collision, append a random suffix
-    const { data: existing } = await supabase
+    const { data: existing, error: skuCheckError } = await supabase
       .from('menu_items')
       .select('sku')
       .eq('restaurant_id', restaurantId)
       .eq('sku', sku)
       .maybeSingle();
-    if (existing) {
-      sku = generateSku(item.name, (count ?? 0) + 1 + Math.floor(Math.random() * 90 + 10));
+
+    // Older schemas may not have the sku column yet.
+    if (!skuCheckError) {
+      if (existing) {
+        sku = generateSku(item.name, (count ?? 0) + 1 + Math.floor(Math.random() * 90 + 10));
+      }
+    } else if (isMissingColumnError(skuCheckError, 'sku')) {
+      sku = null;
+    } else {
+      throw skuCheckError;
     }
   }
 
-  const { data, error } = await supabase
-    .from('menu_items')
-    .insert(toDbMenuItem({ ...item, sku } as Partial<MenuItem> & Record<string, any>, restaurantId, id))
-    .select()
-    .single();
+  const buildPayload = (withSku: boolean) =>
+    toDbMenuItem(
+      { ...item, ...(withSku ? { sku } : {}) } as Partial<MenuItem> & Record<string, any>,
+      restaurantId,
+      id,
+    );
 
-  if (error) throw error;
-  return data as MenuItem;
+  let payload = buildPayload(true);
+  let res = await supabase.from('menu_items').insert(payload).select().single();
+
+  if (res.error && isMissingColumnError(res.error, 'sku')) {
+    payload = buildPayload(false);
+    res = await supabase.from('menu_items').insert(payload).select().single();
+  }
+
+  if (res.error) throw res.error;
+  return res.data as MenuItem;
 }
 
 export async function updateMenuItem(id: string, updates: Partial<MenuItem> & { sku?: string }): Promise<MenuItem> {
@@ -169,7 +196,7 @@ export async function updateMenuItem(id: string, updates: Partial<MenuItem> & { 
   if ((updates as any).prepTime  !== undefined) payload.prep_time   = (updates as any).prepTime;
   if (updates.sku !== undefined) payload.sku = updates.sku?.trim() || null;
 
-  const { data, error } = await supabase
+  let res = await supabase
     .from('menu_items')
     .update(payload)
     .eq('id', id)
@@ -177,8 +204,19 @@ export async function updateMenuItem(id: string, updates: Partial<MenuItem> & { 
     .select()
     .single();
 
-  if (error) throw error;
-  return data as MenuItem;
+  if (res.error && isMissingColumnError(res.error, 'sku') && 'sku' in payload) {
+    const { sku: _omitSku, ...withoutSku } = payload;
+    res = await supabase
+      .from('menu_items')
+      .update(withoutSku)
+      .eq('id', id)
+      .eq('restaurant_id', restaurantId)
+      .select()
+      .single();
+  }
+
+  if (res.error) throw res.error;
+  return res.data as MenuItem;
 }
 
 export async function deleteMenuItem(id: string): Promise<void> {
