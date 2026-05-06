@@ -41,6 +41,28 @@ function getRestaurantId(): string | undefined {
   return undefined;
 }
 
+function decodeJwtPayload(token: string): Record<string, any> | null {
+  try {
+    const parts = token.split('.');
+    if (parts.length < 2) return null;
+    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
+    const json = atob(padded);
+    return JSON.parse(json);
+  } catch {
+    return null;
+  }
+}
+
+async function resolveRestaurantId(): Promise<string | undefined> {
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+  const payload = token ? decodeJwtPayload(token) : null;
+  const claimId = payload?.restaurant_id;
+  if (typeof claimId === 'string' && claimId.trim()) return claimId.trim();
+  return getRestaurantId();
+}
+
 function getStaffId(): string {
   return localStorage.getItem('staffId') || 'system';
 }
@@ -203,7 +225,7 @@ function normalizeWasteEntry(raw: any): WasteEntry {
 // ── Inventory Records ────────────────────────────────────────────────────────
 
 export async function fetchInventory(): Promise<InventoryRecord[]> {
-  const restaurantId = getRestaurantId();
+  const restaurantId = await resolveRestaurantId();
   if (!restaurantId) return [];
 
   const { data, error } = await supabase
@@ -228,7 +250,7 @@ export async function fetchInventoryById(menuItemId: string): Promise<InventoryR
 }
 
 export async function createInventoryRecord(record: Partial<InventoryRecord>): Promise<InventoryRecord> {
-  const restaurantId = getRestaurantId();
+  const restaurantId = await resolveRestaurantId();
   const id = `inv-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   const stock = Math.round(Number(record.stock) || 0);
   const lowStockThreshold = Math.round(Number(record.lowStockThreshold) || 5);
@@ -298,7 +320,7 @@ export async function updateInventoryRecord(
   menuItemId: string,
   record: Partial<InventoryRecord> & Record<string, any>
 ): Promise<InventoryRecord> {
-  const restaurantId = getRestaurantId();
+  const restaurantId = await resolveRestaurantId();
   if (!restaurantId) {
     throw new Error('No company selected. Please sign in again or reselect your company.');
   }
@@ -485,7 +507,7 @@ export async function relinkInventoryRecord(
   oldMenuItemId: string,
   newMenuItemId: string,
 ): Promise<void> {
-  const restaurantId = getRestaurantId();
+  const restaurantId = await resolveRestaurantId();
   if (!restaurantId) throw new Error('No company selected');
 
   const { error } = await supabase
@@ -498,7 +520,7 @@ export async function relinkInventoryRecord(
 }
 
 export async function delinkInventoryRecord(menuItemId: string): Promise<void> {
-  const restaurantId = getRestaurantId();
+  const restaurantId = await resolveRestaurantId();
   if (!restaurantId) throw new Error('No company selected');
 
   const { error } = await supabase

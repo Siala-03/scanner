@@ -51,8 +51,30 @@ function getRestaurantId(): string | null {
   return null;
 }
 
+function decodeJwtPayload(token: string): Record<string, any> | null {
+  try {
+    const parts = token.split('.');
+    if (parts.length < 2) return null;
+    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
+    const json = atob(padded);
+    return JSON.parse(json);
+  } catch {
+    return null;
+  }
+}
+
+async function resolveRestaurantId(): Promise<string | null> {
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+  const payload = token ? decodeJwtPayload(token) : null;
+  const claimId = payload?.restaurant_id;
+  if (typeof claimId === 'string' && claimId.trim()) return claimId.trim();
+  return getRestaurantId();
+}
+
 export async function fetchMenu(): Promise<MenuItem[]> {
-  const restaurantId = getRestaurantId();
+  const restaurantId = await resolveRestaurantId();
   
   // Superadmin doesn't have a restaurant - show empty or all
   if (!restaurantId) {
@@ -74,7 +96,7 @@ export async function fetchMenu(): Promise<MenuItem[]> {
 }
 
 export async function fetchMenuByCategory(category: string): Promise<MenuItem[]> {
-  const restaurantId = getRestaurantId();
+  const restaurantId = await resolveRestaurantId();
   if (!restaurantId) return [];
   
   const { data, error } = await supabase
@@ -90,7 +112,7 @@ export async function fetchMenuByCategory(category: string): Promise<MenuItem[]>
 }
 
 export async function createMenuItem(item: Partial<MenuItem> & { sku?: string }): Promise<MenuItem> {
-  const restaurantId = getRestaurantId();
+  const restaurantId = await resolveRestaurantId();
   if (!restaurantId) throw new Error('No company selected');
 
   const id = `item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -126,7 +148,7 @@ export async function createMenuItem(item: Partial<MenuItem> & { sku?: string })
 }
 
 export async function updateMenuItem(id: string, updates: Partial<MenuItem> & { sku?: string }): Promise<MenuItem> {
-  const restaurantId = getRestaurantId();
+  const restaurantId = await resolveRestaurantId();
   if (!restaurantId) throw new Error('No company selected');
 
   const payload: Record<string, any> = { updated_at: new Date().toISOString() };
@@ -177,7 +199,7 @@ export async function toggleMenuItemAvailability(id: string, isAvailable: boolea
 }
 
 export async function uploadMenu(items: Partial<MenuItem>[]): Promise<{ message: string; count: number }> {
-  const restaurantId = getRestaurantId();
+  const restaurantId = await resolveRestaurantId();
   if (!restaurantId) throw new Error('No company selected');
   
   const itemsToInsert = items.map((item, index) =>
@@ -190,7 +212,7 @@ export async function uploadMenu(items: Partial<MenuItem>[]): Promise<{ message:
 }
 
 export async function clearMenu(): Promise<{ message: string }> {
-  const restaurantId = getRestaurantId();
+  const restaurantId = await resolveRestaurantId();
   if (!restaurantId) throw new Error('No company selected');
   
   const { error } = await supabase.from('menu_items').delete().eq('restaurant_id', restaurantId);
@@ -199,7 +221,7 @@ export async function clearMenu(): Promise<{ message: string }> {
 }
 
 export async function fetchCategories(): Promise<string[]> {
-  const restaurantId = getRestaurantId();
+  const restaurantId = await resolveRestaurantId();
   if (!restaurantId) return [];
   
   const { data, error } = await supabase
