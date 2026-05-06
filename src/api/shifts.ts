@@ -1,5 +1,42 @@
 import { supabase } from '../lib/supabase';
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+const SHIFT_SELECT_CANDIDATES = [
+  'id, restaurant_id, cashier_id, cashier_name, opened_at, closed_at, opening_float, closing_float, expected_cash, cash_variance, total_sales, total_transactions, status, notes',
+  'id, restaurant_id, cashier_id, opened_at, closed_at, opening_float, closing_float, expected_cash, cash_variance, total_sales, total_transactions, status, notes',
+  'id, restaurant_id, cashier_id, opened_at, closed_at, opening_float, closing_float, expected_cash, cash_variance, total_sales, total_transactions, status',
+  'id, restaurant_id, cashier_id, opened_at, closed_at, opening_float, closing_float, total_sales, total_transactions, status',
+  '*',
+];
+
+function isMissingColumnError(error: any): boolean {
+  const message = String(error?.message || '').toLowerCase();
+  return error?.code === 'PGRST204' || (message.includes('column') && message.includes('does not exist'));
+}
+
+function assertRestaurantId(restaurantId: string): void {
+  if (!UUID_RE.test(restaurantId)) {
+    throw new Error('Invalid restaurant configuration. Sign out and sign in again.');
+  }
+}
+
+async function selectSingleShift(
+  build: (selectCols: string) => ReturnType<typeof supabase.from>
+): Promise<any> {
+  let lastError: any = null;
+
+  for (const selectCols of SHIFT_SELECT_CANDIDATES) {
+    const query = build(selectCols) as any;
+    const { data, error } = await query;
+    if (!error) return data;
+    lastError = error;
+    if (!isMissingColumnError(error)) break;
+  }
+
+  throw lastError;
+}
+
 export interface CashierShift {
   id: string;
   restaurantId: string;
@@ -40,21 +77,24 @@ export async function getActiveShift(
   restaurantId: string,
   cashierId: string
 ): Promise<CashierShift | null> {
-  const { data, error } = await supabase
-    .from('cashier_shifts')
-    .select('*')
-    .eq('restaurant_id', restaurantId)
-    .eq('cashier_id', cashierId)
-    .eq('status', 'open')
-    .order('opened_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (error) {
+  try {
+    assertRestaurantId(restaurantId);
+    const data = await selectSingleShift((selectCols) =>
+      supabase
+        .from('cashier_shifts')
+        .select(selectCols)
+        .eq('restaurant_id', restaurantId)
+        .eq('cashier_id', cashierId)
+        .eq('status', 'open')
+        .order('opened_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+    );
+    return data ? normalize(data) : null;
+  } catch (error: any) {
     console.warn('[shifts] getActiveShift:', error.message);
     return null;
   }
-  return data ? normalize(data) : null;
 }
 
 export async function openShift(params: {
@@ -63,20 +103,44 @@ export async function openShift(params: {
   cashierName: string;
   openingFloat: number;
 }): Promise<CashierShift> {
-  const { data, error } = await supabase
-    .from('cashier_shifts')
-    .insert({
-      restaurant_id: params.restaurantId,
-      cashier_id:    params.cashierId,
-      cashier_name:  params.cashierName,
-      opening_float: Math.round(params.openingFloat * 100) / 100,
-      status:        'open',
-    })
-    .select()
-    .single();
+  assertRestaurantId(params.restaurantId);
 
-  if (error) throw error;
-  return normalize(data);
+  const roundedFloat = Math.round(params.openingFloat * 100) / 100;
+  const payloads = [
+    {
+      restaurant_id: params.restaurantId,
+      cashier_id: params.cashierId,
+      cashier_name: params.cashierName,
+      opening_float: roundedFloat,
+      status: 'open',
+    },
+    {
+      restaurant_id: params.restaurantId,
+      cashier_id: params.cashierId,
+      opening_float: roundedFloat,
+      status: 'open',
+    },
+    {
+      restaurant_id: params.restaurantId,
+      cashier_id: params.cashierId,
+      opening_float: roundedFloat,
+    },
+  ];
+
+  let lastError: any = null;
+  for (const payload of payloads) {
+    const { data, error } = await supabase
+      .from('cashier_shifts')
+      .insert(payload)
+      .select()
+      .single();
+
+    if (!error) return normalize(data);
+    lastError = error;
+    if (!isMissingColumnError(error)) break;
+  }
+
+  throw lastError;
 }
 
 export async function closeShift(
@@ -92,22 +156,48 @@ export async function closeShift(
   const cashVariance =
     Math.round((params.closingFloat - params.expectedCash) * 100) / 100;
 
-  const { data, error } = await supabase
-    .from('cashier_shifts')
-    .update({
-      status:             'closed',
-      closed_at:          new Date().toISOString(),
-      closing_float:      Math.round(params.closingFloat * 100) / 100,
-      expected_cash:      Math.round(params.expectedCash * 100) / 100,
-      cash_variance:      cashVariance,
-      total_sales:        Math.round(params.totalSales * 100) / 100,
+  const payloads = [
+    {
+      status: 'closed',
+      closed_at: new Date().toISOString(),
+      closing_float: Math.round(params.closingFloat * 100) / 100,
+      expected_cash: Math.round(params.expectedCash * 100) / 100,
+      cash_variance: cashVariance,
+      total_sales: Math.round(params.totalSales * 100) / 100,
       total_transactions: params.totalTransactions,
-      notes:              params.notes ?? null,
-    })
-    .eq('id', shiftId)
-    .select()
-    .single();
+      notes: params.notes ?? null,
+    },
+    {
+      status: 'closed',
+      closed_at: new Date().toISOString(),
+      closing_float: Math.round(params.closingFloat * 100) / 100,
+      expected_cash: Math.round(params.expectedCash * 100) / 100,
+      cash_variance: cashVariance,
+      total_sales: Math.round(params.totalSales * 100) / 100,
+      total_transactions: params.totalTransactions,
+    },
+    {
+      status: 'closed',
+      closed_at: new Date().toISOString(),
+      closing_float: Math.round(params.closingFloat * 100) / 100,
+      total_sales: Math.round(params.totalSales * 100) / 100,
+      total_transactions: params.totalTransactions,
+    },
+  ];
 
-  if (error) throw error;
-  return normalize(data);
+  let lastError: any = null;
+  for (const payload of payloads) {
+    const { data, error } = await supabase
+      .from('cashier_shifts')
+      .update(payload)
+      .eq('id', shiftId)
+      .select()
+      .single();
+
+    if (!error) return normalize(data);
+    lastError = error;
+    if (!isMissingColumnError(error)) break;
+  }
+
+  throw lastError;
 }
