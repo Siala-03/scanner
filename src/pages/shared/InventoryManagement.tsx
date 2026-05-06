@@ -818,6 +818,7 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
     }
 
     try {
+      const existingByName = locations.find((l) => l.name.trim().toLowerCase() === name.toLowerCase());
       await apiCreateLocation({
         name,
         type: newLocation.type,
@@ -834,7 +835,7 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
         capacity: '',
         temperatureRange: '',
       });
-      alert('Location created successfully');
+      alert(existingByName ? 'Location already exists. Reused existing location.' : 'Location created successfully');
     } catch (err) {
       console.error('Failed to create location', err);
       alert(`Failed to create location: ${getErrorMessage(err)}`);

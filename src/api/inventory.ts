@@ -1224,6 +1224,17 @@ function isMissingLocationsTableError(error: unknown): boolean {
   );
 }
 
+function isDuplicateLocationNameError(error: unknown): boolean {
+  const message = error instanceof Error
+    ? error.message
+    : String((error as any)?.message ?? error ?? '');
+  const msg = message.toLowerCase();
+  return (
+    msg.includes('duplicate key value violates unique constraint') &&
+    msg.includes('idx_inventory_locations_restaurant_name_unique')
+  );
+}
+
 function locationFallbackStorageKey(restaurantId: string): string {
   return `inventory_locations_fallback:${restaurantId}`;
 }
@@ -1373,6 +1384,20 @@ export async function createLocation(payload: {
   capacity?: number;
   temperatureRange?: string;
 }): Promise<InventoryLocation> {
+  const restaurantId = getRestaurantId();
+  if (!restaurantId) throw new Error('No company selected');
+
+  const findExistingLocationByName = async (): Promise<InventoryLocation | null> => {
+    const { data: existing } = await supabase
+      .from('inventory_locations')
+      .select('*')
+      .eq('restaurant_id', restaurantId)
+      .ilike('name', payload.name)
+      .maybeSingle();
+
+    return existing ? normalizeLocation(existing) : null;
+  };
+
   try {
     const created = await apiRequest<any>('/locations', {
       method: 'POST',
@@ -1380,9 +1405,12 @@ export async function createLocation(payload: {
     });
     return normalizeLocation(created);
   } catch (apiErr) {
+    if (isDuplicateLocationNameError(apiErr)) {
+      const existing = await findExistingLocationByName();
+      if (existing) return existing;
+    }
+
     const apiMessage = apiErr instanceof Error ? apiErr.message : (apiErr && typeof apiErr === 'object' && 'message' in apiErr ? String((apiErr as any).message) : 'Backend location endpoint failed');
-    const restaurantId = getRestaurantId();
-    if (!restaurantId) throw new Error('No company selected');
 
     const id = `loc-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
     const { data, error } = await supabase
@@ -1401,6 +1429,11 @@ export async function createLocation(payload: {
       .single();
 
     if (error) {
+      if (isDuplicateLocationNameError(error)) {
+        const existing = await findExistingLocationByName();
+        if (existing) return existing;
+      }
+
       if (isMissingLocationsTableError(error)) {
         const now = new Date().toISOString();
         const location = normalizeLocation({
