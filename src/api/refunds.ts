@@ -1,15 +1,5 @@
 import { supabase } from '../lib/supabase';
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
-function assertUuid(value: string, field: string): void {
-  if (!UUID_RE.test(value)) {
-    throw new Error(
-      `Invalid ${field} — your session has a legacy ID. Please sign out and sign back in to continue.`
-    );
-  }
-}
-
 function decodeJwtPayload(token: string): Record<string, any> | null {
   try {
     const parts = token.split('.');
@@ -64,7 +54,6 @@ export async function createRefund(params: {
   reason: string;
   items?: Array<{ name: string; qty: number; price: number }>;
 }): Promise<MinimartRefund> {
-  assertUuid(params.restaurantId, 'restaurant ID');
   const { data, error } = await supabase
     .from('minimart_refunds')
     .insert({

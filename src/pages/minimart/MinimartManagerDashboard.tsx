@@ -20,6 +20,7 @@ import { MinimartProductManagement } from './MinimartProductManagement';
 import { getMinimartSettings, upsertMinimartSettings } from '../../api/minimartSettings';
 import { fetchRefundRequests, approveRefundRequest, denyRefundRequest } from '../../api/refunds';
 import type { MinimartRefundRequest } from '../../api/refunds';
+import { openShift, closeShift } from '../../api/shifts';
 import type { CashierShift } from '../../api/shifts';
 import type { Staff } from '../../types';
 
