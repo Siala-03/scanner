@@ -385,6 +385,30 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
       from.setDate(from.getDate() - 30);
       const fromIso = from.toISOString();
 
+      const orderSelectCandidates = [
+        'id, total, items, created_at, payment_status',
+        'id, total, items, created_at',
+      ];
+
+      let analyticsOrders: any[] = [];
+      for (const selectCols of orderSelectCandidates) {
+        const res = await supabase
+          .from('orders')
+          .select(selectCols)
+          .eq('restaurant_id', restaurantId)
+          .gte('created_at', fromIso)
+          .order('created_at', { ascending: false });
+        if (!res.error) {
+          analyticsOrders = (res.data || []).filter((o: any) => {
+            const ps = String(o.payment_status || '').toLowerCase();
+            return !ps || ['confirmed', 'paid', 'completed'].includes(ps);
+          });
+          break;
+        }
+        const msg = String(res.error.message || '').toLowerCase();
+        if (!msg.includes('column') && !msg.includes('does not exist')) break;
+      }
+
       // Fetch products, inventory costs/stock, and waste entries in parallel
       const [invRes, wasteRes, productsRes] = await Promise.allSettled([
         supabase
@@ -443,8 +467,9 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
       });
 
       const soldMap: Record<string, { qty: number; revenue: number }> = {};
-      transactions.forEach((t) => {
-        t.items.forEach((item: any) => {
+      analyticsOrders.forEach((o: any) => {
+        const orderItems: any[] = Array.isArray(o.items) ? o.items : [];
+        orderItems.forEach((item: any) => {
           const rawName = item.menu_item_name || item.menuItemName || item.name || '';
           const directId = item.menu_item_id || item.menuItemId || '';
           const resolvedId = directId || menuNameToId[String(rawName).trim().toLowerCase()] || '';
@@ -516,7 +541,7 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
     } finally {
       setAnalyticsLoading(false);
     }
-  }, [restaurantId, transactions]);
+  }, [restaurantId]);
 
   const loadRefundRequests = useCallback(async () => {
     setRefundsLoading(true);
@@ -1530,32 +1555,26 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
                   <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4">
                     <p className="text-[10px] text-slate-500 uppercase tracking-wide mb-1">Revenue</p>
                     <p className="text-lg font-bold text-slate-100">{formatPrice(analytics.totalRevenue)}</p>
-                    <p className="text-xs text-slate-500 mt-0.5">30-day period</p>
                   </div>
                   <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4">
                     <p className="text-[10px] text-slate-500 uppercase tracking-wide mb-1">Cost of Goods</p>
                     <p className="text-lg font-bold text-slate-100">{formatPrice(analytics.totalCostOfGoods)}</p>
-                    <p className="text-xs text-slate-500 mt-0.5">Est. at unit cost</p>
                   </div>
                   <div className={`border rounded-2xl p-4 ${analytics.grossMargin >= 30 ? 'bg-emerald-500/10 border-emerald-500/25' : analytics.grossMargin >= 10 ? 'bg-amber-500/10 border-amber-500/25' : 'bg-red-500/10 border-red-500/25'}`}>
                     <p className={`text-[10px] uppercase tracking-wide mb-1 ${analytics.grossMargin >= 30 ? 'text-emerald-600' : analytics.grossMargin >= 10 ? 'text-amber-600' : 'text-red-600'}`}>Gross Margin</p>
                     <p className={`text-lg font-bold ${analytics.grossMargin >= 30 ? 'text-emerald-400' : analytics.grossMargin >= 10 ? 'text-amber-400' : 'text-red-400'}`}>{analytics.grossMargin}%</p>
-                    <p className="text-xs text-slate-500 mt-0.5">{analytics.totalCostOfGoods > 0 ? 'Based on unit costs' : 'Add unit costs in Inventory'}</p>
                   </div>
                   <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4">
                     <p className="text-[10px] text-slate-500 uppercase tracking-wide mb-1">Tracked Items</p>
                     <p className="text-lg font-bold text-slate-100">{analytics.trackedItems}</p>
-                    <p className="text-xs text-slate-500 mt-0.5">Inventory + menu coverage</p>
                   </div>
                   <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4">
                     <p className="text-[10px] text-slate-500 uppercase tracking-wide mb-1">Items Sold</p>
                     <p className="text-lg font-bold text-slate-100">{analytics.soldItems}</p>
-                    <p className="text-xs text-slate-500 mt-0.5">Distinct SKUs sold in 30 days</p>
                   </div>
                   <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4">
                     <p className="text-[10px] text-slate-500 uppercase tracking-wide mb-1">Negative Margins</p>
                     <p className="text-lg font-bold text-red-400">{analytics.marginStats.filter((m) => m.price > 0 && m.cost > m.price).length}</p>
-                    <p className="text-xs text-slate-500 mt-0.5">Cost is above selling price</p>
                   </div>
                 </div>
 
