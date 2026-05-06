@@ -49,6 +49,7 @@ interface ProductStat {
 
 interface Summary {
   revenue: number;
+  grossProfit: number;
   totalRefunds: number;
   transactions: number;
   avgSale: number;
@@ -173,7 +174,7 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
   const [dateFilter, setDateFilter] = useState<DateFilter>('7d');
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [summary, setSummary] = useState<Summary>({
-    revenue: 0, totalRefunds: 0, transactions: 0, avgSale: 0, totalItems: 0, peakDay: '',
+    revenue: 0, grossProfit: 0, totalRefunds: 0, transactions: 0, avgSale: 0, totalItems: 0, peakDay: '',
     hourlyBars: [],
     byCashier: {}, byPayment: {}, byCategory: {}, dailyBars: [], topProducts: [],
   });
@@ -313,6 +314,17 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
       const productMap: Record<string, { qty: number; revenue: number }> = {};
       let totalItems = 0;
 
+      // Cost map for gross profit estimate on dashboard cards
+      const { data: invCostRows } = await supabase
+        .from('inventory_records')
+        .select('menu_item_id, unit_cost')
+        .eq('restaurant_id', activeRestaurantId);
+      const unitCostMap: Record<string, number> = {};
+      (invCostRows || []).forEach((r: any) => {
+        if (r.menu_item_id) unitCostMap[r.menu_item_id] = Number(r.unit_cost ?? 0);
+      });
+      let totalCostOfGoods = 0;
+
       txns.forEach((t) => {
         if (!byCashier[t.cashierName]) byCashier[t.cashierName] = { count: 0, revenue: 0 };
         byCashier[t.cashierName].count += 1;
@@ -327,6 +339,9 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
           const name = item.menu_item_name || item.menuItemName || item.name || 'Unknown';
           const qty = item.quantity || 1;
           const rev = item.total_price || item.totalPrice || (item.unit_price || 0) * qty || 0;
+          const menuItemId = item.menu_item_id || item.menuItemId || '';
+          const unitCost = unitCostMap[menuItemId] ?? 0;
+          totalCostOfGoods += unitCost * qty;
           const cat = item.category || 'Uncategorized';
           if (!productMap[name]) productMap[name] = { qty: 0, revenue: 0 };
           productMap[name].qty += qty;
@@ -376,10 +391,12 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
       }
 
       const netRevenue = Math.max(0, revenue - totalRefunds);
+      const grossProfit = netRevenue - totalCostOfGoods;
 
       setTransactions(txns);
       setSummary({
         revenue: netRevenue,
+        grossProfit,
         totalRefunds,
         transactions: txns.length,
         avgSale: txns.length > 0 ? netRevenue / txns.length : 0,
@@ -843,12 +860,6 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
     <div className="flex flex-col min-h-screen bg-slate-950 text-slate-100">
       {/* Header */}
       <header className="sticky top-0 z-40 bg-slate-900 border-b border-emerald-900/60">
-        {/* Distinct minimart identity strip — prevents confusion with lounge/restaurant portal */}
-        <div className="bg-emerald-950/80 border-b border-emerald-900/50 px-4 py-1.5 flex items-center gap-2">
-          <ShoppingBagIcon className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-          <span className="text-xs font-bold text-emerald-400 uppercase tracking-widest">Minimart Portal</span>
-          <span className="text-emerald-700 text-xs hidden sm:inline">&mdash; {restaurantName}</span>
-        </div>
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
           <div>
             <p className="font-semibold text-slate-100 truncate">{restaurantName}</p>
@@ -925,7 +936,7 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
             ) : (
               <div className="space-y-6">
                 {/* KPI cards */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
                   <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4">
                     <div className="flex items-center gap-1.5 text-slate-400 text-xs uppercase tracking-wide mb-2">
                       <TrendingUpIcon className="w-3.5 h-3.5 text-amber-400" /> Net Revenue
@@ -936,6 +947,15 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
                         ? <span className="text-red-400">−{formatPrice(summary.totalRefunds)} refunded</span>
                         : 'Confirmed sales'}
                     </p>
+                  </div>
+                  <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4">
+                    <div className="flex items-center gap-1.5 text-slate-400 text-xs uppercase tracking-wide mb-2">
+                      <TrendingUpIcon className="w-3.5 h-3.5 text-emerald-400" /> Gross Profit
+                    </div>
+                    <p className={`text-xl font-bold ${summary.grossProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                      {formatPrice(summary.grossProfit)}
+                    </p>
+                    <p className="text-xs text-slate-500 mt-1">Revenue minus estimated COGS</p>
                   </div>
                   <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4">
                     <div className="flex items-center gap-1.5 text-slate-400 text-xs uppercase tracking-wide mb-2">
