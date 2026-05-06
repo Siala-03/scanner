@@ -2,10 +2,69 @@ import { useState } from 'react';
 import {
   ClockIcon, DollarSignIcon, TrendingUpIcon, XIcon,
   CheckCircleIcon, AlertTriangleIcon, RefreshCwIcon,
-  LogInIcon, LogOutIcon,
+  LogInIcon, LogOutIcon, PrinterIcon,
 } from 'lucide-react';
 import { formatPrice } from '../../utils/currency';
 import type { CashierShift } from '../../api/shifts';
+
+function printShiftSummary(params: {
+  cashierName: string;
+  restaurantName: string;
+  openedAt: string;
+  shiftHours: number;
+  shiftMins: number;
+  salesCount: number;
+  totalRevenue: number;
+  openingFloat: number;
+  closingFloat: number;
+  expectedCash: number;
+  cashVariance: number;
+  paymentBreakdown: Record<string, number>;
+  notes: string;
+}) {
+  const varianceColour = params.cashVariance === 0 ? '#10b981' : params.cashVariance > 0 ? '#60a5fa' : '#f87171';
+  const varianceLabel  = params.cashVariance === 0 ? 'Balanced' : params.cashVariance > 0 ? 'Overage' : 'Shortage';
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Shift Summary</title>
+<style>
+  body{font-family:monospace;background:#fff;color:#111;width:300px;margin:0 auto;padding:12px;font-size:12px;}
+  h1{text-align:center;font-size:14px;margin:0 0 4px;}
+  .sub{text-align:center;font-size:11px;color:#555;margin-bottom:10px;}
+  hr{border:none;border-top:1px dashed #aaa;margin:8px 0;}
+  .row{display:flex;justify-content:space-between;margin:3px 0;}
+  .label{color:#555;}
+  .bold{font-weight:700;}
+  .total{font-size:13px;font-weight:700;}
+  .var{color:${varianceColour};font-weight:700;}
+  .footer{text-align:center;font-size:10px;color:#888;margin-top:12px;}
+</style></head><body>
+<h1>${params.restaurantName}</h1>
+<div class="sub">SHIFT SUMMARY REPORT</div>
+<hr/>
+<div class="row"><span class="label">Cashier</span><span class="bold">${params.cashierName}</span></div>
+<div class="row"><span class="label">Shift Start</span><span>${new Date(params.openedAt).toLocaleString()}</span></div>
+<div class="row"><span class="label">Duration</span><span>${params.shiftHours}h ${params.shiftMins}m</span></div>
+<hr/>
+<div class="row total"><span>Total Sales</span><span>${params.salesCount} txns</span></div>
+<div class="row total"><span>Revenue</span><span>${formatPrice(params.totalRevenue)}</span></div>
+<hr/>
+<div class="label" style="margin-bottom:4px;">Payment Breakdown</div>
+${Object.entries(params.paymentBreakdown).map(([m, v]) => `<div class="row"><span class="label">${m}</span><span>${formatPrice(v)}</span></div>`).join('')}
+<hr/>
+<div class="row"><span class="label">Opening Float</span><span>${formatPrice(params.openingFloat)}</span></div>
+<div class="row"><span class="label">Cash Sales</span><span>${formatPrice(params.paymentBreakdown['Cash'] ?? 0)}</span></div>
+<div class="row"><span class="label">Expected Cash</span><span class="bold">${formatPrice(params.expectedCash)}</span></div>
+<div class="row"><span class="label">Counted Cash</span><span class="bold">${formatPrice(params.closingFloat)}</span></div>
+<div class="row"><span class="label">Variance</span><span class="var">${params.cashVariance > 0 ? '+' : ''}${formatPrice(params.cashVariance)} (${varianceLabel})</span></div>
+${params.notes ? `<hr/><div class="label">Notes</div><div style="margin-top:4px;">${params.notes}</div>` : ''}
+<div class="footer">Printed ${new Date().toLocaleString()}</div>
+</body></html>`;
+  const win = window.open('', '_blank', 'width=360,height=640');
+  if (!win) { alert('Allow pop-ups to print shift summary.'); return; }
+  win.document.write(html);
+  win.document.close();
+  win.focus();
+  win.print();
+}
 
 interface ShiftTxnSummary {
   total: number;
@@ -304,6 +363,28 @@ export function ShiftModal({
             ) : (
               <><CheckCircleIcon className="w-4 h-4" /> Confirm & Close Shift</>
             )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => printShiftSummary({
+              cashierName,
+              restaurantName,
+              openedAt: currentShift?.openedAt ?? new Date().toISOString(),
+              shiftHours,
+              shiftMins,
+              salesCount: shiftSales.count,
+              totalRevenue: shiftSales.total,
+              openingFloat: openingFloat_,
+              closingFloat: counted,
+              expectedCash,
+              cashVariance: variance,
+              paymentBreakdown,
+              notes,
+            })}
+            className="w-full py-2.5 rounded-2xl border border-slate-600 text-slate-300 hover:bg-slate-800 text-sm font-medium transition-all flex items-center justify-center gap-2"
+          >
+            <PrinterIcon className="w-4 h-4" /> Print Shift Summary
           </button>
         </div>
       </div>

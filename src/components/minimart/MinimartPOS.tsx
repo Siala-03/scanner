@@ -82,7 +82,7 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
   const [checkingOut, setCheckingOut] = useState(false);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
   const [showCart, setShowCart] = useState(false);
-  const [shiftSales, setShiftSales] = useState({ count: 0, total: 0 });
+  const [shiftSales, setShiftSales] = useState({ count: 0, total: 0, byPayment: {} as Record<string, number> });
   const [receiptSettings, setReceiptSettings] = useState<RestaurantReceiptSettings>({});
   // Hold cart
   const [holdCart, setHoldCart] = useState<CartLine[] | null>(null);
@@ -94,8 +94,14 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
   const [txnSearch, setTxnSearch] = useState('');
   const [txnPaymentFilter, setTxnPaymentFilter] = useState('all');
   const [txnSort, setTxnSort] = useState<TransactionSort>('newest');
-  // Stock map: menuItemId -> current stock
+  // Stock map: menuItemId -> { stock, threshold }
   const [stockMap, setStockMap] = useState<Record<string, number>>({});
+  const [thresholdMap, setThresholdMap] = useState<Record<string, number>>({});
+  // Barcode / SKU quick-add
+  const [barcodeInput, setBarcodeInput] = useState('');
+  const [barcodeError, setBarcodeError] = useState('');
+  // SKU -> menuItemId lookup built when products load
+  const [skuMap, setSkuMap] = useState<Record<string, string>>({});
   // Sidebar tab
   const [sidebarTab, setSidebarTab] = useState<'cart' | 'txns'>('cart');
   // Refund workflow
@@ -111,15 +117,22 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
       todayStart.setHours(0, 0, 0, 0);
       const { data } = await supabase
         .from('orders')
-        .select('total')
+        .select('total, payment_type, payment_method')
         .eq('restaurant_id', restaurantId)
         .eq('payment_status', 'confirmed')
         .eq('payment_confirmed_by', cashier.id)
         .gte('created_at', todayStart.toISOString());
       const rows = data || [];
+      const byPayment: Record<string, number> = {};
+      rows.forEach((o: any) => {
+        const method = o.payment_type ?? o.payment_method ?? 'Unknown';
+        const label = method === 'cash' ? 'Cash' : method === 'card' ? 'Card' : method === 'mobile_money' ? 'Mobile Money' : method;
+        byPayment[label] = (byPayment[label] ?? 0) + (o.total || 0);
+      });
       setShiftSales({
         count: rows.length,
         total: rows.reduce((s: number, o: any) => s + (o.total || 0), 0),
+        byPayment,
       });
     } catch {
       // non-fatal
@@ -144,11 +157,16 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
   const loadStockMap = useCallback(async () => {
     try {
       const inv = await fetchInventory();
-      const map: Record<string, number> = {};
+      const stockM: Record<string, number> = {};
+      const threshM: Record<string, number> = {};
       (inv as InventoryRecord[]).forEach((r) => {
-        if (r.menuItemId) map[r.menuItemId] = r.stock ?? 0;
+        if (r.menuItemId) {
+          stockM[r.menuItemId] = r.stock ?? 0;
+          threshM[r.menuItemId] = r.lowStockThreshold ?? 5;
+        }
       });
-      setStockMap(map);
+      setStockMap(stockM);
+      setThresholdMap(threshM);
     } catch {
       // non-fatal
     }
@@ -243,6 +261,37 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
         return txnSort === 'oldest' ? delta : -delta;
       });
   }, [shiftTxns, txnSearch, txnPaymentFilter, txnSort]);
+
+  // Rebuild SKU map whenever products change
+  useEffect(() => {
+    const m: Record<string, string> = {};
+    products.forEach((p) => {
+      const sku = (p as any).sku;
+      if (sku) m[String(sku).toLowerCase()] = p.id;
+    });
+    setSkuMap(m);
+  }, [products]);
+
+  const handleBarcodeSubmit = (value: string) => {
+    const q = value.trim().toLowerCase();
+    if (!q) return;
+    // Match by SKU first, then by name prefix
+    const bySkuId = skuMap[q];
+    const product = bySkuId
+      ? products.find((p) => p.id === bySkuId)
+      : products.find((p) => p.name.toLowerCase() === q || (p as any).sku?.toLowerCase() === q);
+    if (product) {
+      if (stockMap[product.id] !== undefined && stockMap[product.id] <= 0) {
+        setBarcodeError(`"${product.name}" is out of stock.`);
+      } else {
+        addToCart(product);
+        setBarcodeError('');
+      }
+    } else {
+      setBarcodeError(`No product found for "${value.trim()}".`);
+    }
+    setBarcodeInput('');
+  };
 
   const categories = ['all', ...Array.from(new Set(products.map((p) => p.category))).sort()];
 
@@ -685,40 +734,102 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
           </button>
         </div>
 
-        {/* Shift stats strip */}
-        <div className="flex items-center gap-1 px-4 py-2">
-          <div className="flex items-center gap-2.5 flex-1">
-            <div className="flex items-center gap-2 bg-slate-800/50 border border-slate-700/40 rounded-xl px-3 py-1.5">
-              <span className="text-[10px] text-slate-500 uppercase tracking-wide">Sales</span>
-              <span className="text-xs font-bold text-slate-200">{shiftSales.count}</span>
+        {/* Shift summary widget */}
+        <div className="px-4 pb-2">
+          {holdCart && (
+            <div className="flex justify-end mb-1.5">
+              <button
+                onClick={recallHeldCart}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-400 text-xs font-semibold hover:bg-amber-500/25 transition-colors"
+              >
+                <BookmarkCheckIcon className="w-3 h-3" /> Recall Hold
+              </button>
             </div>
-            <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-3 py-1.5">
-              <span className="text-[10px] text-emerald-600 uppercase tracking-wide">Revenue</span>
-              <span className="text-xs font-bold text-emerald-400">{formatPrice(shiftSales.total)}</span>
+          )}
+          <div className="rounded-2xl bg-slate-800/60 border border-slate-700/50 overflow-hidden">
+            {/* Top row: key KPIs */}
+            <div className="flex items-center gap-0 divide-x divide-slate-700/50">
+              <div className="flex flex-col items-center px-4 py-2.5 flex-1">
+                <span className="text-[9px] text-slate-500 uppercase tracking-wider mb-0.5">Sales</span>
+                <span className="text-sm font-bold text-slate-200">{shiftSales.count}</span>
+              </div>
+              <div className="flex flex-col items-center px-4 py-2.5 flex-1">
+                <span className="text-[9px] text-emerald-600 uppercase tracking-wider mb-0.5">Revenue</span>
+                <span className="text-sm font-bold text-emerald-400">{formatPrice(shiftSales.total)}</span>
+              </div>
+              {shiftSales.count > 0 && (
+                <div className="hidden sm:flex flex-col items-center px-4 py-2.5 flex-1">
+                  <span className="text-[9px] text-slate-500 uppercase tracking-wider mb-0.5">Avg Sale</span>
+                  <span className="text-sm font-bold text-slate-300">{formatPrice(Math.round(shiftSales.total / shiftSales.count))}</span>
+                </div>
+              )}
+              <button
+                onClick={loadShiftStats}
+                className="p-2.5 text-slate-500 hover:text-amber-400 transition-colors"
+                title="Refresh stats"
+              >
+                <RefreshCwIcon className="w-3.5 h-3.5" />
+              </button>
             </div>
-            {shiftSales.count > 0 && (
-              <div className="hidden sm:flex items-center gap-2 bg-slate-800/50 border border-slate-700/40 rounded-xl px-3 py-1.5">
-                <span className="text-[10px] text-slate-500 uppercase tracking-wide">Avg</span>
-                <span className="text-xs font-bold text-slate-300">{formatPrice(Math.round(shiftSales.total / shiftSales.count))}</span>
+            {/* Payment breakdown row */}
+            {shiftSales.count > 0 && Object.keys(shiftSales.byPayment).length > 0 && (
+              <div className="flex items-center gap-2 px-3 py-2 border-t border-slate-700/40 bg-slate-900/40 flex-wrap">
+                {Object.entries(shiftSales.byPayment).map(([method, amt]) => (
+                  <span key={method} className="flex items-center gap-1.5 text-[10px] bg-slate-800 border border-slate-700/50 rounded-lg px-2 py-1">
+                    <span className="text-slate-500">{method}</span>
+                    <span className="font-bold text-slate-300">{formatPrice(amt)}</span>
+                  </span>
+                ))}
               </div>
             )}
           </div>
-          {holdCart && (
-            <button
-              onClick={recallHeldCart}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-400 text-xs font-semibold hover:bg-amber-500/25 transition-colors"
-            >
-              <BookmarkCheckIcon className="w-3 h-3" /> Recall Hold
-            </button>
-          )}
         </div>
       </header>
 
       <div className="flex flex-1 min-h-0">
         {/* ── Product panel ── */}
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-slate-950">
+          {/* Barcode / SKU quick-add */}
+          <div className="flex gap-2 px-4 pt-3 pb-1 shrink-0 bg-slate-900/50">
+            <div className="relative flex-1">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-500 uppercase tracking-wider select-none">SKU</span>
+              <input
+                type="text"
+                value={barcodeInput}
+                onChange={(e) => { setBarcodeInput(e.target.value); setBarcodeError(''); }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') { handleBarcodeSubmit(barcodeInput); }
+                }}
+                placeholder="Scan barcode or enter SKU…"
+                className={`w-full pl-12 pr-10 py-2 bg-slate-800 border rounded-xl text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-1 transition-all ${
+                  barcodeError
+                    ? 'border-red-500/70 focus:border-red-500 focus:ring-red-500/20'
+                    : 'border-slate-700/60 focus:border-amber-500/70 focus:ring-amber-500/20'
+                }`}
+              />
+              {barcodeInput && (
+                <button
+                  onClick={() => { setBarcodeInput(''); setBarcodeError(''); }}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+                >
+                  <XIcon className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+            <button
+              onClick={() => handleBarcodeSubmit(barcodeInput)}
+              disabled={!barcodeInput.trim()}
+              className="px-3 py-2 rounded-xl bg-amber-500 text-slate-900 font-bold text-xs hover:bg-amber-400 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            >
+              Add
+            </button>
+          </div>
+          {barcodeError && (
+            <p className="px-4 pb-1 text-xs text-red-400 shrink-0 bg-slate-900/50">{barcodeError}</p>
+          )}
+
           {/* Search + refresh */}
-          <div className="flex gap-2 px-4 py-3 shrink-0 bg-slate-900/50 border-b border-slate-800/60">
+          <div className="flex gap-2 px-4 py-2 shrink-0 bg-slate-900/50 border-b border-slate-800/60">
             <div className="relative flex-1">
               <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
               <input
@@ -726,7 +837,7 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search products…"
-                className="w-full pl-9 pr-3 py-2.5 bg-slate-800 border border-slate-700/60 rounded-xl text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-amber-500/70 focus:ring-1 focus:ring-amber-500/20 transition-all"
+                className="w-full pl-9 pr-3 py-2 bg-slate-800 border border-slate-700/60 rounded-xl text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-amber-500/70 focus:ring-1 focus:ring-amber-500/20 transition-all"
               />
             </div>
             <button
@@ -775,8 +886,9 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
                 {filtered.map((product) => {
                   const inCart = cart.find((l) => l.item.id === product.id);
                   const stock = stockMap[product.id] ?? null;
+                  const threshold = thresholdMap[product.id] ?? 5;
                   const outOfStock = stock !== null && stock <= 0;
-                  const lowStock = stock !== null && stock > 0 && stock <= 5;
+                  const lowStock = stock !== null && stock > 0 && stock <= threshold;
                   return (
                     <button
                       key={product.id}
