@@ -10,6 +10,28 @@ function assertUuid(value: string, field: string): void {
   }
 }
 
+function decodeJwtPayload(token: string): Record<string, any> | null {
+  try {
+    const parts = token.split('.');
+    if (parts.length < 2) return null;
+    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
+    const json = atob(padded);
+    return JSON.parse(json);
+  } catch {
+    return null;
+  }
+}
+
+async function resolveTenantRestaurantId(fallback?: string): Promise<string> {
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+  const payload = token ? decodeJwtPayload(token) : null;
+  const claim = payload?.restaurant_id;
+  if (typeof claim === 'string' && claim.trim()) return claim.trim();
+  return (fallback || '').trim();
+}
+
 export interface MinimartRefund {
   id: string;
   orderId?: string;
@@ -120,10 +142,15 @@ export async function requestRefund(params: {
   reason: string;
   items?: Array<{ name: string; qty: number; price: number }>;
 }): Promise<MinimartRefundRequest> {
+  const tenantRestaurantId = await resolveTenantRestaurantId(params.restaurantId);
+  if (!tenantRestaurantId) {
+    throw new Error('Unable to resolve restaurant context from your session. Please sign out and sign back in.');
+  }
+
   const { data, error } = await supabase
     .from('minimart_refund_requests')
     .insert({
-      restaurant_id:  params.restaurantId,
+      restaurant_id:  tenantRestaurantId,
       order_id:       params.orderId,
       order_number:   params.orderNumber ?? null,
       requested_by:   params.requestedBy ?? null,
