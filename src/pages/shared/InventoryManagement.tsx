@@ -301,6 +301,7 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [isBatchDeleting, setIsBatchDeleting] = useState(false);
   const [isBatchAddingToProducts, setIsBatchAddingToProducts] = useState(false);
+  const [autoLinking, setAutoLinking] = useState<string | null>(null);
 
   // Audit trail panel
   const [auditItem, setAuditItem] = useState<{ id: string; name: string } | null>(null);
@@ -572,7 +573,7 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
   };
 
   const handleBatchAddToProducts = async () => {
-    if (!isMinimartScope || selectedRows.size === 0) return;
+    if (selectedRows.size === 0) return;
 
     const ids = Array.from(selectedRows);
     const idsToCreate = ids.filter((id) => !menuItemMap[id]);
@@ -599,9 +600,9 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
 
     for (const id of idsToCreate) {
       const rec = inventoryMap[id];
-      const productName = (rec?.description || '').trim();
+      const productName = (rec?.description || rec?.menuItemId || '').trim();
       const productPrice = rec?.price ?? rec?.unitCost ?? 0;
-      const productCategory = menuItemMap[id]?.category || 'General';
+      const productCategory = menuItemMap[id]?.category || (isMinimartScope ? 'General' : 'Food');
 
       if (!productName || productPrice <= 0) {
         skipped += 1;
@@ -1340,17 +1341,17 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
               </div>
             </div>
 
-            {/* Batch delete toolbar */}
-            {isMinimartScope && isManager && selectedRows.size > 0 && (
-              <div className="flex items-center gap-3 mb-3 px-4 py-2.5 rounded-lg bg-red-500/10 border border-red-500/30">
-                <span className="text-sm text-red-300 font-medium">{selectedRows.size} item{selectedRows.size !== 1 ? 's' : ''} selected</span>
+            {/* Batch action toolbar */}
+            {isManager && selectedRows.size > 0 && (
+              <div className="flex items-center gap-3 mb-3 px-4 py-2.5 rounded-lg bg-slate-700/50 border border-slate-600/50">
+                <span className="text-sm text-slate-300 font-medium">{selectedRows.size} item{selectedRows.size !== 1 ? 's' : ''} selected</span>
                 <button
                   onClick={handleBatchAddToProducts}
                   disabled={isBatchAddingToProducts}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-blue-500/20 border border-blue-500/40 text-blue-200 text-sm font-medium hover:bg-blue-500/30 transition disabled:opacity-50"
                 >
                   <LinkIcon className="w-3.5 h-3.5" />
-                  {isBatchAddingToProducts ? 'Adding…' : 'Add Selected to Products'}
+                  {isBatchAddingToProducts ? 'Linking…' : `Link Selected to ${isMinimartScope ? 'Products' : 'Menu'}`}
                 </button>
                 <button
                   onClick={handleBatchDelete}
@@ -1362,7 +1363,7 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                 </button>
                 <button
                   onClick={() => setSelectedRows(new Set())}
-                  className="text-xs text-slate-400 hover:text-white transition"
+                  className="text-xs text-slate-400 hover:text-white transition ml-auto"
                 >
                   Clear selection
                 </button>
@@ -1375,7 +1376,7 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                 <table className="w-full min-w-[1900px]">
                   <thead className="bg-slate-700/40 border-b border-slate-700/50">
                     <tr>
-                      {isMinimartScope && isManager && (
+                      {isManager && (
                         <th className="px-3 py-3 w-10">
                           <input
                             type="checkbox"
@@ -1395,8 +1396,8 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                                 });
                               }
                             }}
-                            className="w-4 h-4 rounded border-slate-600 bg-slate-800 accent-red-500 cursor-pointer"
-                            title="Select all"
+                            className="w-4 h-4 rounded border-slate-600 bg-slate-800 accent-blue-500 cursor-pointer"
+                            title="Select all on this page"
                           />
                         </th>
                       )}
@@ -1430,7 +1431,7 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                           key={row.item.id}
                           className={`transition-colors ${row.isOut ? 'bg-red-500/5' : row.isLow ? 'bg-amber-500/5' : 'hover:bg-slate-700/20'}`}
                         >
-                          {isMinimartScope && isManager && (
+                          {isManager && (
                             <td className="px-3 py-3 w-10">
                               <input
                                 type="checkbox"
@@ -1443,7 +1444,7 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                                     return next;
                                   });
                                 }}
-                                className="w-4 h-4 rounded border-slate-600 bg-slate-800 accent-red-500 cursor-pointer"
+                                className="w-4 h-4 rounded border-slate-600 bg-slate-800 accent-blue-500 cursor-pointer"
                               />
                             </td>
                           )}
@@ -1709,22 +1710,54 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                                         }
                                         return;
                                       }
-                                      setAddToMenuItemId(row.rec?.id ?? row.item.id);
-                                      setAddToMenuName((row.rec?.description || '').trim());
-                                      setAddToMenuPrice(row.rec?.price ?? row.rec?.unitCost ?? 0);
-                                      setAddToMenuCategory(menuCategories.find((c) => c !== 'all') ?? (isMinimartScope ? 'General' : 'Food'));
+                                      const recId = row.rec?.id ?? row.item.id;
+                                      const name = (row.rec?.description || row.item.name || '').trim();
+                                      const price = row.rec?.price ?? row.rec?.unitCost ?? 0;
+                                      const category = row.item.category !== 'Other' ? row.item.category : (isMinimartScope ? 'General' : 'Food');
+                                      // If data is complete, auto-link without modal
+                                      if (name && price > 0) {
+                                        try {
+                                          setAutoLinking(recId);
+                                          const latestMenu = await fetchMenu().catch(() => menuItems as any[]);
+                                          const existing = latestMenu.find((m: any) => String(m?.name || '').trim().toLowerCase() === name.toLowerCase());
+                                          if (existing?.id) {
+                                            await apiRelinkInventoryRecord(recId, existing.id);
+                                          } else {
+                                            const payload: any = { name, price, category, is_available: true };
+                                            if (isMinimartScope) { payload.requires_kitchen = false; payload.prep_time = 0; }
+                                            const newItem = await createMenuItem(payload);
+                                            await apiRelinkInventoryRecord(recId, newItem.id);
+                                          }
+                                          await refresh();
+                                        } catch (err) {
+                                          alert('Failed to link: ' + getErrorMessage(err));
+                                        } finally {
+                                          setAutoLinking(null);
+                                        }
+                                        return;
+                                      }
+                                      // Fallback to modal when name or price is missing
+                                      setAddToMenuItemId(recId);
+                                      setAddToMenuName(name);
+                                      setAddToMenuPrice(price);
+                                      setAddToMenuCategory(category);
                                       setShowAddToMenuModal(true);
                                     }}
+                                    disabled={autoLinking === (row.rec?.id ?? row.item.id)}
                                     className={`h-7 w-7 inline-flex items-center justify-center rounded-md border transition ${
-                                      menuItemMap[row.item.id]
-                                        ? 'text-orange-200 bg-orange-500/20 border-orange-500/50 hover:bg-orange-500/35'
-                                        : 'text-blue-100 bg-blue-500/22 border-blue-500/55 hover:bg-blue-500/35'
+                                      autoLinking === (row.rec?.id ?? row.item.id)
+                                        ? 'text-slate-400 bg-slate-500/20 border-slate-500/30 cursor-not-allowed'
+                                        : menuItemMap[row.item.id]
+                                          ? 'text-orange-200 bg-orange-500/20 border-orange-500/50 hover:bg-orange-500/35'
+                                          : 'text-blue-100 bg-blue-500/22 border-blue-500/55 hover:bg-blue-500/35'
                                     }`}
-                                    title={menuItemMap[row.item.id] ? `Unlink from ${isMinimartScope ? 'Product' : 'Menu Item'}` : `Add to ${isMinimartScope ? 'Products' : 'Menu'}`}
+                                    title={autoLinking === (row.rec?.id ?? row.item.id) ? 'Linking…' : menuItemMap[row.item.id] ? `Unlink from ${isMinimartScope ? 'Product' : 'Menu Item'}` : `Add to ${isMinimartScope ? 'Products' : 'Menu'}`}
                                   >
-                                    {menuItemMap[row.item.id]
-                                      ? <XCircleIcon className="w-4 h-4" />
-                                      : <LinkIcon className="w-4 h-4" />}
+                                    {autoLinking === (row.rec?.id ?? row.item.id)
+                                      ? <RefreshCcwIcon className="w-4 h-4 animate-spin" />
+                                      : menuItemMap[row.item.id]
+                                        ? <XCircleIcon className="w-4 h-4" />
+                                        : <LinkIcon className="w-4 h-4" />}
                                   </button>
                                   <button
                                     onClick={() => {
