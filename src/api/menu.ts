@@ -1,7 +1,16 @@
 import { supabase, type MenuItem } from '../lib/supabase';
 
+export function generateSku(name: string, sequence: number): string {
+  const prefix = name
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '')
+    .slice(0, 5)
+    .padEnd(2, 'X');
+  return prefix + String(sequence).padStart(2, '0');
+}
+
 function toDbMenuItem(item: Partial<MenuItem> & Record<string, any>, restaurantId: string, fallbackId?: string) {
-  return {
+  const payload: Record<string, any> = {
     id: item.id || fallbackId,
     name: item.name,
     description: item.description || '',
@@ -15,6 +24,8 @@ function toDbMenuItem(item: Partial<MenuItem> & Record<string, any>, restaurantI
     requires_kitchen: item.requires_kitchen ?? item.requiresKitchen ?? false,
     restaurant_id: restaurantId,
   };
+  if (item.sku !== undefined) payload.sku = item.sku || null;
+  return payload;
 }
 
 function getRestaurantId(): string | null {
@@ -78,15 +89,35 @@ export async function fetchMenuByCategory(category: string): Promise<MenuItem[]>
   return (data ?? []) as MenuItem[];
 }
 
-export async function createMenuItem(item: Partial<MenuItem>): Promise<MenuItem> {
+export async function createMenuItem(item: Partial<MenuItem> & { sku?: string }): Promise<MenuItem> {
   const restaurantId = getRestaurantId();
   if (!restaurantId) throw new Error('No company selected');
-  
+
   const id = `item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  
+
+  // Auto-generate SKU if not provided
+  let sku = item.sku?.trim() || null;
+  if (!sku && item.name) {
+    const { count } = await supabase
+      .from('menu_items')
+      .select('*', { count: 'exact', head: true })
+      .eq('restaurant_id', restaurantId);
+    sku = generateSku(item.name, (count ?? 0) + 1);
+    // Ensure uniqueness — if collision, append a random suffix
+    const { data: existing } = await supabase
+      .from('menu_items')
+      .select('sku')
+      .eq('restaurant_id', restaurantId)
+      .eq('sku', sku)
+      .maybeSingle();
+    if (existing) {
+      sku = generateSku(item.name, (count ?? 0) + 1 + Math.floor(Math.random() * 90 + 10));
+    }
+  }
+
   const { data, error } = await supabase
     .from('menu_items')
-    .insert(toDbMenuItem(item as Partial<MenuItem> & Record<string, any>, restaurantId, id))
+    .insert(toDbMenuItem({ ...item, sku } as Partial<MenuItem> & Record<string, any>, restaurantId, id))
     .select()
     .single();
 
@@ -94,25 +125,31 @@ export async function createMenuItem(item: Partial<MenuItem>): Promise<MenuItem>
   return data as MenuItem;
 }
 
-export async function updateMenuItem(id: string, updates: Partial<MenuItem>): Promise<MenuItem> {
+export async function updateMenuItem(id: string, updates: Partial<MenuItem> & { sku?: string }): Promise<MenuItem> {
   const restaurantId = getRestaurantId();
   if (!restaurantId) throw new Error('No company selected');
 
+  const payload: Record<string, any> = { updated_at: new Date().toISOString() };
+  if (updates.name           !== undefined) payload.name            = updates.name;
+  if (updates.description    !== undefined) payload.description     = updates.description;
+  if (updates.price          !== undefined) payload.price           = updates.price;
+  if (updates.category       !== undefined) payload.category        = updates.category;
+  if ((updates as any).emoji !== undefined) payload.emoji           = (updates as any).emoji;
+  if (updates.is_available   !== undefined) payload.is_available    = updates.is_available;
+  if ((updates as any).isAvailable !== undefined) payload.is_available = (updates as any).isAvailable;
+  if (updates.is_popular     !== undefined) payload.is_popular      = updates.is_popular;
+  if ((updates as any).isPopular !== undefined) payload.is_popular  = (updates as any).isPopular;
+  if (updates.image_url      !== undefined) payload.image_url       = updates.image_url;
+  if ((updates as any).imageUrl !== undefined) payload.image_url    = (updates as any).imageUrl;
+  if (updates.requires_kitchen !== undefined) payload.requires_kitchen = updates.requires_kitchen;
+  if ((updates as any).requiresKitchen !== undefined) payload.requires_kitchen = (updates as any).requiresKitchen;
+  if ((updates as any).prep_time !== undefined) payload.prep_time   = (updates as any).prep_time;
+  if ((updates as any).prepTime  !== undefined) payload.prep_time   = (updates as any).prepTime;
+  if (updates.sku !== undefined) payload.sku = updates.sku?.trim() || null;
+
   const { data, error } = await supabase
     .from('menu_items')
-    .update({
-      name: updates.name,
-      description: updates.description,
-      price: updates.price,
-      category: updates.category,
-      emoji: updates.emoji,
-      prep_time: updates.prep_time ?? (updates as any).prepTime,
-      is_available: updates.is_available ?? (updates as any).isAvailable,
-      is_popular: updates.is_popular ?? (updates as any).isPopular,
-      image_url: updates.image_url ?? (updates as any).imageUrl,
-      requires_kitchen: updates.requires_kitchen ?? (updates as any).requiresKitchen,
-      updated_at: new Date().toISOString()
-    })
+    .update(payload)
     .eq('id', id)
     .eq('restaurant_id', restaurantId)
     .select()

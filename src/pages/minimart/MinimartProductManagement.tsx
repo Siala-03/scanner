@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import {
   fetchMenu, createMenuItem, updateMenuItem,
-  deleteMenuItem, toggleMenuItemAvailability,
+  deleteMenuItem, toggleMenuItemAvailability, generateSku,
 } from '../../api/menu';
 import { formatPrice } from '../../utils/currency';
 import {
@@ -109,6 +109,7 @@ function CategorySelect({ value, onChange, categories, onNewCategory, className 
 
 interface ProductForm {
   name: string;
+  sku: string;
   category: string;
   price: string;
   emoji: string;
@@ -118,7 +119,7 @@ interface ProductForm {
 type SortField = 'name' | 'category' | 'price' | 'available';
 type SortDir   = 'asc' | 'desc';
 
-const EMPTY_FORM: ProductForm = { name: '', category: '', price: '', emoji: 'ðŸ“¦', description: '' };
+const EMPTY_FORM: ProductForm = { name: '', sku: '', category: '', price: '', emoji: '📦', description: '' };
 
 // â”€â”€ Main component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -246,9 +247,10 @@ export function MinimartProductManagement() {
     try {
       const created = await createMenuItem({
         name:             addForm.name.trim(),
+        sku:              addForm.sku.trim() || undefined,
         category:         addForm.category.trim(),
         price:            parseFloat(addForm.price),
-        emoji:            addForm.emoji || 'ðŸ“¦',
+        emoji:            addForm.emoji || '📦',
         description:      addForm.description.trim(),
         prep_time:        0,
         requires_kitchen: false,
@@ -269,9 +271,10 @@ export function MinimartProductManagement() {
     setEditingId(p.id);
     setEditForm({
       name:        p.name,
+      sku:         p.sku || '',
       category:    p.category,
       price:       String(p.price),
-      emoji:       (p as any).emoji || 'ðŸ“¦',
+      emoji:       (p as any).emoji || '📦',
       description: p.description || '',
     });
   };
@@ -283,9 +286,10 @@ export function MinimartProductManagement() {
     try {
       const updated = await updateMenuItem(id, {
         name:        editForm.name.trim(),
+        sku:         editForm.sku.trim() || undefined,
         category:    editForm.category.trim(),
         price:       parseFloat(editForm.price),
-        emoji:       editForm.emoji || 'ðŸ“¦',
+        emoji:       editForm.emoji || '📦',
         description: editForm.description.trim(),
       } as any);
       setProducts((prev) => prev.map((p) => (p.id === id ? (updated as MenuItem) : p)));
@@ -584,6 +588,29 @@ export function MinimartProductManagement() {
                 className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500"
               />
             </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Item Code (SKU)</label>
+              <div className="flex gap-1">
+                <input
+                  value={addForm.sku}
+                  onChange={(e) => setAddForm((p) => ({ ...p, sku: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '') }))}
+                  placeholder="e.g. COCAC01"
+                  maxLength={10}
+                  className="flex-1 min-w-0 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500 font-mono"
+                />
+                {addForm.name && (
+                  <button
+                    type="button"
+                    onClick={() => setAddForm((p) => ({ ...p, sku: generateSku(p.name, products.length + 1) }))}
+                    className="shrink-0 px-2 py-1 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-400 hover:bg-amber-500/25 text-xs transition-colors"
+                    title="Auto-generate SKU from name"
+                  >
+                    Auto
+                  </button>
+                )}
+              </div>
+              <p className="text-[10px] text-slate-600 mt-1">Leave blank to auto-generate</p>
+            </div>
           </div>
           {addError && <p className="text-red-400 text-xs mt-3">{addError}</p>}
           <div className="flex gap-2 mt-4">
@@ -688,16 +715,43 @@ export function MinimartProductManagement() {
                     {/* Name */}
                     <td className="px-4 py-3">
                       {isEditing ? (
-                        <input
-                          value={editForm.name}
-                          onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
-                          className="w-full px-2 py-1 bg-slate-800 border border-amber-500 rounded text-sm text-slate-100 focus:outline-none"
-                          autoFocus
-                        />
+                        <div className="space-y-1">
+                          <input
+                            value={editForm.name}
+                            onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
+                            className="w-full px-2 py-1 bg-slate-800 border border-amber-500 rounded text-sm text-slate-100 focus:outline-none"
+                            autoFocus
+                          />
+                          <div className="flex gap-1">
+                            <input
+                              value={editForm.sku}
+                              onChange={(e) => setEditForm((f) => ({ ...f, sku: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '') }))}
+                              placeholder="SKU"
+                              maxLength={10}
+                              className="flex-1 min-w-0 px-2 py-0.5 bg-slate-800 border border-slate-600 rounded text-xs text-slate-300 focus:outline-none focus:border-amber-500 font-mono"
+                            />
+                            {editForm.name && (
+                              <button
+                                type="button"
+                                onClick={() => setEditForm((f) => ({ ...f, sku: generateSku(f.name, products.length + 1) }))}
+                                className="shrink-0 px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 hover:bg-amber-500/25 text-[10px] transition-colors"
+                              >
+                                Auto
+                              </button>
+                            )}
+                          </div>
+                        </div>
                       ) : (
-                        <span className={`font-medium ${isAvailable ? 'text-slate-200' : 'text-slate-500 line-through'}`}>
-                          {p.name}
-                        </span>
+                        <div>
+                          <span className={`font-medium ${isAvailable ? 'text-slate-200' : 'text-slate-500 line-through'}`}>
+                            {p.name}
+                          </span>
+                          {p.sku && (
+                            <span className="block text-[10px] font-mono text-amber-500/60 mt-0.5 tracking-wide">
+                              {p.sku}
+                            </span>
+                          )}
+                        </div>
                       )}
                     </td>
                     {/* Category */}

@@ -74,6 +74,7 @@ export interface Restaurant {
 
 export interface MenuItem {
   id: string;
+  sku?: string | null;
   name: string;
   description: string;
   price: number;
