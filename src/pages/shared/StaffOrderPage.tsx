@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { useMenu } from '../../hooks/useMenu';
 import { useTables } from '../../hooks/useTables';
+import { useStaff } from '../../hooks/useStaff';
 import { createOrder } from '../../api/orders';
 import { fetchKitchenOrders } from '../../api/orders';
 import { formatPrice } from '../../utils/currency';
@@ -102,6 +103,16 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName }: St
 
   const { tables, isLoading: tablesLoading } = useTables();
   const { menuItems, isLoading: menuLoading } = useMenu();
+  const { staff, isLoading: staffLoading } = useStaff();
+  const staffNameOptions = useMemo(() => {
+    const set = new Set<string>();
+    (staff || []).forEach((member) => {
+      const name = typeof member?.name === 'string' ? member.name.trim() : '';
+      if (name) set.add(name);
+    });
+    if (staffName && staffName.trim()) set.add(staffName.trim());
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [staff, staffName]);
 
   // ── Occupancy ────────────────────────────────────────────────────────────────
   const loadOccupancy = useCallback(async () => {
@@ -602,6 +613,8 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName }: St
             cartCount={cartCount}
             orderNotes={orderNotes}
             waiterName={waiterName}
+            staffNameOptions={staffNameOptions}
+            staffLoading={staffLoading}
             isSubmitting={isSubmitting}
             successTable={successTable}
             tableLabel={tableLabel}
@@ -634,6 +647,8 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName }: St
               cartCount={cartCount}
               orderNotes={orderNotes}
               waiterName={waiterName}
+              staffNameOptions={staffNameOptions}
+              staffLoading={staffLoading}
               isSubmitting={isSubmitting}
               successTable={successTable}
               tableLabel={tableLabel}
@@ -660,6 +675,8 @@ function CartPanel({
   cartCount,
   orderNotes,
   waiterName,
+  staffNameOptions,
+  staffLoading,
   isSubmitting,
   successTable,
   tableLabel,
@@ -677,6 +694,8 @@ function CartPanel({
   cartCount: number;
   orderNotes: string;
   waiterName: string;
+  staffNameOptions: string[];
+  staffLoading: boolean;
   isSubmitting: boolean;
   successTable: string | null;
   tableLabel: string;
@@ -780,13 +799,17 @@ function CartPanel({
         <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-400">
           Waiter Name
         </label>
-        <input
-          type="text"
+        <select
           value={waiterName}
           onChange={(e) => onWaiterNameChange(e.target.value)}
-          placeholder="Who is serving this order?"
+          disabled={staffLoading || staffNameOptions.length === 0}
           className="mb-3 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white placeholder-slate-500 focus:border-amber-500 focus:outline-none"
-        />
+        >
+          <option value="">{staffLoading ? 'Loading staff...' : 'Select staff member'}</option>
+          {staffNameOptions.map((name) => (
+            <option key={name} value={name}>{name}</option>
+          ))}
+        </select>
 
         <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-400">
           Order Notes
