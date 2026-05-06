@@ -1238,31 +1238,6 @@ export function WaiterDashboard({
       <div className="mx-auto max-w-6xl px-4 py-5">
         {portalPage === 'orders' ? (
           <div className="space-y-4">
-            {/* ── Assigned Tables Panel ── */}
-            <div className="rounded-lg border border-amber-500/25 bg-amber-500/8 overflow-hidden">
-              <div className="px-4 py-3">
-                <div className="flex items-center gap-2 mb-3">
-                  <MapPinIcon className="w-4 h-4 text-amber-400" />
-                  <span className="text-sm font-semibold text-amber-200">Your Assigned Tables</span>
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-medium">{waiter.assignedTables?.length || 0}</span>
-                </div>
-                {waiter.assignedTables && waiter.assignedTables.length > 0 ? (
-                  <div className="flex flex-wrap gap-2">
-                    {waiter.assignedTables.sort((a, b) => a - b).map((tableNum) => (
-                      <div
-                        key={tableNum}
-                        className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-500/20 border border-amber-500/40 text-amber-200 text-sm font-medium"
-                      >
-                        🍽️ Table {tableNum}
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-amber-300">No tables assigned yet. Contact your manager.</p>
-                )}
-              </div>
-            </div>
-
             {/* ── Today's Reservations Panel ── */}
             {todayReservations.length > 0 && (
               <div className="rounded-lg border border-blue-500/25 bg-blue-500/8 overflow-hidden">
