@@ -19,6 +19,7 @@ import { fetchInventory, updateInventoryRecord } from '../../api/inventory';
 import type { InventoryRecord } from '../../api/inventory';
 import { getActiveShift, openShift, closeShift, type CashierShift } from '../../api/shifts';
 import { createRefund } from '../../api/refunds';
+import { getMinimartSettings } from '../../api/minimartSettings';
 import { ShiftModal } from './ShiftModal';
 import { RefundModal, type RefundableTxn } from './RefundModal';
 import type { MenuItem, Staff } from '../../types';
@@ -44,6 +45,9 @@ interface Receipt {
   orderId: string;
   orderNumber: string;
   lines: CartLine[];
+  subtotal: number;
+  taxRate: number;
+  taxAmount: number;
   total: number;
   payments: PaymentEntry[];
   change: number;
@@ -57,6 +61,149 @@ const PAYMENT_METHODS = [
   { code: '02', label: 'Card' },
   { code: '04', label: 'Mobile Money' },
 ];
+
+// ── Start Shift Page ──────────────────────────────────────────────────────────
+
+interface StartShiftPageProps {
+  cashier: Staff | null;
+  restaurantName: string;
+  onOpen: (float: number) => Promise<void>;
+  onLogout: () => void;
+}
+
+function StartShiftPage({ cashier, restaurantName, onOpen, onLogout }: StartShiftPageProps) {
+  const [float, setFloat] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const cashierInitials = (cashier?.name ?? 'C').split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
+  const now = new Date();
+
+  const handleSubmit = async () => {
+    setSaving(true);
+    setError('');
+    try {
+      await onOpen(parseFloat(float || '0'));
+    } catch (err: any) {
+      setError(err?.message ?? 'Failed to open shift. Please try again.');
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col h-screen bg-slate-950 overflow-hidden">
+      {/* Same header style as POS */}
+      <header className="shrink-0 bg-slate-900 border-b border-slate-800/80">
+        <div className="flex items-center gap-3 px-4 py-3">
+          <div className="flex items-center gap-2.5 flex-1 min-w-0">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center shrink-0 shadow-lg shadow-amber-500/20">
+              <ShoppingCartIcon className="w-4 h-4 text-slate-900" />
+            </div>
+            <div className="min-w-0">
+              <p className="font-bold text-white text-sm truncate leading-tight">{restaurantName}</p>
+              <p className="text-[10px] text-slate-500 uppercase tracking-wider leading-tight">Cashier POS</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 bg-slate-800/60 border border-slate-700/50 rounded-xl px-3 py-1.5">
+            <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-[10px] font-bold text-white">
+              {cashierInitials}
+            </div>
+            <span className="text-xs text-slate-300 font-medium">{cashier?.name}</span>
+          </div>
+          <button
+            onClick={onLogout}
+            className="p-2 rounded-xl text-slate-500 hover:text-slate-200 hover:bg-slate-800 transition-colors"
+            title="Logout"
+          >
+            <LogOutIcon className="w-4 h-4" />
+          </button>
+        </div>
+      </header>
+
+      {/* Page body */}
+      <div className="flex-1 flex items-center justify-center p-6">
+        <div className="w-full max-w-sm space-y-6">
+          {/* Date/time */}
+          <div className="text-center">
+            <p className="text-2xl font-black text-white">
+              {now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </p>
+            <p className="text-sm text-slate-400 mt-1">
+              {now.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })}
+            </p>
+          </div>
+
+          {/* Card */}
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl">
+            <div className="bg-gradient-to-br from-amber-500/15 to-amber-600/5 border-b border-amber-500/20 px-6 py-5 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center">
+                <LogOutIcon className="w-5 h-5 text-amber-400 rotate-180" />
+              </div>
+              <div>
+                <p className="font-bold text-white text-sm">Start Shift</p>
+                <p className="text-xs text-amber-400 mt-0.5">Record your opening float to begin</p>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-5">
+              <div className="flex items-center gap-3 bg-slate-800/60 rounded-2xl px-4 py-3">
+                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-xs font-bold text-white shrink-0">
+                  {cashierInitials}
+                </div>
+                <div>
+                  <p className="text-[10px] text-slate-500 uppercase tracking-wide">Signed in as</p>
+                  <p className="text-sm font-semibold text-white">{cashier?.name || 'Cashier'}</p>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">
+                  Opening Float — cash in drawer
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm font-medium">RWF</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="100"
+                    value={float}
+                    onChange={(e) => { setFloat(e.target.value); setError(''); }}
+                    placeholder="0"
+                    className="w-full pl-14 pr-4 py-3 bg-slate-800 border border-slate-700/60 rounded-2xl text-white text-lg font-bold focus:outline-none focus:border-amber-500/70 focus:ring-1 focus:ring-amber-500/20 transition-all placeholder-slate-600"
+                    autoFocus
+                    onKeyDown={(e) => e.key === 'Enter' && !saving && handleSubmit()}
+                  />
+                </div>
+                <p className="text-xs text-slate-600 mt-1.5">Enter 0 if starting with an empty drawer.</p>
+              </div>
+
+              {error && (
+                <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2 text-xs text-red-300">
+                  <AlertTriangleIcon className="w-3.5 h-3.5 shrink-0" />
+                  {error}
+                </div>
+              )}
+
+              <button
+                onClick={handleSubmit}
+                disabled={saving}
+                className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 disabled:opacity-50 text-slate-900 font-bold text-sm transition-all shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2"
+              >
+                {saving ? (
+                  <><RefreshCwIcon className="w-4 h-4 animate-spin" /> Opening shift…</>
+                ) : (
+                  <><CheckCircleIcon className="w-4 h-4" /> Open Shift &amp; Start Selling</>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Main POS ─────────────────────────────────────────────────────────────────
 
 interface MinimartPOSProps {
   restaurantName: string;
@@ -95,6 +242,9 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
   const [showCloseShift, setShowCloseShift] = useState(false);
   // Refund workflow
   const [refundingTxn, setRefundingTxn] = useState<RefundableTxn | null>(null);
+  // Tax settings
+  const [taxRate, setTaxRate] = useState(0);
+  const [taxLabel, setTaxLabel] = useState('Tax');
 
   const loadShiftStats = useCallback(async () => {
     if (!restaurantId || !cashier?.id) return;
@@ -210,6 +360,9 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
   useEffect(() => {
     if (!restaurantId) return;
     fetchReceiptSettings(restaurantId).then(setReceiptSettings).catch(() => {});
+    getMinimartSettings(restaurantId)
+      .then((s) => { setTaxRate(s.taxRate); setTaxLabel(s.taxLabel); })
+      .catch(() => {});
   }, [restaurantId]);
 
   // Check for an active shift on mount
@@ -261,7 +414,9 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
     setHoldCart(null);
   };
 
-  const cartTotal = cart.reduce((sum, l) => sum + l.item.price * l.qty, 0);
+  const cartSubtotal = cart.reduce((sum, l) => sum + l.item.price * l.qty, 0);
+  const cartTaxAmount = Math.round(cartSubtotal * taxRate / 100);
+  const cartTotal = cartSubtotal + cartTaxAmount;
   const cartCount = cart.reduce((sum, l) => sum + l.qty, 0);
 
   const handleOpenShift = async (float: number) => {
@@ -339,11 +494,16 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
           .catch(() => {});
       });
 
+      const capturedSubtotal = checkoutCart.reduce((s, l) => s + l.item.price * l.qty, 0);
+      const capturedTax = Math.round(capturedSubtotal * taxRate / 100);
       setReceipt({
         orderId:      order.id,
         orderNumber:  (order as any).order_number || (order as any).orderNumber || order.id.slice(-6).toUpperCase(),
         lines:        checkoutCart,
-        total:        cartTotal,
+        subtotal:     capturedSubtotal,
+        taxRate,
+        taxAmount:    capturedTax,
+        total:        capturedSubtotal + capturedTax,
         payments,
         change,
         cashierName:  cashier?.name || 'Cashier',
@@ -435,9 +595,9 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
         totalPrice: l.item.price * l.qty,
       })),
       currency:      'RWF' as const,
-      subtotal:      receipt.total,
-      taxRate:       0,
-      taxAmount:     0,
+      subtotal:      receipt.subtotal,
+      taxRate:       receipt.taxRate,
+      taxAmount:     receipt.taxAmount,
       total:         receipt.total,
       payments:      receipt.payments,
       paymentStatus: 'paid' as const,
@@ -463,17 +623,12 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
 
   // Gate: must open a shift before selling
   if (!currentShift) {
-    return (
-      <ShiftModal
-        mode="open"
-        cashierName={cashier?.name || 'Cashier'}
-        restaurantName={restaurantName}
-        shiftTxns={[]}
-        shiftSales={{ count: 0, total: 0 }}
-        onOpen={handleOpenShift}
-        onClose={async () => {}}
-      />
-    );
+    return <StartShiftPage
+      cashier={cashier}
+      restaurantName={restaurantName}
+      onOpen={handleOpenShift}
+      onLogout={onLogout}
+    />;
   }
 
   // ── History Modal ──────────────────────────────────────────────────────────
@@ -605,8 +760,20 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
                   </div>
                 ))}
               </div>
-              <div className="border-t border-slate-700 pt-2.5 flex justify-between items-center">
-                <span className="text-xs text-slate-400">TOTAL</span>
+              {receipt.taxAmount > 0 && (
+                <>
+                  <div className="border-t border-slate-700/50 pt-2 flex justify-between text-xs">
+                    <span className="text-slate-500">Subtotal</span>
+                    <span className="text-slate-400">{formatPrice(receipt.subtotal)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-slate-500">{taxLabel} ({receipt.taxRate}%)</span>
+                    <span className="text-slate-400">{formatPrice(receipt.taxAmount)}</span>
+                  </div>
+                </>
+              )}
+              <div className={`${receipt.taxAmount > 0 ? '' : 'border-t border-slate-700 pt-2.5 '}flex justify-between items-center`}>
+                <span className="text-xs text-slate-400 font-semibold">TOTAL</span>
                 <span className="text-base font-bold text-white">{formatPrice(receipt.total)}</span>
               </div>
               <div className="flex justify-between text-xs text-slate-500">
@@ -1089,9 +1256,23 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
               className="w-full px-3 py-2.5 bg-slate-800 border border-slate-700/60 rounded-xl text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-amber-500/70 focus:ring-1 focus:ring-amber-500/20 transition-all"
             />
 
-            <div className="flex justify-between items-center px-1">
-              <span className="text-xs text-slate-500 font-medium uppercase tracking-wide">Total</span>
-              <span className={`text-xl font-black ${cartCount > 0 ? 'text-white' : 'text-slate-600'}`}>{formatPrice(cartTotal)}</span>
+            <div className="space-y-1 px-1">
+              {taxRate > 0 && cartCount > 0 && (
+                <div className="flex justify-between text-xs text-slate-500">
+                  <span>Subtotal</span>
+                  <span>{formatPrice(cartSubtotal)}</span>
+                </div>
+              )}
+              {taxRate > 0 && cartCount > 0 && (
+                <div className="flex justify-between text-xs text-slate-500">
+                  <span>{taxLabel} ({taxRate}%)</span>
+                  <span>{formatPrice(cartTaxAmount)}</span>
+                </div>
+              )}
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-slate-500 font-medium uppercase tracking-wide">Total</span>
+                <span className={`text-xl font-black ${cartCount > 0 ? 'text-white' : 'text-slate-600'}`}>{formatPrice(cartTotal)}</span>
+              </div>
             </div>
 
             <button

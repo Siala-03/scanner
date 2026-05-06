@@ -3,8 +3,9 @@ import {
   LogOutIcon, RefreshCwIcon, TrendingUpIcon, ReceiptIcon,
   ShoppingBagIcon, UsersIcon, PlusIcon, TrashIcon, EyeIcon, EyeOffIcon,
   PackageIcon, DownloadIcon, TagIcon, ZapIcon, BarChart2Icon,
+  LineChartIcon, SettingsIcon, AlertTriangleIcon,
 } from 'lucide-react';
-import { ClockIcon, ChevronDownIcon, ChevronUpIcon } from 'lucide-react';
+import { ClockIcon } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Cell,
@@ -15,6 +16,7 @@ import { formatPrice } from '../../utils/currency';
 import { InventoryManagement } from '../shared/InventoryManagement';
 import { exportTransactionsToCsv } from '../../utils/minimartProductImportExport';
 import { MinimartProductManagement } from './MinimartProductManagement';
+import { getMinimartSettings, upsertMinimartSettings } from '../../api/minimartSettings';
 import type { Staff } from '../../types';
 
 interface Transaction {
@@ -71,7 +73,32 @@ interface Props {
 }
 
 type DateFilter = 'today' | '7d' | '30d';
-type Page = 'dashboard' | 'transactions' | 'products' | 'inventory' | 'cashiers';
+type Page = 'dashboard' | 'transactions' | 'products' | 'inventory' | 'cashiers' | 'analytics' | 'settings';
+type TransactionSort = 'newest' | 'oldest';
+
+interface MarginStat {
+  name: string;
+  revenue: number;
+  cost: number;
+  margin: number;
+  marginPct: number;
+}
+
+interface WasteStat {
+  name: string;
+  qty: number;
+  cost: number;
+  reason: string;
+}
+
+interface Analytics {
+  marginStats: MarginStat[];
+  wasteStats: WasteStat[];
+  totalWasteCost: number;
+  totalRevenue: number;
+  totalCostOfGoods: number;
+  grossMargin: number;
+}
 
 const PAYMENT_LABEL: Record<string, string> = {
   '01': 'Cash', '02': 'Card', '04': 'Mobile Money',
@@ -121,7 +148,22 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
 
   // Transactions tab search
   const [txnSearch, setTxnSearch] = useState('');
-  const [expandedTxnId, setExpandedTxnId] = useState<string | null>(null);
+  const [txnCashierFilter, setTxnCashierFilter] = useState('all');
+  const [txnPaymentFilter, setTxnPaymentFilter] = useState('all');
+  const [txnSort, setTxnSort] = useState<TransactionSort>('newest');
+
+  // Analytics
+  const [analytics, setAnalytics] = useState<Analytics | null>(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+
+  // Settings
+  const [taxRate, setTaxRate] = useState('0');
+  const [taxLabel, setTaxLabel] = useState('Tax');
+  const [receiptFooter, setReceiptFooter] = useState('');
+  const [settingsSaving, setSettingsSaving] = useState(false);
+  const [settingsError, setSettingsError] = useState('');
+  const [settingsSaved, setSettingsSaved] = useState(false);
+  const [settingsLoading, setSettingsLoading] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -271,8 +313,131 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
     }
   }, [restaurantId]);
 
+  const loadAnalytics = useCallback(async () => {
+    setAnalyticsLoading(true);
+    try {
+      const now = new Date();
+      const from = new Date(now);
+      from.setDate(from.getDate() - 30);
+      const fromIso = from.toISOString();
+
+      // Fetch inventory cost map and waste entries in parallel
+      const [invRes, wasteRes] = await Promise.allSettled([
+        supabase
+          .from('inventory_records')
+          .select('menu_item_id, unit_cost')
+          .eq('restaurant_id', restaurantId),
+        supabase
+          .from('waste_entries')
+          .select('menu_item_name, qty, unit_cost, total_cost, reason')
+          .eq('restaurant_id', restaurantId)
+          .gte('timestamp', fromIso),
+      ]);
+
+      const costMap: Record<string, number> = {};
+      if (invRes.status === 'fulfilled' && !invRes.value.error) {
+        (invRes.value.data || []).forEach((r: any) => {
+          if (r.menu_item_id) costMap[r.menu_item_id] = Number(r.unit_cost ?? 0);
+        });
+      }
+
+      const wasteByName: Record<string, WasteStat> = {};
+      let totalWasteCost = 0;
+      if (wasteRes.status === 'fulfilled' && !wasteRes.value.error) {
+        (wasteRes.value.data || []).forEach((w: any) => {
+          const name = w.menu_item_name || 'Unknown';
+          const cost = Number(w.total_cost ?? w.unit_cost ?? 0) * (w.total_cost ? 1 : (w.qty ?? 1));
+          if (!wasteByName[name]) wasteByName[name] = { name, qty: 0, cost: 0, reason: w.reason || 'other' };
+          wasteByName[name].qty += Number(w.qty ?? 0);
+          wasteByName[name].cost += cost;
+          totalWasteCost += cost;
+        });
+      }
+
+      // Build margin stats from existing transactions (already loaded)
+      const marginMap: Record<string, { revenue: number; cost: number }> = {};
+      transactions.forEach((t) => {
+        t.items.forEach((item: any) => {
+          const name = item.menu_item_name || item.menuItemName || item.name || 'Unknown';
+          const mid = item.menu_item_id || item.menuItemId || '';
+          const qty = item.quantity || 1;
+          const rev = item.total_price || item.totalPrice || (item.unit_price || 0) * qty || 0;
+          const unitCost = costMap[mid] ?? 0;
+          if (!marginMap[name]) marginMap[name] = { revenue: 0, cost: 0 };
+          marginMap[name].revenue += rev;
+          marginMap[name].cost += unitCost * qty;
+        });
+      });
+
+      const marginStats: MarginStat[] = Object.entries(marginMap)
+        .map(([name, v]) => ({
+          name,
+          revenue: v.revenue,
+          cost: v.cost,
+          margin: v.revenue - v.cost,
+          marginPct: v.revenue > 0 ? Math.round(((v.revenue - v.cost) / v.revenue) * 100) : 0,
+        }))
+        .sort((a, b) => b.revenue - a.revenue)
+        .slice(0, 15);
+
+      const totalRevenue = marginStats.reduce((s, m) => s + m.revenue, 0);
+      const totalCostOfGoods = marginStats.reduce((s, m) => s + m.cost, 0);
+      const grossMargin = totalRevenue > 0
+        ? Math.round(((totalRevenue - totalCostOfGoods) / totalRevenue) * 100)
+        : 0;
+
+      setAnalytics({
+        marginStats,
+        wasteStats: Object.values(wasteByName).sort((a, b) => b.cost - a.cost),
+        totalWasteCost,
+        totalRevenue,
+        totalCostOfGoods,
+        grossMargin,
+      });
+    } catch (err) {
+      console.error('Failed to load analytics:', err);
+    } finally {
+      setAnalyticsLoading(false);
+    }
+  }, [restaurantId, transactions]);
+
+  const loadSettings = useCallback(async () => {
+    setSettingsLoading(true);
+    try {
+      const s = await getMinimartSettings(restaurantId);
+      setTaxRate(String(s.taxRate));
+      setTaxLabel(s.taxLabel);
+      setReceiptFooter(s.receiptFooter);
+    } catch {
+      // table may not exist yet — use defaults
+    } finally {
+      setSettingsLoading(false);
+    }
+  }, [restaurantId]);
+
+  const handleSaveSettings = async () => {
+    setSettingsSaving(true);
+    setSettingsError('');
+    setSettingsSaved(false);
+    try {
+      await upsertMinimartSettings(restaurantId, {
+        taxRate: parseFloat(taxRate) || 0,
+        taxLabel: taxLabel.trim() || 'Tax',
+        receiptFooter: receiptFooter.trim(),
+      });
+      setSettingsSaved(true);
+      setTimeout(() => setSettingsSaved(false), 3000);
+    } catch (err: any) {
+      setSettingsError(err?.message ?? 'Failed to save settings.');
+    } finally {
+      setSettingsSaving(false);
+    }
+  };
+
   useEffect(() => { load(); }, [load]);
   useEffect(() => { if (page === 'cashiers') loadCashiers(); }, [page, loadCashiers]);
+  useEffect(() => { if (page === 'analytics') loadAnalytics(); }, [page, loadAnalytics]);
+  useEffect(() => { if (page === 'settings') loadSettings(); }, [page, loadSettings]);
 
   const handleAddCashier = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -317,25 +482,71 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
 
   const maxBarRevenue = Math.max(...summary.dailyBars.map((b) => b.revenue), 1);
 
+  const txnCashierOptions = useMemo(
+    () => Array.from(new Set(transactions.map((t) => t.cashierName))).sort((a, b) => a.localeCompare(b)),
+    [transactions],
+  );
+
+  const txnPaymentOptions = useMemo(
+    () => Array.from(new Set(transactions.map((t) => t.paymentMethod))).sort((a, b) => a.localeCompare(b)),
+    [transactions],
+  );
+
   const filteredTxns = useMemo(() => {
-    if (!txnSearch.trim()) return transactions;
-    const q = txnSearch.toLowerCase();
-    return transactions.filter(
-      (t) =>
-        t.orderNumber.toLowerCase().includes(q) ||
-        t.cashierName.toLowerCase().includes(q) ||
-        t.paymentMethod.toLowerCase().includes(q),
-    );
-  }, [transactions, txnSearch]);
+    const q = txnSearch.trim().toLowerCase();
+    return [...transactions]
+      .filter((t) => {
+        const matchesSearch = !q ||
+          t.orderNumber.toLowerCase().includes(q) ||
+          t.cashierName.toLowerCase().includes(q) ||
+          t.paymentMethod.toLowerCase().includes(q);
+        const matchesCashier = txnCashierFilter === 'all' || t.cashierName === txnCashierFilter;
+        const matchesPayment = txnPaymentFilter === 'all' || t.paymentMethod === txnPaymentFilter;
+        return matchesSearch && matchesCashier && matchesPayment;
+      })
+      .sort((a, b) => {
+        const delta = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        return txnSort === 'oldest' ? delta : -delta;
+      });
+  }, [transactions, txnCashierFilter, txnPaymentFilter, txnSearch, txnSort]);
 
   const navItems = [
     { key: 'dashboard' as Page, label: 'Dashboard', icon: TrendingUpIcon },
     { key: 'transactions' as Page, label: 'Transactions', icon: ReceiptIcon },
-    { key: 'products' as Page, label: 'Products', icon: PackageIcon },
     { key: 'inventory' as Page, label: 'Inventory', icon: ShoppingBagIcon },
     { key: 'cashiers' as Page, label: 'Cashiers', icon: UsersIcon },
+    { key: 'analytics' as Page, label: 'Analytics', icon: LineChartIcon },
+    { key: 'settings' as Page, label: 'Settings', icon: SettingsIcon },
   ];
 
+                <select
+                  value={txnCashierFilter}
+                  onChange={(e) => setTxnCashierFilter(e.target.value)}
+                  className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-xs text-slate-100 focus:outline-none focus:border-amber-500"
+                >
+                  <option value="all">All cashiers</option>
+                  {txnCashierOptions.map((cashier) => (
+                    <option key={cashier} value={cashier}>{cashier}</option>
+                  ))}
+                </select>
+                <select
+                  value={txnPaymentFilter}
+                  onChange={(e) => setTxnPaymentFilter(e.target.value)}
+                  className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-xs text-slate-100 focus:outline-none focus:border-amber-500"
+                >
+                  <option value="all">All payments</option>
+                  {txnPaymentOptions.map((method) => (
+                    <option key={method} value={method}>{method}</option>
+                  ))}
+                </select>
+                <select
+                  value={txnSort}
+                  onChange={(e) => setTxnSort(e.target.value as TransactionSort)}
+                  className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-xs text-slate-100 focus:outline-none focus:border-amber-500"
+                >
+                  <option value="newest">Newest first</option>
+                  <option value="oldest">Oldest first</option>
+                </select>
   return (
     <div className="flex flex-col min-h-screen bg-slate-950 text-slate-100">
       {/* Header */}
@@ -657,6 +868,34 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
                   placeholder="Search order, cashier…"
                   className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500 w-44"
                 />
+                <select
+                  value={txnCashierFilter}
+                  onChange={(e) => setTxnCashierFilter(e.target.value)}
+                  className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-xs text-slate-100 focus:outline-none focus:border-amber-500"
+                >
+                  <option value="all">All cashiers</option>
+                  {txnCashierOptions.map((cashier) => (
+                    <option key={cashier} value={cashier}>{cashier}</option>
+                  ))}
+                </select>
+                <select
+                  value={txnPaymentFilter}
+                  onChange={(e) => setTxnPaymentFilter(e.target.value)}
+                  className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-xs text-slate-100 focus:outline-none focus:border-amber-500"
+                >
+                  <option value="all">All payments</option>
+                  {txnPaymentOptions.map((method) => (
+                    <option key={method} value={method}>{method}</option>
+                  ))}
+                </select>
+                <select
+                  value={txnSort}
+                  onChange={(e) => setTxnSort(e.target.value as TransactionSort)}
+                  className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-xs text-slate-100 focus:outline-none focus:border-amber-500"
+                >
+                  <option value="newest">Newest first</option>
+                  <option value="oldest">Oldest first</option>
+                </select>
                 <span className="text-xs text-slate-500">{filteredTxns.length} records</span>
                 <button
                   onClick={() => exportTransactionsToCsv(filteredTxns)}
@@ -668,7 +907,7 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
               </div>
             </div>
 
-            <div className="space-y-2">
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
               {loading ? (
                 <div className="flex items-center justify-center h-40 text-slate-400">
                   <RefreshCwIcon className="w-5 h-5 animate-spin mr-2" /> Loading…
@@ -679,44 +918,59 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
                   <p className="text-sm">{transactions.length === 0 ? 'No transactions found' : 'No matches for your search'}</p>
                 </div>
               ) : (
-                filteredTxns.map((t) => (
-                  <div key={t.id} className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
-                    <button
-                      onClick={() => setExpandedTxnId(expandedTxnId === t.id ? null : t.id)}
-                      className="w-full flex items-center gap-4 p-4 text-left hover:bg-slate-800/50 transition-colors"
-                    >
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <p className="text-sm font-semibold text-slate-100">#{t.orderNumber}</p>
-                          <span className="text-xs bg-amber-900/40 text-amber-300 px-2 py-0.5 rounded-full">{t.paymentMethod}</span>
-                        </div>
-                        <p className="text-xs text-slate-500 mt-0.5">
-                          {t.cashierName} · {t.itemCount} item{t.itemCount !== 1 ? 's' : ''} ·{' '}
-                          {new Date(t.createdAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
-                        </p>
-                      </div>
-                      <p className="text-sm font-bold text-emerald-400 shrink-0">{formatPrice(t.total)}</p>
-                      {expandedTxnId === t.id
-                        ? <ChevronUpIcon className="w-4 h-4 text-slate-400 shrink-0" />
-                        : <ChevronDownIcon className="w-4 h-4 text-slate-400 shrink-0" />}
-                    </button>
-                    {expandedTxnId === t.id && t.items.length > 0 && (
-                      <div className="border-t border-slate-800 px-4 py-3 bg-slate-800/30 space-y-1.5">
-                        {t.items.map((item: any, idx: number) => {
-                          const name = item.menu_item_name || item.menuItemName || item.name || 'Item';
-                          const qty = item.quantity || 1;
-                          const price = item.total_price || item.totalPrice || (item.unit_price || 0) * qty;
-                          return (
-                            <div key={idx} className="flex justify-between text-xs">
-                              <span className="text-slate-300">{name} ×{qty}</span>
-                              <span className="text-slate-400">{formatPrice(price)}</span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                ))
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-slate-800">
+                    <thead className="bg-slate-900/90">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-400">Order</th>
+                        <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-400">Date</th>
+                        <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-400">Cashier</th>
+                        <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-400">Payment</th>
+                        <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-400">Items</th>
+                        <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-400">Products</th>
+                        <th className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-wide text-slate-400">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800">
+                      {filteredTxns.map((t) => (
+                        <tr key={t.id} className="hover:bg-slate-800/35 transition-colors align-top">
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <div className="text-sm font-semibold text-slate-100">#{t.orderNumber}</div>
+                            <div className="text-xs text-slate-500">{t.id.slice(0, 8)}</div>
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-300">
+                            {new Date(t.createdAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-slate-300 whitespace-nowrap">{t.cashierName}</td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <span className="inline-flex rounded-full bg-amber-900/40 px-2 py-0.5 text-xs font-medium text-amber-300">
+                              {t.paymentMethod}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-300">
+                            {t.itemCount} item{t.itemCount !== 1 ? 's' : ''}
+                          </td>
+                          <td className="px-4 py-3 text-xs text-slate-400 min-w-[240px]">
+                            {t.items.length > 0
+                              ? t.items
+                                .slice(0, 3)
+                                .map((item: any) => {
+                                  const name = item.menu_item_name || item.menuItemName || item.name || 'Item';
+                                  const qty = item.quantity || 1;
+                                  return `${name} x${qty}`;
+                                })
+                                .join(', ')
+                              : 'No items recorded'}
+                            {t.items.length > 3 ? ` +${t.items.length - 3} more` : ''}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-bold text-emerald-400">
+                            {formatPrice(t.total)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </div>
           </>
@@ -730,6 +984,214 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
         {/* ── Inventory ── */}
         {page === 'inventory' && (
           <InventoryManagement role="manager" inventoryScope="minimart" />
+        )}
+
+        {/* ── Analytics ── */}
+        {page === 'analytics' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wide">Analytics</h2>
+                <p className="text-xs text-slate-500 mt-0.5">Margin analysis and waste tracking (last 30 days)</p>
+              </div>
+              <button
+                onClick={loadAnalytics}
+                className="p-2 rounded-lg bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors"
+              >
+                <RefreshCwIcon className={`w-4 h-4 ${analyticsLoading ? 'animate-spin' : ''}`} />
+              </button>
+            </div>
+
+            {analyticsLoading ? (
+              <div className="flex items-center justify-center h-40 text-slate-400">
+                <RefreshCwIcon className="w-5 h-5 animate-spin mr-2" /> Loading analytics…
+              </div>
+            ) : !analytics ? (
+              <div className="flex flex-col items-center justify-center h-40 text-slate-500">
+                <LineChartIcon className="w-8 h-8 mb-2 opacity-30" />
+                <p className="text-sm">No data available yet</p>
+              </div>
+            ) : (
+              <>
+                {/* KPI summary */}
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4">
+                    <p className="text-[10px] text-slate-500 uppercase tracking-wide mb-1">Revenue</p>
+                    <p className="text-lg font-bold text-slate-100">{formatPrice(analytics.totalRevenue)}</p>
+                    <p className="text-xs text-slate-500 mt-0.5">30-day period</p>
+                  </div>
+                  <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4">
+                    <p className="text-[10px] text-slate-500 uppercase tracking-wide mb-1">Cost of Goods</p>
+                    <p className="text-lg font-bold text-slate-100">{formatPrice(analytics.totalCostOfGoods)}</p>
+                    <p className="text-xs text-slate-500 mt-0.5">Est. at unit cost</p>
+                  </div>
+                  <div className={`border rounded-2xl p-4 ${analytics.grossMargin >= 30 ? 'bg-emerald-500/10 border-emerald-500/25' : analytics.grossMargin >= 10 ? 'bg-amber-500/10 border-amber-500/25' : 'bg-red-500/10 border-red-500/25'}`}>
+                    <p className={`text-[10px] uppercase tracking-wide mb-1 ${analytics.grossMargin >= 30 ? 'text-emerald-600' : analytics.grossMargin >= 10 ? 'text-amber-600' : 'text-red-600'}`}>Gross Margin</p>
+                    <p className={`text-lg font-bold ${analytics.grossMargin >= 30 ? 'text-emerald-400' : analytics.grossMargin >= 10 ? 'text-amber-400' : 'text-red-400'}`}>{analytics.grossMargin}%</p>
+                    <p className="text-xs text-slate-500 mt-0.5">{analytics.totalCostOfGoods > 0 ? 'Based on unit costs' : 'Add unit costs in Inventory'}</p>
+                  </div>
+                </div>
+
+                {/* Margin table */}
+                {analytics.marginStats.length > 0 && (
+                  <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+                    <div className="px-5 py-3.5 border-b border-slate-800 flex items-center gap-2">
+                      <TrendingUpIcon className="w-3.5 h-3.5 text-amber-400" />
+                      <p className="text-xs font-semibold text-slate-300 uppercase tracking-wide">Product Margin Analysis</p>
+                    </div>
+                    <div className="divide-y divide-slate-800">
+                      {analytics.marginStats.map((m) => (
+                        <div key={m.name} className="flex items-center gap-3 px-5 py-3">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm text-slate-200 truncate">{m.name}</p>
+                            <p className="text-xs text-slate-500 mt-0.5">
+                              Rev {formatPrice(m.revenue)} · Cost {m.cost > 0 ? formatPrice(m.cost) : <span className="text-slate-600">no cost set</span>}
+                            </p>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <p className={`text-sm font-semibold ${m.marginPct >= 30 ? 'text-emerald-400' : m.marginPct >= 10 ? 'text-amber-400' : m.cost > 0 ? 'text-red-400' : 'text-slate-500'}`}>
+                              {m.cost > 0 ? `${m.marginPct}%` : '—'}
+                            </p>
+                            <p className="text-xs text-slate-600">{m.cost > 0 ? formatPrice(m.margin) : ''}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    {analytics.totalCostOfGoods === 0 && (
+                      <div className="px-5 py-3 bg-amber-500/5 border-t border-amber-500/15 flex items-center gap-2">
+                        <AlertTriangleIcon className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                        <p className="text-xs text-amber-400">Set unit costs in Inventory to see margin percentages.</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Waste tracking */}
+                <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+                  <div className="px-5 py-3.5 border-b border-slate-800 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <TrashIcon className="w-3.5 h-3.5 text-red-400" />
+                      <p className="text-xs font-semibold text-slate-300 uppercase tracking-wide">Waste (Last 30 Days)</p>
+                    </div>
+                    {analytics.totalWasteCost > 0 && (
+                      <span className="text-xs font-semibold text-red-400">{formatPrice(analytics.totalWasteCost)} lost</span>
+                    )}
+                  </div>
+                  {analytics.wasteStats.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-24 text-slate-500">
+                      <p className="text-sm">No waste recorded in this period</p>
+                      <p className="text-xs text-slate-600 mt-1">Use the Inventory module to record waste</p>
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-slate-800">
+                      {analytics.wasteStats.map((w) => (
+                        <div key={w.name} className="flex items-center gap-3 px-5 py-3">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm text-slate-200 truncate">{w.name}</p>
+                            <p className="text-xs text-slate-500 mt-0.5">{w.qty} units · {w.reason}</p>
+                          </div>
+                          <p className="text-sm font-semibold text-red-400 shrink-0">{formatPrice(w.cost)}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* ── Settings ── */}
+        {page === 'settings' && (
+          <div className="space-y-6 max-w-lg">
+            <div>
+              <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wide">Store Settings</h2>
+              <p className="text-xs text-slate-500 mt-0.5">Tax configuration and receipt options</p>
+            </div>
+
+            {settingsLoading ? (
+              <div className="flex items-center justify-center h-32 text-slate-400">
+                <RefreshCwIcon className="w-5 h-5 animate-spin mr-2" /> Loading…
+              </div>
+            ) : (
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+                <div className="px-5 py-3.5 border-b border-slate-800">
+                  <p className="text-xs font-semibold text-slate-300 uppercase tracking-wide">Tax</p>
+                </div>
+                <div className="p-5 space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs text-slate-400 mb-1.5">Tax Rate (%)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.5"
+                        value={taxRate}
+                        onChange={(e) => setTaxRate(e.target.value)}
+                        placeholder="0"
+                        className="w-full px-3 py-2.5 bg-slate-800 border border-slate-700/60 rounded-xl text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500/70 transition-all"
+                      />
+                      <p className="text-xs text-slate-600 mt-1">Set to 0 to disable tax</p>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-slate-400 mb-1.5">Tax Label</label>
+                      <input
+                        type="text"
+                        value={taxLabel}
+                        onChange={(e) => setTaxLabel(e.target.value)}
+                        placeholder="Tax"
+                        maxLength={20}
+                        className="w-full px-3 py-2.5 bg-slate-800 border border-slate-700/60 rounded-xl text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500/70 transition-all"
+                      />
+                      <p className="text-xs text-slate-600 mt-1">Shown on receipts (e.g. VAT)</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="px-5 py-3.5 border-t border-slate-800">
+                  <p className="text-xs font-semibold text-slate-300 uppercase tracking-wide">Receipt</p>
+                </div>
+                <div className="p-5 space-y-4">
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-1.5">Footer Message</label>
+                    <textarea
+                      value={receiptFooter}
+                      onChange={(e) => setReceiptFooter(e.target.value)}
+                      placeholder="e.g. Thank you for shopping with us!"
+                      rows={2}
+                      maxLength={200}
+                      className="w-full px-3 py-2.5 bg-slate-800 border border-slate-700/60 rounded-xl text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500/70 resize-none transition-all"
+                    />
+                  </div>
+
+                  {settingsError && (
+                    <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2 text-xs text-red-300">
+                      <AlertTriangleIcon className="w-3.5 h-3.5 shrink-0" />
+                      {settingsError}
+                    </div>
+                  )}
+                  {settingsSaved && (
+                    <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-3 py-2 text-xs text-emerald-300">
+                      Settings saved successfully.
+                    </div>
+                  )}
+
+                  <button
+                    onClick={handleSaveSettings}
+                    disabled={settingsSaving}
+                    className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-slate-900 text-sm font-semibold transition-colors flex items-center gap-2"
+                  >
+                    {settingsSaving ? (
+                      <><RefreshCwIcon className="w-4 h-4 animate-spin" /> Saving…</>
+                    ) : (
+                      'Save Settings'
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         )}
 
         {/* ── Cashiers ── */}
