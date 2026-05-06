@@ -50,6 +50,7 @@ interface ProductStat {
 interface Summary {
   revenue: number;
   grossProfit: number;
+  cogs: number;
   totalRefunds: number;
   transactions: number;
   avgSale: number;
@@ -174,7 +175,7 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
   const [dateFilter, setDateFilter] = useState<DateFilter>('7d');
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [summary, setSummary] = useState<Summary>({
-    revenue: 0, grossProfit: 0, totalRefunds: 0, transactions: 0, avgSale: 0, totalItems: 0, peakDay: '',
+    revenue: 0, grossProfit: 0, cogs: 0, totalRefunds: 0, transactions: 0, avgSale: 0, totalItems: 0, peakDay: '',
     hourlyBars: [],
     byCashier: {}, byPayment: {}, byCategory: {}, dailyBars: [], topProducts: [],
   });
@@ -397,6 +398,7 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
       setSummary({
         revenue: netRevenue,
         grossProfit,
+        cogs: totalCostOfGoods,
         totalRefunds,
         transactions: txns.length,
         avgSale: txns.length > 0 ? netRevenue / txns.length : 0,
@@ -936,7 +938,7 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
             ) : (
               <div className="space-y-6">
                 {/* KPI cards */}
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-6 gap-3">
                   <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4">
                     <div className="flex items-center gap-1.5 text-slate-400 text-xs uppercase tracking-wide mb-2">
                       <TrendingUpIcon className="w-3.5 h-3.5 text-amber-400" /> Net Revenue
@@ -956,6 +958,13 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
                       {formatPrice(summary.grossProfit)}
                     </p>
                     <p className="text-xs text-slate-500 mt-1">Revenue minus estimated COGS</p>
+                  </div>
+                  <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4">
+                    <div className="flex items-center gap-1.5 text-slate-400 text-xs uppercase tracking-wide mb-2">
+                      <TrendingUpIcon className="w-3.5 h-3.5 text-orange-400" /> COGS
+                    </div>
+                    <p className="text-xl font-bold text-orange-300">{formatPrice(summary.cogs)}</p>
+                    <p className="text-xs text-slate-500 mt-1">Estimated cost of goods sold</p>
                   </div>
                   <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4">
                     <div className="flex items-center gap-1.5 text-slate-400 text-xs uppercase tracking-wide mb-2">
