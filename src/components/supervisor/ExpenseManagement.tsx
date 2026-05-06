@@ -225,14 +225,15 @@ export default function SupervisorExpenseManagement() {
   const handleGenerateReceipt = async (expenseId: string) => {
     const expense = expenses.find(e => e.id === expenseId);
     if (!expense) return;
-    const restaurantName = localStorage.getItem('restaurantName') || 'Company';
     const restaurantId = localStorage.getItem('restaurantId') || '';
+    let restaurantName = 'Company';
     let address = '';
     let phone = '';
     let logo = '';
     try {
       if (restaurantId) {
         const info = await fetchRestaurant(restaurantId);
+        restaurantName = info.name || 'Company';
         address = (info as any)?.settings?.receipt?.address || info.address || '';
         phone = (info as any)?.settings?.receipt?.phone || info.phone || '';
         logo = (info as any)?.settings?.receipt?.logo || info.logo_url || '';
