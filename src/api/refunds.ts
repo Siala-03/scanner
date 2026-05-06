@@ -120,7 +120,6 @@ export async function requestRefund(params: {
   reason: string;
   items?: Array<{ name: string; qty: number; price: number }>;
 }): Promise<MinimartRefundRequest> {
-  assertUuid(params.restaurantId, 'restaurant ID');
   const { data, error } = await supabase
     .from('minimart_refund_requests')
     .insert({

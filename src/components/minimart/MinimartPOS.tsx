@@ -509,6 +509,7 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
   // ── History Modal ──────────────────────────────────────────────────────────
   if (showHistory) {
     return (
+      <>
       <div className="fixed inset-0 bg-slate-950 flex flex-col z-50">
         <div className="flex items-center gap-3 px-4 py-4 bg-slate-900 border-b border-slate-800/80 shrink-0">
           <button
@@ -596,6 +597,15 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
           )}
         </div>
       </div>
+
+      {refundingTxn && (
+        <RefundModal
+          txn={refundingTxn}
+          onConfirm={handleRefund}
+          onCancel={() => setRefundingTxn(null)}
+        />
+      )}
+      </>
     );
   }
 
