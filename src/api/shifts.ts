@@ -1,7 +1,5 @@
 import { supabase } from '../lib/supabase';
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
 const SHIFT_SELECT_CANDIDATES = [
   'id, restaurant_id, cashier_id, cashier_name, opened_at, closed_at, opening_float, closing_float, expected_cash, cash_variance, total_sales, total_transactions, status, notes',
   'id, restaurant_id, cashier_id, opened_at, closed_at, opening_float, closing_float, expected_cash, cash_variance, total_sales, total_transactions, status, notes',
@@ -13,12 +11,6 @@ const SHIFT_SELECT_CANDIDATES = [
 function isMissingColumnError(error: any): boolean {
   const message = String(error?.message || '').toLowerCase();
   return error?.code === 'PGRST204' || (message.includes('column') && message.includes('does not exist'));
-}
-
-function assertRestaurantId(restaurantId: string): void {
-  if (!UUID_RE.test(restaurantId)) {
-    throw new Error('Invalid restaurant configuration. Sign out and sign in again.');
-  }
 }
 
 async function selectSingleShift(
@@ -78,7 +70,6 @@ export async function getActiveShift(
   cashierId: string
 ): Promise<CashierShift | null> {
   try {
-    assertRestaurantId(restaurantId);
     const data = await selectSingleShift((selectCols) =>
       supabase
         .from('cashier_shifts')
@@ -103,8 +94,6 @@ export async function openShift(params: {
   cashierName: string;
   openingFloat: number;
 }): Promise<CashierShift> {
-  assertRestaurantId(params.restaurantId);
-
   const roundedFloat = Math.round(params.openingFloat * 100) / 100;
   const payloads = [
     {
