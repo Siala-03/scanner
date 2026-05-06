@@ -939,7 +939,13 @@ export function App() {
         {supervisorPage === 'online-orders' && <OnlineOrdersPage />}
         {supervisorPage === 'menu' && <MenuManagement />}
         {supervisorPage === 'schedule' && <SchedulingPage />}
-        {supervisorPage === 'take-order' && <StaffOrderPage />}
+        {supervisorPage === 'take-order' && (
+          <StaffOrderPage
+            restaurantName={restaurantName}
+            restaurantInfo={receiptSettings}
+            staffName={authUser.name}
+          />
+        )}
         {supervisorPage === 'payments' && (
           <div className="p-4 md:p-6">
             <PaymentApprovalPanel

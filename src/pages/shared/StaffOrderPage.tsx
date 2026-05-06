@@ -9,13 +9,15 @@ import {
   CheckCircleIcon,
   XIcon,
   UtensilsIcon,
+  PrinterIcon,
 } from 'lucide-react';
 import { useMenu } from '../../hooks/useMenu';
 import { useTables } from '../../hooks/useTables';
 import { createOrder } from '../../api/orders';
 import { fetchKitchenOrders } from '../../api/orders';
 import { formatPrice } from '../../utils/currency';
-import { MenuItem } from '../../types';
+import { buildReceiptHtml, orderToReceiptData, printReceipt } from '../../utils/receipt';
+import { MenuItem, Order } from '../../types';
 
 type TableStatus = 'free' | 'occupied' | 'urgent';
 
@@ -26,6 +28,19 @@ interface CartEntry {
   quantity: number;
   unitPrice: number;
   notes: string;
+}
+
+interface StaffOrderPageProps {
+  restaurantName?: string;
+  restaurantInfo?: {
+    logo?: string;
+    address?: string;
+    city?: string;
+    country?: string;
+    phone?: string;
+    email?: string;
+  };
+  staffName?: string;
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -46,6 +61,11 @@ const CATEGORY_LABELS: Record<string, string> = {
   specials: 'Specials',
 };
 
+const DRINK_CATEGORIES = new Set([
+  'alcoholic-drinks', 'beers', 'wine', 'soft-drinks',
+  'drinks', 'beverages', 'cocktails', 'bar',
+]);
+
 function categoryLabel(cat: string): string {
   return CATEGORY_LABELS[cat] ?? cat.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
@@ -61,7 +81,7 @@ function getStaffId(): string | null {
   }
 }
 
-export function StaffOrderPage() {
+export function StaffOrderPage({ restaurantName, restaurantInfo, staffName }: StaffOrderPageProps) {
   const [step, setStep] = useState<'table-select' | 'order-entry'>('table-select');
   // null = Bar / Walk-up (no table number)
   const [selectedTable, setSelectedTable] = useState<number | null | 'bar'>('bar');
@@ -74,6 +94,8 @@ export function StaffOrderPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successTable, setSuccessTable] = useState<string | null>(null);
+  const [lastPlacedOrder, setLastPlacedOrder] = useState<Order | null>(null);
+  const [isPrintingReceipt, setIsPrintingReceipt] = useState(false);
   const [showMobileCart, setShowMobileCart] = useState(false);
   const [confirmOccupied, setConfirmOccupied] = useState<number | null>(null);
 
@@ -194,36 +216,120 @@ export function StaffOrderPage() {
   const getCartQty = (menuItemId: string) =>
     cart.find((c) => c.menuItemId === menuItemId)?.quantity ?? 0;
 
+  const cartItemNeedsKitchen = (entry: CartEntry): boolean => {
+    if (entry.menuItem.requiresKitchen === false) return false;
+    if (entry.menuItem.requiresKitchen === true) return true;
+    const cat = String(entry.menuItem.category || '').trim().toLowerCase();
+    if (!cat || cat === 'unknown') return true;
+    return !DRINK_CATEGORIES.has(cat);
+  };
+
+  const resolveStaffName = () => {
+    if (staffName && staffName.trim()) return staffName.trim();
+    try {
+      const authUser = JSON.parse(localStorage.getItem('authUser') || '{}');
+      if (typeof authUser?.name === 'string' && authUser.name.trim()) {
+        return authUser.name.trim();
+      }
+    } catch {
+      // Ignore invalid local storage payload.
+    }
+    return 'Supervisor';
+  };
+
+  const handlePrintLastReceipt = () => {
+    if (!lastPlacedOrder || isPrintingReceipt) return;
+    setIsPrintingReceipt(true);
+    try {
+      const html = buildReceiptHtml(
+        orderToReceiptData(lastPlacedOrder, {
+          restaurantName: restaurantName || 'Company',
+          restaurantAddress: restaurantInfo?.address || '',
+          restaurantPhone: restaurantInfo?.phone || '',
+          restaurantEmail: restaurantInfo?.email || '',
+          restaurantLogo: restaurantInfo?.logo,
+          restaurantCity: restaurantInfo?.city,
+          restaurantCountry: restaurantInfo?.country,
+          taxRate: 0,
+          serverName: resolveStaffName(),
+          orderType: lastPlacedOrder.tableNumber == null ? 'takeout' : 'dine-in',
+          paymentStatus: 'pending',
+          payments: [{ method: 'Pending', amount: 0 }],
+        })
+      );
+      printReceipt(html);
+    } catch (e) {
+      console.error(e);
+      alert('Failed to print receipt. Please try again.');
+    } finally {
+      setIsPrintingReceipt(false);
+    }
+  };
+
+  const handleDoneAfterSuccess = () => {
+    setSuccessTable(null);
+    setLastPlacedOrder(null);
+    setStep('table-select');
+    loadOccupancy();
+  };
+
   // ── Submit ────────────────────────────────────────────────────────────────────
   const handleSubmit = async () => {
     if (cart.length === 0) return;
     setIsSubmitting(true);
     try {
+      const checkoutCart = [...cart];
       const tableNum = selectedTable === 'bar' ? undefined : (selectedTable as number);
-      await createOrder({
+      const needsKitchen = checkoutCart.some(cartItemNeedsKitchen);
+      const created = await createOrder({
         tableNumber: tableNum,
-        items: cart.map((c) => ({
+        items: checkoutCart.map((c) => ({
           menuItemId: c.menuItemId,
           menuItemName: c.menuItemName,
           quantity: c.quantity,
           unitPrice: c.unitPrice,
           notes: c.notes || undefined,
+          category: c.menuItem.category,
+          requiresKitchen: cartItemNeedsKitchen(c),
         })),
         notes: orderNotes || undefined,
         createdBy: getStaffId() ?? undefined,
-        requiresKitchen: cart.some((c) => c.menuItem.requiresKitchen !== false),
+        requiresKitchen: needsKitchen,
       } as any);
+
+      const nowIso = new Date().toISOString();
+      const subtotal = checkoutCart.reduce((sum, c) => sum + c.unitPrice * c.quantity, 0);
+      const printableOrder: Order = {
+        id: String((created as any)?.id || `order-${Date.now()}`),
+        orderNumber: (created as any)?.orderNumber ?? (created as any)?.order_number,
+        tableNumber: tableNum,
+        status: 'pending',
+        items: checkoutCart.map((c, index) => ({
+          id: `item-${Date.now()}-${index}`,
+          menuItem: c.menuItem,
+          menuItemId: c.menuItemId,
+          menuItemName: c.menuItemName,
+          quantity: c.quantity,
+          unitPrice: c.unitPrice,
+          totalPrice: c.unitPrice * c.quantity,
+          specialInstructions: c.notes || undefined,
+          status: 'pending',
+        })),
+        createdAt: (created as any)?.createdAt ?? (created as any)?.created_at ?? nowIso,
+        updatedAt: (created as any)?.updatedAt ?? (created as any)?.updated_at ?? nowIso,
+        subtotal,
+        tax: 0,
+        total: Number((created as any)?.total ?? subtotal),
+        notes: orderNotes || undefined,
+        requiresKitchen: needsKitchen,
+      };
 
       const label = selectedTable === 'bar' ? 'Bar / Walk-up' : `Table ${selectedTable}`;
       setSuccessTable(label);
+      setLastPlacedOrder(printableOrder);
       setCart([]);
       setOrderNotes('');
       setShowMobileCart(false);
-      setTimeout(() => {
-        setSuccessTable(null);
-        setStep('table-select');
-        loadOccupancy();
-      }, 2200);
     } catch (e) {
       console.error(e);
       alert('Failed to place order. Please try again.');
@@ -493,9 +599,13 @@ export function StaffOrderPage() {
             isSubmitting={isSubmitting}
             successTable={successTable}
             tableLabel={tableLabel}
+            canPrintReceipt={Boolean(lastPlacedOrder)}
+            isPrintingReceipt={isPrintingReceipt}
             onUpdateQty={updateQty}
             onNotesChange={setOrderNotes}
             onSubmit={handleSubmit}
+            onPrintReceipt={handlePrintLastReceipt}
+            onDone={handleDoneAfterSuccess}
           />
         </div>
       </div>
@@ -519,9 +629,13 @@ export function StaffOrderPage() {
               isSubmitting={isSubmitting}
               successTable={successTable}
               tableLabel={tableLabel}
+              canPrintReceipt={Boolean(lastPlacedOrder)}
+              isPrintingReceipt={isPrintingReceipt}
               onUpdateQty={updateQty}
               onNotesChange={setOrderNotes}
               onSubmit={() => { handleSubmit(); setShowMobileCart(false); }}
+              onPrintReceipt={handlePrintLastReceipt}
+              onDone={handleDoneAfterSuccess}
             />
           </div>
         </div>
@@ -539,9 +653,13 @@ function CartPanel({
   isSubmitting,
   successTable,
   tableLabel,
+  canPrintReceipt,
+  isPrintingReceipt,
   onUpdateQty,
   onNotesChange,
   onSubmit,
+  onPrintReceipt,
+  onDone,
 }: {
   cart: CartEntry[];
   cartTotal: number;
@@ -550,9 +668,13 @@ function CartPanel({
   isSubmitting: boolean;
   successTable: string | null;
   tableLabel: string;
+  canPrintReceipt: boolean;
+  isPrintingReceipt: boolean;
   onUpdateQty: (id: string, delta: number) => void;
   onNotesChange: (v: string) => void;
   onSubmit: () => void;
+  onPrintReceipt: () => void;
+  onDone: () => void;
 }) {
   if (successTable) {
     return (
@@ -560,6 +682,24 @@ function CartPanel({
         <CheckCircleIcon className="w-14 h-14 text-emerald-400" />
         <p className="font-bold text-lg text-white">Order placed!</p>
         <p className="text-sm text-slate-400">{successTable}</p>
+        <div className="mt-2 w-full max-w-xs space-y-2">
+          {canPrintReceipt && (
+            <button
+              onClick={onPrintReceipt}
+              disabled={isPrintingReceipt}
+              className="w-full rounded-xl border border-emerald-500/40 bg-emerald-500/15 px-4 py-2.5 text-sm font-semibold text-emerald-300 hover:bg-emerald-500/25 disabled:opacity-50"
+            >
+              <PrinterIcon className="inline w-4 h-4 mr-1.5" />
+              {isPrintingReceipt ? 'Printing...' : 'Print Receipt'}
+            </button>
+          )}
+          <button
+            onClick={onDone}
+            className="w-full rounded-xl bg-amber-500 px-4 py-2.5 text-sm font-semibold text-slate-900 hover:bg-amber-400"
+          >
+            New Order
+          </button>
+        </div>
       </div>
     );
   }
