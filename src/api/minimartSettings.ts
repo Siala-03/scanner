@@ -98,7 +98,7 @@ export async function upsertMinimartSettings(
   if (error && isUuidTypeError(error)) {
     const uuidRestaurantId = await resolveUuidRestaurantId(restaurantId);
     if (!uuidRestaurantId) {
-      throw new Error('Settings update failed: this environment expects a UUID restaurant_id, but your current restaurant ID is not UUID.');
+      throw new Error('Settings update failed because minimart_settings.restaurant_id is UUID while your restaurant ID is text. Run migration 064_fix_minimart_settings_restaurant_id.sql and retry.');
     }
 
     effectiveRestaurantId = uuidRestaurantId;
