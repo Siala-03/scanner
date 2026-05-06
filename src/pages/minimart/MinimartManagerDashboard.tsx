@@ -519,34 +519,6 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
     { key: 'settings' as Page, label: 'Settings', icon: SettingsIcon },
   ];
 
-                <select
-                  value={txnCashierFilter}
-                  onChange={(e) => setTxnCashierFilter(e.target.value)}
-                  className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-xs text-slate-100 focus:outline-none focus:border-amber-500"
-                >
-                  <option value="all">All cashiers</option>
-                  {txnCashierOptions.map((cashier) => (
-                    <option key={cashier} value={cashier}>{cashier}</option>
-                  ))}
-                </select>
-                <select
-                  value={txnPaymentFilter}
-                  onChange={(e) => setTxnPaymentFilter(e.target.value)}
-                  className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-xs text-slate-100 focus:outline-none focus:border-amber-500"
-                >
-                  <option value="all">All payments</option>
-                  {txnPaymentOptions.map((method) => (
-                    <option key={method} value={method}>{method}</option>
-                  ))}
-                </select>
-                <select
-                  value={txnSort}
-                  onChange={(e) => setTxnSort(e.target.value as TransactionSort)}
-                  className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-xs text-slate-100 focus:outline-none focus:border-amber-500"
-                >
-                  <option value="newest">Newest first</option>
-                  <option value="oldest">Oldest first</option>
-                </select>
   return (
     <div className="flex flex-col min-h-screen bg-slate-950 text-slate-100">
       {/* Header */}
