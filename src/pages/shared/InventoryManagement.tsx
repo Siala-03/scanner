@@ -263,9 +263,9 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
     const map: Record<string, InventoryRecord> = {};
     inventory.forEach((rec) => {
       const normalized = normalizeInventoryRecord(rec);
-      if (normalized.menuItemId) {
-        map[normalized.menuItemId] = normalized;
-      }
+      if (normalized.menuItemId) map[normalized.menuItemId] = normalized;
+      // Also index by the record's own id so unlinked rows (id = rec.id) can be looked up
+      if (normalized.id) map[normalized.id] = normalized;
     });
     if (Object.keys(map).length === 0 && inventory.length > 0) {
       console.warn('No valid inventory items found after normalization. Inventory count:', inventory.length);
@@ -348,8 +348,8 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
       .filter((rec) => !menuItemMap[rec.menuItemId])
       .map((rec) => {
         const item = {
-          id: rec.menuItemId,
-          name: rec.menuItemId,
+          id: rec.id || rec.menuItemId,
+          name: rec.description || rec.menuItemId || rec.id,
           category: 'Other',
         };
         const stock = rec.stock;
@@ -1702,14 +1702,14 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                                         const linkedName = menuItemMap[row.item.id].name;
                                         if (!window.confirm(`Unlink this inventory record from "${linkedName}"?\nStock tracking will stop until re-linked.`)) return;
                                         try {
-                                          await apiDelinkInventoryRecord(row.item.id);
+                                          await apiDelinkInventoryRecord(row.rec?.id ?? row.item.id);
                                           await refresh();
                                         } catch (err) {
                                           alert('Failed to unlink: ' + getErrorMessage(err));
                                         }
                                         return;
                                       }
-                                      setAddToMenuItemId(row.item.id);
+                                      setAddToMenuItemId(row.rec?.id ?? row.item.id);
                                       setAddToMenuName((row.rec?.description || '').trim());
                                       setAddToMenuPrice(row.rec?.price ?? row.rec?.unitCost ?? 0);
                                       setAddToMenuCategory(menuCategories.find((c) => c !== 'all') ?? (isMinimartScope ? 'General' : 'Food'));

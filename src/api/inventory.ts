@@ -80,6 +80,7 @@ function normalizeInventoryRecord(raw: any): InventoryRecord {
   const cost = raw.cost ?? raw.unit_cost ?? raw.unitCost ?? 0;
   const price = raw.price ?? raw.selling_price ?? raw.sellingPrice ?? 0;
   return {
+    id:                raw.id             ?? '',
     menuItemId:        raw.menu_item_id   ?? raw.menuItemId   ?? '',
     stock:             currentQty,
     lowStockThreshold: raw.low_stock_threshold ?? raw.lowStockThreshold ?? 5,
@@ -504,7 +505,7 @@ export async function updateInventoryRecord(
 }
 
 export async function relinkInventoryRecord(
-  oldMenuItemId: string,
+  inventoryRecordId: string,
   newMenuItemId: string,
 ): Promise<void> {
   const restaurantId = await resolveRestaurantId();
@@ -513,24 +514,23 @@ export async function relinkInventoryRecord(
   const { error } = await supabase
     .from('inventory_records')
     .update({ menu_item_id: newMenuItemId, updated_at: new Date().toISOString() })
-    .eq('menu_item_id', oldMenuItemId)
+    .eq('id', inventoryRecordId)
     .eq('restaurant_id', restaurantId);
 
   if (error) throw new Error(`Failed to relink inventory record: ${error.message}`);
 }
 
-export async function delinkInventoryRecord(menuItemId: string): Promise<void> {
+export async function delinkInventoryRecord(inventoryRecordId: string): Promise<void> {
   const restaurantId = await resolveRestaurantId();
   if (!restaurantId) throw new Error('No company selected');
 
-  // inventory_records.menu_item_id is NOT NULL in this schema,
-  // so "delink" means reassigning to a standalone inventory key.
+  // Use a standalone key so the record stays trackable without a menu item link
   const standaloneId = `standalone-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
 
   const { error } = await supabase
     .from('inventory_records')
     .update({ menu_item_id: standaloneId, updated_at: new Date().toISOString() })
-    .eq('menu_item_id', menuItemId)
+    .eq('id', inventoryRecordId)
     .eq('restaurant_id', restaurantId);
 
   if (error) throw new Error(`Failed to delink inventory record: ${error.message}`);

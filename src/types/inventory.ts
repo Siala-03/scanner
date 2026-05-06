@@ -3,6 +3,7 @@
 // ============================================
 
 export interface InventoryRecord {
+  id: string;
   menuItemId: string;
   stock: number;
   lowStockThreshold: number;
