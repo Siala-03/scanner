@@ -46,6 +46,7 @@ const DRINK_CATEGORIES = new Set([
   'alcoholic-drinks', 'beers', 'wine', 'soft-drinks',
   'drinks', 'beverages', 'cocktails', 'bar',
 ]);
+const SUPERVISOR_SOURCE_TAG = '[source:supervisor-take-order]';
 
 function itemNeedsKitchen(item: OrderItem): boolean {
   if (item.menuItem?.requiresKitchen === false) return false; // explicitly bar-only
@@ -56,6 +57,17 @@ function itemNeedsKitchen(item: OrderItem): boolean {
   ).trim().toLowerCase();
   if (!cat || cat === 'unknown') return true; // unknown → assume kitchen
   return !DRINK_CATEGORIES.has(cat);
+}
+
+function hasSupervisorSourceTag(order: Order): boolean {
+  const note = String(order.notes ?? '').toLowerCase();
+  const special = String(order.specialInstructions ?? '').toLowerCase();
+  return note.includes(SUPERVISOR_SOURCE_TAG) || special.includes(SUPERVISOR_SOURCE_TAG);
+}
+
+function cleanSourceTag(text: string | undefined): string {
+  if (!text) return '';
+  return text.split('\n').filter((line) => !line.toLowerCase().includes(SUPERVISOR_SOURCE_TAG)).join('\n').trim();
 }
 
 // ─── Props ───────────────────────────────────────────────────────────────────
@@ -224,6 +236,7 @@ function IncomingOrderCard({
 }) {
   const [expanded, setExpanded] = useState(false);
   const isQROrder = !order.assignedWaiterId;
+  const supervisorAssigned = hasSupervisorSourceTag(order);
   const kitchenItems = order.items.filter(itemNeedsKitchen);
   const barItems = order.items.filter((i) => !itemNeedsKitchen(i));
   const hasKitchenItems = kitchenItems.length > 0;
@@ -265,6 +278,11 @@ function IncomingOrderCard({
                   <><WineIcon className="w-3 h-3 mr-1" />Bar only</>
                 )}
               </span>
+              {supervisorAssigned && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-cyan-500/30 bg-cyan-500/10 px-2 py-0.5 text-xs font-medium text-cyan-300">
+                  Assigned by supervisor
+                </span>
+              )}
             </div>
             <p className="text-sm text-slate-400 sm:truncate">
               {order.items.length} item{order.items.length !== 1 ? 's' : ''} · {formatPrice(order.total)} · {timeAgo(order.createdAt)}
@@ -415,6 +433,8 @@ function ActiveOrderRow({
   onShare?: (order: Order) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const supervisorAssigned = hasSupervisorSourceTag(order);
+  const cleanedNote = cleanSourceTag(order.notes || order.specialInstructions);
 
   return (
     <motion.div
@@ -442,6 +462,11 @@ function ActiveOrderRow({
               {order.requiresKitchen && (
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-orange-500/15 text-orange-300 text-xs border border-orange-500/20">
                   <UtensilsIcon className="w-3 h-3" />KOT
+                </span>
+              )}
+              {supervisorAssigned && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-300 text-xs border border-cyan-500/25">
+                  Assigned by supervisor
                 </span>
               )}
               {(order as any).paymentStatus === 'confirmed' || (order as any).payment_status === 'confirmed' ? (
@@ -524,8 +549,8 @@ function ActiveOrderRow({
                   <span className="text-slate-400">{formatPrice((item.unitPrice ?? 0) * item.quantity)}</span>
                 </div>
               ))}
-              {(order.notes || order.specialInstructions) && (
-                <p className="text-xs text-yellow-300 pt-1">Note: {order.notes || order.specialInstructions}</p>
+              {cleanedNote && (
+                <p className="text-xs text-yellow-300 pt-1">Note: {cleanedNote}</p>
               )}
               <div className="flex justify-between items-center pt-2 border-t border-slate-700">
                 <span className="text-slate-400 text-sm">Total</span>

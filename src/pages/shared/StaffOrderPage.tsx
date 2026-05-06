@@ -72,6 +72,7 @@ const DRINK_CATEGORIES = new Set([
   'alcoholic-drinks', 'beers', 'wine', 'soft-drinks',
   'drinks', 'beverages', 'cocktails', 'bar',
 ]);
+const SUPERVISOR_SOURCE_TAG = '[source:supervisor-take-order]';
 
 function categoryLabel(cat: string): string {
   return CATEGORY_LABELS[cat] ?? cat.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
@@ -321,10 +322,11 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName }: St
     setIsSubmitting(true);
     try {
       const checkoutCart = [...cart];
-      const combinedNotes = [
+      const visibleNotes = [
         selectedStaffName ? `Waiter: ${selectedStaffName}` : '',
         orderNotes.trim(),
       ].filter(Boolean).join('\n');
+      const persistedNotes = [SUPERVISOR_SOURCE_TAG, visibleNotes].filter(Boolean).join('\n');
       const tableNum = selectedTable === 'bar' ? undefined : (selectedTable as number);
       const needsKitchen = checkoutCart.some(cartItemNeedsKitchen);
       const created = await createOrder({
@@ -338,7 +340,7 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName }: St
           category: c.menuItem.category,
           requiresKitchen: cartItemNeedsKitchen(c),
         })),
-        notes: combinedNotes || undefined,
+        notes: persistedNotes || undefined,
         createdBy: getStaffId() ?? undefined,
         assignedWaiterId: selectedStaffId || undefined,
         requiresKitchen: needsKitchen,
@@ -367,7 +369,7 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName }: St
         subtotal,
         tax: 0,
         total: Number((created as any)?.total ?? subtotal),
-        notes: combinedNotes || undefined,
+        notes: visibleNotes || undefined,
         requiresKitchen: needsKitchen,
       };
 
