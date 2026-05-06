@@ -290,8 +290,9 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
       } as any);
 
       await confirmPayment(order.id, {
-        paymentType:  methodCode,
-        confirmedBy:  cashier?.id,
+        paymentType:     methodCode,
+        confirmedBy:     cashier?.id,
+        confirmedByName: cashier?.name,
         restaurantId,
       });
 

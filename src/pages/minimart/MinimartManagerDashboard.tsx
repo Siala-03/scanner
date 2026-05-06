@@ -212,12 +212,27 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
 
       if (error) throw error;
 
+      // Build a cashier ID → name lookup from staff for existing records without a stored name
+      let cashierNameMap: Record<string, string> = {};
+      try {
+        const allStaff = await fetchAllStaff();
+        cashierNameMap = Object.fromEntries(
+          allStaff
+            .filter((s) => s.restaurantId === restaurantId)
+            .map((s) => [s.id, s.name])
+        );
+      } catch {
+        // non-fatal — fall back to raw id
+      }
+
       const txns: Transaction[] = (data || [])
         .filter((o: any) => ['confirmed', 'paid', 'completed'].includes((o.payment_status || '').toLowerCase()))
         .map((o: any) => ({
         id: o.id,
         orderNumber: o.order_number || o.id.slice(-6).toUpperCase(),
-        cashierName: o.payment_confirmed_by_name || o.payment_confirmed_by || 'Cashier',
+        cashierName: o.payment_confirmed_by_name ||
+          (o.payment_confirmed_by ? cashierNameMap[o.payment_confirmed_by] : undefined) ||
+          'Cashier',
         total: o.total || 0,
         paymentMethod: PAYMENT_LABEL[o.payment_type || o.payment_method] || o.payment_type || o.payment_method || 'Cash',
         itemCount: Array.isArray(o.items)

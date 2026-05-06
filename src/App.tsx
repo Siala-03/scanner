@@ -129,6 +129,7 @@ export function App() {
   const [showQRGrid, setShowQRGrid] = useState(false);
   const [portalSplash, setPortalSplash] = useState<{ name: string; outletType: OutletType } | null>(null);
   const justLoggedIn = useRef(false);
+  const [outletTypeResolved, setOutletTypeResolved] = useState(true);
   const { tables, addTable, removeTable } = useTables();
 
   useEffect(() => {
@@ -612,6 +613,7 @@ export function App() {
         setRestaurantName(name);
         const ot = ((restaurant as any).outlet_type || 'restaurant') as OutletType;
         setOutletType(ot);
+        setOutletTypeResolved(true);
         localStorage.setItem('outletType', ot);
         if (justLoggedIn.current) {
           justLoggedIn.current = false;
@@ -620,7 +622,10 @@ export function App() {
       })
       .catch((err: unknown) => {
         console.warn('Failed to fetch restaurant info:', err);
-        if (active) setRestaurantName('');
+        if (active) {
+          setRestaurantName('');
+          setOutletTypeResolved(true);
+        }
       });
 
     fetchReceiptSettings(currentRestaurantId)
@@ -724,6 +729,15 @@ export function App() {
         authUser={authUser}
         onLogout={handleLogout}
       />
+    );
+  }
+
+  // Wait for outlet type fetch to complete before routing manager/supervisor
+  if (!outletTypeResolved && authUser && (selectedRole === 'manager' || selectedRole === 'supervisor')) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-900">
+        <div className="text-slate-400 animate-pulse">Loading...</div>
+      </div>
     );
   }
 
@@ -1192,6 +1206,9 @@ export function App() {
               embedded
               onLogin={(user) => {
                 justLoggedIn.current = true;
+                if (user.role === 'manager' || user.role === 'supervisor') {
+                  setOutletTypeResolved(false);
+                }
                 setAuthUser(user);
                 restoreStaffContextFromAuthUser(user);
                 setSelectedRole(user.role as UserRole);
