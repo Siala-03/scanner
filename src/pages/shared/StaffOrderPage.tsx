@@ -42,6 +42,7 @@ interface StaffOrderPageProps {
     email?: string;
   };
   staffName?: string;
+  sharedTerminalMode?: boolean;
 }
 
 interface StaffOption {
@@ -89,7 +90,7 @@ function getStaffId(): string | null {
   }
 }
 
-export function StaffOrderPage({ restaurantName, restaurantInfo, staffName }: StaffOrderPageProps) {
+export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, sharedTerminalMode = false }: StaffOrderPageProps) {
   const [step, setStep] = useState<'table-select' | 'order-entry'>('table-select');
   // null = Bar / Walk-up (no table number)
   const [selectedTable, setSelectedTable] = useState<number | null | 'bar'>('bar');
@@ -130,6 +131,7 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName }: St
   }, [staffOptions, selectedStaffId]);
 
   useEffect(() => {
+    if (sharedTerminalMode) return;
     if (selectedStaffId) return;
     const initialByName = (staffName || '').trim();
     if (initialByName) {
@@ -313,12 +315,19 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName }: St
     setSuccessTable(null);
     setLastPlacedOrder(null);
     setStep('table-select');
+    if (sharedTerminalMode) {
+      setSelectedStaffId('');
+    }
     loadOccupancy();
   };
 
   // ── Submit ────────────────────────────────────────────────────────────────────
   const handleSubmit = async () => {
     if (cart.length === 0) return;
+    if (sharedTerminalMode && !selectedStaffId) {
+      alert('Select the active waiter before placing an order.');
+      return;
+    }
     setIsSubmitting(true);
     try {
       const checkoutCart = [...cart];
@@ -326,7 +335,8 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName }: St
         selectedStaffName ? `Waiter: ${selectedStaffName}` : '',
         orderNotes.trim(),
       ].filter(Boolean).join('\n');
-      const persistedNotes = [SUPERVISOR_SOURCE_TAG, visibleNotes].filter(Boolean).join('\n');
+      const includeSupervisorSource = !selectedStaffId;
+      const persistedNotes = [includeSupervisorSource ? SUPERVISOR_SOURCE_TAG : '', visibleNotes].filter(Boolean).join('\n');
       const tableNum = selectedTable === 'bar' ? undefined : (selectedTable as number);
       const needsKitchen = checkoutCart.some(cartItemNeedsKitchen);
       const created = await createOrder({
@@ -341,7 +351,7 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName }: St
           requiresKitchen: cartItemNeedsKitchen(c),
         })),
         notes: persistedNotes || undefined,
-        createdBy: getStaffId() ?? undefined,
+        createdBy: selectedStaffId || getStaffId() || undefined,
         assignedWaiterId: selectedStaffId || undefined,
         requiresKitchen: needsKitchen,
       } as any);
@@ -409,6 +419,50 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName }: St
     ? tableOccupancy[selectedTable as number]
     : undefined;
 
+  if (sharedTerminalMode && !selectedStaffId) {
+    return (
+      <div className="min-h-screen bg-slate-950 p-4 md:p-6">
+        <div className="mx-auto max-w-3xl rounded-3xl border border-slate-800 bg-slate-900/95 p-6 md:p-8 shadow-2xl">
+          <div className="mb-6">
+            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-amber-400">Shared Terminal</p>
+            <h1 className="mt-2 text-3xl font-bold text-white">Select waiter to start taking orders</h1>
+            <p className="mt-2 text-sm text-slate-400">
+              Use this counter device as a shared waiter terminal. Orders will be saved under the selected waiter and the session resets after each completed order.
+            </p>
+          </div>
+
+          {staffLoading ? (
+            <div className="rounded-2xl border border-slate-800 bg-slate-950/70 px-4 py-8 text-center text-slate-400">Loading waiters...</div>
+          ) : staffOptions.length === 0 ? (
+            <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-8 text-center text-amber-200">
+              No waiter accounts are available. Add waiter staff records before using the shared terminal.
+            </div>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2">
+              {staffOptions.map((option) => (
+                <button
+                  key={option.id}
+                  onClick={() => setSelectedStaffId(option.id)}
+                  className="rounded-2xl border border-slate-700 bg-slate-800 px-4 py-5 text-left transition-colors hover:border-amber-500 hover:bg-slate-800/90"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-lg font-semibold text-white">{option.name}</p>
+                      <p className="mt-1 text-xs uppercase tracking-[0.18em] text-slate-400">{option.role || 'waiter'}</p>
+                    </div>
+                    <div className="rounded-full bg-amber-500/15 px-3 py-1 text-xs font-semibold text-amber-300">
+                      Start session
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   // ── Render: table picker ──────────────────────────────────────────────────────
   if (step === 'table-select') {
     return (
@@ -416,19 +470,40 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName }: St
         <div className="max-w-3xl mx-auto">
 
           {/* Header */}
-          <div className="mb-6 flex items-center justify-between">
+          <div className="mb-6 flex items-center justify-between gap-3">
             <div>
               <h1 className="text-2xl font-bold text-white">Take Order</h1>
-              <p className="mt-1 text-sm text-slate-400">Select a table or choose Bar / Walk-up</p>
+              <p className="mt-1 text-sm text-slate-400">
+                {sharedTerminalMode
+                  ? `Active waiter: ${selectedStaffName}. Select a table or choose Bar / Walk-up.`
+                  : 'Select a table or choose Bar / Walk-up'}
+              </p>
             </div>
-            <button
-              onClick={loadOccupancy}
-              disabled={occupancyLoading}
-              className="flex items-center gap-2 rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 text-sm text-slate-300 hover:bg-slate-700 transition-colors disabled:opacity-50"
-            >
-              <RefreshCwIcon className={`w-4 h-4 ${occupancyLoading ? 'animate-spin' : ''}`} />
-              Refresh
-            </button>
+            <div className="flex items-center gap-2">
+              {sharedTerminalMode && (
+                <button
+                  onClick={() => {
+                    setSelectedStaffId('');
+                    setCart([]);
+                    setOrderNotes('');
+                    setLastPlacedOrder(null);
+                    setSuccessTable(null);
+                    setStep('table-select');
+                  }}
+                  className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm font-semibold text-amber-300 hover:bg-amber-500/20 transition-colors"
+                >
+                  Switch Waiter
+                </button>
+              )}
+              <button
+                onClick={loadOccupancy}
+                disabled={occupancyLoading}
+                className="flex items-center gap-2 rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 text-sm text-slate-300 hover:bg-slate-700 transition-colors disabled:opacity-50"
+              >
+                <RefreshCwIcon className={`w-4 h-4 ${occupancyLoading ? 'animate-spin' : ''}`} />
+                Refresh
+              </button>
+            </div>
           </div>
 
           {/* Legend */}
@@ -526,6 +601,9 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName }: St
             </button>
             <div>
               <p className="font-semibold text-white">{tableLabel}</p>
+              {sharedTerminalMode && selectedStaffName && (
+                <p className="text-xs text-amber-300">Taking order as {selectedStaffName}</p>
+              )}
               {tableOccupancyStatus && (
                 <p className={`text-xs ${tableOccupancyStatus === 'urgent' ? 'text-red-400' : 'text-amber-400'}`}>
                   {tableOccupancyStatus === 'urgent' ? 'Urgent — orders waiting >15 min' : 'Table occupied — adding to existing orders'}
@@ -646,11 +724,13 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName }: St
             cartCount={cartCount}
             orderNotes={orderNotes}
             selectedStaffId={selectedStaffId}
+            selectedStaffName={selectedStaffName}
             staffOptions={staffOptions}
             staffLoading={staffLoading}
             isSubmitting={isSubmitting}
             successTable={successTable}
             tableLabel={tableLabel}
+            sharedTerminalMode={sharedTerminalMode}
             canPrintReceipt={Boolean(lastPlacedOrder)}
             isPrintingReceipt={isPrintingReceipt}
             onUpdateQty={updateQty}
@@ -680,11 +760,13 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName }: St
               cartCount={cartCount}
               orderNotes={orderNotes}
               selectedStaffId={selectedStaffId}
+              selectedStaffName={selectedStaffName}
               staffOptions={staffOptions}
               staffLoading={staffLoading}
               isSubmitting={isSubmitting}
               successTable={successTable}
               tableLabel={tableLabel}
+              sharedTerminalMode={sharedTerminalMode}
               canPrintReceipt={Boolean(lastPlacedOrder)}
               isPrintingReceipt={isPrintingReceipt}
               onUpdateQty={updateQty}
@@ -708,11 +790,13 @@ function CartPanel({
   cartCount,
   orderNotes,
   selectedStaffId,
+  selectedStaffName,
   staffOptions,
   staffLoading,
   isSubmitting,
   successTable,
   tableLabel,
+  sharedTerminalMode,
   canPrintReceipt,
   isPrintingReceipt,
   onUpdateQty,
@@ -727,11 +811,13 @@ function CartPanel({
   cartCount: number;
   orderNotes: string;
   selectedStaffId: string;
+  selectedStaffName: string;
   staffOptions: StaffOption[];
   staffLoading: boolean;
   isSubmitting: boolean;
   successTable: string | null;
   tableLabel: string;
+  sharedTerminalMode: boolean;
   canPrintReceipt: boolean;
   isPrintingReceipt: boolean;
   onUpdateQty: (id: string, delta: number) => void;
@@ -829,22 +915,42 @@ function CartPanel({
       </div>
 
       <div className="rounded-xl border border-slate-700 bg-slate-900 p-4">
-        <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-400">
-          Assign Waiter
-        </label>
-        <select
-          value={selectedStaffId}
-          onChange={(e) => onSelectedStaffIdChange(e.target.value)}
-          disabled={staffLoading || staffOptions.length === 0}
-          className="mb-3 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white placeholder-slate-500 focus:border-amber-500 focus:outline-none"
-        >
-          <option value="">{staffLoading ? 'Loading waiters...' : 'Select waiter'}</option>
-          {staffOptions.map((option) => (
-            <option key={option.id} value={option.id}>
-              {option.name}{option.role ? ` (${option.role})` : ''}
-            </option>
-          ))}
-        </select>
+        {sharedTerminalMode ? (
+          <div className="mb-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-amber-300">Active Waiter</p>
+                <p className="mt-1 text-sm font-semibold text-white">{selectedStaffName || 'Not selected'}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => onSelectedStaffIdChange('')}
+                className="rounded-lg border border-amber-500/40 bg-amber-500/15 px-3 py-2 text-xs font-semibold text-amber-300 hover:bg-amber-500/25"
+              >
+                Switch
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-400">
+              Assign Waiter
+            </label>
+            <select
+              value={selectedStaffId}
+              onChange={(e) => onSelectedStaffIdChange(e.target.value)}
+              disabled={staffLoading || staffOptions.length === 0}
+              className="mb-3 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white placeholder-slate-500 focus:border-amber-500 focus:outline-none"
+            >
+              <option value="">{staffLoading ? 'Loading waiters...' : 'Select waiter'}</option>
+              {staffOptions.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.name}{option.role ? ` (${option.role})` : ''}
+                </option>
+              ))}
+            </select>
+          </>
+        )}
 
         <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-400">
           Order Notes

@@ -944,6 +944,7 @@ export function App() {
             restaurantName={restaurantName}
             restaurantInfo={receiptSettings}
             staffName={authUser.name}
+            sharedTerminalMode
           />
         )}
         {supervisorPage === 'payments' && (
