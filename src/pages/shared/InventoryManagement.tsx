@@ -299,6 +299,7 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
   const [editValues, setEditValues] = useState<Partial<InventoryRecord>>({});
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [isBatchDeleting, setIsBatchDeleting] = useState(false);
+  const [isBatchAddingToProducts, setIsBatchAddingToProducts] = useState(false);
 
   // Audit trail panel
   const [auditItem, setAuditItem] = useState<{ id: string; name: string } | null>(null);
@@ -567,6 +568,58 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
     setIsBatchDeleting(false);
     await refresh();
     if (failed > 0) alert(`${ids.length - failed} deleted, ${failed} failed.`);
+  };
+
+  const handleBatchAddToProducts = async () => {
+    if (!isMinimartScope || selectedRows.size === 0) return;
+
+    const ids = Array.from(selectedRows);
+    const idsToCreate = ids.filter((id) => !menuItemMap[id]);
+
+    if (idsToCreate.length === 0) {
+      alert('All selected items are already linked to products.');
+      return;
+    }
+
+    setIsBatchAddingToProducts(true);
+    let created = 0;
+    let skipped = 0;
+    let failed = 0;
+
+    for (const id of idsToCreate) {
+      const rec = inventoryMap[id];
+      const productName = (rec?.description || '').trim();
+      const productPrice = rec?.price ?? rec?.unitCost ?? 0;
+      const productCategory = menuItemMap[id]?.category || 'General';
+
+      if (!productName || productPrice <= 0) {
+        skipped += 1;
+        continue;
+      }
+
+      try {
+        const payload = {
+          name: productName,
+          price: productPrice,
+          category: productCategory,
+          is_available: true,
+          requires_kitchen: false,
+          prep_time: 0,
+        };
+
+        const newItem = await createMenuItem(payload);
+        await apiRelinkInventoryRecord(id, newItem.id);
+        created += 1;
+      } catch {
+        failed += 1;
+      }
+    }
+
+    setIsBatchAddingToProducts(false);
+    await refresh();
+
+    alert(`Add to Products complete: ${created} created, ${skipped} skipped, ${failed} failed.`);
+    setSelectedRows(new Set());
   };
 
   const closeAddToMenuModal = () => {
@@ -1257,6 +1310,14 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
             {isMinimartScope && isManager && selectedRows.size > 0 && (
               <div className="flex items-center gap-3 mb-3 px-4 py-2.5 rounded-lg bg-red-500/10 border border-red-500/30">
                 <span className="text-sm text-red-300 font-medium">{selectedRows.size} item{selectedRows.size !== 1 ? 's' : ''} selected</span>
+                <button
+                  onClick={handleBatchAddToProducts}
+                  disabled={isBatchAddingToProducts}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-blue-500/20 border border-blue-500/40 text-blue-200 text-sm font-medium hover:bg-blue-500/30 transition disabled:opacity-50"
+                >
+                  <LinkIcon className="w-3.5 h-3.5" />
+                  {isBatchAddingToProducts ? 'Adding…' : 'Add Selected to Products'}
+                </button>
                 <button
                   onClick={handleBatchDelete}
                   disabled={isBatchDeleting}
