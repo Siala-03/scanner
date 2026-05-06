@@ -1366,7 +1366,7 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                           />
                         </th>
                       )}
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Item ID</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Product</th>
                       {isMinimartScope && <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Description</th>}
                       <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Expiry Date</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Purchase Date</th>
@@ -1420,7 +1420,7 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                               title="View item movement details"
                             >
                               <div>
-                                <p className="text-white font-medium text-sm hover:text-amber-300 underline underline-offset-2">{row.item.id}</p>
+                                <p className="text-white font-medium text-sm hover:text-amber-300 underline underline-offset-2">{row.item.name || row.item.id}</p>
                                 <div className="flex items-center gap-1.5 mt-0.5">
                                   <p className="text-xs text-slate-500">{row.item.category.replace(/-/g, ' ')}</p>
                                   {menuItemMap[row.item.id] && row.rec && (
