@@ -4,6 +4,7 @@ import {
   CheckCircleIcon, RefreshCwIcon, PrinterIcon, XIcon, LogOutIcon,
   HistoryIcon, ChevronUpIcon, ChevronDownIcon, BookmarkCheckIcon,
   PackageXIcon, AlertTriangleIcon, BookmarkIcon, MessageSquareIcon,
+  RotateCcwIcon,
 } from 'lucide-react';
 import { fetchMenu } from '../../api/menu';
 import { createOrder, confirmPayment } from '../../api/orders';
@@ -14,8 +15,12 @@ import { buildReceiptHtml, printReceipt } from '../../utils/receipt';
 import type { PaymentEntry } from '../../utils/receipt';
 import { PaymentCaptureModal } from '../ui/PaymentCaptureModal';
 import { fiscalizeOrder } from '../../api/ebm';
-import { fetchInventory } from '../../api/inventory';
+import { fetchInventory, updateInventoryRecord } from '../../api/inventory';
 import type { InventoryRecord } from '../../api/inventory';
+import { getActiveShift, openShift, closeShift, type CashierShift } from '../../api/shifts';
+import { createRefund } from '../../api/refunds';
+import { ShiftModal } from './ShiftModal';
+import { RefundModal, type RefundableTxn } from './RefundModal';
 import type { MenuItem, Staff } from '../../types';
 import type { RestaurantReceiptSettings } from '../../api/restaurants';
 
@@ -84,6 +89,12 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
   const [stockMap, setStockMap] = useState<Record<string, number>>({});
   // Sidebar tab
   const [sidebarTab, setSidebarTab] = useState<'cart' | 'txns'>('cart');
+  // Shift management
+  const [currentShift, setCurrentShift] = useState<CashierShift | null>(null);
+  const [shiftLoading, setShiftLoading] = useState(true);
+  const [showCloseShift, setShowCloseShift] = useState(false);
+  // Refund workflow
+  const [refundingTxn, setRefundingTxn] = useState<RefundableTxn | null>(null);
 
   const loadShiftStats = useCallback(async () => {
     if (!restaurantId || !cashier?.id) return;
@@ -201,6 +212,15 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
     fetchReceiptSettings(restaurantId).then(setReceiptSettings).catch(() => {});
   }, [restaurantId]);
 
+  // Check for an active shift on mount
+  useEffect(() => {
+    if (!restaurantId || !cashier?.id) { setShiftLoading(false); return; }
+    getActiveShift(restaurantId, cashier.id)
+      .then((shift) => setCurrentShift(shift))
+      .catch(() => {})
+      .finally(() => setShiftLoading(false));
+  }, [restaurantId, cashier?.id]);
+
   const categories = ['all', ...Array.from(new Set(products.map((p) => p.category))).sort()];
 
   const filtered = products.filter((p) => {
@@ -244,8 +264,37 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
   const cartTotal = cart.reduce((sum, l) => sum + l.item.price * l.qty, 0);
   const cartCount = cart.reduce((sum, l) => sum + l.qty, 0);
 
+  const handleOpenShift = async (float: number) => {
+    if (!restaurantId || !cashier?.id) return;
+    const shift = await openShift({
+      restaurantId,
+      cashierId:    cashier.id,
+      cashierName:  cashier.name || 'Cashier',
+      openingFloat: float,
+    });
+    setCurrentShift(shift);
+  };
+
+  const handleCloseShift = async (params: { closingFloat: number; notes: string }) => {
+    if (!currentShift) return;
+    const closed = await closeShift(currentShift.id, {
+      closingFloat:      params.closingFloat,
+      expectedCash:      (currentShift.openingFloat ?? 0) +
+                         shiftTxns.filter(t => t.paymentLabel === 'Cash').reduce((s, t) => s + t.total, 0),
+      totalSales:        shiftSales.total,
+      totalTransactions: shiftSales.count,
+      notes:             params.notes,
+    });
+    setCurrentShift(null);
+    setShowCloseShift(false);
+    alert(`Shift closed. Duration: ${
+      Math.round((new Date(closed.closedAt!).getTime() - new Date(closed.openedAt).getTime()) / 60000)
+    } min · Revenue: ${formatPrice(closed.totalSales ?? 0)}`);
+  };
+
   const handleCheckout = async (payments: PaymentEntry[], change: number) => {
     if (cart.length === 0) return;
+    const checkoutCart = [...cart]; // capture before state reset
     setShowPaymentModal(false);
     setCheckingOut(true);
     // Map primary method to EBM code (use first/largest payment)
@@ -256,7 +305,7 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
       const order = await createOrder({
         tableNumber: undefined as any,
         customerName: customerName || undefined,
-        items: cart.map((l) => ({
+        items: checkoutCart.map((l) => ({
           menuItemId:   l.item.id,
           menuItemName: l.item.name,
           quantity:     l.qty,
@@ -280,10 +329,20 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
           .catch((err) => console.warn('[EBM] Fiscalization failed:', err));
       }
 
+      // Deduct inventory stock (non-blocking, best-effort)
+      checkoutCart.forEach((line) => {
+        const cur = stockMap[line.item.id];
+        if (cur == null) return;
+        const next = Math.max(0, cur - line.qty);
+        updateInventoryRecord(line.item.id, { stock: next })
+          .then(() => setStockMap((prev) => ({ ...prev, [line.item.id]: next })))
+          .catch(() => {});
+      });
+
       setReceipt({
         orderId:      order.id,
         orderNumber:  (order as any).order_number || (order as any).orderNumber || order.id.slice(-6).toUpperCase(),
-        lines:        [...cart],
+        lines:        checkoutCart,
         total:        cartTotal,
         payments,
         change,
@@ -297,13 +356,60 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
       setShowCart(false);
       loadShiftStats();
       loadShiftTxns();
-      // Switch sidebar to Transactions after a sale so cashier can immediately see it
       setSidebarTab('txns');
     } catch (err) {
       console.error('Checkout failed:', err);
       alert('Checkout failed. Please try again.');
     } finally {
       setCheckingOut(false);
+    }
+  };
+
+  const handleRefund = async (params: { refundAmount: number; reason: string }) => {
+    if (!refundingTxn || !restaurantId) return;
+    await createRefund({
+      orderId:      refundingTxn.id,
+      restaurantId,
+      refundedBy:   cashier?.id,
+      refundAmount: params.refundAmount,
+      reason:       params.reason,
+      items:        refundingTxn.items,
+    });
+    setRefundingTxn(null);
+    alert(`Refund of ${formatPrice(params.refundAmount)} recorded for order #${refundingTxn.orderNumber}.`);
+  };
+
+  const handleReprintTxn = (txn: ShiftTxn) => {
+    const receiptData = {
+      restaurantName,
+      restaurantAddress: receiptSettings.address || '',
+      restaurantPhone:   receiptSettings.phone   || '',
+      restaurantLogo:    receiptSettings.logo,
+      restaurantCity:    receiptSettings.city,
+      restaurantCountry: receiptSettings.country,
+      orderNumber:       txn.orderNumber,
+      receiptId:         txn.orderNumber,
+      orderType:         'takeout' as const,
+      serverName:        cashier?.name || 'Cashier',
+      orderDate:         txn.timestamp,
+      items: txn.items.map((i) => ({
+        quantity:   i.qty,
+        name:       i.name,
+        unitPrice:  i.qty > 0 ? Math.round(i.price / i.qty) : i.price,
+        totalPrice: i.price,
+      })),
+      currency:      'RWF' as const,
+      subtotal:      txn.total,
+      taxRate:       0,
+      taxAmount:     0,
+      total:         txn.total,
+      payments:      [{ method: txn.paymentLabel, amount: txn.total }],
+      paymentStatus: 'paid' as const,
+    };
+    try {
+      printReceipt(buildReceiptHtml(receiptData));
+    } catch {
+      alert('Could not open print window. Please allow pop-ups.');
     }
   };
 
@@ -345,6 +451,30 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
   };
 
   const cashierInitials = (cashier?.name ?? 'C').split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
+
+  // Shift loading spinner
+  if (shiftLoading) {
+    return (
+      <div className="fixed inset-0 bg-slate-950 flex items-center justify-center">
+        <RefreshCwIcon className="w-6 h-6 animate-spin text-amber-400" />
+      </div>
+    );
+  }
+
+  // Gate: must open a shift before selling
+  if (!currentShift) {
+    return (
+      <ShiftModal
+        mode="open"
+        cashierName={cashier?.name || 'Cashier'}
+        restaurantName={restaurantName}
+        shiftTxns={[]}
+        shiftSales={{ count: 0, total: 0 }}
+        onOpen={handleOpenShift}
+        onClose={async () => {}}
+      />
+    );
+  }
 
   // ── History Modal ──────────────────────────────────────────────────────────
   if (showHistory) {
@@ -406,13 +536,29 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
                     : <ChevronDownIcon className="w-4 h-4 text-slate-500 shrink-0" />}
                 </button>
                 {expandedTxn === t.id && (
-                  <div className="border-t border-slate-800 px-4 py-3 space-y-1.5 bg-slate-800/20">
-                    {t.items.map((item, idx) => (
-                      <div key={idx} className="flex justify-between text-xs">
-                        <span className="text-slate-300">{item.name} <span className="text-slate-500">×{item.qty}</span></span>
-                        <span className="text-slate-400 font-medium">{formatPrice(item.price)}</span>
-                      </div>
-                    ))}
+                  <div className="border-t border-slate-800 px-4 py-3 space-y-2 bg-slate-800/20">
+                    <div className="space-y-1.5">
+                      {t.items.map((item, idx) => (
+                        <div key={idx} className="flex justify-between text-xs">
+                          <span className="text-slate-300">{item.name} <span className="text-slate-500">×{item.qty}</span></span>
+                          <span className="text-slate-400 font-medium">{formatPrice(item.price)}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex gap-2 pt-1">
+                      <button
+                        onClick={() => handleReprintTxn(t)}
+                        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-700 text-slate-300 hover:text-white text-xs font-medium transition-colors"
+                      >
+                        <PrinterIcon className="w-3 h-3" /> Reprint
+                      </button>
+                      <button
+                        onClick={() => setRefundingTxn({ id: t.id, orderNumber: t.orderNumber, total: t.total, paymentLabel: t.paymentLabel, items: t.items })}
+                        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-orange-500/15 border border-orange-500/25 text-orange-400 hover:bg-orange-500/25 text-xs font-medium transition-colors"
+                      >
+                        <RotateCcwIcon className="w-3 h-3" /> Refund
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -537,6 +683,14 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
                 {cartCount}
               </span>
             )}
+          </button>
+
+          <button
+            onClick={() => setShowCloseShift(true)}
+            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 border border-slate-700/50 text-slate-400 hover:text-red-400 hover:border-red-500/30 transition-colors text-xs font-medium"
+            title="End shift"
+          >
+            <LogOutIcon className="w-3.5 h-3.5" /> End Shift
           </button>
 
           <button
@@ -968,6 +1122,28 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
         currency="RWF"
         onConfirm={handleCheckout}
         onCancel={() => setShowPaymentModal(false)}
+      />
+    )}
+
+    {showCloseShift && (
+      <ShiftModal
+        mode="close"
+        cashierName={cashier?.name || 'Cashier'}
+        restaurantName={restaurantName}
+        currentShift={currentShift}
+        shiftTxns={shiftTxns}
+        shiftSales={shiftSales}
+        onOpen={async () => {}}
+        onClose={handleCloseShift}
+        onCancelClose={() => setShowCloseShift(false)}
+      />
+    )}
+
+    {refundingTxn && (
+      <RefundModal
+        txn={refundingTxn}
+        onConfirm={handleRefund}
+        onCancel={() => setRefundingTxn(null)}
       />
     )}
     </>
