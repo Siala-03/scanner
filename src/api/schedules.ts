@@ -1,6 +1,9 @@
 import { apiRequest } from './http';
 import { StaffSchedule } from '../types';
 
+const API_BASE = import.meta.env.VITE_API_URL || '';
+const SCHEDULES_BASE_PATH = API_BASE.includes('/functions/v1') ? '/schedules' : '/api/schedules';
+
 function rowToSchedule(row: Record<string, unknown>): StaffSchedule {
   return {
     id: row.id as string,
@@ -23,7 +26,7 @@ export async function getSchedules(
   endDate: string
 ): Promise<StaffSchedule[]> {
   const data = await apiRequest<any[]>(
-    `/api/schedules?startDate=${startDate}&endDate=${endDate}`
+    `${SCHEDULES_BASE_PATH}?startDate=${startDate}&endDate=${endDate}`
   );
   return (data || []).map(rowToSchedule);
 }
@@ -37,7 +40,7 @@ export async function createSchedule(data: {
   role?: string;
   notes?: string;
 }): Promise<StaffSchedule> {
-  const row = await apiRequest<any>('/api/schedules', {
+  const row = await apiRequest<any>(SCHEDULES_BASE_PATH, {
     method: 'POST',
     json: {
       staffId: data.staffId,
@@ -55,7 +58,7 @@ export async function updateSchedule(
   id: string,
   data: { startTime?: string; endTime?: string; role?: string; notes?: string }
 ): Promise<StaffSchedule> {
-  const row = await apiRequest<any>(`/api/schedules/${id}`, {
+  const row = await apiRequest<any>(`${SCHEDULES_BASE_PATH}/${id}`, {
     method: 'PUT',
     json: data,
   });
@@ -63,5 +66,5 @@ export async function updateSchedule(
 }
 
 export async function deleteSchedule(id: string): Promise<void> {
-  await apiRequest<void>(`/api/schedules/${id}`, { method: 'DELETE' });
+  await apiRequest<void>(`${SCHEDULES_BASE_PATH}/${id}`, { method: 'DELETE' });
 }
