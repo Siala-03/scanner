@@ -474,7 +474,7 @@ export function buildReceiptHtml(receipt: ReceiptData): string {
   <hr class="solid">
 
   <div class="footer">
-    <div class="thanks">Thank you for dining with us!</div>
+    <div class="thanks">Thank you for chosing us!</div>
     <div>We hope to see you again soon.</div>
     <div style="font-size:8pt;color:#555;margin-top:4px">${receiptId}</div>
     <div class="powered">Powered by SERVV</div>

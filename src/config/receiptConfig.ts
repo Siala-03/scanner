@@ -77,7 +77,7 @@ export const defaultReceiptConfig: ReceiptConfig = {
   autoPrint: false,
 
   // Footer Message
-  footerMessage: 'Thank you for dining with us!',
+  footerMessage: 'Thank you for chosing us!',
   
   // Social Media (optional)
   socialMedia: {

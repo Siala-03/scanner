@@ -287,7 +287,7 @@ function buildOrderReceiptLines(receipt: ReceiptData): string[] {
   }
 
   add(divider('='));
-  add(pad('Thank you for dining with us!', COLS, 'center'));
+  add(pad('Thank you for chosing us!', COLS, 'center'));
   add(pad('Powered by SERVV IQ', COLS, 'center'));
   add(divider('='));
 

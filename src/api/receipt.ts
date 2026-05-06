@@ -187,7 +187,7 @@ function formatReceiptAsText(receipt: ReceiptData, customMessage?: string): stri
   }
   
   // Footer
-  lines.push('Thank you for dining with us!');
+  lines.push('Thank you for chosing us!');
   lines.push(`Receipt ID: ${receipt.receiptId}`);
   
   return lines.join('\n');
@@ -281,7 +281,7 @@ function formatReceiptAsHTML(receipt: ReceiptData, customMessage?: string): stri
   <hr style="border: none; border-top: 1px solid #eee; margin: 16px 0;">
   
   <div style="text-align: center; margin-top: 16px;">
-    <p style="margin: 4px 0;">Thank you for dining with us!</p>
+    <p style="margin: 4px 0;">Thank you for chosing us!</p>
     <p style="margin: 4px 0; font-size: 0.8em; color: #999;">Receipt ID: ${receipt.receiptId}</p>
   </div>
 </body>
