@@ -523,9 +523,13 @@ export async function delinkInventoryRecord(menuItemId: string): Promise<void> {
   const restaurantId = await resolveRestaurantId();
   if (!restaurantId) throw new Error('No company selected');
 
+  // inventory_records.menu_item_id is NOT NULL in this schema,
+  // so "delink" means reassigning to a standalone inventory key.
+  const standaloneId = `standalone-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
+
   const { error } = await supabase
     .from('inventory_records')
-    .update({ menu_item_id: null, updated_at: new Date().toISOString() })
+    .update({ menu_item_id: standaloneId, updated_at: new Date().toISOString() })
     .eq('menu_item_id', menuItemId)
     .eq('restaurant_id', restaurantId);
 
