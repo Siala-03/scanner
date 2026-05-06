@@ -44,6 +44,12 @@ interface StaffOrderPageProps {
   staffName?: string;
 }
 
+interface StaffOption {
+  id: string;
+  name: string;
+  role?: string;
+}
+
 const CATEGORY_LABELS: Record<string, string> = {
   all: 'All Items',
   'alcoholic-drinks': 'Alcoholic',
@@ -91,7 +97,7 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName }: St
 
   const [cart, setCart] = useState<CartEntry[]>([]);
   const [orderNotes, setOrderNotes] = useState('');
-  const [waiterName, setWaiterName] = useState(staffName || '');
+  const [selectedStaffId, setSelectedStaffId] = useState('');
   const [activeCategory, setActiveCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -104,15 +110,38 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName }: St
   const { tables, isLoading: tablesLoading } = useTables();
   const { menuItems, isLoading: menuLoading } = useMenu();
   const { staff, isLoading: staffLoading } = useStaff();
-  const staffNameOptions = useMemo(() => {
-    const set = new Set<string>();
-    (staff || []).forEach((member) => {
-      const name = typeof member?.name === 'string' ? member.name.trim() : '';
-      if (name) set.add(name);
-    });
-    if (staffName && staffName.trim()) set.add(staffName.trim());
-    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  const staffOptions = useMemo<StaffOption[]>(() => {
+    const options = (staff || [])
+      .map((member) => {
+        const name = typeof member?.name === 'string' ? member.name.trim() : '';
+        if (!member?.id || !name) return null;
+        return { id: member.id, name, role: member.role };
+      })
+      .filter((option): option is StaffOption => Boolean(option));
+
+    options.sort((a, b) => a.name.localeCompare(b.name));
+    return options;
   }, [staff, staffName]);
+
+  const selectedStaffName = useMemo(() => {
+    return staffOptions.find((option) => option.id === selectedStaffId)?.name ?? '';
+  }, [staffOptions, selectedStaffId]);
+
+  useEffect(() => {
+    if (selectedStaffId) return;
+    const initialByName = (staffName || '').trim();
+    if (initialByName) {
+      const matched = staffOptions.find((option) => option.name === initialByName);
+      if (matched) {
+        setSelectedStaffId(matched.id);
+        return;
+      }
+    }
+    const currentStaffId = getStaffId();
+    if (currentStaffId && staffOptions.some((option) => option.id === currentStaffId)) {
+      setSelectedStaffId(currentStaffId);
+    }
+  }, [selectedStaffId, staffName, staffOptions]);
 
   // ── Occupancy ────────────────────────────────────────────────────────────────
   const loadOccupancy = useCallback(async () => {
@@ -263,7 +292,7 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName }: St
           restaurantCity: restaurantInfo?.city,
           restaurantCountry: restaurantInfo?.country,
           taxRate: 0,
-          serverName: waiterName.trim() || resolveStaffName(),
+          serverName: selectedStaffName || resolveStaffName(),
           orderType: lastPlacedOrder.tableNumber == null ? 'takeout' : 'dine-in',
           paymentStatus: 'pending',
           payments: [{ method: 'Pending', amount: 0 }],
@@ -292,7 +321,7 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName }: St
     try {
       const checkoutCart = [...cart];
       const combinedNotes = [
-        waiterName.trim() ? `Waiter: ${waiterName.trim()}` : '',
+        selectedStaffName ? `Waiter: ${selectedStaffName}` : '',
         orderNotes.trim(),
       ].filter(Boolean).join('\n');
       const tableNum = selectedTable === 'bar' ? undefined : (selectedTable as number);
@@ -310,6 +339,7 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName }: St
         })),
         notes: combinedNotes || undefined,
         createdBy: getStaffId() ?? undefined,
+        assignedWaiterId: selectedStaffId || undefined,
         requiresKitchen: needsKitchen,
       } as any);
 
@@ -612,8 +642,8 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName }: St
             cartTotal={cartTotal}
             cartCount={cartCount}
             orderNotes={orderNotes}
-            waiterName={waiterName}
-            staffNameOptions={staffNameOptions}
+            selectedStaffId={selectedStaffId}
+            staffOptions={staffOptions}
             staffLoading={staffLoading}
             isSubmitting={isSubmitting}
             successTable={successTable}
@@ -622,7 +652,7 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName }: St
             isPrintingReceipt={isPrintingReceipt}
             onUpdateQty={updateQty}
             onNotesChange={setOrderNotes}
-            onWaiterNameChange={setWaiterName}
+            onSelectedStaffIdChange={setSelectedStaffId}
             onSubmit={handleSubmit}
             onPrintReceipt={handlePrintLastReceipt}
             onDone={handleDoneAfterSuccess}
@@ -646,8 +676,8 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName }: St
               cartTotal={cartTotal}
               cartCount={cartCount}
               orderNotes={orderNotes}
-              waiterName={waiterName}
-              staffNameOptions={staffNameOptions}
+              selectedStaffId={selectedStaffId}
+              staffOptions={staffOptions}
               staffLoading={staffLoading}
               isSubmitting={isSubmitting}
               successTable={successTable}
@@ -656,7 +686,7 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName }: St
               isPrintingReceipt={isPrintingReceipt}
               onUpdateQty={updateQty}
               onNotesChange={setOrderNotes}
-              onWaiterNameChange={setWaiterName}
+              onSelectedStaffIdChange={setSelectedStaffId}
               onSubmit={() => { handleSubmit(); setShowMobileCart(false); }}
               onPrintReceipt={handlePrintLastReceipt}
               onDone={handleDoneAfterSuccess}
@@ -674,8 +704,8 @@ function CartPanel({
   cartTotal,
   cartCount,
   orderNotes,
-  waiterName,
-  staffNameOptions,
+  selectedStaffId,
+  staffOptions,
   staffLoading,
   isSubmitting,
   successTable,
@@ -684,7 +714,7 @@ function CartPanel({
   isPrintingReceipt,
   onUpdateQty,
   onNotesChange,
-  onWaiterNameChange,
+  onSelectedStaffIdChange,
   onSubmit,
   onPrintReceipt,
   onDone,
@@ -693,8 +723,8 @@ function CartPanel({
   cartTotal: number;
   cartCount: number;
   orderNotes: string;
-  waiterName: string;
-  staffNameOptions: string[];
+  selectedStaffId: string;
+  staffOptions: StaffOption[];
   staffLoading: boolean;
   isSubmitting: boolean;
   successTable: string | null;
@@ -703,7 +733,7 @@ function CartPanel({
   isPrintingReceipt: boolean;
   onUpdateQty: (id: string, delta: number) => void;
   onNotesChange: (v: string) => void;
-  onWaiterNameChange: (v: string) => void;
+  onSelectedStaffIdChange: (v: string) => void;
   onSubmit: () => void;
   onPrintReceipt: () => void;
   onDone: () => void;
@@ -797,17 +827,19 @@ function CartPanel({
 
       <div className="rounded-xl border border-slate-700 bg-slate-900 p-4">
         <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-400">
-          Waiter Name
+          Assign Staff
         </label>
         <select
-          value={waiterName}
-          onChange={(e) => onWaiterNameChange(e.target.value)}
-          disabled={staffLoading || staffNameOptions.length === 0}
+          value={selectedStaffId}
+          onChange={(e) => onSelectedStaffIdChange(e.target.value)}
+          disabled={staffLoading || staffOptions.length === 0}
           className="mb-3 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white placeholder-slate-500 focus:border-amber-500 focus:outline-none"
         >
           <option value="">{staffLoading ? 'Loading staff...' : 'Select staff member'}</option>
-          {staffNameOptions.map((name) => (
-            <option key={name} value={name}>{name}</option>
+          {staffOptions.map((option) => (
+            <option key={option.id} value={option.id}>
+              {option.name}{option.role ? ` (${option.role})` : ''}
+            </option>
           ))}
         </select>
 
