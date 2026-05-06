@@ -90,6 +90,7 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName }: St
 
   const [cart, setCart] = useState<CartEntry[]>([]);
   const [orderNotes, setOrderNotes] = useState('');
+  const [waiterName, setWaiterName] = useState(staffName || '');
   const [activeCategory, setActiveCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -251,7 +252,7 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName }: St
           restaurantCity: restaurantInfo?.city,
           restaurantCountry: restaurantInfo?.country,
           taxRate: 0,
-          serverName: resolveStaffName(),
+          serverName: waiterName.trim() || resolveStaffName(),
           orderType: lastPlacedOrder.tableNumber == null ? 'takeout' : 'dine-in',
           paymentStatus: 'pending',
           payments: [{ method: 'Pending', amount: 0 }],
@@ -279,6 +280,10 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName }: St
     setIsSubmitting(true);
     try {
       const checkoutCart = [...cart];
+      const combinedNotes = [
+        waiterName.trim() ? `Waiter: ${waiterName.trim()}` : '',
+        orderNotes.trim(),
+      ].filter(Boolean).join('\n');
       const tableNum = selectedTable === 'bar' ? undefined : (selectedTable as number);
       const needsKitchen = checkoutCart.some(cartItemNeedsKitchen);
       const created = await createOrder({
@@ -292,7 +297,7 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName }: St
           category: c.menuItem.category,
           requiresKitchen: cartItemNeedsKitchen(c),
         })),
-        notes: orderNotes || undefined,
+        notes: combinedNotes || undefined,
         createdBy: getStaffId() ?? undefined,
         requiresKitchen: needsKitchen,
       } as any);
@@ -320,7 +325,7 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName }: St
         subtotal,
         tax: 0,
         total: Number((created as any)?.total ?? subtotal),
-        notes: orderNotes || undefined,
+        notes: combinedNotes || undefined,
         requiresKitchen: needsKitchen,
       };
 
@@ -596,6 +601,7 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName }: St
             cartTotal={cartTotal}
             cartCount={cartCount}
             orderNotes={orderNotes}
+            waiterName={waiterName}
             isSubmitting={isSubmitting}
             successTable={successTable}
             tableLabel={tableLabel}
@@ -603,6 +609,7 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName }: St
             isPrintingReceipt={isPrintingReceipt}
             onUpdateQty={updateQty}
             onNotesChange={setOrderNotes}
+            onWaiterNameChange={setWaiterName}
             onSubmit={handleSubmit}
             onPrintReceipt={handlePrintLastReceipt}
             onDone={handleDoneAfterSuccess}
@@ -626,6 +633,7 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName }: St
               cartTotal={cartTotal}
               cartCount={cartCount}
               orderNotes={orderNotes}
+              waiterName={waiterName}
               isSubmitting={isSubmitting}
               successTable={successTable}
               tableLabel={tableLabel}
@@ -633,6 +641,7 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName }: St
               isPrintingReceipt={isPrintingReceipt}
               onUpdateQty={updateQty}
               onNotesChange={setOrderNotes}
+              onWaiterNameChange={setWaiterName}
               onSubmit={() => { handleSubmit(); setShowMobileCart(false); }}
               onPrintReceipt={handlePrintLastReceipt}
               onDone={handleDoneAfterSuccess}
@@ -650,6 +659,7 @@ function CartPanel({
   cartTotal,
   cartCount,
   orderNotes,
+  waiterName,
   isSubmitting,
   successTable,
   tableLabel,
@@ -657,6 +667,7 @@ function CartPanel({
   isPrintingReceipt,
   onUpdateQty,
   onNotesChange,
+  onWaiterNameChange,
   onSubmit,
   onPrintReceipt,
   onDone,
@@ -665,6 +676,7 @@ function CartPanel({
   cartTotal: number;
   cartCount: number;
   orderNotes: string;
+  waiterName: string;
   isSubmitting: boolean;
   successTable: string | null;
   tableLabel: string;
@@ -672,6 +684,7 @@ function CartPanel({
   isPrintingReceipt: boolean;
   onUpdateQty: (id: string, delta: number) => void;
   onNotesChange: (v: string) => void;
+  onWaiterNameChange: (v: string) => void;
   onSubmit: () => void;
   onPrintReceipt: () => void;
   onDone: () => void;
@@ -764,6 +777,17 @@ function CartPanel({
       </div>
 
       <div className="rounded-xl border border-slate-700 bg-slate-900 p-4">
+        <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-400">
+          Waiter Name
+        </label>
+        <input
+          type="text"
+          value={waiterName}
+          onChange={(e) => onWaiterNameChange(e.target.value)}
+          placeholder="Who is serving this order?"
+          className="mb-3 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white placeholder-slate-500 focus:border-amber-500 focus:outline-none"
+        />
+
         <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-400">
           Order Notes
         </label>
