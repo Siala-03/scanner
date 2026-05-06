@@ -65,6 +65,19 @@ const PAYMENT_METHODS = [
   { code: '04', label: 'Mobile Money' },
 ];
 
+function decodeJwtPayload(token: string): Record<string, any> | null {
+  try {
+    const parts = token.split('.');
+    if (parts.length < 2) return null;
+    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
+    const json = atob(padded);
+    return JSON.parse(json);
+  } catch {
+    return null;
+  }
+}
+
 // ── Main POS ─────────────────────────────────────────────────────────────────
 
 interface MinimartPOSProps {
@@ -75,6 +88,8 @@ interface MinimartPOSProps {
 }
 
 export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }: MinimartPOSProps) {
+  const [sessionRestaurantId, setSessionRestaurantId] = useState('');
+  const activeRestaurantId = sessionRestaurantId || restaurantId;
   const [products, setProducts] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -113,19 +128,55 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
   const [taxRate, setTaxRate] = useState(0);
   const [taxLabel, setTaxLabel] = useState('Tax');
 
+  useEffect(() => {
+    let mounted = true;
+    supabase.auth.getSession().then(({ data }) => {
+      if (!mounted) return;
+      const token = data.session?.access_token;
+      const payload = token ? decodeJwtPayload(token) : null;
+      const claim = payload?.restaurant_id;
+      if (typeof claim === 'string' && claim.trim()) {
+        setSessionRestaurantId(claim.trim());
+      }
+    }).catch(() => {});
+    return () => { mounted = false; };
+  }, []);
+
   const loadShiftStats = useCallback(async () => {
-    if (!restaurantId || !cashier?.id) return;
+    if (!activeRestaurantId || !cashier?.id) return;
     try {
       const todayStart = new Date();
       todayStart.setHours(0, 0, 0, 0);
-      const { data } = await supabase
+
+      let rows: any[] = [];
+      // First try strict cashier/confirmed filter; if schema differs, retry with broader query.
+      const strict = await supabase
         .from('orders')
-        .select('total, payment_type, payment_method')
-        .eq('restaurant_id', restaurantId)
+        .select('total, payment_type, payment_method, payment_status, payment_confirmed_by, created_at')
+        .eq('restaurant_id', activeRestaurantId)
         .eq('payment_status', 'confirmed')
         .eq('payment_confirmed_by', cashier.id)
         .gte('created_at', todayStart.toISOString());
-      const rows = data || [];
+
+      if (!strict.error) {
+        rows = strict.data || [];
+      } else {
+        const relaxed = await supabase
+          .from('orders')
+          .select('total, payment_type, payment_method, payment_status, payment_confirmed_by, created_at')
+          .eq('restaurant_id', activeRestaurantId)
+          .gte('created_at', todayStart.toISOString());
+
+        if (!relaxed.error) {
+          rows = (relaxed.data || []).filter((o: any) => {
+            const ps = String(o.payment_status || '').toLowerCase();
+            const cashierMatch = o.payment_confirmed_by ? o.payment_confirmed_by === cashier.id : true;
+            const statusMatch = !ps || ['confirmed', 'paid', 'completed'].includes(ps);
+            return cashierMatch && statusMatch;
+          });
+        }
+      }
+
       const byPayment: Record<string, number> = {};
       rows.forEach((o: any) => {
         const method = o.payment_type ?? o.payment_method ?? 'Unknown';
@@ -140,7 +191,7 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
     } catch {
       // non-fatal
     }
-  }, [restaurantId, cashier?.id]);
+  }, [activeRestaurantId, cashier?.id]);
 
   const loadProducts = useCallback(async () => {
     setLoading(true);
@@ -176,7 +227,7 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
   }, []);
 
   const loadShiftTxns = useCallback(async () => {
-    if (!restaurantId || !cashier?.id) return;
+    if (!activeRestaurantId || !cashier?.id) return;
     setTxnsLoading(true);
     try {
       const todayStart = new Date();
@@ -192,7 +243,7 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
         const res = await supabase
           .from('orders')
           .select(selectCols)
-          .eq('restaurant_id', restaurantId)
+          .eq('restaurant_id', activeRestaurantId)
           .eq('payment_status', 'confirmed')
           .eq('payment_confirmed_by', cashier.id)
           .gte('created_at', todayStart.toISOString())
@@ -257,18 +308,22 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
     } finally {
       setTxnsLoading(false);
     }
-  }, [restaurantId, cashier?.id]);
+  }, [activeRestaurantId, cashier?.id]);
 
   useEffect(() => { loadProducts(); }, [loadProducts]);
   useEffect(() => { loadShiftStats(); }, [loadShiftStats]);
+  useEffect(() => {
+    const id = setInterval(() => { loadShiftStats(); }, 15000);
+    return () => clearInterval(id);
+  }, [loadShiftStats]);
   useEffect(() => { loadStockMap(); }, [loadStockMap]);
   useEffect(() => {
-    if (!restaurantId) return;
-    fetchReceiptSettings(restaurantId).then(setReceiptSettings).catch(() => {});
-    getMinimartSettings(restaurantId)
+    if (!activeRestaurantId) return;
+    fetchReceiptSettings(activeRestaurantId).then(setReceiptSettings).catch(() => {});
+    getMinimartSettings(activeRestaurantId)
       .then((s) => { setTaxRate(s.taxRate); setTaxLabel(s.taxLabel); })
       .catch(() => {});
-  }, [restaurantId]);
+  }, [activeRestaurantId]);
 
   const txnPaymentOptions = useMemo(
     () => Array.from(new Set(shiftTxns.map((t) => t.paymentLabel))).sort((a, b) => a.localeCompare(b)),
@@ -390,18 +445,18 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
         })),
         requiresKitchen: false,
         idempotencyKey,
-        restaurantId,
+        restaurantId: activeRestaurantId,
       } as any);
 
       await confirmPayment(order.id, {
         paymentType:     methodCode,
         confirmedBy:     cashier?.id,
         confirmedByName: cashier?.name,
-        restaurantId,
+        restaurantId: activeRestaurantId,
       });
 
-      if (restaurantId) {
-        fiscalizeOrder(order.id, { restaurantId, paymentType: methodCode })
+      if (activeRestaurantId) {
+        fiscalizeOrder(order.id, { restaurantId: activeRestaurantId, paymentType: methodCode })
           .catch((err) => console.warn('[EBM] Fiscalization failed:', err));
       }
 
