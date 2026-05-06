@@ -37,7 +37,7 @@ import type {
   WasteReason,
   StockMovement,
 } from '../../types/inventory';
-import { createMenuItem } from '../../api/menu';
+import { createMenuItem, fetchMenu } from '../../api/menu';
 import {
   updateInventoryRecord as apiUpdateInventoryRecord,
   deleteInventoryRecord as apiDeleteInventoryRecord,
@@ -584,8 +584,18 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
 
     setIsBatchAddingToProducts(true);
     let created = 0;
+    let linkedExisting = 0;
     let skipped = 0;
     let failed = 0;
+    let firstError = '';
+
+    // Build a fresh lookup in case menu changed outside this page.
+    const latestMenu = await fetchMenu().catch(() => menuItems as any[]);
+    const menuByName = new Map<string, any>();
+    latestMenu.forEach((m: any) => {
+      const key = String(m?.name || '').trim().toLowerCase();
+      if (key) menuByName.set(key, m);
+    });
 
     for (const id of idsToCreate) {
       const rec = inventoryMap[id];
@@ -599,6 +609,14 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
       }
 
       try {
+        // If a product with same name already exists, only relink inventory.
+        const existing = menuByName.get(productName.toLowerCase());
+        if (existing?.id) {
+          await apiRelinkInventoryRecord(id, existing.id);
+          linkedExisting += 1;
+          continue;
+        }
+
         const payload = {
           name: productName,
           price: productPrice,
@@ -610,16 +628,19 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
 
         const newItem = await createMenuItem(payload);
         await apiRelinkInventoryRecord(id, newItem.id);
+        menuByName.set(productName.toLowerCase(), newItem);
         created += 1;
-      } catch {
+      } catch (err) {
         failed += 1;
+        if (!firstError) firstError = getErrorMessage(err);
       }
     }
 
     setIsBatchAddingToProducts(false);
     await refresh();
 
-    alert(`Add to Products complete: ${created} created, ${skipped} skipped, ${failed} failed.`);
+    const errorSuffix = firstError ? `\nFirst error: ${firstError}` : '';
+    alert(`Add to Products complete: ${created} created, ${linkedExisting} linked to existing, ${skipped} skipped, ${failed} failed.${errorSuffix}`);
     setSelectedRows(new Set());
   };
 
@@ -662,6 +683,17 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
     if (!addToMenuCategory.trim()) { alert('Please select a category'); return; }
     setIsAddingToMenu(true);
     try {
+      const latestMenu = await fetchMenu().catch(() => menuItems as any[]);
+      const existing = latestMenu.find((m: any) => String(m?.name || '').trim().toLowerCase() === resolvedName.toLowerCase());
+
+      if (existing?.id) {
+        await apiRelinkInventoryRecord(addToMenuItemId, existing.id);
+        await refresh();
+        closeAddToMenuModal();
+        alert(`Linked inventory to existing ${isMinimartScope ? 'product' : 'menu item'} "${existing.name}".`);
+        return;
+      }
+
       const payload: any = {
         name: resolvedName,
         price: addToMenuPrice,
