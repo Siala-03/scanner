@@ -3,7 +3,8 @@ import {
   LogOutIcon, RefreshCwIcon, TrendingUpIcon, ReceiptIcon,
   ShoppingBagIcon, UsersIcon, PlusIcon, TrashIcon, EyeIcon, EyeOffIcon,
   PackageIcon, DownloadIcon, TagIcon, ZapIcon, BarChart2Icon,
-  LineChartIcon, SettingsIcon, AlertTriangleIcon,
+  LineChartIcon, SettingsIcon, AlertTriangleIcon, RotateCcwIcon,
+  CheckIcon, XIcon,
 } from 'lucide-react';
 import { ClockIcon } from 'lucide-react';
 import {
@@ -17,7 +18,8 @@ import { InventoryManagement } from '../shared/InventoryManagement';
 import { exportTransactionsToCsv } from '../../utils/minimartProductImportExport';
 import { MinimartProductManagement } from './MinimartProductManagement';
 import { getMinimartSettings, upsertMinimartSettings } from '../../api/minimartSettings';
-import { openShift, closeShift } from '../../api/shifts';
+import { fetchRefundRequests, approveRefundRequest, denyRefundRequest } from '../../api/refunds';
+import type { MinimartRefundRequest } from '../../api/refunds';
 import type { CashierShift } from '../../api/shifts';
 import type { Staff } from '../../types';
 
@@ -46,6 +48,7 @@ interface ProductStat {
 
 interface Summary {
   revenue: number;
+  totalRefunds: number;
   transactions: number;
   avgSale: number;
   totalItems: number;
@@ -75,7 +78,7 @@ interface Props {
 }
 
 type DateFilter = 'today' | '7d' | '30d';
-type Page = 'dashboard' | 'transactions' | 'shifts' | 'products' | 'inventory' | 'cashiers' | 'analytics' | 'settings';
+type Page = 'dashboard' | 'transactions' | 'shifts' | 'products' | 'inventory' | 'cashiers' | 'analytics' | 'settings' | 'refunds';
 type TransactionSort = 'newest' | 'oldest';
 
 interface MarginStat {
@@ -132,11 +135,19 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
   const [dateFilter, setDateFilter] = useState<DateFilter>('7d');
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [summary, setSummary] = useState<Summary>({
-    revenue: 0, transactions: 0, avgSale: 0, totalItems: 0, peakDay: '',
+    revenue: 0, totalRefunds: 0, transactions: 0, avgSale: 0, totalItems: 0, peakDay: '',
     hourlyBars: [],
     byCashier: {}, byPayment: {}, byCategory: {}, dailyBars: [], topProducts: [],
   });
   const [loading, setLoading] = useState(true);
+
+  // Refund requests
+  const [pendingRefunds, setPendingRefunds] = useState<MinimartRefundRequest[]>([]);
+  const [allRefunds, setAllRefunds] = useState<MinimartRefundRequest[]>([]);
+  const [refundsLoading, setRefundsLoading] = useState(false);
+  const [reviewingRefund, setReviewingRefund] = useState<MinimartRefundRequest | null>(null);
+  const [reviewNotes, setReviewNotes] = useState('');
+  const [reviewSaving, setReviewSaving] = useState(false);
 
   // Cashiers tab
   const [cashiers, setCashiers] = useState<Staff[]>([]);
@@ -313,11 +324,27 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
         count: hourlyMap[h].count,
       })).filter((b) => b.count > 0);
 
+      // Fetch refunds for the same period to compute net revenue
+      let totalRefunds = 0;
+      try {
+        const { data: refundData } = await supabase
+          .from('minimart_refunds')
+          .select('refund_amount')
+          .eq('restaurant_id', restaurantId)
+          .gte('created_at', from.toISOString());
+        totalRefunds = (refundData || []).reduce((s: number, r: any) => s + Number(r.refund_amount ?? 0), 0);
+      } catch {
+        // non-fatal — table may not exist yet
+      }
+
+      const netRevenue = Math.max(0, revenue - totalRefunds);
+
       setTransactions(txns);
       setSummary({
-        revenue,
+        revenue: netRevenue,
+        totalRefunds,
         transactions: txns.length,
-        avgSale: txns.length > 0 ? revenue / txns.length : 0,
+        avgSale: txns.length > 0 ? netRevenue / txns.length : 0,
         totalItems,
         peakDay: peakBar.day,
         hourlyBars: hourlyBarsFinal,
@@ -454,8 +481,23 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
     }
   }, [restaurantId, transactions]);
 
+  const loadRefundRequests = useCallback(async () => {
+    setRefundsLoading(true);
+    try {
+      const [pending, all] = await Promise.all([
+        fetchRefundRequests(restaurantId, 'pending'),
+        fetchRefundRequests(restaurantId),
+      ]);
+      setPendingRefunds(pending);
+      setAllRefunds(all);
+    } catch {
+      // non-fatal
+    } finally {
+      setRefundsLoading(false);
+    }
+  }, [restaurantId]);
+
   const loadSettings = useCallback(async () => {
-    setSettingsLoading(true);
     try {
       const s = await getMinimartSettings(restaurantId);
       setTaxRate(String(s.taxRate));
@@ -571,10 +613,57 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
   };
 
   useEffect(() => { load(); }, [load]);
+  // Load pending refund count on mount so nav badge is always visible
+  useEffect(() => { loadRefundRequests(); }, [loadRefundRequests]);
+  useEffect(() => { if (page === 'refunds') loadRefundRequests(); }, [page, loadRefundRequests]);
   useEffect(() => { if (page === 'cashiers') loadCashiers(); }, [page, loadCashiers]);
   useEffect(() => { if (page === 'analytics') loadAnalytics(); }, [page, loadAnalytics]);
   useEffect(() => { if (page === 'settings') loadSettings(); }, [page, loadSettings]);
   useEffect(() => { if (page === 'shifts') { loadShifts(); loadCashiers(); } }, [page, loadShifts, loadCashiers]);
+
+  const handleApproveRefund = async (req: MinimartRefundRequest) => {
+    if (!req.orderId) { alert('Cannot approve: missing order reference.'); return; }
+    setReviewSaving(true);
+    try {
+      await approveRefundRequest({
+        requestId:    req.id,
+        reviewedBy:   manager.id,
+        reviewNotes:  reviewNotes.trim() || undefined,
+        restaurantId: restaurantId,
+        orderId:      req.orderId,
+        refundedBy:   manager.id,
+        refundAmount: req.refundAmount,
+        reason:       req.reason,
+        items:        req.items,
+      });
+      setReviewingRefund(null);
+      setReviewNotes('');
+      await loadRefundRequests();
+    } catch (err: any) {
+      alert(err?.message ?? 'Failed to approve refund.');
+    } finally {
+      setReviewSaving(false);
+    }
+  };
+
+  const handleDenyRefund = async (req: MinimartRefundRequest) => {
+    if (!reviewNotes.trim()) { alert('Please enter a reason for denial.'); return; }
+    setReviewSaving(true);
+    try {
+      await denyRefundRequest({
+        requestId:   req.id,
+        reviewedBy:  manager.id,
+        reviewNotes: reviewNotes.trim(),
+      });
+      setReviewingRefund(null);
+      setReviewNotes('');
+      await loadRefundRequests();
+    } catch (err: any) {
+      alert(err?.message ?? 'Failed to deny refund.');
+    } finally {
+      setReviewSaving(false);
+    }
+  };
 
   const handleAddCashier = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -650,6 +739,7 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
   const navItems = [
     { key: 'dashboard' as Page, label: 'Dashboard', icon: TrendingUpIcon },
     { key: 'transactions' as Page, label: 'Transactions', icon: ReceiptIcon },
+    { key: 'refunds' as Page, label: 'Refunds', icon: RotateCcwIcon, badge: pendingRefunds.length || undefined },
     { key: 'shifts' as Page, label: 'Shifts', icon: ClockIcon },
     { key: 'inventory' as Page, label: 'Inventory', icon: ShoppingBagIcon },
     { key: 'cashiers' as Page, label: 'Cashiers', icon: UsersIcon },
@@ -704,7 +794,12 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
                     }`}
                   >
                     <Icon className="w-4 h-4 shrink-0" />
-                    <span>{item.label}</span>
+                    <span className="flex-1 text-left">{item.label}</span>
+                    {(item as any).badge ? (
+                      <span className="ml-auto text-[10px] bg-red-500 text-white font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+                        {(item as any).badge}
+                      </span>
+                    ) : null}
                   </button>
                 );
               })}
@@ -741,10 +836,14 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4">
                     <div className="flex items-center gap-1.5 text-slate-400 text-xs uppercase tracking-wide mb-2">
-                      <TrendingUpIcon className="w-3.5 h-3.5 text-amber-400" /> Revenue
+                      <TrendingUpIcon className="w-3.5 h-3.5 text-amber-400" /> Net Revenue
                     </div>
                     <p className="text-xl font-bold text-slate-100">{formatPrice(summary.revenue)}</p>
-                    <p className="text-xs text-slate-500 mt-1">Confirmed sales</p>
+                    <p className="text-xs text-slate-500 mt-1">
+                      {summary.totalRefunds > 0
+                        ? <span className="text-red-400">−{formatPrice(summary.totalRefunds)} refunded</span>
+                        : 'Confirmed sales'}
+                    </p>
                   </div>
                   <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4">
                     <div className="flex items-center gap-1.5 text-slate-400 text-xs uppercase tracking-wide mb-2">
@@ -1695,6 +1794,152 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
                     </button>
                   </div>
                 ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Refund Requests ── */}
+        {page === 'refunds' && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wide">Refund Requests</h2>
+              <button
+                onClick={loadRefundRequests}
+                className="p-2 rounded-lg bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors"
+              >
+                <RefreshCwIcon className={`w-4 h-4 ${refundsLoading ? 'animate-spin' : ''}`} />
+              </button>
+            </div>
+
+            {/* Pending requests (highlighted) */}
+            {pendingRefunds.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-bold text-red-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <AlertTriangleIcon className="w-3.5 h-3.5" />
+                  Pending Approval ({pendingRefunds.length})
+                </p>
+                {pendingRefunds.map((req) => (
+                  <div key={req.id} className="bg-slate-900 border border-red-500/30 rounded-2xl p-4 space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold text-slate-200">
+                          Order #{req.orderNumber ?? '—'}
+                          <span className="ml-2 text-xs text-slate-500">by {req.cashierName ?? 'Unknown cashier'}</span>
+                        </p>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          {new Date(req.createdAt).toLocaleString()}
+                        </p>
+                        <p className="text-xs text-slate-400 mt-1">Reason: {req.reason}</p>
+                        {req.items && req.items.length > 0 && (
+                          <div className="mt-1.5 space-y-0.5">
+                            {req.items.map((it, i) => (
+                              <p key={i} className="text-[11px] text-slate-500">
+                                {it.qty}× {it.name} — {formatPrice(it.price)}
+                              </p>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-lg font-black text-white">{formatPrice(req.refundAmount)}</p>
+                        <span className="text-[10px] bg-amber-500/20 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded-full font-bold">PENDING</span>
+                      </div>
+                    </div>
+
+                    {reviewingRefund?.id === req.id ? (
+                      <div className="space-y-2 border-t border-slate-700/50 pt-3">
+                        <label className="block text-xs text-slate-400">Review notes {reviewingRefund && <span className="text-red-400">(required for denial)</span>}</label>
+                        <textarea
+                          value={reviewNotes}
+                          onChange={(e) => setReviewNotes(e.target.value)}
+                          placeholder="Optional notes for approval, required for denial…"
+                          rows={2}
+                          className="w-full px-3 py-2 bg-slate-800 border border-slate-700/60 rounded-xl text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-emerald-500/50 resize-none"
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleApproveRefund(req)}
+                            disabled={reviewSaving}
+                            className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold text-sm transition-colors"
+                          >
+                            <CheckIcon className="w-4 h-4" />
+                            {reviewSaving ? 'Processing…' : 'Approve Refund'}
+                          </button>
+                          <button
+                            onClick={() => handleDenyRefund(req)}
+                            disabled={reviewSaving}
+                            className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-red-700 hover:bg-red-600 disabled:opacity-50 text-white font-bold text-sm transition-colors"
+                          >
+                            <XIcon className="w-4 h-4" />
+                            {reviewSaving ? 'Processing…' : 'Deny'}
+                          </button>
+                          <button
+                            onClick={() => { setReviewingRefund(null); setReviewNotes(''); }}
+                            className="px-3 py-2 rounded-xl bg-slate-800 text-slate-400 hover:text-slate-200 text-sm transition-colors"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => { setReviewingRefund(req); setReviewNotes(''); }}
+                        className="w-full py-2 rounded-xl border border-slate-600 text-slate-300 hover:bg-slate-800 text-sm font-medium transition-colors"
+                      >
+                        Review Request
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {pendingRefunds.length === 0 && !refundsLoading && (
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 text-center">
+                <CheckIcon className="w-8 h-8 text-emerald-500 mx-auto mb-2" />
+                <p className="text-sm text-slate-400">No pending refund requests.</p>
+              </div>
+            )}
+
+            {/* History */}
+            {allRefunds.filter((r) => r.status !== 'pending').length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">History</p>
+                <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-slate-800 text-slate-500 uppercase tracking-wide">
+                        <th className="px-4 py-2.5 text-left">Order</th>
+                        <th className="px-4 py-2.5 text-left">Cashier</th>
+                        <th className="px-4 py-2.5 text-left">Amount</th>
+                        <th className="px-4 py-2.5 text-left">Status</th>
+                        <th className="px-4 py-2.5 text-left">Date</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {allRefunds.filter((r) => r.status !== 'pending').map((req) => (
+                        <tr key={req.id} className="border-b border-slate-800/60 last:border-0 hover:bg-slate-800/30">
+                          <td className="px-4 py-2.5 text-slate-300">#{req.orderNumber ?? '—'}</td>
+                          <td className="px-4 py-2.5 text-slate-400">{req.cashierName ?? '—'}</td>
+                          <td className="px-4 py-2.5 font-semibold text-slate-200">{formatPrice(req.refundAmount)}</td>
+                          <td className="px-4 py-2.5">
+                            <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${
+                              req.status === 'approved'
+                                ? 'bg-emerald-900/40 text-emerald-400'
+                                : 'bg-red-900/40 text-red-400'
+                            }`}>
+                              {req.status.toUpperCase()}
+                            </span>
+                          </td>
+                          <td className="px-4 py-2.5 text-slate-500">
+                            {new Date(req.createdAt).toLocaleDateString()}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
           </div>

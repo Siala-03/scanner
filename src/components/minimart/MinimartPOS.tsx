@@ -17,7 +17,7 @@ import { PaymentCaptureModal } from '../ui/PaymentCaptureModal';
 import { fiscalizeOrder } from '../../api/ebm';
 import { fetchInventory, updateInventoryRecord } from '../../api/inventory';
 import type { InventoryRecord } from '../../api/inventory';
-import { createRefund } from '../../api/refunds';
+import { requestRefund } from '../../api/refunds';
 import { getMinimartSettings } from '../../api/minimartSettings';
 import { RefundModal, type RefundableTxn } from './RefundModal';
 import type { MenuItem, Staff } from '../../types';
@@ -419,16 +419,18 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
 
   const handleRefund = async (params: { refundAmount: number; reason: string }) => {
     if (!refundingTxn || !restaurantId) return;
-    await createRefund({
-      orderId:      refundingTxn.id,
+    await requestRefund({
       restaurantId,
-      refundedBy:   cashier?.id,
+      orderId:      refundingTxn.id,
+      orderNumber:  refundingTxn.orderNumber,
+      requestedBy:  cashier?.id,
+      cashierName:  cashier?.name,
       refundAmount: params.refundAmount,
       reason:       params.reason,
       items:        refundingTxn.items,
     });
     setRefundingTxn(null);
-    alert(`Refund of ${formatPrice(params.refundAmount)} recorded for order #${refundingTxn.orderNumber}.`);
+    alert(`Refund request for ${formatPrice(params.refundAmount)} on order #${refundingTxn.orderNumber} submitted. Awaiting manager approval.`);
   };
 
   const handleReprintTxn = (txn: ShiftTxn) => {
@@ -703,15 +705,6 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
             <span className="text-xs text-slate-300 font-medium">{cashier?.name}</span>
           </div>
 
-          {/* Action buttons */}
-          <button
-            onClick={() => { setShowHistory(true); loadShiftTxns(); }}
-            className="p-2 rounded-xl bg-slate-800 text-slate-400 hover:text-amber-400 hover:bg-slate-700 transition-colors border border-slate-700/50"
-            title="Today's sales"
-          >
-            <HistoryIcon className="w-4 h-4" />
-          </button>
-
           {/* Cart toggle (mobile) */}
           <button
             onClick={() => setShowCart(true)}
@@ -723,6 +716,15 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
                 {cartCount}
               </span>
             )}
+          </button>
+
+          {/* Today's sales / history */}
+          <button
+            onClick={() => { setShowHistory(true); loadShiftTxns(); }}
+            className="p-2 rounded-xl bg-slate-800 text-slate-400 hover:text-amber-400 hover:bg-slate-700 transition-colors border border-slate-700/50"
+            title="Today's sales"
+          >
+            <HistoryIcon className="w-4 h-4" />
           </button>
 
           <button
@@ -956,20 +958,6 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
             {/* Tab strip */}
             <div className="flex items-center gap-1 px-3 pt-2.5 pb-0">
               <button
-                onClick={() => setSidebarTab('cart')}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-t-xl text-xs font-semibold transition-all border-b-2 ${
-                  sidebarTab === 'cart'
-                    ? 'text-amber-400 border-amber-500 bg-amber-500/5'
-                    : 'text-slate-500 border-transparent hover:text-slate-300'
-                }`}
-              >
-                <ShoppingCartIcon className="w-3.5 h-3.5" />
-                Cart
-                {cartCount > 0 && (
-                  <span className="ml-0.5 text-[9px] bg-amber-500 text-slate-900 font-bold px-1.5 py-0.5 rounded-full">{cartCount}</span>
-                )}
-              </button>
-              <button
                 onClick={() => { setSidebarTab('txns'); if (shiftTxns.length === 0) loadShiftTxns(); }}
                 className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-t-xl text-xs font-semibold transition-all border-b-2 ${
                   sidebarTab === 'txns'
@@ -981,6 +969,20 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
                 Transactions
                 {shiftTxns.length > 0 && (
                   <span className="ml-0.5 text-[9px] bg-emerald-600 text-white font-bold px-1.5 py-0.5 rounded-full">{shiftTxns.length}</span>
+                )}
+              </button>
+              <button
+                onClick={() => setSidebarTab('cart')}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-t-xl text-xs font-semibold transition-all border-b-2 ${
+                  sidebarTab === 'cart'
+                    ? 'text-amber-400 border-amber-500 bg-amber-500/5'
+                    : 'text-slate-500 border-transparent hover:text-slate-300'
+                }`}
+              >
+                <ShoppingCartIcon className="w-3.5 h-3.5" />
+                Cart
+                {cartCount > 0 && (
+                  <span className="ml-0.5 text-[9px] bg-amber-500 text-slate-900 font-bold px-1.5 py-0.5 rounded-full">{cartCount}</span>
                 )}
               </button>
             </div>

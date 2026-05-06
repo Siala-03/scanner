@@ -183,13 +183,28 @@ export function App() {
 
   // Load auth state from localStorage on mount
   useEffect(() => {
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    const isValidUuid = (v: unknown): v is string => typeof v === 'string' && UUID_RE.test(v);
+
     const savedAuthUser = localStorage.getItem('authUser');
     const savedSelectedRole = localStorage.getItem('selectedRole');
     const savedRestaurantId = localStorage.getItem('restaurantId');
     if (savedAuthUser) {
       try {
         const user = JSON.parse(savedAuthUser);
-        const restoredRestaurantId = user.restaurantId || user.restaurant_id || savedRestaurantId || null;
+        const rawId = user.restaurantId || user.restaurant_id || savedRestaurantId || null;
+        // Reject legacy non-UUID restaurant IDs — user must re-login to get a fresh UUID
+        const restoredRestaurantId = isValidUuid(rawId) ? rawId : null;
+        if (!restoredRestaurantId && rawId) {
+          console.warn('[auth] Legacy restaurant ID detected — clearing session to force re-login:', rawId);
+          localStorage.removeItem('authUser');
+          localStorage.removeItem('selectedRole');
+          localStorage.removeItem('restaurantId');
+          localStorage.removeItem('staffId');
+          localStorage.removeItem('staffRole');
+          setRouteResolved(true);
+          return;
+        }
         if (restoredRestaurantId && !user.restaurantId) {
           user.restaurantId = restoredRestaurantId;
         }
