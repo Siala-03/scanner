@@ -82,6 +82,8 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
   const [expandedTxn, setExpandedTxn] = useState<string | null>(null);
   // Stock map: menuItemId -> current stock
   const [stockMap, setStockMap] = useState<Record<string, number>>({});
+  // Sidebar tab
+  const [sidebarTab, setSidebarTab] = useState<'cart' | 'txns'>('cart');
 
   const loadShiftStats = useCallback(async () => {
     if (!restaurantId || !cashier?.id) return;
@@ -295,6 +297,8 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
       setShowCart(false);
       loadShiftStats();
       loadShiftTxns();
+      // Switch sidebar to Transactions after a sale so cashier can immediately see it
+      setSidebarTab('txns');
     } catch (err) {
       console.error('Checkout failed:', err);
       alert('Checkout failed. Please try again.');
@@ -698,40 +702,79 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
             ${showCart ? 'flex' : 'hidden sm:flex'}
           `}
         >
-          {/* Cart header */}
-          <div className="flex items-center justify-between px-4 py-3.5 border-b border-slate-800/80 shrink-0">
-            <div className="flex items-center gap-2.5">
-              <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${cartCount > 0 ? 'bg-amber-500/20 border border-amber-500/30' : 'bg-slate-800 border border-slate-700'}`}>
-                <ShoppingCartIcon className={`w-4 h-4 ${cartCount > 0 ? 'text-amber-400' : 'text-slate-500'}`} />
-              </div>
-              <div>
-                <span className="font-bold text-white text-sm">Cart</span>
-                {cartCount > 0 && (
-                  <span className="ml-2 text-[10px] bg-amber-500 text-slate-900 font-bold px-1.5 py-0.5 rounded-full">{cartCount} item{cartCount !== 1 ? 's' : ''}</span>
-                )}
-              </div>
-            </div>
-            <div className="flex items-center gap-1.5">
-              {cart.length > 0 && (
-                <button
-                  onClick={holdCurrentCart}
-                  title="Hold this cart"
-                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs text-slate-400 hover:text-amber-400 hover:bg-slate-800 transition-colors border border-transparent hover:border-slate-700"
-                >
-                  <BookmarkIcon className="w-3.5 h-3.5" /> Hold
-                </button>
-              )}
+          {/* Cart/Txns header with tab strip */}
+          <div className="shrink-0 border-b border-slate-800/80">
+            {/* Tab strip */}
+            <div className="flex items-center gap-1 px-3 pt-2.5 pb-0">
               <button
-                onClick={() => setShowCart(false)}
-                className="sm:hidden p-1.5 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
+                onClick={() => setSidebarTab('cart')}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-t-xl text-xs font-semibold transition-all border-b-2 ${
+                  sidebarTab === 'cart'
+                    ? 'text-amber-400 border-amber-500 bg-amber-500/5'
+                    : 'text-slate-500 border-transparent hover:text-slate-300'
+                }`}
               >
-                <XIcon className="w-4 h-4" />
+                <ShoppingCartIcon className="w-3.5 h-3.5" />
+                Cart
+                {cartCount > 0 && (
+                  <span className="ml-0.5 text-[9px] bg-amber-500 text-slate-900 font-bold px-1.5 py-0.5 rounded-full">{cartCount}</span>
+                )}
+              </button>
+              <button
+                onClick={() => { setSidebarTab('txns'); if (shiftTxns.length === 0) loadShiftTxns(); }}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-t-xl text-xs font-semibold transition-all border-b-2 ${
+                  sidebarTab === 'txns'
+                    ? 'text-emerald-400 border-emerald-500 bg-emerald-500/5'
+                    : 'text-slate-500 border-transparent hover:text-slate-300'
+                }`}
+              >
+                <HistoryIcon className="w-3.5 h-3.5" />
+                Transactions
+                {shiftTxns.length > 0 && (
+                  <span className="ml-0.5 text-[9px] bg-emerald-600 text-white font-bold px-1.5 py-0.5 rounded-full">{shiftTxns.length}</span>
+                )}
               </button>
             </div>
+            {/* Sub-header row */}
+            {sidebarTab === 'cart' ? (
+              <div className="flex items-center justify-between px-4 py-2">
+                <span className="text-xs text-slate-500">
+                  {cartCount > 0 ? `${cartCount} item${cartCount !== 1 ? 's' : ''}` : 'Empty'}
+                </span>
+                <div className="flex items-center gap-1">
+                  {cart.length > 0 && (
+                    <button
+                      onClick={holdCurrentCart}
+                      title="Hold this cart"
+                      className="flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs text-slate-400 hover:text-amber-400 hover:bg-slate-800 transition-colors border border-transparent hover:border-slate-700"
+                    >
+                      <BookmarkIcon className="w-3 h-3" /> Hold
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setShowCart(false)}
+                    className="sm:hidden p-1.5 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
+                  >
+                    <XIcon className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between px-4 py-2">
+                <span className="text-xs text-slate-500">{shiftTxns.length} txn{shiftTxns.length !== 1 ? 's' : ''} today</span>
+                <button
+                  onClick={loadShiftTxns}
+                  className="p-1.5 rounded-xl text-slate-500 hover:text-slate-200 hover:bg-slate-800 transition-colors"
+                  title="Refresh"
+                >
+                  <RefreshCwIcon className={`w-3.5 h-3.5 ${txnsLoading ? 'animate-spin' : ''}`} />
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Cart lines */}
-          <div className="flex-1 overflow-y-auto px-3 py-2">
+          <div className={`flex-1 overflow-y-auto px-3 py-2 ${sidebarTab === 'txns' ? 'hidden' : ''}`}>
             {cart.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-40 text-slate-500">
                 <div className="w-12 h-12 rounded-2xl bg-slate-800/60 flex items-center justify-center mb-3">
@@ -802,8 +845,88 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
             )}
           </div>
 
+          {/* ── Transactions inline panel ── */}
+          {sidebarTab === 'txns' && (
+            <div className="flex-1 overflow-y-auto flex flex-col min-h-0">
+              {/* Payment method breakdown */}
+              {shiftTxns.length > 0 && (() => {
+                const byMethod: Record<string, number> = {};
+                shiftTxns.forEach((t) => {
+                  byMethod[t.paymentLabel] = (byMethod[t.paymentLabel] || 0) + t.total;
+                });
+                return (
+                  <div className="px-3 pt-3 pb-2 space-y-1 border-b border-slate-800/80 shrink-0">
+                    <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1.5">Today's Breakdown</p>
+                    {Object.entries(byMethod).map(([method, total]) => (
+                      <div key={method} className="flex justify-between items-center text-xs">
+                        <span className="text-slate-400">{method}</span>
+                        <span className="font-bold text-slate-200">{formatPrice(total)}</span>
+                      </div>
+                    ))}
+                    <div className="flex justify-between items-center pt-1.5 border-t border-slate-800/60 text-xs">
+                      <span className="text-slate-300 font-semibold">Total</span>
+                      <span className="font-black text-emerald-400">{formatPrice(shiftSales.total)}</span>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Transaction list */}
+              <div className="flex-1 overflow-y-auto px-3 py-2 space-y-2">
+                {txnsLoading ? (
+                  <div className="flex items-center justify-center h-32 text-slate-400">
+                    <RefreshCwIcon className="w-4 h-4 animate-spin mr-2" /> Loading…
+                  </div>
+                ) : shiftTxns.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-36 text-slate-500">
+                    <HistoryIcon className="w-7 h-7 mb-2 opacity-30" />
+                    <p className="text-xs font-medium">No sales yet today</p>
+                  </div>
+                ) : (
+                  shiftTxns.map((t) => (
+                    <div key={t.id} className="bg-slate-800/60 border border-slate-700/40 rounded-2xl overflow-hidden">
+                      <button
+                        onClick={() => setExpandedTxn(expandedTxn === t.id ? null : t.id)}
+                        className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left hover:bg-slate-700/30 transition-colors"
+                      >
+                        <div className="w-7 h-7 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0">
+                          <CheckCircleIcon className="w-3.5 h-3.5 text-emerald-400" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <p className="text-xs font-semibold text-white">#{t.orderNumber}</p>
+                            <span className="text-[9px] bg-slate-700 text-slate-400 border border-slate-600 px-1.5 py-0.5 rounded-full">{t.paymentLabel}</span>
+                          </div>
+                          <p className="text-[10px] text-slate-500 mt-0.5">
+                            {t.itemCount} item{t.itemCount !== 1 ? 's' : ''} · {t.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="text-xs font-bold text-emerald-400">{formatPrice(t.total)}</p>
+                          {expandedTxn === t.id
+                            ? <ChevronUpIcon className="w-3 h-3 text-slate-500 mt-0.5 ml-auto" />
+                            : <ChevronDownIcon className="w-3 h-3 text-slate-500 mt-0.5 ml-auto" />}
+                        </div>
+                      </button>
+                      {expandedTxn === t.id && (
+                        <div className="border-t border-slate-700/50 px-3 py-2 space-y-1 bg-slate-800/30">
+                          {t.items.map((item, idx) => (
+                            <div key={idx} className="flex justify-between text-[10px]">
+                              <span className="text-slate-300">{item.name} <span className="text-slate-500">×{item.qty}</span></span>
+                              <span className="text-slate-400 font-medium">{formatPrice(item.price)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Checkout section */}
-          <div className="border-t border-slate-800/80 p-4 space-y-3 shrink-0 bg-slate-900/80">
+          <div className={`border-t border-slate-800/80 p-4 space-y-3 shrink-0 bg-slate-900/80 ${sidebarTab === 'txns' ? 'hidden' : ''}`}>
             <input
               type="text"
               value={customerName}
