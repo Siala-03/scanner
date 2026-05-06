@@ -17,6 +17,8 @@ import { InventoryManagement } from '../shared/InventoryManagement';
 import { exportTransactionsToCsv } from '../../utils/minimartProductImportExport';
 import { MinimartProductManagement } from './MinimartProductManagement';
 import { getMinimartSettings, upsertMinimartSettings } from '../../api/minimartSettings';
+import { openShift, closeShift } from '../../api/shifts';
+import type { CashierShift } from '../../api/shifts';
 import type { Staff } from '../../types';
 
 interface Transaction {
@@ -73,7 +75,7 @@ interface Props {
 }
 
 type DateFilter = 'today' | '7d' | '30d';
-type Page = 'dashboard' | 'transactions' | 'products' | 'inventory' | 'cashiers' | 'analytics' | 'settings';
+type Page = 'dashboard' | 'transactions' | 'shifts' | 'products' | 'inventory' | 'cashiers' | 'analytics' | 'settings';
 type TransactionSort = 'newest' | 'oldest';
 
 interface MarginStat {
@@ -155,6 +157,18 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
   // Analytics
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
+
+  // Shifts tab
+  const [shifts, setShifts] = useState<CashierShift[]>([]);
+  const [shiftsLoading, setShiftsLoading] = useState(false);
+  const [shiftStatusFilter, setShiftStatusFilter] = useState<'all' | 'open' | 'closed'>('all');
+  const [showOpenShiftForm, setShowOpenShiftForm] = useState(false);
+  const [openShiftCashierId, setOpenShiftCashierId] = useState('');
+  const [openShiftFloat, setOpenShiftFloat] = useState('');
+  const [closingShiftId, setClosingShiftId] = useState<string | null>(null);
+  const [closingFloat, setClosingFloat] = useState('');
+  const [closingNotes, setClosingNotes] = useState('');
+  const [shiftSaving, setShiftSaving] = useState(false);
 
   // Settings
   const [taxRate, setTaxRate] = useState('0');
@@ -336,8 +350,8 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
       from.setDate(from.getDate() - 30);
       const fromIso = from.toISOString();
 
-      // Fetch inventory cost map and waste entries in parallel
-      const [invRes, wasteRes] = await Promise.allSettled([
+      // Fetch products, inventory costs, and waste entries in parallel
+      const [invRes, wasteRes, productsRes] = await Promise.allSettled([
         supabase
           .from('inventory_records')
           .select('menu_item_id, unit_cost')
@@ -347,6 +361,10 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
           .select('menu_item_name, qty, unit_cost, total_cost, reason')
           .eq('restaurant_id', restaurantId)
           .gte('timestamp', fromIso),
+        supabase
+          .from('menu_items')
+          .select('id, name, price')
+          .eq('restaurant_id', restaurantId),
       ]);
 
       const costMap: Record<string, number> = {};
@@ -369,31 +387,51 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
         });
       }
 
-      // Build margin stats from existing transactions (already loaded)
-      const marginMap: Record<string, { revenue: number; cost: number }> = {};
-      transactions.forEach((t) => {
-        t.items.forEach((item: any) => {
-          const name = item.menu_item_name || item.menuItemName || item.name || 'Unknown';
-          const mid = item.menu_item_id || item.menuItemId || '';
-          const qty = item.quantity || 1;
-          const rev = item.total_price || item.totalPrice || (item.unit_price || 0) * qty || 0;
-          const unitCost = costMap[mid] ?? 0;
-          if (!marginMap[name]) marginMap[name] = { revenue: 0, cost: 0 };
-          marginMap[name].revenue += rev;
-          marginMap[name].cost += unitCost * qty;
+      // Build margin stats from real product prices vs inventory unit costs
+      const products: Array<{ id: string; name: string; price: number }> = [];
+      if (productsRes.status === 'fulfilled' && !productsRes.value.error) {
+        (productsRes.value.data || []).forEach((p: any) => {
+          products.push({ id: p.id, name: p.name || 'Unknown', price: Number(p.price ?? 0) });
         });
-      });
+      }
 
-      const marginStats: MarginStat[] = Object.entries(marginMap)
-        .map(([name, v]) => ({
-          name,
-          revenue: v.revenue,
-          cost: v.cost,
-          margin: v.revenue - v.cost,
-          marginPct: v.revenue > 0 ? Math.round(((v.revenue - v.cost) / v.revenue) * 100) : 0,
-        }))
-        .sort((a, b) => b.revenue - a.revenue)
-        .slice(0, 15);
+      // Fall back to transaction-derived data if no products fetched
+      const marginStats: MarginStat[] = products.length > 0
+        ? products
+            .map((p) => {
+              const unitCost = costMap[p.id] ?? 0;
+              const margin = p.price - unitCost;
+              const marginPct = p.price > 0 ? Math.round((margin / p.price) * 100) : 0;
+              return { name: p.name, revenue: p.price, cost: unitCost, margin, marginPct };
+            })
+            .filter((m) => m.revenue > 0)
+            .sort((a, b) => b.marginPct - a.marginPct)
+            .slice(0, 15)
+        : (() => {
+            const marginMap: Record<string, { revenue: number; cost: number }> = {};
+            transactions.forEach((t) => {
+              t.items.forEach((item: any) => {
+                const name = item.menu_item_name || item.menuItemName || item.name || 'Unknown';
+                const mid = item.menu_item_id || item.menuItemId || '';
+                const qty = item.quantity || 1;
+                const rev = item.total_price || item.totalPrice || (item.unit_price || 0) * qty || 0;
+                const unitCost = costMap[mid] ?? 0;
+                if (!marginMap[name]) marginMap[name] = { revenue: 0, cost: 0 };
+                marginMap[name].revenue += rev;
+                marginMap[name].cost += unitCost * qty;
+              });
+            });
+            return Object.entries(marginMap)
+              .map(([name, v]) => ({
+                name,
+                revenue: v.revenue,
+                cost: v.cost,
+                margin: v.revenue - v.cost,
+                marginPct: v.revenue > 0 ? Math.round(((v.revenue - v.cost) / v.revenue) * 100) : 0,
+              }))
+              .sort((a, b) => b.revenue - a.revenue)
+              .slice(0, 15);
+          })();
 
       const totalRevenue = marginStats.reduce((s, m) => s + m.revenue, 0);
       const totalCostOfGoods = marginStats.reduce((s, m) => s + m.cost, 0);
@@ -430,6 +468,89 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
     }
   }, [restaurantId]);
 
+  const loadShifts = useCallback(async () => {
+    setShiftsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('cashier_shifts')
+        .select('*')
+        .eq('restaurant_id', restaurantId)
+        .order('opened_at', { ascending: false })
+        .limit(60);
+      if (error) throw error;
+      setShifts((data || []).map((r: any): CashierShift => ({
+        id: r.id,
+        restaurantId: r.restaurant_id,
+        cashierId: r.cashier_id ?? undefined,
+        cashierName: r.cashier_name ?? '',
+        openedAt: r.opened_at,
+        closedAt: r.closed_at ?? null,
+        openingFloat: Number(r.opening_float ?? 0),
+        closingFloat: r.closing_float != null ? Number(r.closing_float) : null,
+        expectedCash: r.expected_cash != null ? Number(r.expected_cash) : null,
+        cashVariance: r.cash_variance != null ? Number(r.cash_variance) : null,
+        totalSales: r.total_sales != null ? Number(r.total_sales) : null,
+        totalTransactions: r.total_transactions != null ? Number(r.total_transactions) : null,
+        status: r.status ?? 'open',
+        notes: r.notes ?? null,
+      })));
+    } catch (err) {
+      console.error('Failed to load shifts:', err);
+    } finally {
+      setShiftsLoading(false);
+    }
+  }, [restaurantId]);
+
+  const handleOpenShift = async () => {
+    if (!openShiftCashierId) { alert('Please select a cashier.'); return; }
+    const selectedCashier = cashiers.find((c) => c.id === openShiftCashierId);
+    if (!selectedCashier) return;
+    setShiftSaving(true);
+    try {
+      await openShift({
+        restaurantId,
+        cashierId: openShiftCashierId,
+        cashierName: selectedCashier.name,
+        openingFloat: parseFloat(openShiftFloat || '0'),
+      });
+      setShowOpenShiftForm(false);
+      setOpenShiftCashierId('');
+      setOpenShiftFloat('');
+      loadShifts();
+    } catch (err: any) {
+      alert(err?.message ?? 'Failed to open shift.');
+    } finally {
+      setShiftSaving(false);
+    }
+  };
+
+  const handleCloseShift = async (shiftId: string) => {
+    if (!closingFloat) { alert('Please enter the counted cash amount.'); return; }
+    setShiftSaving(true);
+    try {
+      const shift = shifts.find((s) => s.id === shiftId);
+      const cashSales = transactions
+        .filter((t) => t.paymentMethod === 'Cash')
+        .reduce((sum, t) => sum + t.total, 0);
+      const expectedCash = (shift?.openingFloat ?? 0) + cashSales;
+      await closeShift(shiftId, {
+        closingFloat: parseFloat(closingFloat),
+        expectedCash,
+        totalSales: transactions.reduce((s, t) => s + t.total, 0),
+        totalTransactions: transactions.length,
+        notes: closingNotes,
+      });
+      setClosingShiftId(null);
+      setClosingFloat('');
+      setClosingNotes('');
+      loadShifts();
+    } catch (err: any) {
+      alert(err?.message ?? 'Failed to close shift.');
+    } finally {
+      setShiftSaving(false);
+    }
+  };
+
   const handleSaveSettings = async () => {
     setSettingsSaving(true);
     setSettingsError('');
@@ -453,6 +574,7 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
   useEffect(() => { if (page === 'cashiers') loadCashiers(); }, [page, loadCashiers]);
   useEffect(() => { if (page === 'analytics') loadAnalytics(); }, [page, loadAnalytics]);
   useEffect(() => { if (page === 'settings') loadSettings(); }, [page, loadSettings]);
+  useEffect(() => { if (page === 'shifts') { loadShifts(); loadCashiers(); } }, [page, loadShifts, loadCashiers]);
 
   const handleAddCashier = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -528,6 +650,7 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
   const navItems = [
     { key: 'dashboard' as Page, label: 'Dashboard', icon: TrendingUpIcon },
     { key: 'transactions' as Page, label: 'Transactions', icon: ReceiptIcon },
+    { key: 'shifts' as Page, label: 'Shifts', icon: ClockIcon },
     { key: 'inventory' as Page, label: 'Inventory', icon: ShoppingBagIcon },
     { key: 'cashiers' as Page, label: 'Cashiers', icon: UsersIcon },
     { key: 'analytics' as Page, label: 'Analytics', icon: LineChartIcon },
@@ -963,6 +1086,272 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
           </>
         )}
 
+        {/* ── Shifts ── */}
+        {page === 'shifts' && (() => {
+          const filteredShifts = shifts.filter((s) =>
+            shiftStatusFilter === 'all' || s.status === shiftStatusFilter
+          );
+          const selectedCashierForOpen = cashiers.find((c) => c.id === openShiftCashierId);
+          const closingShift = shifts.find((s) => s.id === closingShiftId);
+          const cashSalesTotal = transactions
+            .filter((t) => t.paymentMethod === 'Cash')
+            .reduce((sum, t) => sum + t.total, 0);
+          const expectedInDrawer = (closingShift?.openingFloat ?? 0) + cashSalesTotal;
+          const countedCash = parseFloat(closingFloat || '0');
+          const cashVariance = closingFloat ? countedCash - expectedInDrawer : null;
+
+          return (
+            <div className="space-y-5">
+              {/* Header */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-bold text-slate-100">Shifts & Float</h2>
+                  <p className="text-xs text-slate-500 mt-0.5">Opening/closing floats and cash reconciliation</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={loadShifts}
+                    className="p-2 rounded-lg bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors"
+                  >
+                    <RefreshCwIcon className={`w-4 h-4 ${shiftsLoading ? 'animate-spin' : ''}`} />
+                  </button>
+                  <button
+                    onClick={() => { setShowOpenShiftForm(true); loadCashiers(); }}
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-900 text-sm font-bold transition-colors"
+                  >
+                    <PlusIcon className="w-4 h-4" /> Open Shift
+                  </button>
+                </div>
+              </div>
+
+              {/* Open shift form */}
+              {showOpenShiftForm && (
+                <div className="bg-slate-900 border border-amber-500/30 rounded-2xl p-5 space-y-4">
+                  <p className="text-sm font-semibold text-amber-400">Open New Shift</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs text-slate-400 mb-1.5">Cashier</label>
+                      <select
+                        value={openShiftCashierId}
+                        onChange={(e) => setOpenShiftCashierId(e.target.value)}
+                        className="w-full px-3 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-sm text-slate-100 focus:outline-none focus:border-amber-500"
+                      >
+                        <option value="">Select cashier…</option>
+                        {cashiers.map((c) => (
+                          <option key={c.id} value={c.id}>{c.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-slate-400 mb-1.5">Opening Float (cash in drawer)</label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs font-medium">RWF</span>
+                        <input
+                          type="number"
+                          min="0"
+                          step="100"
+                          value={openShiftFloat}
+                          onChange={(e) => setOpenShiftFloat(e.target.value)}
+                          placeholder="0"
+                          className="w-full pl-12 pr-4 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-sm text-white font-bold focus:outline-none focus:border-amber-500 placeholder-slate-600"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 justify-end">
+                    <button
+                      onClick={() => { setShowOpenShiftForm(false); setOpenShiftCashierId(''); setOpenShiftFloat(''); }}
+                      className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleOpenShift}
+                      disabled={shiftSaving || !openShiftCashierId}
+                      className="flex items-center gap-2 px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-slate-900 text-sm font-bold transition-colors"
+                    >
+                      {shiftSaving ? <RefreshCwIcon className="w-4 h-4 animate-spin" /> : <ClockIcon className="w-4 h-4" />}
+                      Open Shift{selectedCashierForOpen ? ` · ${selectedCashierForOpen.name}` : ''}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Status filter */}
+              <div className="flex gap-2">
+                {(['all', 'open', 'closed'] as const).map((f) => (
+                  <button
+                    key={f}
+                    onClick={() => setShiftStatusFilter(f)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors capitalize ${
+                      shiftStatusFilter === f ? 'bg-amber-500 text-slate-900' : 'bg-slate-800 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    {f}
+                  </button>
+                ))}
+                <span className="ml-auto text-xs text-slate-500 self-center">{filteredShifts.length} shifts</span>
+              </div>
+
+              {/* Shifts list */}
+              {shiftsLoading ? (
+                <div className="flex items-center justify-center h-32 text-slate-400">
+                  <RefreshCwIcon className="w-5 h-5 animate-spin mr-2" /> Loading shifts…
+                </div>
+              ) : filteredShifts.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-32 text-slate-500">
+                  <ClockIcon className="w-8 h-8 mb-2 opacity-30" />
+                  <p className="text-sm">No shifts recorded yet</p>
+                  <p className="text-xs text-slate-600 mt-1">Use "Open Shift" to start tracking</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {filteredShifts.map((shift) => {
+                    const isClosing = closingShiftId === shift.id;
+                    const durationMs = shift.closedAt
+                      ? new Date(shift.closedAt).getTime() - new Date(shift.openedAt).getTime()
+                      : Date.now() - new Date(shift.openedAt).getTime();
+                    const hrs = Math.floor(durationMs / 3600000);
+                    const mins = Math.floor((durationMs % 3600000) / 60000);
+
+                    return (
+                      <div key={shift.id} className={`bg-slate-900 border rounded-2xl overflow-hidden ${shift.status === 'open' ? 'border-amber-500/30' : 'border-slate-800'}`}>
+                        {/* Shift row */}
+                        <div className="flex items-center gap-4 px-5 py-4">
+                          <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${shift.status === 'open' ? 'bg-amber-400 animate-pulse' : 'bg-slate-600'}`} />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="text-sm font-semibold text-slate-100">{shift.cashierName || 'Unknown cashier'}</p>
+                              <span className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full ${shift.status === 'open' ? 'bg-amber-500/20 text-amber-400' : 'bg-slate-700 text-slate-400'}`}>
+                                {shift.status}
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-500 mt-0.5">
+                              {new Date(shift.openedAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                              {shift.closedAt ? ` → ${new Date(shift.closedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ` · ${hrs}h ${mins}m ongoing`}
+                            </p>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <p className="text-xs text-slate-500">Float In</p>
+                            <p className="text-sm font-bold text-slate-200">{formatPrice(shift.openingFloat)}</p>
+                          </div>
+                          {shift.closingFloat != null && (
+                            <div className="text-right shrink-0">
+                              <p className="text-xs text-slate-500">Counted</p>
+                              <p className="text-sm font-bold text-slate-200">{formatPrice(shift.closingFloat)}</p>
+                            </div>
+                          )}
+                          {shift.cashVariance != null && (
+                            <div className="text-right shrink-0">
+                              <p className="text-xs text-slate-500">Variance</p>
+                              <p className={`text-sm font-bold ${shift.cashVariance === 0 ? 'text-emerald-400' : shift.cashVariance > 0 ? 'text-blue-400' : 'text-red-400'}`}>
+                                {shift.cashVariance > 0 ? '+' : ''}{formatPrice(shift.cashVariance)}
+                              </p>
+                            </div>
+                          )}
+                          {shift.totalSales != null && (
+                            <div className="text-right shrink-0">
+                              <p className="text-xs text-slate-500">{shift.totalTransactions} txns</p>
+                              <p className="text-sm font-bold text-emerald-400">{formatPrice(shift.totalSales)}</p>
+                            </div>
+                          )}
+                          {shift.status === 'open' && (
+                            <button
+                              onClick={() => {
+                                if (isClosing) { setClosingShiftId(null); setClosingFloat(''); setClosingNotes(''); }
+                                else { setClosingShiftId(shift.id); setClosingFloat(''); setClosingNotes(''); }
+                              }}
+                              className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                                isClosing ? 'bg-slate-700 text-slate-300' : 'bg-red-500/20 border border-red-500/40 text-red-300 hover:bg-red-500/30'
+                              }`}
+                            >
+                              {isClosing ? 'Cancel' : 'Close Shift'}
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Inline close form */}
+                        {isClosing && (
+                          <div className="border-t border-slate-800 bg-slate-800/30 px-5 py-4 space-y-4">
+                            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Till Reconciliation</p>
+                            <div className="grid grid-cols-3 gap-3 text-xs">
+                              <div className="bg-slate-800 rounded-xl p-3">
+                                <p className="text-slate-500 mb-1">Opening Float</p>
+                                <p className="font-bold text-slate-200">{formatPrice(shift.openingFloat)}</p>
+                              </div>
+                              <div className="bg-slate-800 rounded-xl p-3">
+                                <p className="text-slate-500 mb-1">Cash Sales (today)</p>
+                                <p className="font-bold text-slate-200">{formatPrice(cashSalesTotal)}</p>
+                              </div>
+                              <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3">
+                                <p className="text-emerald-600 mb-1">Expected in Drawer</p>
+                                <p className="font-bold text-emerald-400">{formatPrice(expectedInDrawer)}</p>
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              <div>
+                                <label className="block text-xs text-slate-400 mb-1.5">Counted cash amount *</label>
+                                <div className="relative">
+                                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs font-medium">RWF</span>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    step="100"
+                                    value={closingFloat}
+                                    onChange={(e) => setClosingFloat(e.target.value)}
+                                    placeholder="0"
+                                    className="w-full pl-12 pr-4 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-sm text-white font-bold focus:outline-none focus:border-amber-500 placeholder-slate-600"
+                                    autoFocus
+                                  />
+                                </div>
+                                {closingFloat && cashVariance !== null && (
+                                  <div className={`mt-2 flex items-center justify-between text-xs rounded-lg px-3 py-1.5 ${
+                                    cashVariance === 0 ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400'
+                                    : cashVariance > 0 ? 'bg-blue-500/10 border border-blue-500/20 text-blue-400'
+                                    : 'bg-red-500/10 border border-red-500/20 text-red-400'
+                                  }`}>
+                                    <span>{cashVariance === 0 ? 'Balanced' : cashVariance > 0 ? 'Overage' : 'Shortage'}</span>
+                                    <span className="font-bold">{cashVariance > 0 ? '+' : ''}{formatPrice(cashVariance)}</span>
+                                  </div>
+                                )}
+                              </div>
+                              <div>
+                                <label className="block text-xs text-slate-400 mb-1.5">Notes (optional)</label>
+                                <textarea
+                                  value={closingNotes}
+                                  onChange={(e) => setClosingNotes(e.target.value)}
+                                  placeholder="Shift notes…"
+                                  rows={3}
+                                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-amber-500 resize-none"
+                                />
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => handleCloseShift(shift.id)}
+                              disabled={shiftSaving || !closingFloat}
+                              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-white text-sm font-bold transition-colors"
+                            >
+                              {shiftSaving ? <RefreshCwIcon className="w-4 h-4 animate-spin" /> : <ZapIcon className="w-4 h-4" />}
+                              Confirm & Close Shift
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Notes display for closed shifts */}
+                        {shift.status === 'closed' && shift.notes && (
+                          <div className="border-t border-slate-800 px-5 py-2.5">
+                            <p className="text-xs text-slate-500">{shift.notes}</p>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
         {/* ── Products ── */}
         {page === 'products' && (
           <MinimartProductManagement />
@@ -1032,7 +1421,7 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
                           <div className="flex-1 min-w-0">
                             <p className="text-sm text-slate-200 truncate">{m.name}</p>
                             <p className="text-xs text-slate-500 mt-0.5">
-                              Rev {formatPrice(m.revenue)} · Cost {m.cost > 0 ? formatPrice(m.cost) : <span className="text-slate-600">no cost set</span>}
+                              Price {formatPrice(m.revenue)} · Cost {m.cost > 0 ? formatPrice(m.cost) : <span className="text-slate-600">no cost set</span>}
                             </p>
                           </div>
                           <div className="text-right shrink-0">

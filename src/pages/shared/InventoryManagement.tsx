@@ -42,6 +42,7 @@ import {
   updateInventoryRecord as apiUpdateInventoryRecord,
   deleteInventoryRecord as apiDeleteInventoryRecord,
   relinkInventoryRecord as apiRelinkInventoryRecord,
+  delinkInventoryRecord as apiDelinkInventoryRecord,
   createSupplier as apiCreateSupplier,
   updateSupplier as apiUpdateSupplier,
   createLocation as apiCreateLocation,
@@ -1663,24 +1664,33 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                                     <PlusIcon className="w-4 h-4" />
                                   </button>
                                   <button
-                                    onClick={() => {
-                                      if (menuItemMap[row.item.id]) return;
+                                    onClick={async () => {
+                                      if (menuItemMap[row.item.id]) {
+                                        const linkedName = menuItemMap[row.item.id].name;
+                                        if (!window.confirm(`Unlink this inventory record from "${linkedName}"?\nStock tracking will stop until re-linked.`)) return;
+                                        try {
+                                          await apiDelinkInventoryRecord(row.item.id);
+                                          await refresh();
+                                        } catch (err) {
+                                          alert('Failed to unlink: ' + getErrorMessage(err));
+                                        }
+                                        return;
+                                      }
                                       setAddToMenuItemId(row.item.id);
                                       setAddToMenuName((row.rec?.description || '').trim());
                                       setAddToMenuPrice(row.rec?.price ?? row.rec?.unitCost ?? 0);
                                       setAddToMenuCategory(menuCategories.find((c) => c !== 'all') ?? (isMinimartScope ? 'General' : 'Food'));
                                       setShowAddToMenuModal(true);
                                     }}
-                                    disabled={!!menuItemMap[row.item.id]}
                                     className={`h-7 w-7 inline-flex items-center justify-center rounded-md border transition ${
                                       menuItemMap[row.item.id]
-                                        ? 'text-slate-400 cursor-not-allowed bg-slate-600/30 border-slate-500/40'
+                                        ? 'text-orange-200 bg-orange-500/20 border-orange-500/50 hover:bg-orange-500/35'
                                         : 'text-blue-100 bg-blue-500/22 border-blue-500/55 hover:bg-blue-500/35'
                                     }`}
-                                    title={menuItemMap[row.item.id] ? `Already linked to ${isMinimartScope ? 'Product' : 'Menu Item'}` : `Add to ${isMinimartScope ? 'Products' : 'Menu'}`}
+                                    title={menuItemMap[row.item.id] ? `Unlink from ${isMinimartScope ? 'Product' : 'Menu Item'}` : `Add to ${isMinimartScope ? 'Products' : 'Menu'}`}
                                   >
                                     {menuItemMap[row.item.id]
-                                      ? <CheckCircleIcon className="w-4 h-4" />
+                                      ? <XCircleIcon className="w-4 h-4" />
                                       : <LinkIcon className="w-4 h-4" />}
                                   </button>
                                   <button

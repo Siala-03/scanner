@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { Fragment, useState, useEffect, useCallback, useMemo } from 'react';
 import {
   SearchIcon, ShoppingCartIcon, PlusIcon, MinusIcon, TrashIcon,
   CheckCircleIcon, RefreshCwIcon, PrinterIcon, XIcon, LogOutIcon,
@@ -38,6 +38,8 @@ interface ShiftTxn {
   items: Array<{ name: string; qty: number; price: number }>;
   timestamp: Date;
 }
+
+type TransactionSort = 'newest' | 'oldest';
 
 interface Receipt {
   orderId: string;
@@ -89,6 +91,9 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
   const [shiftTxns, setShiftTxns] = useState<ShiftTxn[]>([]);
   const [txnsLoading, setTxnsLoading] = useState(false);
   const [expandedTxn, setExpandedTxn] = useState<string | null>(null);
+  const [txnSearch, setTxnSearch] = useState('');
+  const [txnPaymentFilter, setTxnPaymentFilter] = useState('all');
+  const [txnSort, setTxnSort] = useState<TransactionSort>('newest');
   // Stock map: menuItemId -> current stock
   const [stockMap, setStockMap] = useState<Record<string, number>>({});
   // Sidebar tab
@@ -217,6 +222,27 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
       .then((s) => { setTaxRate(s.taxRate); setTaxLabel(s.taxLabel); })
       .catch(() => {});
   }, [restaurantId]);
+
+  const txnPaymentOptions = useMemo(
+    () => Array.from(new Set(shiftTxns.map((t) => t.paymentLabel))).sort((a, b) => a.localeCompare(b)),
+    [shiftTxns],
+  );
+
+  const filteredTxns = useMemo(() => {
+    const q = txnSearch.trim().toLowerCase();
+    return [...shiftTxns]
+      .filter((t) => {
+        const matchesSearch = !q ||
+          t.orderNumber.toLowerCase().includes(q) ||
+          t.paymentLabel.toLowerCase().includes(q);
+        const matchesPayment = txnPaymentFilter === 'all' || t.paymentLabel === txnPaymentFilter;
+        return matchesSearch && matchesPayment;
+      })
+      .sort((a, b) => {
+        const delta = a.timestamp.getTime() - b.timestamp.getTime();
+        return txnSort === 'oldest' ? delta : -delta;
+      });
+  }, [shiftTxns, txnSearch, txnPaymentFilter, txnSort]);
 
   const categories = ['all', ...Array.from(new Set(products.map((p) => p.category))).sort()];
 
@@ -982,55 +1008,114 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
                 );
               })()}
 
-              {/* Transaction list */}
-              <div className="flex-1 overflow-y-auto px-3 py-2 space-y-2">
+              {/* Read-only transaction table */}
+              <div className="shrink-0 px-3 py-2 border-b border-slate-800/80 bg-slate-900/70 space-y-2">
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <div className="relative flex-1">
+                    <SearchIcon className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      value={txnSearch}
+                      onChange={(e) => setTxnSearch(e.target.value)}
+                      placeholder="Search order or payment"
+                      className="w-full pl-8 pr-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <select
+                      value={txnPaymentFilter}
+                      onChange={(e) => setTxnPaymentFilter(e.target.value)}
+                      className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-xs text-slate-100 focus:outline-none focus:border-amber-500"
+                    >
+                      <option value="all">All payments</option>
+                      {txnPaymentOptions.map((method) => (
+                        <option key={method} value={method}>{method}</option>
+                      ))}
+                    </select>
+                    <select
+                      value={txnSort}
+                      onChange={(e) => setTxnSort(e.target.value as TransactionSort)}
+                      className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-xs text-slate-100 focus:outline-none focus:border-amber-500"
+                    >
+                      <option value="newest">Newest first</option>
+                      <option value="oldest">Oldest first</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-auto">
                 {txnsLoading ? (
                   <div className="flex items-center justify-center h-32 text-slate-400">
                     <RefreshCwIcon className="w-4 h-4 animate-spin mr-2" /> Loading…
                   </div>
-                ) : shiftTxns.length === 0 ? (
+                ) : filteredTxns.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-36 text-slate-500">
                     <HistoryIcon className="w-7 h-7 mb-2 opacity-30" />
-                    <p className="text-xs font-medium">No sales yet today</p>
+                    <p className="text-xs font-medium">No transactions match the current filters</p>
                   </div>
                 ) : (
-                  shiftTxns.map((t) => (
-                    <div key={t.id} className="bg-slate-800/60 border border-slate-700/40 rounded-2xl overflow-hidden">
-                      <button
-                        onClick={() => setExpandedTxn(expandedTxn === t.id ? null : t.id)}
-                        className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left hover:bg-slate-700/30 transition-colors"
-                      >
-                        <div className="w-7 h-7 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0">
-                          <CheckCircleIcon className="w-3.5 h-3.5 text-emerald-400" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5">
-                            <p className="text-xs font-semibold text-white">#{t.orderNumber}</p>
-                            <span className="text-[9px] bg-slate-700 text-slate-400 border border-slate-600 px-1.5 py-0.5 rounded-full">{t.paymentLabel}</span>
-                          </div>
-                          <p className="text-[10px] text-slate-500 mt-0.5">
-                            {t.itemCount} item{t.itemCount !== 1 ? 's' : ''} · {t.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </p>
-                        </div>
-                        <div className="text-right shrink-0">
-                          <p className="text-xs font-bold text-emerald-400">{formatPrice(t.total)}</p>
-                          {expandedTxn === t.id
-                            ? <ChevronUpIcon className="w-3 h-3 text-slate-500 mt-0.5 ml-auto" />
-                            : <ChevronDownIcon className="w-3 h-3 text-slate-500 mt-0.5 ml-auto" />}
-                        </div>
-                      </button>
-                      {expandedTxn === t.id && (
-                        <div className="border-t border-slate-700/50 px-3 py-2 space-y-1 bg-slate-800/30">
-                          {t.items.map((item, idx) => (
-                            <div key={idx} className="flex justify-between text-[10px]">
-                              <span className="text-slate-300">{item.name} <span className="text-slate-500">×{item.qty}</span></span>
-                              <span className="text-slate-400 font-medium">{formatPrice(item.price)}</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  ))
+                  <div className="min-w-[560px]">
+                    <table className="w-full text-xs">
+                      <thead className="sticky top-0 bg-slate-900/95 z-10 border-b border-slate-800">
+                        <tr>
+                          <th className="px-3 py-2 text-left font-semibold uppercase tracking-wide text-slate-400">Order</th>
+                          <th className="px-3 py-2 text-left font-semibold uppercase tracking-wide text-slate-400">Time</th>
+                          <th className="px-3 py-2 text-left font-semibold uppercase tracking-wide text-slate-400">Payment</th>
+                          <th className="px-3 py-2 text-left font-semibold uppercase tracking-wide text-slate-400">Items</th>
+                          <th className="px-3 py-2 text-right font-semibold uppercase tracking-wide text-slate-400">Total</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800/90">
+                        {filteredTxns.map((t) => (
+                          <Fragment key={t.id}>
+                            <tr
+                              className="hover:bg-slate-800/30 cursor-pointer transition-colors"
+                              onClick={() => setExpandedTxn(expandedTxn === t.id ? null : t.id)}
+                            >
+                              <td className="px-3 py-2.5 whitespace-nowrap">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-slate-300 font-semibold">#{t.orderNumber}</span>
+                                  {expandedTxn === t.id
+                                    ? <ChevronUpIcon className="w-3 h-3 text-slate-500" />
+                                    : <ChevronDownIcon className="w-3 h-3 text-slate-500" />}
+                                </div>
+                                <div className="text-[10px] text-slate-600">{t.id.slice(0, 8)}</div>
+                              </td>
+                              <td className="px-3 py-2.5 text-slate-300 whitespace-nowrap">
+                                {t.timestamp.toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                              </td>
+                              <td className="px-3 py-2.5 whitespace-nowrap">
+                                <span className="inline-flex rounded-full bg-amber-900/40 px-2 py-0.5 text-[10px] font-medium text-amber-300 border border-amber-700/40">
+                                  {t.paymentLabel}
+                                </span>
+                              </td>
+                              <td className="px-3 py-2.5 text-slate-300 whitespace-nowrap">
+                                {t.itemCount} item{t.itemCount !== 1 ? 's' : ''}
+                              </td>
+                              <td className="px-3 py-2.5 text-right whitespace-nowrap font-bold text-emerald-400">
+                                {formatPrice(t.total)}
+                              </td>
+                            </tr>
+                            {expandedTxn === t.id && (
+                              <tr className="bg-slate-900/60">
+                                <td colSpan={5} className="px-3 py-2.5">
+                                  <div className="space-y-1">
+                                    {t.items.map((item, idx) => (
+                                      <div key={idx} className="flex justify-between text-[11px]">
+                                        <span className="text-slate-300">{item.name} <span className="text-slate-500">×{item.qty}</span></span>
+                                        <span className="text-slate-400 font-medium">{formatPrice(item.price)}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+                          </Fragment>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 )}
               </div>
             </div>

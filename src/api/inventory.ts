@@ -497,6 +497,19 @@ export async function relinkInventoryRecord(
   if (error) throw new Error(`Failed to relink inventory record: ${error.message}`);
 }
 
+export async function delinkInventoryRecord(menuItemId: string): Promise<void> {
+  const restaurantId = getRestaurantId();
+  if (!restaurantId) throw new Error('No company selected');
+
+  const { error } = await supabase
+    .from('inventory_records')
+    .update({ menu_item_id: null, updated_at: new Date().toISOString() })
+    .eq('menu_item_id', menuItemId)
+    .eq('restaurant_id', restaurantId);
+
+  if (error) throw new Error(`Failed to delink inventory record: ${error.message}`);
+}
+
 async function maybeAutoReorder(params: {
   menuItemId: string;
   restaurantId: string;
