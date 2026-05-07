@@ -149,31 +149,33 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
       todayStart.setHours(0, 0, 0, 0);
 
       let rows: any[] = [];
-      // First try strict cashier/confirmed filter; if schema differs, retry with broader query.
-      const strict = await supabase
-        .from('orders')
-        .select('total, payment_type, payment_method, payment_status, payment_confirmed_by, created_at')
-        .eq('restaurant_id', activeRestaurantId)
-        .eq('payment_status', 'confirmed')
-        .eq('payment_confirmed_by', cashier.id)
-        .gte('created_at', todayStart.toISOString());
-
-      if (!strict.error) {
-        rows = strict.data || [];
-      } else {
-        const relaxed = await supabase
+      for (const cols of [
+        'total, payment_type, payment_method, payment_status, payment_confirmed_by, created_at',
+        'total, payment_type, payment_method, payment_status, created_at',
+        'total, payment_type, payment_method, created_at',
+        'total, payment_method, created_at',
+        'total, created_at',
+      ]) {
+        const res = await supabase
           .from('orders')
-          .select('total, payment_type, payment_method, payment_status, payment_confirmed_by, created_at')
+          .select(cols)
           .eq('restaurant_id', activeRestaurantId)
-          .gte('created_at', todayStart.toISOString());
+          .gte('created_at', todayStart.toISOString())
+          .order('created_at', { ascending: false });
 
-        if (!relaxed.error) {
-          rows = (relaxed.data || []).filter((o: any) => {
+        if (!res.error) {
+          rows = (res.data || []).filter((o: any) => {
             const ps = String(o.payment_status || '').toLowerCase();
             const cashierMatch = o.payment_confirmed_by ? o.payment_confirmed_by === cashier.id : true;
             const statusMatch = !ps || ['confirmed', 'paid', 'completed'].includes(ps);
             return cashierMatch && statusMatch;
           });
+          break;
+        }
+
+        const msg = String(res.error.message || '').toLowerCase();
+        if (!msg.includes('column') && !msg.includes('does not exist')) {
+          break;
         }
       }
 
@@ -233,7 +235,9 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
       const todayStart = new Date();
       todayStart.setHours(0, 0, 0, 0);
       const candidateSelects = [
-        'id, order_number, total, items, created_at, payment_type',
+        'id, order_number, total, items, created_at, payment_type, payment_method, payment_status, payment_confirmed_by',
+        'id, order_number, total, items, created_at, payment_method, payment_status, payment_confirmed_by',
+        'id, order_number, total, items, created_at, payment_method, payment_status',
         'id, order_number, total, items, created_at, payment_method',
         'id, order_number, total, items, created_at',
       ];
@@ -244,13 +248,16 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
           .from('orders')
           .select(selectCols)
           .eq('restaurant_id', activeRestaurantId)
-          .eq('payment_status', 'confirmed')
-          .eq('payment_confirmed_by', cashier.id)
           .gte('created_at', todayStart.toISOString())
           .order('created_at', { ascending: false });
 
         if (!res.error) {
-          data = res.data || [];
+          data = (res.data || []).filter((o: any) => {
+            const ps = String(o.payment_status || '').toLowerCase();
+            const cashierMatch = o.payment_confirmed_by ? o.payment_confirmed_by === cashier.id : true;
+            const statusMatch = !ps || ['confirmed', 'paid', 'completed'].includes(ps);
+            return cashierMatch && statusMatch;
+          });
           break;
         }
 
