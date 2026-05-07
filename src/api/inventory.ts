@@ -92,6 +92,7 @@ function normalizeInventoryRecord(raw: any): InventoryRecord {
     updatedAt:         raw.updated_at      ?? raw.updatedAt    ?? new Date().toISOString(),
     // Extended fields for minimart inventory sheet format.
     description:       raw.description     ?? raw.item_description ?? '',
+    category:          raw.category        ?? '',
     expiryDate:        raw.expiry_date     ?? raw.expiryDate ?? '',
     purchaseDate:      raw.purchase_date   ?? raw.purchaseDate ?? '',
     qtyStart:          raw.qty_start       ?? raw.qtyStart ?? currentQty,
@@ -265,6 +266,7 @@ export async function createInventoryRecord(record: Partial<InventoryRecord>): P
     id,
     menu_item_id:        record.menuItemId,
     description:         record.description         ?? '',
+    category:            record.category            ?? '',
     stock,
     low_stock_threshold: lowStockThreshold,
     reorder_point:       reorderPoint,
@@ -357,6 +359,7 @@ export async function updateInventoryRecord(
   if (record.supplierId          !== undefined) updateFields.supplier_id         = record.supplierId;
   if (record.supplier_id         !== undefined) updateFields.supplier_id         = record.supplier_id;
   if (record.description         !== undefined) updateFields.description         = record.description;
+  if (record.category            !== undefined) updateFields.category            = record.category;
   if (record.location            !== undefined) updateFields.location            = record.location;
   if (record.expiryDate          !== undefined) updateFields.expiry_date         = record.expiryDate   || null;
   if (record.expiry_date         !== undefined) updateFields.expiry_date         = record.expiry_date  || null;
@@ -444,6 +447,7 @@ export async function updateInventoryRecord(
     menu_item_id:        menuItemId,
     restaurant_id:       restaurantId,
     description:         record.description         ?? '',
+    category:            record.category            ?? '',
     stock,
     low_stock_threshold: lowStockThreshold,
     reorder_point:       reorderPoint,

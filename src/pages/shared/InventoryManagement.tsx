@@ -1516,6 +1516,9 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                   <tbody className="divide-y divide-slate-700/30">
                     {paginatedInventoryRows.map((row) => {
                       const isEditing = editingRow === row.item.id;
+                      const targetMenuItemId = row.rec?.menuItemId || row.item.id;
+                      const linkedMenuItem = menuItemMap[targetMenuItemId];
+                      const rowInventoryRec = inventoryMap[targetMenuItemId] || row.rec;
                       const maxStock = Math.max(row.rec?.reorderQty ?? row.stock * 2, row.stock, 1);
                       const purchaseDate = row.rec?.purchaseDate ? new Date(row.rec.purchaseDate) : null;
                       const ageDays = purchaseDate && !Number.isNaN(purchaseDate.getTime())
@@ -1750,7 +1753,7 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                               {isEditing ? (
                                 <div className="flex items-center gap-1 whitespace-nowrap">
                                   <button
-                                    onClick={() => handleSaveRow(row.item.id, row.item.name)}
+                                    onClick={() => handleSaveRow(targetMenuItemId, row.item.name)}
                                     className="h-7 w-7 inline-flex items-center justify-center rounded-md border border-emerald-500/45 bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/30 transition"
                                     title="Save"
                                   >
@@ -1767,7 +1770,7 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                               ) : (
                                 <div className="flex items-center gap-1 whitespace-nowrap">
                                   <button
-                                    onClick={() => openAuditTrail(row.item.id, row.item.name)}
+                                    onClick={() => openAuditTrail(targetMenuItemId, row.item.name)}
                                     className="h-7 w-7 inline-flex items-center justify-center rounded-md border border-purple-500/50 bg-purple-500/20 text-purple-100 hover:bg-purple-500/32 transition"
                                     title="Cost & stock history"
                                   >
@@ -1775,10 +1778,11 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                                   </button>
                                   <button
                                     onClick={() => {
-                                      const rec = inventoryMap[row.item.id];
+                                      const rec = rowInventoryRec;
                                       setEditingRow(row.item.id);
                                       setEditValues({
-                                        description: rec?.description ?? menuItemMap[row.item.id]?.description ?? row.item.name ?? '',
+                                        description: rec?.description ?? linkedMenuItem?.description ?? row.item.name ?? '',
+                                        category: rec?.category ?? '',
                                         stock: rec?.stock ?? 0,
                                         lowStockThreshold: rec?.lowStockThreshold ?? 0,
                                         reorderPoint: rec?.reorderPoint ?? 0,
@@ -1796,7 +1800,7 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                                   <button
                                     onClick={() => {
                                       setNewPO({ supplierId: suppliers[0]?.id ?? '', expectedDelivery: '', notes: `Auto reordering ${row.item.name} based on threshold` });
-                                      setNewPOItems([{ menuItemId: row.item.id, orderedQty: Math.max((row.rec?.reorderQty ?? 5) - row.stock, 1), unit: '', unitCost: row.rec?.unitCost ?? 0 }]);
+                                      setNewPOItems([{ menuItemId: targetMenuItemId, orderedQty: Math.max((row.rec?.reorderQty ?? 5) - row.stock, 1), unit: '', unitCost: row.rec?.unitCost ?? 0 }]);
                                       setShowNewPO(true);
                                     }}
                                     className="h-7 w-7 inline-flex items-center justify-center rounded-md border border-emerald-500/50 bg-emerald-500/20 text-emerald-100 hover:bg-emerald-500/32 transition"
@@ -1806,8 +1810,8 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                                   </button>
                                   <button
                                     onClick={async () => {
-                                      if (menuItemMap[row.item.id]) {
-                                        const linkedName = menuItemMap[row.item.id].name;
+                                      if (linkedMenuItem) {
+                                        const linkedName = linkedMenuItem.name;
                                         if (!window.confirm(`Unlink this inventory record from "${linkedName}"?\nStock tracking will stop until re-linked.`)) return;
                                         try {
                                           await apiDelinkInventoryRecord(row.rec?.id ?? row.item.id);
@@ -1854,22 +1858,22 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                                     className={`h-7 w-7 inline-flex items-center justify-center rounded-md border transition ${
                                       autoLinking === (row.rec?.id ?? row.item.id)
                                         ? 'text-slate-400 bg-slate-500/20 border-slate-500/30 cursor-not-allowed'
-                                        : menuItemMap[row.item.id]
+                                        : linkedMenuItem
                                           ? 'text-orange-200 bg-orange-500/20 border-orange-500/50 hover:bg-orange-500/35'
                                           : 'text-blue-100 bg-blue-500/22 border-blue-500/55 hover:bg-blue-500/35'
                                     }`}
-                                    title={autoLinking === (row.rec?.id ?? row.item.id) ? 'Linking…' : menuItemMap[row.item.id] ? `Unlink from ${isMinimartScope ? 'Product' : 'Menu Item'}` : `Add to ${isMinimartScope ? 'Products' : 'Menu'}`}
+                                    title={autoLinking === (row.rec?.id ?? row.item.id) ? 'Linking…' : linkedMenuItem ? `Unlink from ${isMinimartScope ? 'Product' : 'Menu Item'}` : `Add to ${isMinimartScope ? 'Products' : 'Menu'}`}
                                   >
                                     {autoLinking === (row.rec?.id ?? row.item.id)
                                       ? <RefreshCcwIcon className="w-4 h-4 animate-spin" />
-                                      : menuItemMap[row.item.id]
+                                      : linkedMenuItem
                                         ? <XCircleIcon className="w-4 h-4" />
                                         : <LinkIcon className="w-4 h-4" />}
                                   </button>
                                   <button
                                     onClick={() => {
                                       if (window.confirm(`Delete inventory record for ${row.item.name}? This action cannot be undone.`)) {
-                                        handleDeleteInventoryItem(row.item.id);
+                                        handleDeleteInventoryItem(targetMenuItemId);
                                       }
                                     }}
                                     className="h-7 w-7 inline-flex items-center justify-center rounded-md border border-red-500/50 bg-red-500/20 text-red-100 hover:bg-red-500/32 transition"
