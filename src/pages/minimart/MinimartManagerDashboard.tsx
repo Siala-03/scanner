@@ -692,23 +692,31 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
       const PLABEL: Record<string, string> = { '01': 'Cash', '02': 'Card', '04': 'Mobile Money' };
       // Try to fetch with payment_type first, fall back to payment_method
       let rows: Array<{ total: number; paymentMethod: string }> = [];
+      const now = new Date().toISOString();
+      const upperBound = shift.closedAt || now;
+      
       for (const cols of [
         'total, payment_type, payment_method, payment_status, payment_confirmed_by',
         'total, payment_method, payment_status, payment_confirmed_by',
         'total, payment_status, payment_confirmed_by',
       ]) {
-        const res = await supabase
+        let query = supabase
           .from('orders')
           .select(cols)
           .eq('restaurant_id', activeRestaurantId)
           .gte('created_at', shift.openedAt)
-          .order('created_at', { ascending: false });
+          .lt('created_at', upperBound);
+        
+        if (shift.cashierId) {
+          query = query.eq('payment_confirmed_by', shift.cashierId);
+        }
+        
+        const res = await query.order('created_at', { ascending: false });
         if (!res.error) {
           rows = (res.data || [])
             .filter((o: any) => {
               const ps = String(o.payment_status || '').toLowerCase();
-              const cashierMatch = shift.cashierId ? o.payment_confirmed_by === shift.cashierId : true;
-              return cashierMatch && ['confirmed', 'paid', 'completed'].includes(ps);
+              return ['confirmed', 'paid', 'completed'].includes(ps);
             })
             .map((o: any) => ({
               total: o.total || 0,

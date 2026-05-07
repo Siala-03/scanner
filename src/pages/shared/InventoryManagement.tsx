@@ -119,6 +119,15 @@ function StarRating({ rating }: { rating: number }) {
 
 // ── Helper Functions ─────────────────────────────────────────────────────────
 
+// Convert a standalone product code into a valid SKU (uppercase alphanumeric, ≤10 chars).
+// Returns null if the code looks like an auto-generated system ID (item-…, standalone-…).
+function standaloneCodeToSku(code: string): string | null {
+  if (!code) return null;
+  if (/^(item|standalone)-/.test(code)) return null; // already a generated ID, skip
+  const sanitized = code.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10);
+  return sanitized || null;
+}
+
 function normalizeInventoryRecord(rec: any): InventoryRecord {
   const menuItemId = rec.menuItemId || rec.menu_item_id || rec.itemId || rec.item_id || rec.id || '';
   if (!menuItemId) {
@@ -258,6 +267,7 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
   // ── Link inventory to product/menu modal state ──────────────────────────
   const [showAddToMenuModal, setShowAddToMenuModal] = useState(false);
   const [addToMenuItemId, setAddToMenuItemId] = useState(''); // existing inventory record's menuItemId
+  const [addToMenuOriginalCode, setAddToMenuOriginalCode] = useState(''); // original standalone menuItemId (product code)
   const [addToMenuName, setAddToMenuName] = useState('');
   const [addToMenuPrice, setAddToMenuPrice] = useState(0);
   const [addToMenuCategory, setAddToMenuCategory] = useState('');
@@ -713,13 +723,15 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
           continue;
         }
 
-        const payload = {
+        const batchSku = standaloneCodeToSku(rec?.menuItemId ?? '');
+        const payload: any = {
           name: productName,
           price: productPrice,
           category: 'Uncategorized',
           is_available: true,
           requires_kitchen: false,
           prep_time: 0,
+          ...(batchSku ? { sku: batchSku } : {}),
         };
 
         const newItem = await createMenuItem(payload);
@@ -743,6 +755,7 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
   const closeAddToMenuModal = () => {
     setShowAddToMenuModal(false);
     setAddToMenuItemId('');
+    setAddToMenuOriginalCode('');
     setAddToMenuName('');
     setAddToMenuPrice(0);
     setAddToMenuCategory('');
@@ -796,6 +809,8 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
         category: addToMenuCategory,
         is_available: true,
       };
+      const preservedSku = standaloneCodeToSku(addToMenuOriginalCode);
+      if (preservedSku) payload.sku = preservedSku;
       if (isMinimartScope) {
         payload.requires_kitchen = false;
         payload.prep_time = 0;
@@ -1565,6 +1580,15 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                             >
                               <div>
                                 <p className="text-white font-medium text-sm hover:text-amber-300 underline underline-offset-2">{row.item.name || row.item.id}</p>
+                                {(() => {
+                                  const linkedItem = menuItemMap[row.item.id];
+                                  const sku = linkedItem?.sku ?? (row.rec as any)?.sku ?? null;
+                                  return sku ? (
+                                    <p className="text-[10px] font-mono text-amber-500/70 mt-0.5 tracking-wide">{sku}</p>
+                                  ) : !linkedItem ? (
+                                    <p className="text-[10px] font-mono text-slate-500 mt-0.5 tracking-wide">{row.item.id}</p>
+                                  ) : null;
+                                })()}
                                 <div className="flex items-center gap-1.5 mt-0.5">
                                   <p className="text-xs text-slate-500">{row.item.category.replace(/-/g, ' ')}</p>
                                   {menuItemMap[row.item.id] && row.rec && (
@@ -1833,6 +1857,8 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                                         return;
                                       }
                                       const recId = row.rec?.id ?? row.item.id;
+                                      // row.item.id is the original standalone menuItemId (product code) for unlinked items
+                                      const originalCode = !linkedMenuItem ? row.item.id : '';
                                       const name = (row.rec?.description || row.item.name || '').trim();
                                       const price = row.rec?.price ?? row.rec?.unitCost ?? 0;
                                       const category = row.item.category !== 'Other' ? row.item.category : (isMinimartScope ? 'General' : 'Food');
@@ -1847,6 +1873,8 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                                           } else {
                                             const payload: any = { name, price, category, is_available: true };
                                             if (isMinimartScope) { payload.requires_kitchen = false; payload.prep_time = 0; }
+                                            const preservedSku = standaloneCodeToSku(originalCode);
+                                            if (preservedSku) payload.sku = preservedSku;
                                             const newItem = await createMenuItem(payload);
                                             await apiRelinkInventoryRecord(recId, newItem.id);
                                           }
@@ -1860,6 +1888,7 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                                       }
                                       // Fallback to modal when name or price is missing
                                       setAddToMenuItemId(recId);
+                                      setAddToMenuOriginalCode(originalCode);
                                       setAddToMenuName(name);
                                       setAddToMenuPrice(price);
                                       setAddToMenuCategory(category);
