@@ -37,7 +37,7 @@ import type {
   WasteReason,
   StockMovement,
 } from '../../types/inventory';
-import { createMenuItem, fetchMenu } from '../../api/menu';
+import { createMenuItem, fetchMenu, updateMenuItem as apiUpdateMenuItem } from '../../api/menu';
 import { deleteMenuItem as apiDeleteMenuItem } from '../../api/menu';
 import {
   updateInventoryRecord as apiUpdateInventoryRecord,
@@ -483,6 +483,12 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
     }
 
     const updatePayload: any = {};
+    const currentDescription = isMinimartScope
+      ? (current as any).description
+      : (menuItemMap[menuItemId]?.description ?? (current as any).description ?? '');
+    const isDescriptionChanged =
+      editValues.description !== undefined && editValues.description !== currentDescription;
+    const shouldUpdateMenuDescription = !isMinimartScope && isDescriptionChanged && !!menuItemMap[menuItemId];
     
     // Check each field and add to payload if it changed
     if (editValues.stock !== undefined && editValues.stock !== current.stock) {
@@ -509,7 +515,7 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
     if (editValues.price !== undefined && editValues.price !== (current as any).price) {
       updatePayload.price = editValues.price;
     }
-    if (isMinimartScope && editValues.description !== undefined && editValues.description !== (current as any).description) {
+    if (isMinimartScope && isDescriptionChanged) {
       updatePayload.description = editValues.description;
     }
     if (editValues.expiryDate !== undefined && editValues.expiryDate !== (current as any).expiryDate) {
@@ -519,7 +525,7 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
       updatePayload.purchaseDate = editValues.purchaseDate || null;
     }
 
-    if (Object.keys(updatePayload).length === 0) {
+    if (Object.keys(updatePayload).length === 0 && !shouldUpdateMenuDescription) {
       alert('No changes made');
       setEditingRow(null);
       setEditValues({});
@@ -528,10 +534,20 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
 
     try {
       console.log('Saving inventory item:', { menuItemId, updatePayload });
-      await apiUpdateInventoryRecord(menuItemId, updatePayload);
+      if (Object.keys(updatePayload).length > 0) {
+        await apiUpdateInventoryRecord(menuItemId, updatePayload);
+      }
+      if (shouldUpdateMenuDescription) {
+        await apiUpdateMenuItem(menuItemId, {
+          description: editValues.description ?? '',
+        } as any);
+      }
       
       // Refresh the data
       await refresh();
+      if (!isMinimartScope && shouldUpdateMenuDescription) {
+        await refreshMenu();
+      }
       
       alert('Inventory item updated successfully');
       setEditingRow(null);
@@ -1468,7 +1484,7 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                         </th>
                       )}
                       <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Product</th>
-                      {isMinimartScope && <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Description</th>}
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Description</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Expiry Date</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Purchase Date</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Age</th>
@@ -1534,20 +1550,18 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                               </div>
                             </button>
                           </td>
-                          {isMinimartScope && (
                           <td className="px-4 py-3 text-sm text-slate-300">
                             {isEditing ? (
                               <input
                                 type="text"
-                                value={editValues.description ?? row.rec?.description ?? row.item.name ?? ''}
+                                value={editValues.description ?? row.rec?.description ?? menuItemMap[row.item.id]?.description ?? row.item.name ?? ''}
                                 onChange={(e) => setEditValues((v) => ({ ...v, description: e.target.value }))}
                                 className="w-36 px-2 py-1 rounded bg-slate-900 border border-slate-600 text-white text-xs focus:outline-none focus:ring-1 focus:ring-amber-500"
                               />
                             ) : (
-                              row.rec?.description || row.item.name || '—'
+                              row.rec?.description || menuItemMap[row.item.id]?.description || row.item.name || '—'
                             )}
                           </td>
-                          )}
                           <td className="px-4 py-3 text-sm text-slate-300">
                             {isEditing ? (
                               <input
@@ -1738,6 +1752,7 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                                       const rec = inventoryMap[row.item.id];
                                       setEditingRow(row.item.id);
                                       setEditValues({
+                                        description: rec?.description ?? menuItemMap[row.item.id]?.description ?? row.item.name ?? '',
                                         stock: rec?.stock ?? 0,
                                         lowStockThreshold: rec?.lowStockThreshold ?? 0,
                                         reorderPoint: rec?.reorderPoint ?? 0,
