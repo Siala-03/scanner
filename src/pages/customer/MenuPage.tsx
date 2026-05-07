@@ -371,9 +371,10 @@ export function MenuPage({ onAddToCart }: MenuPageProps) {
       )}
 
       {/* Item Detail Modal */}
-      <Modal isOpen={!!selectedItem} onClose={() => setSelectedItem(null)} variant="light">
+      <Modal isOpen={!!selectedItem} onClose={() => setSelectedItem(null)} variant="light" size="full">
         {selectedItem && (
-          <div className="p-4 sm:p-6 max-h-[90vh] overflow-y-auto">
+          <div className="min-h-0 flex flex-col">
+            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y pb-4 sm:pb-5" style={{ WebkitOverflowScrolling: 'touch' }}>
             <div className="flex justify-between items-start mb-4 sm:mb-5">
               <div className="flex-1 min-w-0">
                 <span className="text-4xl sm:text-5xl mb-3 block">{selectedItem.emoji}</span>
@@ -608,14 +609,18 @@ export function MenuPage({ onAddToCart }: MenuPageProps) {
               )}
             </div>
 
-            <Button
-              onClick={handleAddFromModal}
-              className="w-full touch-manipulation"
-              size="lg"
-              disabled={!requiredGroupsMet}
-            >
-              {!requiredGroupsMet ? 'Select required options' : `Add to Cart — ${formatPrice((getEffectivePrice(selectedItem) + modifierAdjustment) * quantity)}`}
-            </Button>
+            </div>
+
+            <div className="sticky bottom-0 border-t border-slate-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
+              <Button
+                onClick={handleAddFromModal}
+                className="w-full touch-manipulation"
+                size="lg"
+                disabled={!requiredGroupsMet}
+              >
+                {!requiredGroupsMet ? 'Select required options' : `Add to Cart — ${formatPrice((getEffectivePrice(selectedItem) + modifierAdjustment) * quantity)}`}
+              </Button>
+            </div>
           </div>
         )}
       </Modal>

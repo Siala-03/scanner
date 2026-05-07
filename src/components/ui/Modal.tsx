@@ -103,7 +103,12 @@ export function Modal({
                 </button>
               </div>
             }
-            <div className={`flex-1 overflow-y-auto p-4 sm:p-6 ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>{children}</div>
+            <div
+              className={`flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y p-4 sm:p-6 ${isLight ? 'text-slate-700' : 'text-slate-200'}`}
+              style={{ WebkitOverflowScrolling: 'touch' }}
+            >
+              {children}
+            </div>
           </motion.div>
         </div>
       }

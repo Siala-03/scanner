@@ -109,7 +109,7 @@ function ReservationBookingForm({ restaurantId, restaurantName }: { restaurantId
     <motion.div
       initial="hidden"
       animate="visible"
-      className="p-4 max-w-3xl mx-auto"
+      className="p-4 pb-28 sm:pb-32 max-w-3xl mx-auto"
     >
       <div className="grid grid-cols-1 md:grid-cols-[0.9fr_1.1fr] gap-4 md:gap-5">
         <motion.div variants={panelVariants} className="rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 via-orange-50 to-white p-5">
@@ -128,7 +128,7 @@ function ReservationBookingForm({ restaurantId, restaurantName }: { restaurantId
         <motion.form
           variants={formVariants}
           onSubmit={handleSubmit}
-          className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-[0_8px_30px_rgba(15,23,42,0.06)] space-y-4"
+          className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-[0_8px_30px_rgba(15,23,42,0.06)] space-y-4 pb-6"
         >
           <motion.div variants={fieldVariants}>
             <label className="block text-xs font-semibold text-slate-700 mb-1">Full Name <span className="text-red-500">*</span></label>
@@ -557,8 +557,8 @@ export function CustomerApp({
         </motion.div>
       </AnimatePresence>
 
-      {/* Call Waiter Floating Button - Only show on non-cart pages */}
-      {activeTab !== 'cart' && (
+      {/* Call Waiter Floating Button - hide on reserve to avoid CTA overlap */}
+      {(activeTab === 'menu' || activeTab === 'orders') && (
         <motion.button
           whileTap={{
             scale: 0.9
