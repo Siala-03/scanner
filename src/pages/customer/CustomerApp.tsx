@@ -8,6 +8,11 @@ import {
   CheckIcon,
   GlobeIcon,
   CalendarIcon,
+  ClockIcon,
+  UsersIcon,
+  PhoneIcon,
+  UserIcon,
+  MessageSquareIcon,
 } from 'lucide-react';
 import { CartItem, MenuItem, Order, Customer, SelectedModifier } from '../../types';
 import { MenuPage } from './MenuPage';
@@ -18,6 +23,8 @@ import { createReservation } from '../../api/reservations';
 
 function ReservationBookingForm({ restaurantId, restaurantName }: { restaurantId?: string; restaurantName?: string }) {
   const today = new Date().toISOString().slice(0, 10);
+  const quickTimes = ['18:00', '19:00', '20:00', '21:00'];
+  const quickPartySizes = [2, 4, 6, 8];
   const [form, setForm] = useState({
     customerName: '',
     customerPhone: '',
@@ -30,7 +37,26 @@ function ReservationBookingForm({ restaurantId, restaurantName }: { restaurantId
   const [error, setError] = useState('');
   const [confirmed, setConfirmed] = useState(false);
 
-  const inputClass = "w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent text-sm";
+  const panelVariants = {
+    hidden: { opacity: 0, y: 14 },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.35, ease: 'easeOut' } },
+  };
+
+  const formVariants = {
+    hidden: { opacity: 0, y: 10 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: { duration: 0.35, ease: 'easeOut', staggerChildren: 0.04, delayChildren: 0.08 },
+    },
+  };
+
+  const fieldVariants = {
+    hidden: { opacity: 0, y: 8 },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.25, ease: 'easeOut' } },
+  };
+
+  const inputClass = "w-full px-4 py-3 rounded-xl border border-slate-300 bg-white text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500/60 focus:border-amber-500 text-sm shadow-sm";
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -62,16 +88,16 @@ function ReservationBookingForm({ restaurantId, restaurantName }: { restaurantId
 
   if (confirmed) {
     return (
-      <div className="min-h-[60vh] flex flex-col items-center justify-center p-6 text-center">
-        <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mb-4">
-          <CheckIcon className="w-8 h-8 text-green-600" />
+      <div className="min-h-[60vh] flex flex-col items-center justify-center p-6 text-center bg-gradient-to-b from-emerald-50 to-white rounded-2xl border border-emerald-100">
+        <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center mb-4 shadow-sm">
+          <CheckIcon className="w-8 h-8 text-emerald-600" />
         </div>
-        <h2 className="text-xl font-bold text-slate-900 mb-2">Reservation Submitted!</h2>
-        <p className="text-slate-500 text-sm mb-1">We'll confirm your booking shortly.</p>
-        <p className="text-slate-400 text-xs">You'll receive a WhatsApp confirmation once a staff member reviews your request.</p>
+        <h2 className="text-2xl font-bold text-slate-900 mb-2">Reservation Submitted!</h2>
+        <p className="text-slate-600 text-sm mb-1">We'll confirm your booking shortly.</p>
+        <p className="text-slate-500 text-xs">You'll receive a WhatsApp confirmation once a staff member reviews your request.</p>
         <button
           onClick={() => { setConfirmed(false); setForm({ customerName: '', customerPhone: '', partySize: 2, reservationDate: today, reservationTime: '19:00', notes: '' }); }}
-          className="mt-6 px-6 py-2.5 rounded-xl bg-amber-500 text-white font-semibold text-sm hover:bg-amber-600 transition-colors"
+          className="mt-6 px-6 py-2.5 rounded-xl bg-amber-500 text-white font-semibold text-sm hover:bg-amber-600 transition-colors shadow-md"
         >
           Make Another Reservation
         </button>
@@ -80,48 +106,118 @@ function ReservationBookingForm({ restaurantId, restaurantName }: { restaurantId
   }
 
   return (
-    <div className="p-4 max-w-md mx-auto">
-      <div className="mb-6 text-center">
-        <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center mx-auto mb-3">
-          <CalendarIcon className="w-6 h-6 text-amber-600" />
-        </div>
-        <h2 className="text-lg font-bold text-slate-900">Reserve a Table</h2>
-        {restaurantName && <p className="text-slate-500 text-sm mt-1">{restaurantName}</p>}
+    <motion.div
+      initial="hidden"
+      animate="visible"
+      className="p-4 max-w-3xl mx-auto"
+    >
+      <div className="grid grid-cols-1 md:grid-cols-[0.9fr_1.1fr] gap-4 md:gap-5">
+        <motion.div variants={panelVariants} className="rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 via-orange-50 to-white p-5">
+          <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center mb-3">
+            <CalendarIcon className="w-6 h-6 text-amber-700" />
+          </div>
+          <h2 className="text-xl font-bold text-slate-900">Reserve a Table</h2>
+          {restaurantName && <p className="text-slate-600 text-sm mt-1">{restaurantName}</p>}
+          <div className="mt-4 space-y-2 text-sm text-slate-600">
+            <p className="flex items-center gap-2"><ClockIcon className="w-4 h-4 text-amber-700" /> Pick your preferred date and time.</p>
+            <p className="flex items-center gap-2"><UsersIcon className="w-4 h-4 text-amber-700" /> Choose party size and any special requests.</p>
+            <p className="flex items-center gap-2"><PhoneIcon className="w-4 h-4 text-amber-700" /> We confirm by WhatsApp after staff review.</p>
+          </div>
+        </motion.div>
+
+        <motion.form
+          variants={formVariants}
+          onSubmit={handleSubmit}
+          className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-[0_8px_30px_rgba(15,23,42,0.06)] space-y-4"
+        >
+          <motion.div variants={fieldVariants}>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">Full Name <span className="text-red-500">*</span></label>
+            <div className="relative">
+              <UserIcon className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input type="text" value={form.customerName} onChange={e => setForm(f => ({ ...f, customerName: e.target.value }))} placeholder="Your full name" className={`${inputClass} pl-9`} />
+            </div>
+          </motion.div>
+
+          <motion.div variants={fieldVariants}>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">Phone <span className="text-red-500">*</span></label>
+            <div className="relative">
+              <PhoneIcon className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input type="tel" value={form.customerPhone} onChange={e => setForm(f => ({ ...f, customerPhone: e.target.value }))} placeholder="+250 7XX XXX XXX" className={`${inputClass} pl-9`} />
+            </div>
+          </motion.div>
+
+          <motion.div variants={fieldVariants} className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Date</label>
+              <input type="date" min={today} value={form.reservationDate} onChange={e => setForm(f => ({ ...f, reservationDate: e.target.value }))} className={inputClass} />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Time</label>
+              <input type="time" value={form.reservationTime} onChange={e => setForm(f => ({ ...f, reservationTime: e.target.value }))} className={inputClass} />
+            </div>
+          </motion.div>
+
+          <motion.div variants={fieldVariants} className="flex flex-wrap gap-2">
+            {quickTimes.map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setForm(f => ({ ...f, reservationTime: t }))}
+                className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition ${form.reservationTime === t ? 'bg-amber-500 text-white border-amber-500' : 'bg-white text-slate-600 border-slate-300 hover:border-amber-400 hover:text-amber-700'}`}
+              >
+                {t}
+              </button>
+            ))}
+          </motion.div>
+
+          <motion.div variants={fieldVariants}>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">Party Size</label>
+            <input type="number" min={1} max={20} placeholder="2" value={form.partySize === 0 ? '' : form.partySize} onChange={e => setForm(f => ({ ...f, partySize: Number(e.target.value) }))} className={inputClass} />
+            <div className="mt-2 flex flex-wrap gap-2">
+              {quickPartySizes.map((size) => (
+                <button
+                  key={size}
+                  type="button"
+                  onClick={() => setForm(f => ({ ...f, partySize: size }))}
+                  className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition ${form.partySize === size ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-300 hover:border-slate-500 hover:text-slate-900'}`}
+                >
+                  {size} guests
+                </button>
+              ))}
+            </div>
+          </motion.div>
+
+          <motion.div variants={fieldVariants}>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">Special Requests</label>
+            <div className="relative">
+              <MessageSquareIcon className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+              <textarea rows={3} value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="Allergies, special occasions, seating preference..." className={`${inputClass} pl-9 resize-none`} />
+            </div>
+          </motion.div>
+
+          {error && (
+            <motion.p
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2"
+            >
+              {error}
+            </motion.p>
+          )}
+
+          <motion.button
+            variants={fieldVariants}
+            whileTap={{ scale: 0.985 }}
+            type="submit"
+            disabled={saving}
+            className="w-full py-3.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white font-semibold text-sm shadow-lg shadow-amber-500/30 hover:from-amber-600 hover:to-orange-600 transition-all disabled:opacity-60"
+          >
+            {saving ? 'Submitting...' : 'Request Reservation'}
+          </motion.button>
+          <motion.p variants={fieldVariants} className="text-center text-xs text-slate-500">You'll receive a WhatsApp confirmation once confirmed.</motion.p>
+        </motion.form>
       </div>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="block text-xs font-semibold text-slate-600 mb-1">Full Name <span className="text-red-500">*</span></label>
-          <input type="text" value={form.customerName} onChange={e => setForm(f => ({ ...f, customerName: e.target.value }))} placeholder="Your full name" className={inputClass} />
-        </div>
-        <div>
-          <label className="block text-xs font-semibold text-slate-600 mb-1">Phone <span className="text-red-500">*</span></label>
-          <input type="tel" value={form.customerPhone} onChange={e => setForm(f => ({ ...f, customerPhone: e.target.value }))} placeholder="+250 7XX XXX XXX" className={inputClass} />
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1">Date</label>
-            <input type="date" min={today} value={form.reservationDate} onChange={e => setForm(f => ({ ...f, reservationDate: e.target.value }))} className={inputClass} />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1">Time</label>
-            <input type="time" value={form.reservationTime} onChange={e => setForm(f => ({ ...f, reservationTime: e.target.value }))} className={inputClass} />
-          </div>
-        </div>
-        <div>
-          <label className="block text-xs font-semibold text-slate-600 mb-1">Party Size</label>
-          <input type="number" min={1} max={20} placeholder="2" value={form.partySize === 0 ? '' : form.partySize} onChange={e => setForm(f => ({ ...f, partySize: Number(e.target.value) }))} className={inputClass} />
-        </div>
-        <div>
-          <label className="block text-xs font-semibold text-slate-600 mb-1">Special Requests</label>
-          <textarea rows={2} value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="Allergies, special occasions..." className={`${inputClass} resize-none`} />
-        </div>
-        {error && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>}
-        <button type="submit" disabled={saving} className="w-full py-3.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-white font-semibold text-sm shadow-lg shadow-amber-500/30 hover:from-amber-600 hover:to-amber-700 transition-all disabled:opacity-60">
-          {saving ? 'Submitting...' : 'Request Reservation'}
-        </button>
-        <p className="text-center text-xs text-slate-400">You'll receive a WhatsApp confirmation once confirmed.</p>
-      </form>
-    </div>
+    </motion.div>
   );
 }
 
