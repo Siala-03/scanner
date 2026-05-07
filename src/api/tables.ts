@@ -2,7 +2,24 @@
 
 function getRestaurantId(): string | undefined {
   if (typeof window !== 'undefined') {
-    return localStorage.getItem('restaurantId') || undefined;
+    const direct = localStorage.getItem('restaurantId');
+    if (direct && direct.trim()) return direct;
+
+    const authUserRaw = localStorage.getItem('authUser');
+    if (authUserRaw) {
+      try {
+        const authUser = JSON.parse(authUserRaw);
+        const fallback = authUser?.restaurantId || authUser?.restaurant_id;
+        if (typeof fallback === 'string' && fallback.trim()) {
+          localStorage.setItem('restaurantId', fallback);
+          return fallback;
+        }
+      } catch {
+        return undefined;
+      }
+    }
+
+    return undefined;
   }
   return undefined;
 }
@@ -63,7 +80,15 @@ export async function createTable(tableNumber: number, capacity: number = 4): Pr
 }
 
 export async function deleteTable(id: string): Promise<void> {
-  const { error } = await supabase.from('tables').delete().eq('id', id);
+  const restaurantId = getRestaurantId();
+  if (!restaurantId) throw new Error('No company selected');
+
+  const { error } = await supabase
+    .from('tables')
+    .delete()
+    .eq('id', id)
+    .eq('restaurant_id', restaurantId);
+
   if (error) throw error;
 }
 

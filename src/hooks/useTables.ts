@@ -1,21 +1,44 @@
 import { useState, useEffect, useCallback } from 'react';
 import { fetchTables, createTable, deleteTable } from '../api/tables';
 
-const TABLES_STORAGE_KEY = 'scanner_tables';
+const resolveRestaurantId = (): string | undefined => {
+  const direct = localStorage.getItem('restaurantId');
+  if (direct && direct.trim()) return direct;
+
+  const authUserRaw = localStorage.getItem('authUser');
+  if (!authUserRaw) return undefined;
+
+  try {
+    const authUser = JSON.parse(authUserRaw);
+    const fallback = authUser?.restaurantId || authUser?.restaurant_id;
+    if (typeof fallback === 'string' && fallback.trim()) {
+      localStorage.setItem('restaurantId', fallback);
+      return fallback;
+    }
+  } catch {
+    return undefined;
+  }
+
+  return undefined;
+};
+
+const tablesStorageKey = (restaurantId: string) => `scanner_tables:${restaurantId}`;
 
 // Helper functions for localStorage
-const getStoredTables = (): number[] => {
+const getStoredTables = (restaurantId?: string): number[] => {
+  if (!restaurantId) return [];
   try {
-    const stored = localStorage.getItem(TABLES_STORAGE_KEY);
-    return stored ? JSON.parse(stored) : [];
+    const scoped = localStorage.getItem(tablesStorageKey(restaurantId));
+    return scoped ? JSON.parse(scoped) : [];
   } catch {
     return [];
   }
 };
 
-const setStoredTables = (tables: number[]) => {
+const setStoredTables = (restaurantId: string | undefined, tables: number[]) => {
+  if (!restaurantId) return;
   try {
-    localStorage.setItem(TABLES_STORAGE_KEY, JSON.stringify(tables));
+    localStorage.setItem(tablesStorageKey(restaurantId), JSON.stringify(tables));
   } catch (error) {
     console.warn('Failed to store tables in localStorage:', error);
   }
@@ -43,22 +66,29 @@ export function useTables() {
 
   // Fetch tables from backend
   const loadTables = useCallback(async () => {
+    const restaurantId = resolveRestaurantId();
+    if (!restaurantId) {
+      setTables([]);
+      setIsLoading(false);
+      return;
+    }
+
     try {
       setIsLoading(true);
       const backendTables = await fetchTables();
       if (backendTables && backendTables.length > 0) {
         const tableNumbers = backendTables.map(t => t.tableNumber || t.table_number);
         setTables(tableNumbers);
-        setStoredTables(tableNumbers); // Also store locally
+        setStoredTables(restaurantId, tableNumbers); // Also store locally
       } else {
         // If no backend tables, use locally stored ones
-        const localTables = getStoredTables();
+        const localTables = getStoredTables(restaurantId);
         setTables(localTables);
       }
     } catch (err) {
       console.warn('Failed to fetch tables from backend, using local storage:', err);
       // Fall back to locally stored tables
-      const localTables = getStoredTables();
+      const localTables = getStoredTables(restaurantId);
       setTables(localTables);
     } finally {
       setIsLoading(false);
@@ -68,10 +98,22 @@ export function useTables() {
   // Initial load
   useEffect(() => {
     loadTables();
+
+    const handleRestaurantChange = () => {
+      loadTables();
+    };
+
+    window.addEventListener('restaurantIdChanged', handleRestaurantChange);
+    return () => {
+      window.removeEventListener('restaurantIdChanged', handleRestaurantChange);
+    };
   }, [loadTables]);
 
   // Add table
   const addTable = async () => {
+    const restaurantId = resolveRestaurantId();
+    if (!restaurantId) throw new Error('No restaurant context');
+
     try {
       console.log('useTables: Adding table...');
       const nextTableNumber = getNextAvailableTableNumber(tables);
@@ -80,7 +122,7 @@ export function useTables() {
       // Always update local state first for immediate UI feedback
       const newTables = [...tables, nextTableNumber].sort((a, b) => a - b);
       setTables(newTables);
-      setStoredTables(newTables);
+      setStoredTables(restaurantId, newTables);
       console.log('useTables: Local state updated');
 
       // Try to create table in backend
@@ -99,6 +141,9 @@ export function useTables() {
 
   // Remove table
   const removeTable = async (tableNumber: number) => {
+    const restaurantId = resolveRestaurantId();
+    if (!restaurantId) throw new Error('No restaurant context');
+
     try {
       // Try to delete from backend
       try {
@@ -116,7 +161,7 @@ export function useTables() {
       // Always update local state and storage
       const newTables = tables.filter(t => t !== tableNumber);
       setTables(newTables);
-      setStoredTables(newTables);
+      setStoredTables(restaurantId, newTables);
     } catch (err) {
       console.error('Failed to delete table:', err);
       throw err;
