@@ -249,6 +249,9 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
   const [closingFloat, setClosingFloat] = useState('');
   const [closingNotes, setClosingNotes] = useState('');
   const [shiftSaving, setShiftSaving] = useState(false);
+  // Transactions loaded specifically for the shift being closed
+  const [shiftTxnsForClose, setShiftTxnsForClose] = useState<Array<{ total: number; paymentMethod: string }>>([]);
+  const [shiftTxnsForCloseLoading, setShiftTxnsForCloseLoading] = useState(false);
 
   // Settings
   const [taxRate, setTaxRate] = useState('0');
@@ -683,6 +686,47 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
     }
   }, [activeRestaurantId]);
 
+  const loadShiftTxnsForClose = useCallback(async (shift: CashierShift) => {
+    setShiftTxnsForCloseLoading(true);
+    try {
+      const PLABEL: Record<string, string> = { '01': 'Cash', '02': 'Card', '04': 'Mobile Money' };
+      // Try to fetch with payment_type first, fall back to payment_method
+      let rows: Array<{ total: number; paymentMethod: string }> = [];
+      for (const cols of [
+        'total, payment_type, payment_method, payment_status, payment_confirmed_by',
+        'total, payment_method, payment_status, payment_confirmed_by',
+        'total, payment_status, payment_confirmed_by',
+      ]) {
+        const res = await supabase
+          .from('orders')
+          .select(cols)
+          .eq('restaurant_id', activeRestaurantId)
+          .gte('created_at', shift.openedAt)
+          .order('created_at', { ascending: false });
+        if (!res.error) {
+          rows = (res.data || [])
+            .filter((o: any) => {
+              const ps = String(o.payment_status || '').toLowerCase();
+              const cashierMatch = shift.cashierId ? o.payment_confirmed_by === shift.cashierId : true;
+              return cashierMatch && ['confirmed', 'paid', 'completed'].includes(ps);
+            })
+            .map((o: any) => ({
+              total: o.total || 0,
+              paymentMethod: PLABEL[o.payment_type || o.payment_method] ?? o.payment_type ?? o.payment_method ?? 'Cash',
+            }));
+          break;
+        }
+        const msg = String(res.error?.message || '').toLowerCase();
+        if (!msg.includes('column') && !msg.includes('does not exist')) break;
+      }
+      setShiftTxnsForClose(rows);
+    } catch {
+      setShiftTxnsForClose([]);
+    } finally {
+      setShiftTxnsForCloseLoading(false);
+    }
+  }, [activeRestaurantId]);
+
   const handleOpenShift = async () => {
     if (!openShiftCashierId) { alert('Please select a cashier.'); return; }
     const selectedCashier = cashiers.find((c) => c.id === openShiftCashierId);
@@ -711,15 +755,15 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
     setShiftSaving(true);
     try {
       const shift = shifts.find((s) => s.id === shiftId);
-      const cashSales = transactions
+      const cashSales = shiftTxnsForClose
         .filter((t) => t.paymentMethod === 'Cash')
         .reduce((sum, t) => sum + t.total, 0);
       const expectedCash = (shift?.openingFloat ?? 0) + cashSales;
       await closeShift(shiftId, {
         closingFloat: parseFloat(closingFloat),
         expectedCash,
-        totalSales: transactions.reduce((s, t) => s + t.total, 0),
-        totalTransactions: transactions.length,
+        totalSales: shiftTxnsForClose.reduce((s, t) => s + t.total, 0),
+        totalTransactions: shiftTxnsForClose.length,
         notes: closingNotes,
       });
       setClosingShiftId(null);
@@ -760,6 +804,14 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
   useEffect(() => { if (page === 'analytics') loadAnalytics(); }, [page, loadAnalytics]);
   useEffect(() => { if (page === 'settings') loadSettings(); }, [page, loadSettings]);
   useEffect(() => { if (page === 'shifts') { loadShifts(); loadCashiers(); } }, [page, loadShifts, loadCashiers]);
+  useEffect(() => {
+    if (closingShiftId) {
+      const shift = shifts.find((s) => s.id === closingShiftId);
+      if (shift) loadShiftTxnsForClose(shift);
+    } else {
+      setShiftTxnsForClose([]);
+    }
+  }, [closingShiftId, shifts, loadShiftTxnsForClose]);
 
   const handleApproveRefund = async (req: MinimartRefundRequest) => {
     if (!req.orderId) { alert('Cannot approve: missing order reference.'); return; }
@@ -1342,7 +1394,7 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
           );
           const selectedCashierForOpen = cashiers.find((c) => c.id === openShiftCashierId);
           const closingShift = shifts.find((s) => s.id === closingShiftId);
-          const cashSalesTotal = transactions
+          const cashSalesTotal = shiftTxnsForClose
             .filter((t) => t.paymentMethod === 'Cash')
             .reduce((sum, t) => sum + t.total, 0);
           const expectedInDrawer = (closingShift?.openingFloat ?? 0) + cashSalesTotal;
@@ -1522,14 +1574,17 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
                         {/* Inline close form */}
                         {isClosing && (
                           <div className="border-t border-slate-800 bg-slate-800/30 px-5 py-4 space-y-4">
-                            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Till Reconciliation</p>
+                            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">
+                              Till Reconciliation
+                              {shiftTxnsForCloseLoading && <span className="ml-2 text-amber-400 normal-case tracking-normal">Loading…</span>}
+                            </p>
                             <div className="grid grid-cols-3 gap-3 text-xs">
                               <div className="bg-slate-800 rounded-xl p-3">
                                 <p className="text-slate-500 mb-1">Opening Float</p>
                                 <p className="font-bold text-slate-200">{formatPrice(shift.openingFloat)}</p>
                               </div>
                               <div className="bg-slate-800 rounded-xl p-3">
-                                <p className="text-slate-500 mb-1">Cash Sales (today)</p>
+                                <p className="text-slate-500 mb-1">Cash Sales (this shift)</p>
                                 <p className="font-bold text-slate-200">{formatPrice(cashSalesTotal)}</p>
                               </div>
                               <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3">

@@ -353,9 +353,9 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
       .filter((rec) => !menuItemMap[rec.menuItemId])
       .map((rec) => {
         const item = {
-          id: rec.id || rec.menuItemId,
-          name: rec.description || rec.menuItemId || rec.id,
-          category: 'Other',
+          id: rec.menuItemId || rec.id,
+          name: rec.menuItemId || rec.id,
+          category: rec.category || 'Other',
         };
         const stock = rec.stock;
         const threshold = rec.lowStockThreshold;
@@ -1573,12 +1573,12 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                             {isEditing ? (
                               <input
                                 type="text"
-                                value={editValues.description ?? row.rec?.description ?? menuItemMap[row.item.id]?.description ?? row.item.name ?? ''}
+                                value={editValues.description ?? row.rec?.description ?? menuItemMap[row.item.id]?.description ?? ''}
                                 onChange={(e) => setEditValues((v) => ({ ...v, description: e.target.value }))}
                                 className="w-36 px-2 py-1 rounded bg-slate-900 border border-slate-600 text-white text-xs focus:outline-none focus:ring-1 focus:ring-amber-500"
                               />
                             ) : (
-                              row.rec?.description || menuItemMap[row.item.id]?.description || row.item.name || '—'
+                              row.rec?.description || menuItemMap[row.item.id]?.description || '—'
                             )}
                           </td>
                           <td className="px-4 py-3 text-sm text-slate-300">
