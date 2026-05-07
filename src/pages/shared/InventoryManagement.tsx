@@ -1151,6 +1151,8 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
       if (rows.length === 0) throw new Error('No valid rows found in file');
       let updated = 0;
       for (const row of rows) {
+        const hasDescription = row.description !== undefined;
+        const descriptionValue = row.description ?? '';
         await apiUpdateInventoryRecord(row.menuItemId, {
           stock:             row.stock,
           lowStockThreshold: row.lowStockThreshold,
@@ -1161,11 +1163,15 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
           price:             row.price,
           location:          row.location,
           unitMeasurement:   row.unitMeasurement,
-          ...(isMinimartScope ? { description: row.description } : {}),
+          ...(hasDescription ? { description: descriptionValue } : {}),
           expiryDate:        row.expiryDate,
           purchaseDate:      row.purchaseDate,
           qtyStart:          row.qtyStart,
         });
+
+        if (!isMinimartScope && hasDescription && menuItemMap[row.menuItemId]) {
+          await apiUpdateMenuItem(row.menuItemId, { description: descriptionValue } as any);
+        }
         updated++;
       }
       await refresh();

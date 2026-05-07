@@ -169,10 +169,11 @@ function parseCsvRows(content: string): InventoryImportRow[] {
 
     const stock = Math.round(parseFloat(row.currentqty ?? row.stock ?? row.qtystart ?? '0') || 0);
     const qtyStart = Math.round(parseFloat(row.qtystart ?? String(stock)) || stock);
+    const rawDescription = row.description ?? row.desc ?? row.details;
 
     results.push({
       menuItemId: id,
-      description: row.description ?? row.itemname ?? '',
+      description: rawDescription === undefined ? undefined : String(rawDescription).trim(),
       expiryDate: normaliseDate(row.expirydate),
       purchaseDate: normaliseDate(row.purchasedate),
       qtyStart,
@@ -205,10 +206,11 @@ function parseExcelRows(buffer: ArrayBuffer): InventoryImportRow[] {
 
       const stock = Math.round(Number(row.currentqty ?? row.stock ?? row.qtystart ?? 0));
       const qtyStart = Math.round(Number(row.qtystart ?? stock));
+      const rawDescription = row.description ?? row.desc ?? row.details;
 
       return {
         menuItemId: id,
-        description: String(row.description ?? row.itemname ?? ''),
+        description: rawDescription === undefined ? undefined : String(rawDescription).trim(),
         expiryDate: normaliseDate(row.expirydate),
         purchaseDate: normaliseDate(row.purchasedate),
         qtyStart,
