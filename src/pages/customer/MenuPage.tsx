@@ -244,7 +244,7 @@ export function MenuPage({ onAddToCart }: MenuPageProps) {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white text-slate-900 pb-24">
+    <div className="min-h-screen bg-gradient-to-b from-slate-100 via-slate-50 to-white text-slate-900 pb-24">
       <div className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-slate-200/50 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-5">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -315,17 +315,19 @@ export function MenuPage({ onAddToCart }: MenuPageProps) {
               <p className="text-xs text-slate-500">Most loved by our guests</p>
             </div>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 sm:gap-4 lg:gap-5">
-            {popularItems.map((item) => (
-              <MenuItemCard
-                key={item.id}
-                item={item}
-                onAddToCart={handleAddToCart}
-                onViewDetails={handleViewDetails}
-                avgRating={itemRatings[item.id]?.avgRating}
-                reviewCount={itemRatings[item.id]?.totalCount}
-              />
-            ))}
+          <div className="rounded-2xl border border-slate-200/80 bg-slate-50/70 p-3 sm:p-4 shadow-[0_8px_26px_rgba(15,23,42,0.05)]">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 sm:gap-4 lg:gap-5">
+              {popularItems.map((item) => (
+                <MenuItemCard
+                  key={item.id}
+                  item={item}
+                  onAddToCart={handleAddToCart}
+                  onViewDetails={handleViewDetails}
+                  avgRating={itemRatings[item.id]?.avgRating}
+                  reviewCount={itemRatings[item.id]?.totalCount}
+                />
+              ))}
+            </div>
           </div>
         </div>
       )}
@@ -343,17 +345,19 @@ export function MenuPage({ onAddToCart }: MenuPageProps) {
               </div>
               <span className="text-sm text-slate-400 font-medium">{filteredItems.length} items</span>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 sm:gap-4 lg:gap-5">
-              {filteredItems.map((item) => (
-                <MenuItemCard
-                  key={item.id}
-                  item={item}
-                  onAddToCart={handleAddToCart}
-                  onViewDetails={handleViewDetails}
-                  avgRating={itemRatings[item.id]?.avgRating}
-                  reviewCount={itemRatings[item.id]?.totalCount}
-                />
-              ))}
+            <div className="rounded-2xl border border-slate-200/80 bg-slate-50/70 p-3 sm:p-4 shadow-[0_8px_26px_rgba(15,23,42,0.05)]">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 sm:gap-4 lg:gap-5">
+                {filteredItems.map((item) => (
+                  <MenuItemCard
+                    key={item.id}
+                    item={item}
+                    onAddToCart={handleAddToCart}
+                    onViewDetails={handleViewDetails}
+                    avgRating={itemRatings[item.id]?.avgRating}
+                    reviewCount={itemRatings[item.id]?.totalCount}
+                  />
+                ))}
+              </div>
             </div>
             
             {filteredItems.length === 0 && (
