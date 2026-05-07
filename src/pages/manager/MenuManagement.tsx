@@ -23,6 +23,7 @@ import { useMenu } from '../../hooks/useMenu';
 import { exportMenuToCsv, exportMenuToJson, importMenuFromFile, saveCustomMenu, downloadMenuTemplate } from '../../utils/menuImportExport';
 import { supabase } from '../../lib/supabase';
 import { updateInventoryRecord as apiUpdateInventoryRecord } from '../../api/inventory';
+import { deleteMenuItem as apiDeleteMenuItem } from '../../api/menu';
 
 // Default categories with emojis from dummy data
 const defaultCategories: MenuCategoryInfo[] = [
@@ -277,7 +278,9 @@ export function MenuManagement() {
       saveCustomMenu(updatedItems);
       setIsSaving(true);
       try {
+        // Keep bulk sync behavior, then explicitly delete the removed record.
         await saveMenu(updatedItems);
+        await apiDeleteMenuItem(itemId);
         await refresh();
       } catch (err) {
         console.error('Failed to delete item:', err);

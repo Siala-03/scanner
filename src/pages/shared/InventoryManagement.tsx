@@ -38,6 +38,7 @@ import type {
   StockMovement,
 } from '../../types/inventory';
 import { createMenuItem, fetchMenu } from '../../api/menu';
+import { deleteMenuItem as apiDeleteMenuItem } from '../../api/menu';
 import {
   updateInventoryRecord as apiUpdateInventoryRecord,
   deleteInventoryRecord as apiDeleteInventoryRecord,
@@ -547,6 +548,12 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
     if (!isManager) return;
     try {
       await apiDeleteInventoryRecord(menuItemId);
+
+      // In restobar scope, a row is menu-driven; delete linked menu item as well.
+      if (!isMinimartScope && menuItemMap[menuItemId]) {
+        await apiDeleteMenuItem(menuItemId);
+      }
+
       // Remove immediately from local state so the card disappears without waiting for a full refresh
       removeInventoryRecord(menuItemId);
       // Then sync with the server in the background
