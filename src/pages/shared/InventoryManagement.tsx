@@ -547,12 +547,26 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
   const handleDeleteInventoryItem = async (menuItemId: string) => {
     if (!isManager) return;
     try {
-      await apiDeleteInventoryRecord(menuItemId);
-
-      // In restobar scope, a row is menu-driven; delete linked menu item as well.
-      if (!isMinimartScope && menuItemMap[menuItemId]) {
-        await apiDeleteMenuItem(menuItemId);
+      let inventoryDeleteError: unknown = null;
+      try {
+        await apiDeleteInventoryRecord(menuItemId);
+      } catch (err) {
+        inventoryDeleteError = err;
       }
+
+      let menuDeleteError: unknown = null;
+      // In restobar scope, rows are menu-driven, so remove menu item as well.
+      if (!isMinimartScope) {
+        try {
+          await apiDeleteMenuItem(menuItemId);
+        } catch (err) {
+          menuDeleteError = err;
+        }
+      }
+
+      // For minimart, inventory delete must succeed. For restobar, accept success if either side deleted.
+      if (isMinimartScope && inventoryDeleteError) throw inventoryDeleteError;
+      if (!isMinimartScope && inventoryDeleteError && menuDeleteError) throw inventoryDeleteError;
 
       // Remove immediately from local state so the card disappears without waiting for a full refresh
       removeInventoryRecord(menuItemId);
@@ -573,7 +587,30 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
     let failed = 0;
     for (const id of ids) {
       try {
-        await apiDeleteInventoryRecord(id);
+        let inventoryDeleteError: unknown = null;
+        try {
+          await apiDeleteInventoryRecord(id);
+        } catch (err) {
+          inventoryDeleteError = err;
+        }
+
+        let menuDeleteError: unknown = null;
+        if (!isMinimartScope) {
+          try {
+            await apiDeleteMenuItem(id);
+          } catch (err) {
+            menuDeleteError = err;
+          }
+        }
+
+        if (isMinimartScope && inventoryDeleteError) {
+          throw inventoryDeleteError;
+        }
+
+        if (!isMinimartScope && inventoryDeleteError && menuDeleteError) {
+          throw inventoryDeleteError;
+        }
+
         removeInventoryRecord(id);
       } catch {
         failed++;
