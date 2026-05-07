@@ -115,6 +115,8 @@ interface Analytics {
   soldItems: number;
 }
 
+const DEFAULT_MARGIN_ROWS_PER_PAGE = 10;
+
 const PAYMENT_LABEL: Record<string, string> = {
   '01': 'Cash', '02': 'Card', '04': 'Mobile Money',
 };
@@ -208,6 +210,33 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
   // Analytics
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [marginPage, setMarginPage] = useState(1);
+  const [marginRowsPerPage, setMarginRowsPerPage] = useState(DEFAULT_MARGIN_ROWS_PER_PAGE);
+
+  const totalMarginPages = useMemo(() => {
+    const count = analytics?.marginStats.length ?? 0;
+    return Math.max(1, Math.ceil(count / marginRowsPerPage));
+  }, [analytics, marginRowsPerPage]);
+
+  const pagedMarginStats = useMemo(() => {
+    if (!analytics?.marginStats?.length) return [];
+    const start = (marginPage - 1) * marginRowsPerPage;
+    return analytics.marginStats.slice(start, start + marginRowsPerPage);
+  }, [analytics, marginPage, marginRowsPerPage]);
+
+  useEffect(() => {
+    setMarginPage(1);
+  }, [analytics]);
+
+  useEffect(() => {
+    setMarginPage(1);
+  }, [marginRowsPerPage]);
+
+  useEffect(() => {
+    if (marginPage > totalMarginPages) {
+      setMarginPage(totalMarginPages);
+    }
+  }, [marginPage, totalMarginPages]);
 
   // Shifts tab
   const [shifts, setShifts] = useState<CashierShift[]>([]);
@@ -1659,7 +1688,7 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-800">
-                          {analytics.marginStats.map((m) => (
+                          {pagedMarginStats.map((m) => (
                             <tr key={m.id} className="hover:bg-slate-800/25 transition-colors">
                               <td className="px-5 py-2.5 text-slate-200">{m.name}</td>
                               <td className="px-3 py-2.5 text-right text-slate-300">{m.price > 0 ? formatPrice(m.price) : '—'}</td>
@@ -1677,6 +1706,43 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
                         </tbody>
                       </table>
                     </div>
+                    {analytics.marginStats.length > marginRowsPerPage && (
+                      <div className="px-5 py-3 border-t border-slate-800 flex items-center justify-between gap-3">
+                        <p className="text-xs text-slate-500">
+                          Showing {(marginPage - 1) * marginRowsPerPage + 1}
+                          {' '}to{' '}
+                          {Math.min(marginPage * marginRowsPerPage, analytics.marginStats.length)} of {analytics.marginStats.length}
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <label className="text-xs text-slate-500" htmlFor="margin-rows-per-page">Rows</label>
+                          <select
+                            id="margin-rows-per-page"
+                            value={marginRowsPerPage}
+                            onChange={(e) => setMarginRowsPerPage(Number(e.target.value))}
+                            className="px-2 py-1 rounded-md border border-slate-700 bg-slate-900 text-xs text-slate-300 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                          >
+                            <option value={10}>10</option>
+                            <option value={25}>25</option>
+                            <option value={50}>50</option>
+                          </select>
+                          <button
+                            onClick={() => setMarginPage((p) => Math.max(1, p - 1))}
+                            disabled={marginPage === 1}
+                            className="px-2.5 py-1.5 text-xs rounded-md border border-slate-700 text-slate-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-800"
+                          >
+                            Prev
+                          </button>
+                          <span className="text-xs text-slate-400">Page {marginPage} of {totalMarginPages}</span>
+                          <button
+                            onClick={() => setMarginPage((p) => Math.min(totalMarginPages, p + 1))}
+                            disabled={marginPage === totalMarginPages}
+                            className="px-2.5 py-1.5 text-xs rounded-md border border-slate-700 text-slate-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-800"
+                          >
+                            Next
+                          </button>
+                        </div>
+                      </div>
+                    )}
                     {analytics.totalCostOfGoods === 0 && (
                       <div className="px-5 py-3 bg-amber-500/5 border-t border-amber-500/15 flex items-center gap-2">
                         <AlertTriangleIcon className="w-3.5 h-3.5 text-amber-400 shrink-0" />

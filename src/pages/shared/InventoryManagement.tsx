@@ -83,7 +83,7 @@ const PO_STATUS_CONFIG: Record<PurchaseOrderStatus, { label: string; color: stri
 const WASTE_REASONS: WasteReason[] = ['expired', 'spoiled', 'damaged', 'overproduction', 'spillage', 'other'];
 const ALERT_HIDDEN_MS = 30 * 60 * 1000;
 const ALERT_VISIBLE_MS = 30 * 1000;
-const INVENTORY_ROWS_PER_PAGE = 25;
+const DEFAULT_INVENTORY_ROWS_PER_PAGE = 25;
 
 // ── Small reusable components ────────────────────────────────────────────────
 
@@ -124,6 +124,7 @@ function normalizeInventoryRecord(rec: any): InventoryRecord {
     console.warn('Inventory record has no menuItemId:', rec);
   }
   return {
+    id: rec.id ?? `inv_${menuItemId}`,
     menuItemId,
     stock: rec.stock ?? 0,
     lowStockThreshold: rec.lowStockThreshold ?? rec.low_stock_threshold ?? 0,
@@ -296,6 +297,7 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
   const [locationFilter, setLocationFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'ok' | 'low' | 'out'>('all');
   const [currentPage, setCurrentPage] = useState(1);
+  const [inventoryRowsPerPage, setInventoryRowsPerPage] = useState(DEFAULT_INVENTORY_ROWS_PER_PAGE);
   const [editingRow, setEditingRow] = useState<string | null>(null);
   const [editValues, setEditValues] = useState<Partial<InventoryRecord>>({});
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
@@ -396,18 +398,22 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
   }, [query, categoryFilter, locationFilter, statusFilter, inventory, menuItems, menuItemMap]);
 
   const totalInventoryPages = useMemo(
-    () => Math.max(1, Math.ceil(inventoryRows.length / INVENTORY_ROWS_PER_PAGE)),
-    [inventoryRows.length]
+    () => Math.max(1, Math.ceil(inventoryRows.length / inventoryRowsPerPage)),
+    [inventoryRows.length, inventoryRowsPerPage]
   );
 
   const paginatedInventoryRows = useMemo(() => {
-    const start = (currentPage - 1) * INVENTORY_ROWS_PER_PAGE;
-    return inventoryRows.slice(start, start + INVENTORY_ROWS_PER_PAGE);
-  }, [inventoryRows, currentPage]);
+    const start = (currentPage - 1) * inventoryRowsPerPage;
+    return inventoryRows.slice(start, start + inventoryRowsPerPage);
+  }, [inventoryRows, currentPage, inventoryRowsPerPage]);
 
   useEffect(() => {
     setCurrentPage(1);
   }, [query, categoryFilter, locationFilter, statusFilter]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [inventoryRowsPerPage]);
 
   useEffect(() => {
     if (currentPage > totalInventoryPages) {
@@ -499,7 +505,7 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
     if (editValues.qtyStart !== undefined && editValues.qtyStart !== (current as any).qtyStart) {
       updatePayload.qtyStart = editValues.qtyStart;
     }
-    if (isMinimartScope && editValues.price !== undefined && editValues.price !== (current as any).price) {
+    if (editValues.price !== undefined && editValues.price !== (current as any).price) {
       updatePayload.price = editValues.price;
     }
     if (isMinimartScope && editValues.description !== undefined && editValues.description !== (current as any).description) {
@@ -1786,14 +1792,25 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
               {inventoryRows.length > 0 && (
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 px-4 py-3 border-t border-slate-700/50 bg-slate-800/30">
                   <p className="text-xs text-slate-400">
-                    Showing {(currentPage - 1) * INVENTORY_ROWS_PER_PAGE + 1}
+                    Showing {(currentPage - 1) * inventoryRowsPerPage + 1}
                     {' - '}
-                    {Math.min(currentPage * INVENTORY_ROWS_PER_PAGE, inventoryRows.length)}
+                    {Math.min(currentPage * inventoryRowsPerPage, inventoryRows.length)}
                     {' of '}
                     {inventoryRows.length}
                     {' items'}
                   </p>
                   <div className="flex items-center gap-2">
+                    <label className="text-xs text-slate-400" htmlFor="inventory-rows-per-page">Rows</label>
+                    <select
+                      id="inventory-rows-per-page"
+                      value={inventoryRowsPerPage}
+                      onChange={(e) => setInventoryRowsPerPage(Number(e.target.value))}
+                      className="px-2 py-1 rounded-md border border-slate-600 bg-slate-900 text-xs text-slate-300 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                    >
+                      <option value={10}>10</option>
+                      <option value={25}>25</option>
+                      <option value={50}>50</option>
+                    </select>
                     <button
                       onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                       disabled={currentPage === 1}
