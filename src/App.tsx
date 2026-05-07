@@ -387,6 +387,8 @@ export function App() {
       localStorage.removeItem('outletType');
       setRestaurantName('');
       setOutletType('restaurant');
+      setCurrentRestaurantId(null); // clear so useEffect re-fires on next login
+      setOutletTypeResolved(true);
       setTableNumber(null);
       setManagerPage('dashboard');
       setSupervisorPage('dashboard');
@@ -412,6 +414,8 @@ export function App() {
     localStorage.removeItem('outletType');
     setRestaurantName('');
     setOutletType('restaurant');
+    setCurrentRestaurantId(null); // clear so useEffect re-fires on next login
+    setOutletTypeResolved(true);
     setTableNumber(null);
     setManagerPage('dashboard');
     setSupervisorPage('dashboard');
@@ -639,6 +643,7 @@ export function App() {
         console.warn('Failed to fetch restaurant info:', err);
         if (active) {
           setRestaurantName('');
+          setOutletType('restaurant'); // safe fallback — don't leave a stale 'minimart' from localStorage
           setOutletTypeResolved(true);
         }
       });
@@ -1229,6 +1234,7 @@ export function App() {
               onLogin={(user) => {
                 justLoggedIn.current = true;
                 if (user.role === 'manager' || user.role === 'supervisor') {
+                  setOutletType('restaurant'); // clear stale value before API resolves
                   setOutletTypeResolved(false);
                 }
                 setAuthUser(user);

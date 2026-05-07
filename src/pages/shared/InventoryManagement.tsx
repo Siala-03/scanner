@@ -246,6 +246,7 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
     temperatureRange: '',
   });
   const [newInventoryItemName, setNewInventoryItemName] = useState('');
+  const [newInventoryItemCategory, setNewInventoryItemCategory] = useState('');
   const [newInventoryItemLocation, setNewInventoryItemLocation] = useState('');
   const [newInventoryItemStock, setNewInventoryItemStock] = useState(0);
   const [newInventoryItemLowThreshold, setNewInventoryItemLowThreshold] = useState(5);
@@ -288,10 +289,13 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
     return ['all', ...Array.from(new Set(locs))];
   }, [inventory]);
 
-  const inventoryCategories = useMemo(
-    () => ['all', ...Array.from(new Set([...menuCategories, 'Other']))],
-    [menuCategories]
-  );
+  const inventoryCategories = useMemo(() => {
+    const standaloneCategories = inventory
+      .map(normalizeInventoryRecord)
+      .filter((rec) => !menuItemMap[rec.menuItemId] && rec.category && rec.category.trim())
+      .map((rec) => rec.category as string);
+    return ['all', ...Array.from(new Set([...menuCategories, ...standaloneCategories, 'Other']))];
+  }, [menuCategories, inventory, menuItemMap]);
 
   // ── Overview state ──────────────────────────────────────────────────────
   const [query, setQuery] = useState('');
@@ -448,6 +452,9 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
         unitCost: newInventoryItemUnitCost,
         unitMeasurement: newInventoryItemUnitMeasurement,
         location: newInventoryItemLocation,
+        ...(addItemMode === 'standalone' && newInventoryItemCategory.trim()
+          ? { category: newInventoryItemCategory.trim() }
+          : {}),
       });
 
       upsertInventoryRecords([created]);
@@ -1133,6 +1140,7 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
       setAddMenuSearch('');
       setSelectedMenuItemId('');
       setNewInventoryItemName('');
+      setNewInventoryItemCategory('');
       setNewInventoryItemStock(0);
       setNewInventoryItemLowThreshold(5);
       setNewInventoryItemReorderPoint(10);
@@ -2922,6 +2930,21 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                     onChange={(e) => setNewInventoryItemName(e.target.value)}
                     className="mt-1 w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
                   />
+                </label>
+                <label className="block text-sm text-slate-300">
+                  Category
+                  <input
+                    placeholder="e.g. Beverages, Snacks, Cleaning"
+                    value={newInventoryItemCategory}
+                    onChange={(e) => setNewInventoryItemCategory(e.target.value)}
+                    className="mt-1 w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    list="standalone-category-suggestions"
+                  />
+                  <datalist id="standalone-category-suggestions">
+                    {inventoryCategories.filter((c) => c !== 'all').map((c) => (
+                      <option key={c} value={c} />
+                    ))}
+                  </datalist>
                 </label>
                 <p className="text-xs text-slate-500">
                   Standalone items are not linked to the menu and won't auto-decrement on orders.
