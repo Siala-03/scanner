@@ -279,11 +279,18 @@ function buildOrderReceiptLines(receipt: ReceiptData): string[] {
     add(pad(`Balance: ${receipt.loyaltyPoints.pointsBalance} pts`, COLS, 'center'));
   }
 
-  // Notes
+  // Comment / Note
   if (receipt.notes || receipt.specialInstructions) {
     add(divider('-'));
-    add('Note:');
-    wrapText(receipt.notes || receipt.specialInstructions || '').forEach(l => add(`  ${l}`));
+    add('COMMENT / NOTE:');
+    if (receipt.notes) {
+      add('  Order Note:');
+      wrapText(receipt.notes).forEach(l => add(`    ${l}`));
+    }
+    if (receipt.specialInstructions) {
+      add('  Special Instructions:');
+      wrapText(receipt.specialInstructions).forEach(l => add(`    ${l}`));
+    }
   }
 
   add(divider('='));

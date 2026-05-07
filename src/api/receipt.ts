@@ -171,6 +171,13 @@ function formatReceiptAsText(receipt: ReceiptData, customMessage?: string): stri
   receipt.payments.forEach(p => lines.push(`Payment: ${p.method}${p.reference ? ` (${p.reference})` : ''} — ${formatReceiptAmount(p.amount)}`));
   lines.push(`Status: ${receipt.paymentStatus.toUpperCase()}`);
   lines.push('');
+
+  if (receipt.notes || receipt.specialInstructions) {
+    lines.push('*Comment / Note:*');
+    if (receipt.notes) lines.push(`Order Note: ${receipt.notes}`);
+    if (receipt.specialInstructions) lines.push(`Special Instructions: ${receipt.specialInstructions}`);
+    lines.push('');
+  }
   
   // Loyalty points
   if (receipt.loyaltyPoints && receipt.loyaltyPoints.pointsEarned > 0) {
@@ -273,6 +280,14 @@ function formatReceiptAsHTML(receipt: ReceiptData, customMessage?: string): stri
     ${receipt.payments.map(p => `<p style="margin: 4px 0;"><strong>${p.method}${p.reference ? ` (${p.reference})` : ''}:</strong> ${formatReceiptAmount(p.amount)}</p>`).join('')}
     <p style="margin: 4px 0;"><strong>Status:</strong> ${receipt.paymentStatus.toUpperCase()}</p>
   </div>
+
+  ${(receipt.notes || receipt.specialInstructions) ? `
+  <div style="margin-top: 16px; padding: 12px; background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 4px;">
+    <p style="margin: 0 0 8px; font-weight: bold; text-transform: uppercase; font-size: 0.8em; letter-spacing: 0.08em; color: #475569;">Comment / Note</p>
+    ${receipt.notes ? `<p style="margin: 4px 0;"><strong>Order Note:</strong> ${receipt.notes}</p>` : ''}
+    ${receipt.specialInstructions ? `<p style="margin: 4px 0;"><strong>Special Instructions:</strong> ${receipt.specialInstructions}</p>` : ''}
+  </div>
+  ` : ''}
   
   ${loyaltySection}
   
@@ -312,6 +327,13 @@ function formatReceiptAsSMS(receipt: ReceiptData, customMessage?: string): strin
   }
   lines.push(`TOTAL: ${formatReceiptAmount(receipt.total)}`);
   lines.push('');
+
+  if (receipt.notes || receipt.specialInstructions) {
+    lines.push('Comment / Note:');
+    if (receipt.notes) lines.push(`Order Note: ${receipt.notes}`);
+    if (receipt.specialInstructions) lines.push(`Special: ${receipt.specialInstructions}`);
+    lines.push('');
+  }
   
   if (receipt.loyaltyPoints && receipt.loyaltyPoints.pointsEarned > 0) {
     lines.push(`Points: +${receipt.loyaltyPoints.pointsEarned}`);

@@ -19,7 +19,6 @@ import {
   CalendarIcon,
   UsersIcon,
   ClockIcon,
-  MapPinIcon,
   PencilIcon,
   XIcon,
 } from 'lucide-react';
@@ -1039,11 +1038,14 @@ export function WaiterDashboard({
     setPaymentCaptureOrder(order);
   };
 
-  const handlePaymentConfirmed = async (payments: PaymentEntry[], change: number) => {
+  const handlePaymentConfirmed = async (payments: PaymentEntry[], change: number, receiptNote?: string) => {
     const order = paymentCaptureOrder;
     if (!order) return;
     setPaymentCaptureOrder(null);
     try {
+      const combinedNotes = [cleanSourceTag(order.notes), receiptNote?.trim() || '']
+        .filter(Boolean)
+        .join('\n');
       const html = buildReceiptHtml(
         orderToReceiptData(order, {
           restaurantName: restaurantName || 'Company',
@@ -1059,6 +1061,7 @@ export function WaiterDashboard({
           payments,
           paymentStatus: 'paid',
           change,
+          notes: combinedNotes || undefined,
         })
       );
       printReceipt(html);

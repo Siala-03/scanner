@@ -18,6 +18,7 @@ import { createOrder } from '../../api/orders';
 import { fetchKitchenOrders } from '../../api/orders';
 import { formatPrice } from '../../utils/currency';
 import { buildReceiptHtml, orderToReceiptData, printReceipt } from '../../utils/receipt';
+import { Modal } from '../../components/ui/Modal';
 import { MenuItem, Order } from '../../types';
 
 type TableStatus = 'free' | 'occupied' | 'urgent';
@@ -106,6 +107,8 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
   const [successTable, setSuccessTable] = useState<string | null>(null);
   const [lastPlacedOrder, setLastPlacedOrder] = useState<Order | null>(null);
   const [isPrintingReceipt, setIsPrintingReceipt] = useState(false);
+  const [showReceiptNoteModal, setShowReceiptNoteModal] = useState(false);
+  const [receiptNote, setReceiptNote] = useState('');
   const [showMobileCart, setShowMobileCart] = useState(false);
   const [confirmOccupied, setConfirmOccupied] = useState<number | null>(null);
 
@@ -284,8 +287,17 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
 
   const handlePrintLastReceipt = () => {
     if (!lastPlacedOrder || isPrintingReceipt) return;
+    setReceiptNote('');
+    setShowReceiptNoteModal(true);
+  };
+
+  const confirmPrintLastReceipt = () => {
+    if (!lastPlacedOrder || isPrintingReceipt) return;
     setIsPrintingReceipt(true);
     try {
+      const combinedNotes = [lastPlacedOrder.notes?.trim() || '', receiptNote.trim()]
+        .filter(Boolean)
+        .join('\n');
       const html = buildReceiptHtml(
         orderToReceiptData(lastPlacedOrder, {
           restaurantName: restaurantName || 'Company',
@@ -300,9 +312,11 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
           orderType: lastPlacedOrder.tableNumber == null ? 'takeout' : 'dine-in',
           paymentStatus: 'pending',
           payments: [{ method: 'Pending', amount: 0 }],
+          notes: combinedNotes || undefined,
         })
       );
       printReceipt(html);
+      setShowReceiptNoteModal(false);
     } catch (e) {
       console.error(e);
       alert('Failed to print receipt. Please try again.');
@@ -779,6 +793,36 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
           </div>
         </div>
       )}
+
+      <Modal isOpen={showReceiptNoteModal} onClose={() => setShowReceiptNoteModal(false)} title="Add Receipt Note">
+        <div className="space-y-4">
+          <p className="text-sm text-slate-400">
+            Add an optional note that will appear on the printed receipt.
+          </p>
+          <textarea
+            value={receiptNote}
+            onChange={(e) => setReceiptNote(e.target.value)}
+            rows={4}
+            placeholder="Enter note for this receipt"
+            className="w-full resize-none rounded-xl border border-slate-600 bg-slate-800 px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
+          />
+          <div className="flex gap-3">
+            <button
+              onClick={() => setShowReceiptNoteModal(false)}
+              className="flex-1 rounded-xl border border-slate-600 px-4 py-2.5 text-sm font-medium text-slate-300 hover:bg-slate-800"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={confirmPrintLastReceipt}
+              disabled={isPrintingReceipt}
+              className="flex-1 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
+            >
+              {isPrintingReceipt ? 'Printing...' : 'Print Receipt'}
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

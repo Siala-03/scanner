@@ -21,7 +21,7 @@ interface EntryDraft {
 interface PaymentCaptureModalProps {
   total: number;
   currency?: 'RWF' | 'USD';
-  onConfirm: (payments: PaymentEntry[], change: number) => void;
+  onConfirm: (payments: PaymentEntry[], change: number, receiptNote?: string) => void;
   onCancel: () => void;
 }
 
@@ -34,6 +34,7 @@ export function PaymentCaptureModal({
   const [entries, setEntries] = useState<EntryDraft[]>([
     { method: 'Cash', amount: String(Math.round(total)), reference: '' },
   ]);
+  const [receiptNote, setReceiptNote] = useState('');
 
   const fmt = (v: number) =>
     currency === 'RWF'
@@ -73,7 +74,7 @@ export function PaymentCaptureModal({
         amount: parseFloat(e.amount),
         reference: e.reference.trim() || undefined,
       }));
-    onConfirm(payments, change);
+    onConfirm(payments, change, receiptNote.trim() || undefined);
   };
 
   return (
@@ -169,6 +170,19 @@ export function PaymentCaptureModal({
                 <span className="font-bold text-red-400">{fmt(remaining)}</span>
               </div>
             )}
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="block text-xs font-semibold uppercase tracking-wide text-slate-400">
+              Receipt Note
+            </label>
+            <textarea
+              value={receiptNote}
+              onChange={(e) => setReceiptNote(e.target.value)}
+              rows={3}
+              placeholder="Add an optional note to print on the receipt"
+              className="w-full resize-none rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500"
+            />
           </div>
 
           {/* Actions */}

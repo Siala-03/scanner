@@ -459,9 +459,14 @@ export function buildReceiptHtml(receipt: ReceiptData): string {
     ${receipt.deliveryProvider ? `${receipt.deliveryProvider} &middot; ` : ''}${deliveryAddress}
   </div>` : ''}
 
-  ${notes || specialInstructions ? `
+  ${(notes || specialInstructions) ? `
   <hr class="dashed">
-  <div class="notes-box"><strong>Note:</strong> ${notes || specialInstructions}</div>` : ''}
+  <div style="font-size:8pt;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#333;margin-bottom:4px">Comment / Note</div>
+  <div class="notes-box">
+    ${notes ? `<div><strong>Order Note:</strong> ${notes}</div>` : ''}
+    ${notes && specialInstructions ? `<div style="height:4px"></div>` : ''}
+    ${specialInstructions ? `<div><strong>Special Instructions:</strong> ${specialInstructions}</div>` : ''}
+  </div>` : ''}
 
   ${loyaltyPoints && loyaltyPoints.pointsEarned > 0 ? `
   <hr class="dashed">
