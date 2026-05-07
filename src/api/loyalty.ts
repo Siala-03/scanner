@@ -9,6 +9,19 @@ function toDate(value: unknown): Date {
   return value instanceof Date ? value : new Date(String(value ?? Date.now()));
 }
 
+function decodeJwtPayload(token: string): Record<string, any> | null {
+  try {
+    const parts = token.split('.');
+    if (parts.length < 2) return null;
+    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
+    const json = atob(padded);
+    return JSON.parse(json);
+  } catch {
+    return null;
+  }
+}
+
 function mapCustomer(row: any): Customer {
   return {
     id: row.id,
@@ -70,7 +83,7 @@ async function findCustomerBy(field: 'phone' | 'email', value: string, restauran
   return unscoped.data;
 }
 
-function resolveRestaurantId(): string | undefined {
+function getRestaurantIdFromStorage(): string | undefined {
   const direct = localStorage.getItem('restaurantId');
   if (direct && direct.trim()) return direct;
 
@@ -91,6 +104,22 @@ function resolveRestaurantId(): string | undefined {
   return undefined;
 }
 
+async function resolveRestaurantId(): Promise<string | undefined> {
+  const fromStorage = getRestaurantIdFromStorage();
+  if (fromStorage) return fromStorage;
+
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+  const payload = token ? decodeJwtPayload(token) : null;
+  const claimId = payload?.restaurant_id;
+  if (typeof claimId === 'string' && claimId.trim()) {
+    localStorage.setItem('restaurantId', claimId.trim());
+    return claimId.trim();
+  }
+
+  return undefined;
+}
+
 // Customer management
 export async function createOrFindCustomer(customerData: {
   phone?: string;
@@ -98,7 +127,7 @@ export async function createOrFindCustomer(customerData: {
   name?: string;
   restaurantId?: string;
 }): Promise<Customer> {
-  const restaurantId = customerData.restaurantId || resolveRestaurantId();
+  const restaurantId = customerData.restaurantId || await resolveRestaurantId();
   if (!restaurantId) throw new Error('No company selected');
 
   const phone = customerData.phone?.trim();
@@ -147,24 +176,18 @@ export async function createOrFindCustomer(customerData: {
 
 export async function getCustomers(): Promise<Customer[]> {
   try {
-    const restaurantId = resolveRestaurantId();
-    let query = db.from('customers').select('*').order('last_visit', { ascending: false });
-    if (restaurantId) {
-      query = query.eq('restaurant_id', restaurantId);
-    }
-    const result = await query;
+    const restaurantId = await resolveRestaurantId();
+    if (!restaurantId) return [];
+
+    const result = await db
+      .from('customers')
+      .select('*')
+      .eq('restaurant_id', restaurantId)
+      .order('last_visit', { ascending: false });
 
     if (result.error?.code === '42703') {
-      // Older schemas may not include `last_visit` and/or `restaurant_id`.
-      const legacy = await db.from('customers').select('*').order('join_date', { ascending: false });
-      if (legacy.error?.code === '42703') {
-        // Final fallback for very old schemas without `join_date`.
-        const oldest = await db.from('customers').select('*').order('created_at', { ascending: false });
-        if (oldest.error) throw oldest.error;
-        return (oldest.data || []).map(mapCustomer);
-      }
-      if (legacy.error) throw legacy.error;
-      return (legacy.data || []).map(mapCustomer);
+      // Fail closed for tenant isolation when schema lacks restaurant scoping.
+      return [];
     }
 
     if (result.error) throw result.error;
@@ -182,67 +205,42 @@ export async function getCustomers(): Promise<Customer[]> {
 }
 
 export async function getCustomerDetails(customerId: string): Promise<LoyaltySummary> {
-  const restaurantId = resolveRestaurantId();
+  const restaurantId = await resolveRestaurantId();
+  if (!restaurantId) throw new Error('No company selected');
 
-  let customerRes = restaurantId
-    ? await db.from('customers').select('*').eq('id', customerId).eq('restaurant_id', restaurantId).maybeSingle()
-    : await db.from('customers').select('*').eq('id', customerId).maybeSingle();
+  let customerRes = await db.from('customers').select('*').eq('id', customerId).eq('restaurant_id', restaurantId).maybeSingle();
 
   if (customerRes.error?.code === '42703') {
-    customerRes = await db.from('customers').select('*').eq('id', customerId).maybeSingle();
+    throw new Error('Loyalty tenant isolation requires customers.restaurant_id');
   }
 
   if (customerRes.error) throw customerRes.error;
   if (!customerRes.data) throw new Error('Customer not found');
 
-  let txRes = restaurantId
-    ? await db
-        .from('loyalty_transactions')
-        .select('*')
-        .eq('customer_id', customerId)
-        .eq('restaurant_id', restaurantId)
-        .order('created_at', { ascending: false })
-        .limit(20)
-    : await db
-        .from('loyalty_transactions')
-        .select('*')
-        .eq('customer_id', customerId)
-        .order('created_at', { ascending: false })
-        .limit(20);
+  let txRes = await db
+    .from('loyalty_transactions')
+    .select('*')
+    .eq('customer_id', customerId)
+    .eq('restaurant_id', restaurantId)
+    .order('created_at', { ascending: false })
+    .limit(20);
 
   if (txRes.error?.code === '42703') {
-    txRes = await db
-      .from('loyalty_transactions')
-      .select('*')
-      .eq('customer_id', customerId)
-      .order('created_at', { ascending: false })
-      .limit(20);
+    throw new Error('Loyalty tenant isolation requires loyalty_transactions.restaurant_id');
   }
 
   const points = Number(customerRes.data.total_points ?? customerRes.data.totalPoints ?? 0);
 
-  let rewardsRes = restaurantId
-    ? await db
-        .from('rewards')
-        .select('*')
-        .eq('is_active', true)
-        .eq('restaurant_id', restaurantId)
-        .lte('points_required', points)
-        .order('points_required', { ascending: true })
-    : await db
-        .from('rewards')
-        .select('*')
-        .eq('is_active', true)
-        .lte('points_required', points)
-        .order('points_required', { ascending: true });
+  let rewardsRes = await db
+    .from('rewards')
+    .select('*')
+    .eq('is_active', true)
+    .eq('restaurant_id', restaurantId)
+    .lte('points_required', points)
+    .order('points_required', { ascending: true });
 
   if (rewardsRes.error?.code === '42703') {
-    rewardsRes = await db
-      .from('rewards')
-      .select('*')
-      .eq('is_active', true)
-      .lte('points_required', points)
-      .order('points_required', { ascending: true });
+    throw new Error('Loyalty tenant isolation requires rewards.restaurant_id');
   }
 
   return {
@@ -267,7 +265,7 @@ export async function awardPoints(data: {
 
 // Rewards management
 export async function getRewards(restaurantId?: string): Promise<Reward[]> {
-  const resolvedRestaurantId = restaurantId || resolveRestaurantId();
+  const resolvedRestaurantId = restaurantId || await resolveRestaurantId();
   if (!resolvedRestaurantId) throw new Error('No company selected');
 
   const result = await db
@@ -278,13 +276,7 @@ export async function getRewards(restaurantId?: string): Promise<Reward[]> {
     .order('points_required', { ascending: true });
 
   if (result.error?.code === '42703') {
-    const legacy = await db
-      .from('rewards')
-      .select('*')
-      .eq('is_active', true)
-      .order('points_required', { ascending: true });
-    if (legacy.error) throw legacy.error;
-    return (legacy.data || []).map(mapReward);
+    return [];
   }
 
   if (result.error) throw result.error;

@@ -50,6 +50,18 @@ export function LoyaltyManagement() {
     loadCustomers();
   }, [loadCustomers]);
 
+  useEffect(() => {
+    const handleRestaurantChange = () => {
+      setSelectedCustomers(new Set());
+      loadCustomers();
+    };
+
+    window.addEventListener('restaurantIdChanged', handleRestaurantChange);
+    return () => {
+      window.removeEventListener('restaurantIdChanged', handleRestaurantChange);
+    };
+  }, [loadCustomers]);
+
   const filteredCustomers = customers
     .filter(c => {
       if (!searchQuery) return true;
