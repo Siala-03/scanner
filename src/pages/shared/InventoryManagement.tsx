@@ -528,6 +528,9 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
     if (editValues.category !== undefined && editValues.category !== (current as any).category) {
       updatePayload.category = editValues.category;
     }
+    if (isDescriptionChanged) {
+      updatePayload.description = editValues.description;
+    }
 
     if (Object.keys(updatePayload).length === 0 && !shouldUpdateMenuDescription) {
       alert('No changes made');
