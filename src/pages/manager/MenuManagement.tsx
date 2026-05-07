@@ -21,8 +21,7 @@ import { MenuItemEditor } from '../../components/manager/MenuItemEditor';
 import { formatPrice } from '../../utils/currency';
 import { useMenu } from '../../hooks/useMenu';
 import { exportMenuToCsv, exportMenuToJson, importMenuFromFile, saveCustomMenu, downloadMenuTemplate } from '../../utils/menuImportExport';
-import { supabase } from '../../lib/supabase';
-import { updateInventoryRecord as apiUpdateInventoryRecord } from '../../api/inventory';
+import { fetchInventory, updateInventoryRecord as apiUpdateInventoryRecord } from '../../api/inventory';
 import { deleteMenuItem as apiDeleteMenuItem } from '../../api/menu';
 
 // Default categories with emojis from dummy data
@@ -95,16 +94,10 @@ export function MenuManagement() {
   const [isSavingTrack, setIsSavingTrack] = useState(false);
 
   const loadInvMap = useCallback(async () => {
-    const restaurantId = localStorage.getItem('restaurantId');
-    if (!restaurantId) return;
-    const { data } = await supabase
-      .from('inventory_records')
-      .select('menu_item_id, stock, low_stock_threshold')
-      .eq('restaurant_id', restaurantId);
-    if (!data) return;
+    const records = await fetchInventory();
     const map: Record<string, InvEntry> = {};
-    data.forEach((r) => {
-      map[r.menu_item_id] = { stock: r.stock, threshold: r.low_stock_threshold };
+    records.forEach((r) => {
+      map[r.menuItemId] = { stock: r.stock, threshold: r.lowStockThreshold };
     });
     setInvMap(map);
   }, []);
