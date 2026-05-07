@@ -3,6 +3,7 @@ import * as XLSX from 'xlsx';
 export interface InventoryImportRow {
   menuItemId: string;
   description?: string;
+  category?: string;
   expiryDate?: string;
   purchaseDate?: string;
   qtyStart?: number;
@@ -19,6 +20,7 @@ export interface InventoryImportRow {
 const CSV_HEADERS = [
   'Item_ID',
   'Description',
+  'Category',
   'Expiry_Date',
   'Purchase_Date',
   'Qty_Start',
@@ -73,6 +75,7 @@ export function exportInventoryToCsv(
       [
         csvEsc(r.item.id),
         csvEsc(r.rec?.description ?? r.item.name),
+        csvEsc(''),
         csvEsc(r.rec?.expiryDate ?? ''),
         csvEsc(r.rec?.purchaseDate ?? ''),
         r.rec?.qtyStart ?? r.rec?.stock ?? 0,
@@ -92,9 +95,9 @@ export function exportInventoryToCsv(
 
 export function downloadInventoryTemplate(): void {
   const examples = [
-    'item-example-001,Coca Cola,2026-12-31,2026-05-01,24,24,500,700,Bar Fridge',
-    'item-example-002,Heineken Beer,2027-02-28,2026-05-01,48,48,1200,1700,Fridge 2',
-    'item-example-003,Tomatoes,2026-05-10,2026-05-02,10,10,200,350,Dry Store',
+    'item-example-001,Coca Cola,Beverages,2026-12-31,2026-05-01,24,24,500,700,Bar Fridge',
+    'item-example-002,Heineken Beer,Beverages,2027-02-28,2026-05-01,48,48,1200,1700,Fridge 2',
+    'item-example-003,Tomatoes,Produce,2026-05-10,2026-05-02,10,10,200,350,Dry Store',
   ];
   const csv = [CSV_HEADERS.join(','), ...examples].join('\n');
   dl(new Blob([csv], { type: 'text/csv' }), 'inventory-template.csv');
@@ -170,10 +173,12 @@ function parseCsvRows(content: string): InventoryImportRow[] {
     const stock = Math.round(parseFloat(row.currentqty ?? row.stock ?? row.qtystart ?? '0') || 0);
     const qtyStart = Math.round(parseFloat(row.qtystart ?? String(stock)) || stock);
     const rawDescription = row.description ?? row.desc ?? row.details;
+    const rawCategory = row.category ?? row.cat ?? '';
 
     results.push({
       menuItemId: id,
       description: rawDescription === undefined ? undefined : String(rawDescription).trim(),
+      category: rawCategory ? String(rawCategory).trim() : undefined,
       expiryDate: normaliseDate(row.expirydate),
       purchaseDate: normaliseDate(row.purchasedate),
       qtyStart,
@@ -207,10 +212,12 @@ function parseExcelRows(buffer: ArrayBuffer): InventoryImportRow[] {
       const stock = Math.round(Number(row.currentqty ?? row.stock ?? row.qtystart ?? 0));
       const qtyStart = Math.round(Number(row.qtystart ?? stock));
       const rawDescription = row.description ?? row.desc ?? row.details;
+      const rawCategory = row.category ?? row.cat ?? '';
 
       return {
         menuItemId: id,
         description: rawDescription === undefined ? undefined : String(rawDescription).trim(),
+        category: rawCategory ? String(rawCategory).trim() : undefined,
         expiryDate: normaliseDate(row.expirydate),
         purchaseDate: normaliseDate(row.purchasedate),
         qtyStart,
@@ -244,6 +251,7 @@ export async function importInventoryFromFile(file: File): Promise<InventoryImpo
     return (data as any[]).map((r, i) => ({
       menuItemId: String(r.menu_item_id || r.menuItemId || r.id || `row-${i}`),
       description: String(r.description ?? ''),
+      category: String(r.category ?? r.cat ?? ''),
       expiryDate: normaliseDate(r.expiry_date ?? r.expiryDate),
       purchaseDate: normaliseDate(r.purchase_date ?? r.purchaseDate),
       qtyStart: Math.round(Number(r.qty_start ?? r.qtyStart ?? r.current_qty ?? r.currentQty ?? r.stock ?? 0)),

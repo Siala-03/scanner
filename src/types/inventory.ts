@@ -12,6 +12,7 @@ export interface InventoryRecord {
   unitCost: number; // cost per unit in RWF
   // Optional fields for minimart inventory sheet format.
   description?: string;
+  category?: string; // inventory-specific category (separate from menu category)
   expiryDate?: string;
   purchaseDate?: string;
   qtyStart?: number;

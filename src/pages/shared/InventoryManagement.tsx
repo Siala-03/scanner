@@ -133,6 +133,7 @@ function normalizeInventoryRecord(rec: any): InventoryRecord {
     reorderQty: rec.reorderQty ?? rec.reorder_qty ?? 0,
     unitCost: rec.unitCost ?? rec.unit_cost ?? 0,
     description: rec.description ?? rec.item_description ?? '',
+    category: rec.category ?? '',
     expiryDate: rec.expiryDate ?? rec.expiry_date ?? '',
     purchaseDate: rec.purchaseDate ?? rec.purchase_date ?? '',
     qtyStart: rec.qtyStart ?? rec.qty_start ?? rec.stock ?? 0,
@@ -524,6 +525,9 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
     if (editValues.purchaseDate !== undefined && editValues.purchaseDate !== (current as any).purchaseDate) {
       updatePayload.purchaseDate = editValues.purchaseDate || null;
     }
+    if (editValues.category !== undefined && editValues.category !== (current as any).category) {
+      updatePayload.category = editValues.category;
+    }
 
     if (Object.keys(updatePayload).length === 0 && !shouldUpdateMenuDescription) {
       alert('No changes made');
@@ -684,7 +688,6 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
       const rec = inventoryMap[id];
       const productName = (rec?.description || rec?.menuItemId || '').trim();
       const productPrice = rec?.price ?? rec?.unitCost ?? 0;
-      const productCategory = menuItemMap[id]?.category || (isMinimartScope ? 'General' : 'Food');
 
       if (!productName || productPrice <= 0) {
         skipped += 1;
@@ -703,7 +706,7 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
         const payload = {
           name: productName,
           price: productPrice,
-          category: productCategory,
+          category: 'Uncategorized',
           is_available: true,
           requires_kitchen: false,
           prep_time: 0,
@@ -1153,6 +1156,8 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
       for (const row of rows) {
         const hasDescription = row.description !== undefined;
         const descriptionValue = row.description ?? '';
+        const hasCategory = row.category !== undefined;
+        const categoryValue = row.category ?? '';
         await apiUpdateInventoryRecord(row.menuItemId, {
           stock:             row.stock,
           lowStockThreshold: row.lowStockThreshold,
@@ -1164,6 +1169,7 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
           location:          row.location,
           unitMeasurement:   row.unitMeasurement,
           ...(hasDescription ? { description: descriptionValue } : {}),
+          ...(hasCategory ? { category: categoryValue } : {}),
           expiryDate:        row.expiryDate,
           purchaseDate:      row.purchaseDate,
           qtyStart:          row.qtyStart,
@@ -1491,6 +1497,7 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                       )}
                       <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Product</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Description</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Category</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Expiry Date</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Purchase Date</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Age</th>
@@ -1566,6 +1573,19 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                               />
                             ) : (
                               row.rec?.description || menuItemMap[row.item.id]?.description || row.item.name || '—'
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-slate-300">
+                            {isEditing ? (
+                              <input
+                                type="text"
+                                value={editValues.category ?? row.rec?.category ?? ''}
+                                onChange={(e) => setEditValues((v) => ({ ...v, category: e.target.value }))}
+                                placeholder="e.g. Beverages, Produce"
+                                className="w-32 px-2 py-1 rounded bg-slate-900 border border-slate-600 text-white text-xs focus:outline-none focus:ring-1 focus:ring-amber-500"
+                              />
+                            ) : (
+                              row.rec?.category || '—'
                             )}
                           </td>
                           <td className="px-4 py-3 text-sm text-slate-300">
