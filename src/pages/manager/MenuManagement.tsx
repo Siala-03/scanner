@@ -45,6 +45,20 @@ interface TabOption {
   icon?: React.ReactNode;
 }
 
+const slugifyCategory = (value: string): string =>
+  String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-');
+
+const titleCaseCategory = (value: string): string =>
+  String(value || '')
+    .trim()
+    .replace(/[-_]+/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+
 export function MenuManagement() {
   // Use menu hook to get items from backend
   const {
@@ -66,6 +80,7 @@ export function MenuManagement() {
   const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+  const [customCategories, setCustomCategories] = useState<MenuCategoryInfo[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const exportButtonRef = useRef<HTMLDivElement>(null);
 
@@ -143,28 +158,64 @@ export function MenuManagement() {
       return () => document.removeEventListener('click', handleClickOutside);
     }
   }, [isExportMenuOpen]);
-  // Build categories from menu items + defaults
-  // Build tabs from menu items + defaults
+  const categoryOptions = useMemo(() => {
+    const defaultById = new Map(defaultCategories.map((c) => [c.id, c]));
+    const map = new Map<string, MenuCategoryInfo>();
+
+    defaultCategories.forEach((c) => map.set(c.id, c));
+
+    menuItemsState.forEach((item) => {
+      const raw = String(item.category || '').trim();
+      if (!raw) return;
+      const normalized = slugifyCategory(raw);
+      const fromDefault = defaultById.get(normalized as MenuCategoryInfo['id']);
+      if (fromDefault) {
+        map.set(fromDefault.id, fromDefault);
+        return;
+      }
+      map.set(normalized, {
+        id: normalized,
+        name: titleCaseCategory(raw),
+        emoji: item.emoji || '🍽️',
+      });
+    });
+
+    customCategories.forEach((c) => {
+      const normalizedId = slugifyCategory(c.id);
+      map.set(normalizedId, {
+        id: normalizedId,
+        name: c.name || titleCaseCategory(normalizedId),
+        emoji: c.emoji || '🍽️',
+      });
+    });
+
+    return Array.from(map.values());
+  }, [menuItemsState, customCategories]);
+
+  // Build tabs from menu items + defaults + custom
   const tabs: TabOption[] = useMemo(() => {
-    const uniqueCategories = Array.from(new Set(menuItemsState.map(item => item.category)));
+    const categorySet = new Set(
+      menuItemsState
+        .map((item) => slugifyCategory(item.category))
+        .filter(Boolean)
+    );
     // Start with 'All Items' tab
     const allTab: TabOption = { id: 'all', label: 'All Items' };
-    // Add categories from default that exist in menu
-    const categoryTabs = defaultCategories
-      .filter(c => uniqueCategories.includes(c.id))
-      .map(c => ({
+    const categoryTabs = categoryOptions
+      .filter((c) => categorySet.has(c.id))
+      .map((c) => ({
         id: c.id,
         label: c.name,
         icon: c.emoji
       }));
     return [allTab, ...categoryTabs];
-  }, [menuItemsState]);
+  }, [menuItemsState, categoryOptions]);
 
   const filteredItems = useMemo(() => {
     let items =
     activeCategory === 'all' ?
     menuItemsState :
-    menuItemsState.filter((item) => item.category === activeCategory);
+    menuItemsState.filter((item) => slugifyCategory(item.category) === activeCategory);
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       items = items.filter(
@@ -591,7 +642,7 @@ export function MenuManagement() {
 
                   <div className="flex items-center justify-between text-sm text-slate-400 mb-3">
                     <span>
-                      {defaultCategories.find((c) => c.id === item.category)?.name || item.category}
+                      {categoryOptions.find((c) => c.id === slugifyCategory(item.category))?.name || item.category}
                     </span>
                     <span>{item.prepTime} min prep</span>
                   </div>
@@ -679,8 +730,22 @@ export function MenuManagement() {
           isOpen={isEditorOpen}
           onClose={() => setIsEditorOpen(false)}
           onSave={handleSaveItem}
-          categories={defaultCategories}
-          onAddCategory={() => {}}
+          categories={categoryOptions}
+          onAddCategory={(category) => {
+            const normalizedId = slugifyCategory(category.id);
+            if (!normalizedId) return;
+            setCustomCategories((prev) => {
+              if (prev.some((c) => slugifyCategory(c.id) === normalizedId)) return prev;
+              return [
+                ...prev,
+                {
+                  id: normalizedId,
+                  name: category.name || titleCaseCategory(normalizedId),
+                  emoji: category.emoji || '🍽️',
+                },
+              ];
+            });
+          }}
         />
 
         {/* Track Stock Modal */}
