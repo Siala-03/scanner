@@ -515,10 +515,104 @@ export async function relinkInventoryRecord(
   const restaurantId = await resolveRestaurantId();
   if (!restaurantId) throw new Error('No company selected');
 
+  // Some callers pass inventory_records.id while others pass current menu_item_id.
+  // Resolve the source record from either key for compatibility.
+  const { data: sourceById, error: sourceByIdError } = await supabase
+    .from('inventory_records')
+    .select('*')
+    .eq('id', inventoryRecordId)
+    .eq('restaurant_id', restaurantId)
+    .maybeSingle();
+  if (sourceByIdError) throw new Error(`Failed to resolve inventory record: ${sourceByIdError.message}`);
+
+  let source = sourceById;
+  if (!source) {
+    const { data: sourceByMenuItemId, error: sourceByMenuItemIdError } = await supabase
+      .from('inventory_records')
+      .select('*')
+      .eq('menu_item_id', inventoryRecordId)
+      .eq('restaurant_id', restaurantId)
+      .order('updated_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (sourceByMenuItemIdError) throw new Error(`Failed to resolve inventory record: ${sourceByMenuItemIdError.message}`);
+    source = sourceByMenuItemId;
+  }
+
+  if (!source?.id) throw new Error('Inventory record not found for relink');
+  if (source.menu_item_id === newMenuItemId) return;
+
+  const { data: target, error: targetError } = await supabase
+    .from('inventory_records')
+    .select('*')
+    .eq('menu_item_id', newMenuItemId)
+    .eq('restaurant_id', restaurantId)
+    .maybeSingle();
+  if (targetError) throw new Error(`Failed to check existing inventory link: ${targetError.message}`);
+
+  const nowIso = new Date().toISOString();
+
+  if (target?.id && target.id !== source.id) {
+    // Merge into target to keep a single record per menu item.
+    const sourceStock = Number(source.stock ?? 0);
+    const targetStock = Number(target.stock ?? 0);
+    const mergedStock = sourceStock > 0 ? sourceStock : targetStock;
+
+    const merged: Record<string, any> = {
+      stock: mergedStock,
+      low_stock_threshold: Number(target.low_stock_threshold ?? 0) > 0
+        ? target.low_stock_threshold
+        : source.low_stock_threshold,
+      reorder_point: Number(target.reorder_point ?? 0) > 0
+        ? target.reorder_point
+        : source.reorder_point,
+      reorder_qty: Number(target.reorder_qty ?? 0) > 0
+        ? target.reorder_qty
+        : source.reorder_qty,
+      unit_cost: Number(target.unit_cost ?? 0) > 0
+        ? target.unit_cost
+        : source.unit_cost,
+      price: Number(target.price ?? 0) > 0
+        ? target.price
+        : source.price,
+      description: String(target.description ?? '').trim()
+        ? target.description
+        : source.description,
+      category: String(target.category ?? '').trim()
+        ? target.category
+        : source.category,
+      location: String(target.location ?? '').trim()
+        ? target.location
+        : source.location,
+      expiry_date: target.expiry_date ?? source.expiry_date ?? null,
+      purchase_date: target.purchase_date ?? source.purchase_date ?? null,
+      qty_start: Number(target.qty_start ?? 0) > 0
+        ? target.qty_start
+        : (source.qty_start ?? mergedStock),
+      supplier_id: target.supplier_id ?? source.supplier_id ?? null,
+      updated_at: nowIso,
+    };
+
+    const { error: mergeError } = await supabase
+      .from('inventory_records')
+      .update(merged)
+      .eq('id', target.id)
+      .eq('restaurant_id', restaurantId);
+    if (mergeError) throw new Error(`Failed to merge duplicate inventory records: ${mergeError.message}`);
+
+    const { error: deleteError } = await supabase
+      .from('inventory_records')
+      .delete()
+      .eq('id', source.id)
+      .eq('restaurant_id', restaurantId);
+    if (deleteError) throw new Error(`Failed to remove duplicate inventory record: ${deleteError.message}`);
+    return;
+  }
+
   const { error } = await supabase
     .from('inventory_records')
-    .update({ menu_item_id: newMenuItemId, updated_at: new Date().toISOString() })
-    .eq('id', inventoryRecordId)
+    .update({ menu_item_id: newMenuItemId, updated_at: nowIso })
+    .eq('id', source.id)
     .eq('restaurant_id', restaurantId);
 
   if (error) throw new Error(`Failed to relink inventory record: ${error.message}`);
