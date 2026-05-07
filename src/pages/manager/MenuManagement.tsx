@@ -63,6 +63,7 @@ export function MenuManagement() {
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -269,25 +270,80 @@ export function MenuManagement() {
       setIsSaving(false);
     }
   };
+
+  const performDeleteItems = async (itemIds: string[]) => {
+    if (itemIds.length === 0) return;
+
+    const updatedItems = menuItemsState.filter((item) => !itemIds.includes(item.id));
+    saveCustomMenu(updatedItems);
+    setIsSaving(true);
+
+    try {
+      const results = await Promise.allSettled(itemIds.map((id) => apiDeleteMenuItem(id)));
+      const failed = results.filter((r) => r.status === 'rejected').length;
+      await refresh();
+
+      if (failed > 0) {
+        alert(`${itemIds.length - failed} item(s) deleted, ${failed} failed.`);
+      }
+    } catch (err) {
+      console.error('Failed to delete menu item(s):', err);
+    } finally {
+      setIsSaving(false);
+      setSelectedItemIds((prev) => {
+        const next = new Set(prev);
+        itemIds.forEach((id) => next.delete(id));
+        return next;
+      });
+    }
+  };
   
   const handleDeleteItem = async (itemId: string) => {
     if (confirm('Are you sure you want to delete this item?')) {
-      const updatedItems = menuItemsState.filter((item) => item.id !== itemId);
-      
-      // Save to backend
-      saveCustomMenu(updatedItems);
-      setIsSaving(true);
-      try {
-        // Keep bulk sync behavior, then explicitly delete the removed record.
-        await saveMenu(updatedItems);
-        await apiDeleteMenuItem(itemId);
-        await refresh();
-      } catch (err) {
-        console.error('Failed to delete item:', err);
-      } finally {
-        setIsSaving(false);
-      }
+      await performDeleteItems([itemId]);
     }
+  };
+
+  const handleDeleteSelected = async () => {
+    const ids = Array.from(selectedItemIds);
+    if (ids.length === 0) return;
+
+    if (!confirm(`Delete ${ids.length} selected menu item(s)? This cannot be undone.`)) {
+      return;
+    }
+
+    await performDeleteItems(ids);
+  };
+
+  const handleDeleteAllVisible = async () => {
+    const ids = filteredItems.map((item) => item.id);
+    if (ids.length === 0) return;
+
+    if (!confirm(`Delete all ${ids.length} visible menu item(s)? This cannot be undone.`)) {
+      return;
+    }
+
+    await performDeleteItems(ids);
+  };
+
+  const allFilteredSelected =
+    filteredItems.length > 0 && filteredItems.every((item) => selectedItemIds.has(item.id));
+
+  const toggleSelectAllFiltered = () => {
+    if (allFilteredSelected) {
+      setSelectedItemIds((prev) => {
+        const next = new Set(prev);
+        filteredItems.forEach((item) => next.delete(item.id));
+        return next;
+      });
+      return;
+    }
+
+    setSelectedItemIds((prev) => {
+      const next = new Set(prev);
+      filteredItems.forEach((item) => next.add(item.id));
+      return next;
+    });
   };
 
   const handleExportJson = () => {
@@ -418,6 +474,48 @@ export function MenuManagement() {
         </div>
 
         {/* Menu Items Grid */}
+        {selectedItemIds.size > 0 && (
+          <div className="mb-4 px-3 py-2.5 rounded-lg border border-red-500/30 bg-red-500/10 flex flex-wrap items-center gap-2">
+            <span className="text-sm text-red-200 font-medium">{selectedItemIds.size} selected</span>
+            <Button variant="danger" size="sm" onClick={handleDeleteSelected} isLoading={isSaving}>
+              <TrashIcon className="w-4 h-4" />
+              Delete Selected
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setSelectedItemIds(new Set())}
+              className="text-slate-300"
+            >
+              Clear
+            </Button>
+          </div>
+        )}
+
+        <div className="mb-3 flex items-center gap-2">
+          <input
+            id="menu-select-all"
+            type="checkbox"
+            checked={allFilteredSelected}
+            onChange={toggleSelectAllFiltered}
+            className="w-4 h-4 rounded border-slate-600 bg-slate-800 accent-amber-500"
+          />
+          <label htmlFor="menu-select-all" className="text-xs text-slate-400">
+            Select all visible ({filteredItems.length})
+          </label>
+          <Button
+            variant="danger"
+            size="sm"
+            onClick={handleDeleteAllVisible}
+            isLoading={isSaving}
+            className="ml-auto"
+            disabled={filteredItems.length === 0}
+          >
+            <TrashIcon className="w-4 h-4" />
+            Delete All Visible
+          </Button>
+        </div>
+
         <div className="grid sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <AnimatePresence mode="popLayout">
             {filteredItems.map((item, index) =>
@@ -443,6 +541,23 @@ export function MenuManagement() {
 
                 <Card
                 className={`bg-slate-800 h-full flex flex-col ${!item.isAvailable ? 'opacity-60' : ''}`}>
+
+                  <div className="mb-2">
+                    <input
+                      aria-label={`Select ${item.name}`}
+                      type="checkbox"
+                      checked={selectedItemIds.has(item.id)}
+                      onChange={(e) => {
+                        setSelectedItemIds((prev) => {
+                          const next = new Set(prev);
+                          if (e.target.checked) next.add(item.id);
+                          else next.delete(item.id);
+                          return next;
+                        });
+                      }}
+                      className="w-4 h-4 rounded border-slate-600 bg-slate-800 accent-amber-500"
+                    />
+                  </div>
 
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center gap-3">
