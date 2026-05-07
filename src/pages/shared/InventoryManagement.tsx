@@ -588,44 +588,54 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
     setIsBatchDeleting(true);
     const ids = Array.from(selectedRows);
     let failed = 0;
-    for (const id of ids) {
-      try {
-        let inventoryDeleteError: unknown = null;
+    try {
+      for (const selectedId of ids) {
+        // selectedId may be inventory_records.id for unlinked rows; resolve the real menu_item_id key.
+        const resolvedInventoryId = inventoryMap[selectedId]?.menuItemId || selectedId;
         try {
-          await apiDeleteInventoryRecord(id);
-        } catch (err) {
-          inventoryDeleteError = err;
-        }
-
-        let menuDeleteError: unknown = null;
-        if (!isMinimartScope) {
+          let inventoryDeleteError: unknown = null;
           try {
-            await apiDeleteMenuItem(id);
+            await apiDeleteInventoryRecord(resolvedInventoryId);
           } catch (err) {
-            menuDeleteError = err;
+            inventoryDeleteError = err;
           }
-        }
 
-        if (isMinimartScope && inventoryDeleteError) {
-          throw inventoryDeleteError;
-        }
+          let menuDeleteError: unknown = null;
+          if (!isMinimartScope) {
+            try {
+              await apiDeleteMenuItem(resolvedInventoryId);
+            } catch (err) {
+              menuDeleteError = err;
+            }
+          }
 
-        if (!isMinimartScope && inventoryDeleteError && menuDeleteError) {
-          throw inventoryDeleteError;
-        }
+          if (isMinimartScope && inventoryDeleteError) {
+            throw inventoryDeleteError;
+          }
 
-        removeInventoryRecord(id);
-      } catch {
-        failed++;
+          if (!isMinimartScope && inventoryDeleteError && menuDeleteError) {
+            throw inventoryDeleteError;
+          }
+
+          removeInventoryRecord(resolvedInventoryId);
+          if (resolvedInventoryId !== selectedId) {
+            removeInventoryRecord(selectedId);
+          }
+        } catch {
+          failed++;
+        }
       }
+
+      await refresh();
+      if (!isMinimartScope) {
+        await refreshMenu();
+      }
+
+      if (failed > 0) alert(`${ids.length - failed} deleted, ${failed} failed.`);
+    } finally {
+      setSelectedRows(new Set());
+      setIsBatchDeleting(false);
     }
-    setSelectedRows(new Set());
-    setIsBatchDeleting(false);
-    await refresh();
-    if (!isMinimartScope) {
-      await refreshMenu();
-    }
-    if (failed > 0) alert(`${ids.length - failed} deleted, ${failed} failed.`);
   };
 
   const handleBatchAddToProducts = async () => {
