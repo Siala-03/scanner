@@ -1,5 +1,4 @@
 import type { MenuItem, MenuCategory } from '../types';
-import { menuItems as defaultMenuItems } from '../data/menuData';
 import { fetchMenu, uploadMenu, clearMenu } from '../api/menu';
 
 // Import xlsx for Excel support
@@ -20,19 +19,19 @@ export async function getAllMenuItems(): Promise<MenuItem[]> {
       return backendMenu;
     }
   } catch (err) {
-    console.warn('Backend menu unavailable, using local');
+    console.warn('Backend menu unavailable, using local cache if present');
   }
   
-  // Fallback to local storage or default
+  // Fallback to local storage only
   const stored = localStorage.getItem(MENU_STORAGE_KEY);
   if (stored) {
     try {
       return JSON.parse(stored);
     } catch {
-      return defaultMenuItems;
+      return [];
     }
   }
-  return defaultMenuItems;
+  return [];
 }
 
 /**

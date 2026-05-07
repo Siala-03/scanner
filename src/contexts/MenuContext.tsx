@@ -2,8 +2,6 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import type { MenuItem } from '../types';
 import { fetchMenu, uploadMenu } from '../api/menu';
 import { supabase } from '../lib/supabase';
-import { menuItems as defaultMenuItems } from '../data/menuData';
-import { loadCustomMenu } from '../utils/menuImportExport';
 import { getMenuItemCartKey } from '../utils/menuKeys';
 
 function getRestaurantIdFromUrl(): string | null {
@@ -64,36 +62,23 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
   const [error, setError]           = useState<string | null>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
-  const loadFallbackMenu = useCallback(() => {
-    const stored = loadCustomMenu();
-    if (stored && stored.length > 0) {
-      setMenuItems(stored.map(normalizeMenuItem));
-      setError(null);
-      return true;
-    }
-    return false;
-  }, []);
-
   const refresh = useCallback(async () => {
     setIsLoading(true);
     try {
       const menu = await fetchMenu();
       if (menu.length > 0) {
         setMenuItems(menu.map(normalizeMenuItem));
-      } else if (!isMinimartRoute() && !loadFallbackMenu()) {
-        setMenuItems(defaultMenuItems);
-      } else if (isMinimartRoute()) {
+      } else {
         setMenuItems([]);
       }
       setError(null);
     } catch (err) {
-      if (!isMinimartRoute() && !loadFallbackMenu()) setMenuItems(defaultMenuItems);
-      if (isMinimartRoute()) setMenuItems([]);
+      setMenuItems([]);
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setIsLoading(false);
     }
-  }, [loadFallbackMenu]);
+  }, []);
 
   const saveMenu = useCallback(async (items: MenuItem[]) => {
     setIsLoading(true);
@@ -121,17 +106,14 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
         if (!isMounted) return;
         if (items.length > 0) {
           setMenuItems(items.map(normalizeMenuItem));
-        } else if (!isMinimartRoute() && !loadFallbackMenu()) {
-          setMenuItems(defaultMenuItems);
-        } else if (isMinimartRoute()) {
+        } else {
           setMenuItems([]);
         }
         setError(null);
-      } catch {
+      } catch (err) {
         if (!isMounted) return;
-        if (!isMinimartRoute() && !loadFallbackMenu()) setMenuItems(defaultMenuItems);
-        if (isMinimartRoute()) setMenuItems([]);
-        setError(null); // don't show error — we have a fallback
+        setMenuItems([]);
+        setError(err instanceof Error ? err.message : String(err));
       } finally {
         if (isMounted) setIsLoading(false);
       }
@@ -165,7 +147,7 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
       }
       window.removeEventListener('restaurantIdChanged', handleRestaurantChange);
     };
-  }, [refresh, loadFallbackMenu]);
+  }, [refresh]);
 
   const value = useMemo(
     () => ({ menuItems, categories, isLoading, error, refresh, saveMenu }),
