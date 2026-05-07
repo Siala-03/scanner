@@ -273,31 +273,102 @@ router.post('/:id/receive', async (req: Request, res: Response) => {
 
     const po = poResult.rows[0];
     const items = po.items;
+    const nowIso = new Date().toISOString();
+
+    // Keep compatibility with deployments that may not yet have minimart columns.
+    const [hasQtyStartColumnResult, hasRestaurantColumnResult] = await Promise.all([
+      client.query(
+        `SELECT 1
+         FROM information_schema.columns
+         WHERE table_name = 'inventory_records' AND column_name = 'qty_start'
+         LIMIT 1`
+      ),
+      client.query(
+        `SELECT 1
+         FROM information_schema.columns
+         WHERE table_name = 'inventory_records' AND column_name = 'restaurant_id'
+         LIMIT 1`
+      ),
+    ]);
+
+    const hasQtyStartColumn = hasQtyStartColumnResult.rows.length > 0;
+    const hasRestaurantColumn = hasRestaurantColumnResult.rows.length > 0;
 
     // Update inventory for each item
     for (const receivedItem of received_items) {
       const { menu_item_id, received_qty } = receivedItem;
+      if (!received_qty || Number(received_qty) <= 0) continue;
+
+      const receivedQtyNumber = Number(received_qty);
       
       // Get current stock
       const invResult = await client.query(
-        'SELECT stock FROM inventory_records WHERE menu_item_id = $1',
-        [menu_item_id]
+        `SELECT stock, qty_start
+         FROM inventory_records
+         WHERE menu_item_id = $1
+           ${hasRestaurantColumn && po.restaurant_id ? 'AND restaurant_id = $2' : ''}
+         FOR UPDATE`,
+        hasRestaurantColumn && po.restaurant_id
+          ? [menu_item_id, po.restaurant_id]
+          : [menu_item_id]
       );
 
-      const stockBefore = invResult.rows.length > 0 ? invResult.rows[0].stock : 0;
-      const newStock = stockBefore + received_qty;
+      const stockBefore = invResult.rows.length > 0 ? Number(invResult.rows[0].stock) : 0;
+      const qtyStartBefore = invResult.rows.length > 0
+        ? Number(invResult.rows[0].qty_start ?? invResult.rows[0].stock ?? 0)
+        : 0;
+      const newStock = stockBefore + receivedQtyNumber;
+      const newQtyStart = qtyStartBefore + receivedQtyNumber;
 
       // Update inventory
       if (invResult.rows.length > 0) {
-        await client.query(
-          'UPDATE inventory_records SET stock = $1, updated_at = $2 WHERE menu_item_id = $3',
-          [newStock, new Date().toISOString(), menu_item_id]
-        );
+        if (hasQtyStartColumn) {
+          await client.query(
+            `UPDATE inventory_records
+             SET stock = $1, qty_start = $2, updated_at = $3
+             WHERE menu_item_id = $4
+               ${hasRestaurantColumn && po.restaurant_id ? 'AND restaurant_id = $5' : ''}`,
+            hasRestaurantColumn && po.restaurant_id
+              ? [newStock, newQtyStart, nowIso, menu_item_id, po.restaurant_id]
+              : [newStock, newQtyStart, nowIso, menu_item_id]
+          );
+        } else {
+          await client.query(
+            `UPDATE inventory_records
+             SET stock = $1, updated_at = $2
+             WHERE menu_item_id = $3
+               ${hasRestaurantColumn && po.restaurant_id ? 'AND restaurant_id = $4' : ''}`,
+            hasRestaurantColumn && po.restaurant_id
+              ? [newStock, nowIso, menu_item_id, po.restaurant_id]
+              : [newStock, nowIso, menu_item_id]
+          );
+        }
       } else {
-        await client.query(
-          `INSERT INTO inventory_records (id, menu_item_id, stock) VALUES ($1, $2, $3)`,
-          [`inv_${Date.now().toString(36)}`, menu_item_id, received_qty]
-        );
+        if (hasQtyStartColumn && hasRestaurantColumn && po.restaurant_id) {
+          await client.query(
+            `INSERT INTO inventory_records (id, menu_item_id, stock, qty_start, restaurant_id, updated_at)
+             VALUES ($1, $2, $3, $4, $5, $6)`,
+            [`inv_${Date.now().toString(36)}`, menu_item_id, newStock, newQtyStart, po.restaurant_id, nowIso]
+          );
+        } else if (hasQtyStartColumn) {
+          await client.query(
+            `INSERT INTO inventory_records (id, menu_item_id, stock, qty_start, updated_at)
+             VALUES ($1, $2, $3, $4, $5)`,
+            [`inv_${Date.now().toString(36)}`, menu_item_id, newStock, newQtyStart, nowIso]
+          );
+        } else if (hasRestaurantColumn && po.restaurant_id) {
+          await client.query(
+            `INSERT INTO inventory_records (id, menu_item_id, stock, restaurant_id, updated_at)
+             VALUES ($1, $2, $3, $4, $5)`,
+            [`inv_${Date.now().toString(36)}`, menu_item_id, newStock, po.restaurant_id, nowIso]
+          );
+        } else {
+          await client.query(
+            `INSERT INTO inventory_records (id, menu_item_id, stock, updated_at)
+             VALUES ($1, $2, $3, $4)`,
+            [`inv_${Date.now().toString(36)}`, menu_item_id, newStock, nowIso]
+          );
+        }
       }
 
       // Record movement
@@ -306,7 +377,7 @@ router.post('/:id/receive', async (req: Request, res: Response) => {
         `INSERT INTO stock_movements 
           (id, menu_item_id, menu_item_name, type, qty, stock_before, balance_after, reference, performed_by)
          VALUES ($1, $2, $3, 'purchase', $4, $5, $6, $7, $8)`,
-        [movementId, menu_item_id, menu_item_id, received_qty, stockBefore, newStock, id, received_by]
+        [movementId, menu_item_id, menu_item_id, receivedQtyNumber, stockBefore, newStock, id, received_by]
       );
     }
 

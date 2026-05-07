@@ -952,29 +952,90 @@ export async function receivePurchaseOrder(
   // Update inventory stock for each received item
   for (const item of receivedItems) {
     if (!item.received_qty || item.received_qty <= 0) continue;
+    const receivedQty = Number(item.received_qty);
+    const nowIso = new Date().toISOString();
 
-    // Use supabase so RLS never blocks the fetch — same client used for the write below
-    let fetchQuery = supabase
+    // Try the extended schema first so PO receipts update both Start Qty and Current Qty.
+    let fetchQueryExtended = supabase
+      .from('inventory_records')
+      .select('stock, qty_start')
+      .eq('menu_item_id', item.menu_item_id);
+    if (restaurantId) fetchQueryExtended = fetchQueryExtended.eq('restaurant_id', restaurantId);
+
+    const { data: invExtended, error: fetchExtendedError } = await fetchQueryExtended.maybeSingle();
+
+    const hasQtyStart = !fetchExtendedError;
+
+    if (hasQtyStart) {
+      const oldStock = Number(invExtended?.stock ?? 0);
+      const oldQtyStart = Number(invExtended?.qty_start ?? invExtended?.stock ?? 0);
+      const newStock = oldStock + receivedQty;
+      const newQtyStart = oldQtyStart + receivedQty;
+
+      if (invExtended) {
+        let updateQuery = supabase
+          .from('inventory_records')
+          .update({ stock: newStock, qty_start: newQtyStart, updated_at: nowIso })
+          .eq('menu_item_id', item.menu_item_id);
+        if (restaurantId) updateQuery = updateQuery.eq('restaurant_id', restaurantId);
+        await updateQuery;
+      } else {
+        await supabase
+          .from('inventory_records')
+          .insert({
+            id:                  `inv-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
+            menu_item_id:        item.menu_item_id,
+            stock:               newStock,
+            qty_start:           newQtyStart,
+            restaurant_id:       restaurantId,
+            low_stock_threshold: 5,
+            reorder_point:       10,
+            reorder_qty:         20,
+            unit_cost:           0,
+            updated_at:          nowIso,
+          });
+      }
+
+      // Record the movement
+      const { error: movementError } = await supabase.from('stock_movements').insert({
+        id:            `mov-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        menu_item_id:  item.menu_item_id,
+        menu_item_name: item.menu_item_id,
+        type:          'purchase',
+        qty:           receivedQty,
+        stock_before:  oldStock,
+        balance_after: newStock,
+        performed_by:  receivedBy,
+        reference:     `PO:${id}`,
+        restaurant_id: restaurantId,
+      });
+      if (movementError) {
+        console.warn('Failed to record stock movement for received PO item:', movementError);
+      }
+
+      continue;
+    }
+
+    // Legacy fallback when qty_start is unavailable in schema.
+    let fetchQueryLegacy = supabase
       .from('inventory_records')
       .select('stock')
       .eq('menu_item_id', item.menu_item_id);
-    if (restaurantId) fetchQuery = fetchQuery.eq('restaurant_id', restaurantId);
+    if (restaurantId) fetchQueryLegacy = fetchQueryLegacy.eq('restaurant_id', restaurantId);
 
-    const { data: inv } = await fetchQuery.maybeSingle();
+    const { data: invLegacy } = await fetchQueryLegacy.maybeSingle();
 
-    const oldStock = inv?.stock ?? 0;
-    const newStock = oldStock + item.received_qty;
+    const oldStock = Number(invLegacy?.stock ?? 0);
+    const newStock = oldStock + receivedQty;
 
-    if (inv) {
-      // Existing record — update stock in place
+    if (invLegacy) {
       let updateQuery = supabase
         .from('inventory_records')
-        .update({ stock: newStock, updated_at: new Date().toISOString() })
+        .update({ stock: newStock, updated_at: nowIso })
         .eq('menu_item_id', item.menu_item_id);
       if (restaurantId) updateQuery = updateQuery.eq('restaurant_id', restaurantId);
       await updateQuery;
     } else {
-      // No record yet — insert with generated id
       await supabase
         .from('inventory_records')
         .insert({
@@ -986,7 +1047,7 @@ export async function receivePurchaseOrder(
           reorder_point:       10,
           reorder_qty:         20,
           unit_cost:           0,
-          updated_at:          new Date().toISOString(),
+          updated_at:          nowIso,
         });
     }
 
@@ -996,7 +1057,7 @@ export async function receivePurchaseOrder(
       menu_item_id:  item.menu_item_id,
       menu_item_name: item.menu_item_id,
       type:          'purchase',
-      qty:           item.received_qty,
+      qty:           receivedQty,
       stock_before:  oldStock,
       balance_after: newStock,
       performed_by:  receivedBy,
