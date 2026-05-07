@@ -175,7 +175,7 @@ function parseCostChangeNote(note?: string): { oldCost: number; newCost: number 
 
 export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryManagementProps) {
   const isMinimartScope = inventoryScope === 'minimart';
-  const { menuItems: contextMenuItems } = useMenu();
+  const { menuItems: contextMenuItems, refresh: refreshMenu } = useMenu();
   const menuItems = useMemo(() => {
     if (inventoryScope !== 'minimart') return contextMenuItems;
     return contextMenuItems.filter((m: any) => {
@@ -571,7 +571,10 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
       // Remove immediately from local state so the card disappears without waiting for a full refresh
       removeInventoryRecord(menuItemId);
       // Then sync with the server in the background
-      refresh();
+      await refresh();
+      if (!isMinimartScope) {
+        await refreshMenu();
+      }
       alert('Inventory item deleted successfully');
     } catch (err) {
       console.error('Failed to delete inventory record', err);
@@ -619,6 +622,9 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
     setSelectedRows(new Set());
     setIsBatchDeleting(false);
     await refresh();
+    if (!isMinimartScope) {
+      await refreshMenu();
+    }
     if (failed > 0) alert(`${ids.length - failed} deleted, ${failed} failed.`);
   };
 
