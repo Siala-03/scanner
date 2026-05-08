@@ -206,6 +206,8 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
   const [txnCashierFilter, setTxnCashierFilter] = useState('all');
   const [txnPaymentFilter, setTxnPaymentFilter] = useState('all');
   const [txnSort, setTxnSort] = useState<TransactionSort>('newest');
+  const [txnDateFrom, setTxnDateFrom] = useState('');
+  const [txnDateTo, setTxnDateTo] = useState('');
 
   // Analytics
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
@@ -920,6 +922,8 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
 
   const filteredTxns = useMemo(() => {
     const q = txnSearch.trim().toLowerCase();
+    const fromMs = txnDateFrom ? new Date(txnDateFrom).getTime() : null;
+    const toMs   = txnDateTo   ? new Date(txnDateTo + 'T23:59:59').getTime() : null;
     return [...transactions]
       .filter((t) => {
         const matchesSearch = !q ||
@@ -928,13 +932,16 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
           t.paymentMethod.toLowerCase().includes(q);
         const matchesCashier = txnCashierFilter === 'all' || t.cashierName === txnCashierFilter;
         const matchesPayment = txnPaymentFilter === 'all' || t.paymentMethod === txnPaymentFilter;
-        return matchesSearch && matchesCashier && matchesPayment;
+        const tMs = new Date(t.createdAt).getTime();
+        const matchesFrom = fromMs === null || tMs >= fromMs;
+        const matchesTo   = toMs   === null || tMs <= toMs;
+        return matchesSearch && matchesCashier && matchesPayment && matchesFrom && matchesTo;
       })
       .sort((a, b) => {
         const delta = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
         return txnSort === 'oldest' ? delta : -delta;
       });
-  }, [transactions, txnCashierFilter, txnPaymentFilter, txnSearch, txnSort]);
+  }, [transactions, txnCashierFilter, txnPaymentFilter, txnSearch, txnSort, txnDateFrom, txnDateTo]);
 
   const navItems = [
     { key: 'dashboard' as Page, label: 'Dashboard', icon: TrendingUpIcon },
@@ -1279,6 +1286,29 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
                     {f === 'today' ? 'Today' : f === '7d' ? 'Last 7 days' : 'Last 30 days'}
                   </button>
                 ))}
+              </div>
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="date"
+                  value={txnDateFrom}
+                  onChange={(e) => setTxnDateFrom(e.target.value)}
+                  className="px-2 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-xs text-slate-100 focus:outline-none focus:border-amber-500"
+                />
+                <span className="text-xs text-slate-500">–</span>
+                <input
+                  type="date"
+                  value={txnDateTo}
+                  onChange={(e) => setTxnDateTo(e.target.value)}
+                  className="px-2 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-xs text-slate-100 focus:outline-none focus:border-amber-500"
+                />
+                {(txnDateFrom || txnDateTo) && (
+                  <button
+                    onClick={() => { setTxnDateFrom(''); setTxnDateTo(''); }}
+                    className="px-2 py-1.5 rounded-lg bg-slate-700 text-slate-400 hover:text-slate-200 text-xs transition-colors"
+                  >
+                    Clear
+                  </button>
+                )}
               </div>
               <div className="ml-auto flex items-center gap-2">
                 <input
