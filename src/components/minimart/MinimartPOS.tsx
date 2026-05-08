@@ -508,7 +508,7 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
       setShowCart(false);
       loadShiftStats();
       loadShiftTxns();
-      setSidebarTab('txns');
+      setSidebarTab('cart');
     } catch (err) {
       console.error('Checkout failed:', err);
       alert('Checkout failed. Please try again.');
@@ -1151,20 +1151,6 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
             {/* Tab strip */}
             <div className="flex items-center gap-1 px-3 pt-2.5 pb-0">
               <button
-                onClick={() => { setSidebarTab('txns'); if (shiftTxns.length === 0) loadShiftTxns(); }}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-t-xl text-xs font-semibold transition-all border-b-2 ${
-                  sidebarTab === 'txns'
-                    ? 'text-emerald-400 border-emerald-500 bg-emerald-500/5'
-                    : 'text-slate-500 border-transparent hover:text-slate-300'
-                }`}
-              >
-                <HistoryIcon className="w-3.5 h-3.5" />
-                Transactions
-                {shiftTxns.length > 0 && (
-                  <span className="ml-0.5 text-[9px] bg-emerald-600 text-white font-bold px-1.5 py-0.5 rounded-full">{shiftTxns.length}</span>
-                )}
-              </button>
-              <button
                 onClick={() => setSidebarTab('cart')}
                 className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-t-xl text-xs font-semibold transition-all border-b-2 ${
                   sidebarTab === 'cart'
@@ -1176,6 +1162,20 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
                 Cart
                 {cartCount > 0 && (
                   <span className="ml-0.5 text-[9px] bg-amber-500 text-slate-900 font-bold px-1.5 py-0.5 rounded-full">{cartCount}</span>
+                )}
+              </button>
+              <button
+                onClick={() => { setSidebarTab('txns'); if (shiftTxns.length === 0) loadShiftTxns(); }}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-t-xl text-xs font-semibold transition-all border-b-2 ${
+                  sidebarTab === 'txns'
+                    ? 'text-emerald-400 border-emerald-500 bg-emerald-500/5'
+                    : 'text-slate-500 border-transparent hover:text-slate-300'
+                }`}
+              >
+                <HistoryIcon className="w-3.5 h-3.5" />
+                Transactions
+                {shiftTxns.length > 0 && (
+                  <span className="ml-0.5 text-[9px] bg-emerald-600 text-white font-bold px-1.5 py-0.5 rounded-full">{shiftTxns.length}</span>
                 )}
               </button>
             </div>
