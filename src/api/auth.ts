@@ -51,10 +51,21 @@ export async function loginStaff(
   password: string,
   restaurantId?: string
 ): Promise<Staff> {
-  const resolvedRestaurantId = restaurantId || getRestaurantId();
+  const persistedRestaurantId = localStorage.getItem('restaurantId');
+  const resolvedRestaurantId =
+    restaurantId || (persistedRestaurantId && persistedRestaurantId.trim() ? persistedRestaurantId : undefined);
+
+  // Prevent stale identity headers/tokens from a previous session causing intermittent 401s on login.
+  localStorage.removeItem('staffId');
+  localStorage.removeItem('staffRole');
+  localStorage.removeItem('token');
+  localStorage.removeItem('authUser');
+  await supabase.auth.signOut().catch(() => {});
+
   const raw = await callEdgeFn('staff-login', {
     method: 'POST',
     body: { action: 'login', username, password, restaurantId: resolvedRestaurantId },
+    includeStaffHeader: false,
   });
 
   const staff = normalizeStaff(raw);

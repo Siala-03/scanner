@@ -18,6 +18,7 @@ export async function callEdgeFn(
     method?: 'GET' | 'POST' | 'DELETE';
     body?: unknown;
     params?: Record<string, string>;
+    includeStaffHeader?: boolean;
   } = {}
 ): Promise<any> {
   const url = new URL(`${edgeFunctionsBase}/${fnName}`);
@@ -33,7 +34,9 @@ export async function callEdgeFn(
     apikey: supabaseAnonKey,
     Authorization: `Bearer ${supabaseAnonKey}`,
   };
-  if (staffId) headers['x-staff-id'] = staffId;
+  if (options.includeStaffHeader !== false && staffId) {
+    headers['x-staff-id'] = staffId;
+  }
 
   const res = await fetch(url.toString(), {
     method: options.method ?? 'GET',
