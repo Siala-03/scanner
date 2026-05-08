@@ -5,16 +5,12 @@ import {
   PlusIcon,
   MinusIcon,
   XIcon,
-  ChevronLeftIcon,
   ShoppingCartIcon,
   TrashIcon,
   UtensilsIcon,
-  ClockIcon,
-  CheckIcon,
   SparklesIcon
 } from 'lucide-react';
 import { MenuItem, OrderItem, CartItem } from '../../types/index';
-import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { formatPrice } from '../../utils/currency';
@@ -50,8 +46,6 @@ export function WaiterOrderEntry({
   const [searchQuery, setSearchQuery] = useState('');
   const [cart, setCart] = useState<LocalCartItem[]>([]);
   const [orderNotes, setOrderNotes] = useState('');
-  const [showItemDetail, setShowItemDetail] = useState<MenuItem | null>(null);
-  const [itemQuantity, setItemQuantity] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showCart, setShowCart] = useState(false);
 
@@ -109,22 +103,38 @@ export function WaiterOrderEntry({
 
   // Add item to cart
   const addToCart = (item: MenuItem, quantity = 1, notes = '') => {
-    const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    const cartItem: LocalCartItem = {
-      tempId,
-      menuItem: item,
-      menuItemId: item.id,
-      menuItemName: item.name,
-      quantity,
-      unitPrice: item.price,
-      totalPrice: item.price * quantity,
-      notes,
-      modifiers: [],
-      specialInstructions: notes
-    };
-    setCart(prev => [...prev, cartItem]);
-    setShowItemDetail(null);
-    setItemQuantity(1);
+    setCart((prev) => {
+      const existingIndex = prev.findIndex(
+        (line) => line.menuItemId === item.id && !line.specialInstructions && !notes
+      );
+
+      if (existingIndex >= 0) {
+        return prev.map((line, idx) => {
+          if (idx !== existingIndex) return line;
+          const nextQty = line.quantity + quantity;
+          return {
+            ...line,
+            quantity: nextQty,
+            totalPrice: (line.unitPrice || 0) * nextQty,
+          };
+        });
+      }
+
+      const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const cartItem: LocalCartItem = {
+        tempId,
+        menuItem: item,
+        menuItemId: item.id,
+        menuItemName: item.name,
+        quantity,
+        unitPrice: item.price,
+        totalPrice: item.price * quantity,
+        notes,
+        modifiers: [],
+        specialInstructions: notes
+      };
+      return [...prev, cartItem];
+    });
   };
 
   // Update cart item quantity
@@ -188,15 +198,15 @@ export function WaiterOrderEntry({
   };
 
   const renderCartItems = () => (
-    <div className="flex-1 overflow-y-auto p-4 space-y-3">
+    <div className="flex-1 overflow-y-auto p-3 space-y-2">
       {cart.map((item) => (
         <div
           key={item.tempId}
-          className="rounded-2xl border border-slate-700 bg-slate-900/80 p-3"
+          className="rounded-xl border border-slate-700 bg-slate-900/80 p-2.5"
         >
           <div className="flex items-start justify-between gap-2">
             <div className="flex-1 min-w-0">
-              <h4 className="font-medium text-slate-100 text-sm">
+              <h4 className="font-medium text-slate-100 text-sm truncate">
                 {item.menuItemName}
               </h4>
               <p className="text-xs text-slate-500">
@@ -211,11 +221,11 @@ export function WaiterOrderEntry({
             </button>
           </div>
 
-          <div className="mt-3 flex items-center justify-between gap-3">
+          <div className="mt-2.5 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <button
                 onClick={() => updateCartItemQuantity(item.tempId, -1)}
-                className="p-1.5 rounded-full bg-slate-800 hover:bg-slate-700 transition-colors"
+                className="w-7 h-7 rounded-xl bg-slate-800 hover:bg-slate-700 transition-colors flex items-center justify-center"
               >
                 <MinusIcon className="w-4 h-4 text-slate-200" />
               </button>
@@ -224,18 +234,18 @@ export function WaiterOrderEntry({
               </span>
               <button
                 onClick={() => updateCartItemQuantity(item.tempId, 1)}
-                className="p-1.5 rounded-full bg-slate-800 hover:bg-slate-700 transition-colors"
+                className="w-7 h-7 rounded-xl bg-slate-800 hover:bg-slate-700 transition-colors flex items-center justify-center"
               >
                 <PlusIcon className="w-4 h-4 text-slate-200" />
               </button>
             </div>
-            <span className="font-semibold text-amber-300">
+            <span className="font-semibold text-amber-300 text-sm">
               {formatPrice(item.totalPrice || 0)}
             </span>
           </div>
 
           {item.notes && (
-            <p className="mt-2 text-xs italic text-slate-500">
+            <p className="mt-2 text-xs italic text-slate-500 truncate">
               Note: {item.notes}
             </p>
           )}
@@ -397,10 +407,7 @@ export function WaiterOrderEntry({
                     animate={{ opacity: 1, y: 0 }}
                     whileHover={{ y: -2 }}
                     className="relative flex flex-col items-start rounded-2xl border border-slate-700 bg-slate-900/90 p-3 text-left transition-colors hover:border-amber-500/50 hover:bg-slate-800"
-                    onClick={() => {
-                      setShowItemDetail(item);
-                      setItemQuantity(1);
-                    }}
+                    onClick={() => addToCart(item, 1)}
                   >
                     <span className="text-2xl sm:text-3xl mb-1">{item.emoji}</span>
                     <div className="mb-1 flex flex-wrap items-center gap-1.5">
@@ -466,93 +473,6 @@ export function WaiterOrderEntry({
         </div>
       </div>
 
-      {/* Item Detail Modal */}
-      <Modal
-        isOpen={!!showItemDetail}
-        onClose={() => {
-          setShowItemDetail(null);
-          setItemQuantity(1);
-        }}
-      >
-        {showItemDetail && (
-          <div className="p-6">
-            <div className="flex justify-between items-start mb-5">
-              <div className="flex-1">
-                <span className="text-6xl mb-4 block">{showItemDetail.emoji}</span>
-                <div className="mb-3 flex flex-wrap gap-2">
-                  <Badge variant="secondary" size="sm" className="bg-slate-700 text-slate-200">{showItemDetail.category}</Badge>
-                  <Badge variant="primary" size="sm" className="bg-amber-500/20 text-amber-300">
-                    {showItemDetail.prepTime}m prep
-                  </Badge>
-                </div>
-                <h3 className="text-2xl font-bold text-slate-100">
-                  {showItemDetail.name}
-                </h3>
-                <p className="text-slate-400 text-sm mt-2 leading-relaxed">
-                  {showItemDetail.description}
-                </p>
-              </div>
-              <button
-                onClick={() => {
-                  setShowItemDetail(null);
-                  setItemQuantity(1);
-                }}
-                className="p-2 rounded-full hover:bg-slate-800 transition-colors"
-              >
-                <XIcon className="w-5 h-5 text-slate-400" />
-              </button>
-            </div>
-
-            <div className="flex items-center gap-2 mb-6">
-              <div className="p-1.5 bg-amber-500/20 rounded-lg">
-                <ClockIcon className="w-4 h-4 text-amber-600" />
-              </div>
-              <span className="text-sm text-slate-400">
-                {showItemDetail.prepTime} minutes preparation time
-              </span>
-            </div>
-
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">
-                  Price
-                </p>
-                <span className="text-2xl font-bold text-amber-300">
-                  {formatPrice(showItemDetail.price)}
-                </span>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => setItemQuantity(Math.max(1, itemQuantity - 1))}
-                  className="p-3 rounded-full bg-slate-800 hover:bg-slate-700 transition-colors"
-                >
-                  <MinusIcon className="w-5 h-5 text-slate-200" />
-                </button>
-                <span className="text-xl font-semibold w-12 text-center text-slate-100">
-                  {itemQuantity}
-                </span>
-                <button
-                  onClick={() => setItemQuantity(itemQuantity + 1)}
-                  className="p-3 rounded-full bg-slate-800 hover:bg-slate-700 transition-colors"
-                >
-                  <PlusIcon className="w-5 h-5 text-slate-200" />
-                </button>
-              </div>
-            </div>
-
-            <Button
-              onClick={() => addToCart(showItemDetail, itemQuantity)}
-              className="w-full"
-              size="lg"
-              variant="primary"
-            >
-              <PlusIcon className="w-5 h-5 mr-2" />
-              Add to Order - {formatPrice(showItemDetail.price * itemQuantity)}
-            </Button>
-          </div>
-        )}
-      </Modal>
     </div>
   );
 }
