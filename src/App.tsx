@@ -1,5 +1,4 @@
 import { useCallback, useState, useEffect, useRef } from 'react';
-import { useTheme } from './contexts/ThemeContext';
 import { motion } from 'framer-motion';
 import { ArrowLeftIcon, QrCodeIcon, LogOutIcon, ChevronDownIcon } from 'lucide-react';
 import { CartItem, OrderStatus, Customer } from './types';
@@ -101,13 +100,8 @@ const MANAGER_NAV_FLAT: Array<{ id: ManagerPage; label: string }> = [
   ...MANAGER_NAV_GROUPS.flatMap((g) => g.items),
 ];
 
-function getThemeStorageKeyForRole(role: UserRole): string {
-  return `theme:${role ?? 'default'}`;
-}
-
 export function App() {
-  const { theme } = useTheme();
-  const servvLogo = theme === 'light' ? '/assets/logo_servv_black.PNG' : '/assets/logo_servv_white.PNG';
+  const servvLogo = '/assets/logo_servv_white.PNG';
   const [selectedRole, setSelectedRole] = useState<UserRole>(null);
   const [authUser, setAuthUser] = useState<Staff | null>(null);
   const [supplierUser, setSupplierUser] = useState<SupplierUser | null>(null);
@@ -133,22 +127,7 @@ export function App() {
 
   useEffect(() => {
     const root = document.documentElement;
-    const isCustomerPortal = selectedRole === 'customer' && tableNumber !== null;
-
-    if (isCustomerPortal) {
-      // Customer menu has its own visual design; skip global light-mode remaps here.
-      root.removeAttribute('data-theme');
-      return;
-    }
-
-    const storedTheme =
-      localStorage.getItem(getThemeStorageKeyForRole(selectedRole)) ??
-      localStorage.getItem('theme');
-    if (storedTheme === 'light') {
-      root.setAttribute('data-theme', 'light');
-    } else {
-      root.removeAttribute('data-theme');
-    }
+    root.removeAttribute('data-theme');
   }, [selectedRole, tableNumber]);
 
   useEffect(() => {

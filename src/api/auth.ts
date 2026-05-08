@@ -51,20 +51,22 @@ export async function loginStaff(
   password: string,
   restaurantId?: string
 ): Promise<Staff> {
-  const persistedRestaurantId = localStorage.getItem('restaurantId');
-  const resolvedRestaurantId =
-    restaurantId || (persistedRestaurantId && persistedRestaurantId.trim() ? persistedRestaurantId : undefined);
+  // Do NOT fall back to localStorage restaurantId here. A stale value from a previous
+  // session causes the edge function to filter staff_credentials by the wrong restaurant,
+  // returning 401 for any staff who belong to a different outlet. Only use an explicit
+  // restaurantId when it comes from a QR-code URL param passed by the caller.
 
-  // Prevent stale identity headers/tokens from a previous session causing intermittent 401s on login.
+  // Clear stale session state before attempting a new login.
   localStorage.removeItem('staffId');
   localStorage.removeItem('staffRole');
   localStorage.removeItem('token');
   localStorage.removeItem('authUser');
+  localStorage.removeItem('restaurantId');
   await supabase.auth.signOut().catch(() => {});
 
   const raw = await callEdgeFn('staff-login', {
     method: 'POST',
-    body: { action: 'login', username, password, restaurantId: resolvedRestaurantId },
+    body: { action: 'login', username, password, restaurantId: restaurantId ?? '' },
     includeStaffHeader: false,
   });
 

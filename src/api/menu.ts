@@ -161,12 +161,15 @@ export async function createMenuItem(item: Partial<MenuItem> & { sku?: string })
     }
   }
 
-  const buildPayload = (withSku: boolean) =>
-    toDbMenuItem(
-      { ...item, ...(withSku ? { sku } : {}) } as Partial<MenuItem> & Record<string, any>,
+  const buildPayload = (withSku: boolean) => {
+    // Strip sku from the original item so toDbMenuItem never re-adds it when withSku=false.
+    const { sku: _dropSku, ...baseItem } = item as any;
+    return toDbMenuItem(
+      withSku ? { ...baseItem, sku } : baseItem,
       restaurantId,
       id,
     );
+  };
 
   let payload = buildPayload(canUseSku);
   let res = await supabase.from('menu_items').insert(payload).select().single();

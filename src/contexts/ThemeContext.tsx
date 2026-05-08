@@ -48,31 +48,31 @@ function getThemeStorageKey(scope: ThemeScope): string {
 
 function readThemeForScope(scope: ThemeScope): Theme {
   if (scope === 'customer') return 'dark';
-  const scoped = localStorage.getItem(getThemeStorageKey(scope));
-  if (scoped === 'light' || scoped === 'dark') return scoped;
-  const legacy = localStorage.getItem('theme');
-  return legacy === 'light' ? 'light' : 'dark';
+  return 'dark';
 }
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [scope, setScope] = useState<ThemeScope>(() => getCurrentScope());
-  const [theme, setTheme] = useState<Theme>(() => readThemeForScope(getCurrentScope()));
+  const [theme, setTheme] = useState<Theme>('dark');
+
+  useEffect(() => {
+    localStorage.removeItem('theme');
+    localStorage.removeItem(getThemeStorageKey('default'));
+    ROLE_SCOPES.forEach((roleScope) => {
+      localStorage.removeItem(getThemeStorageKey(roleScope));
+    });
+  }, []);
 
   useEffect(() => {
     const root = document.documentElement;
-    const effectiveTheme = scope === 'customer' ? 'dark' : theme;
-    if (effectiveTheme === 'light') {
-      root.setAttribute('data-theme', 'light');
-    } else {
-      root.removeAttribute('data-theme');
-    }
+    root.removeAttribute('data-theme');
   }, [scope, theme]);
 
   useEffect(() => {
     const syncScope = () => {
       const nextScope = getCurrentScope();
       setScope(nextScope);
-      setTheme(readThemeForScope(nextScope));
+      setTheme('dark');
     };
 
     window.addEventListener('popstate', syncScope);
@@ -85,11 +85,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const toggleTheme = () => {
     if (scope === 'customer') return;
-    setTheme((prev) => {
-      const next = prev === 'dark' ? 'light' : 'dark';
-      localStorage.setItem(getThemeStorageKey(scope), next);
-      return next;
-    });
+    setTheme('dark');
   };
 
   return (
