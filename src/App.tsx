@@ -2,7 +2,6 @@ import { useCallback, useState, useEffect, useRef } from 'react';
 import { useTheme } from './contexts/ThemeContext';
 import { motion } from 'framer-motion';
 import { ArrowLeftIcon, QrCodeIcon, LogOutIcon, ChevronDownIcon } from 'lucide-react';
-import { ThemeToggle } from './components/ui/ThemeToggle';
 import { CartItem, OrderStatus, Customer } from './types';
 import { setCurrency, CurrencyCode } from './utils/currency';
 import { OrdersProvider, useOrdersContext } from './contexts/OrdersContext';
@@ -776,7 +775,6 @@ export function App() {
                 <div className="text-xs sm:text-sm text-slate-400">{restaurantName || 'Company'}</div>
               </div>
               <div className="ml-auto flex items-center gap-2">
-                <ThemeToggle />
                 <button
                   onClick={handleLogout}
                   className="p-2 rounded-lg bg-slate-700/60 hover:bg-red-600 text-slate-200 hover:text-white transition-colors"
@@ -955,7 +953,6 @@ export function App() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <ThemeToggle />
               <button
                 onClick={handleLogout}
                 className="p-2 rounded-lg bg-slate-700/60 hover:bg-red-600 text-slate-200 hover:text-white transition-colors"
@@ -1125,7 +1122,6 @@ export function App() {
               )}
               <span className="text-white font-medium">Kitchen Display</span>
               <div className="ml-auto">
-                <ThemeToggle />
               </div>
             </div>
             <div className="text-sm text-slate-400">{restaurantName || 'Company'}</div>
@@ -1157,7 +1153,6 @@ export function App() {
               </button>
               <span className="text-white font-medium">Superadmin Dashboard</span>
               <div className="ml-auto">
-                <ThemeToggle />
               </div>
             </div>
           </div>
@@ -1244,10 +1239,7 @@ export function App() {
             >
               Supplier Portal
             </Button>
-            <div className="flex items-center gap-2 mt-2">
-              <span className="text-xs text-slate-400">Theme</span>
-              <ThemeToggle />
-            </div>
+
           </div>
         </motion.div>
       </div>

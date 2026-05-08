@@ -35,7 +35,6 @@ import { ReceiptShareModal } from '../../components/ui/ReceiptShareModal';
 import { PaymentCaptureModal } from '../../components/ui/PaymentCaptureModal';
 import { supabase } from '../../lib/supabase';
 import { markTableSessionPendingCloseFromReceipt } from '../../utils/tableSessions';
-import { ThemeToggle } from '../../components/ui/ThemeToggle';
 import { OnlineOrdersForWaiter } from '../../components/waiter/OnlineOrdersSection';
 import { useTables } from '../../hooks/useTables';
 
@@ -1146,7 +1145,6 @@ export function WaiterDashboard({
                 <PencilIcon className="w-4 h-4" />
                 <span>New Order</span>
               </button>
-              <ThemeToggle />
               <button
                 onClick={onLogout}
                 className="p-2 rounded-lg bg-slate-700/60 text-slate-200 hover:bg-red-600 hover:text-white transition-colors"
