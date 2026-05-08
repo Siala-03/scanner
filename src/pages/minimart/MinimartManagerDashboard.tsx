@@ -277,6 +277,22 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
         from.setDate(from.getDate() - 30);
       }
 
+      // Dashboard cards remain scoped to the global date filter.
+      const summaryFrom = new Date(from);
+      const summaryTo = new Date(now);
+
+      // Transactions tab can request a custom wider/narrower window.
+      let queryFrom = new Date(summaryFrom);
+      let queryTo: Date | null = null;
+      if (txnDateFrom || txnDateTo) {
+        queryFrom = txnDateFrom
+          ? new Date(`${txnDateFrom}T00:00:00`)
+          : new Date('2000-01-01T00:00:00');
+        queryTo = txnDateTo
+          ? new Date(`${txnDateTo}T23:59:59.999`)
+          : null;
+      }
+
       const candidateSelects = [
         'id, order_number, total, items, created_at, payment_confirmed_by_name, payment_confirmed_by, payment_status, payment_type',
         'id, order_number, total, items, created_at, payment_confirmed_by_name, payment_confirmed_by, payment_status, payment_method',
@@ -289,12 +305,17 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
       let data: any[] | null = null;
       let error: any = null;
       for (const selectCols of candidateSelects) {
-        const res = await supabase
+        let query = supabase
           .from('orders')
           .select(selectCols)
           .eq('restaurant_id', activeRestaurantId)
-          .gte('created_at', from.toISOString())
-          .order('created_at', { ascending: false });
+          .gte('created_at', queryFrom.toISOString());
+
+        if (queryTo) {
+          query = query.lte('created_at', queryTo.toISOString());
+        }
+
+        const res = await query.order('created_at', { ascending: false });
 
         if (!res.error) {
           data = res.data || [];
@@ -341,7 +362,12 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
         createdAt: o.created_at,
       }));
 
-      const revenue = txns.reduce((s, t) => s + t.total, 0);
+      const summaryTxns = txns.filter((t) => {
+        const ms = new Date(t.createdAt).getTime();
+        return ms >= summaryFrom.getTime() && ms <= summaryTo.getTime();
+      });
+
+      const revenue = summaryTxns.reduce((s, t) => s + t.total, 0);
 
       const byCashier: Record<string, { count: number; revenue: number }> = {};
       const byPayment: Record<string, { count: number; revenue: number }> = {};
@@ -360,7 +386,7 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
       });
       let totalCostOfGoods = 0;
 
-      txns.forEach((t) => {
+      summaryTxns.forEach((t) => {
         if (!byCashier[t.cashierName]) byCashier[t.cashierName] = { count: 0, revenue: 0 };
         byCashier[t.cashierName].count += 1;
         byCashier[t.cashierName].revenue += t.total;
@@ -394,13 +420,13 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
         .slice(0, 5);
 
       const days = dateFilter === 'today' ? 1 : dateFilter === '7d' ? 7 : 30;
-      const dailyBars = buildDailyBars(txns, days);
+      const dailyBars = buildDailyBars(summaryTxns, days);
       const peakBar = dailyBars.reduce((best, b) => b.revenue > best.revenue ? b : best, { day: '', revenue: 0 });
 
       // Hourly breakdown (only meaningful for today filter)
       const hourlyMap: Record<number, { revenue: number; count: number }> = {};
       for (let h = 0; h < 24; h++) hourlyMap[h] = { revenue: 0, count: 0 };
-      txns.forEach((t) => {
+      summaryTxns.forEach((t) => {
         const h = new Date(t.createdAt).getHours();
         hourlyMap[h].revenue += t.total;
         hourlyMap[h].count += 1;
@@ -419,7 +445,8 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
           .from('minimart_refunds')
           .select('refund_amount')
           .eq('restaurant_id', activeRestaurantId)
-          .gte('created_at', from.toISOString());
+          .gte('created_at', summaryFrom.toISOString())
+          .lte('created_at', summaryTo.toISOString());
         totalRefunds = (refundData || []).reduce((s: number, r: any) => s + Number(r.refund_amount ?? 0), 0);
       } catch {
         // non-fatal — table may not exist yet
@@ -434,8 +461,8 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
         grossProfit,
         cogs: totalCostOfGoods,
         totalRefunds,
-        transactions: txns.length,
-        avgSale: txns.length > 0 ? netRevenue / txns.length : 0,
+        transactions: summaryTxns.length,
+        avgSale: summaryTxns.length > 0 ? netRevenue / summaryTxns.length : 0,
         totalItems,
         peakDay: peakBar.day,
         hourlyBars: hourlyBarsFinal,
@@ -446,7 +473,7 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
     } finally {
       setLoading(false);
     }
-  }, [activeRestaurantId, dateFilter]);
+  }, [activeRestaurantId, dateFilter, txnDateFrom, txnDateTo]);
 
   const loadCashiers = useCallback(async () => {
     setCashiersLoading(true);
