@@ -53,7 +53,7 @@ export function WaiterOrderEntry({
   const [showItemDetail, setShowItemDetail] = useState<MenuItem | null>(null);
   const [itemQuantity, setItemQuantity] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [activeView, setActiveView] = useState<'menu' | 'cart'>('menu');
+  const [showCart, setShowCart] = useState(false);
 
   // Load existing order items into cart if editing
   useEffect(() => {
@@ -69,7 +69,7 @@ export function WaiterOrderEntry({
   }, [existingOrder, isOpen, cart.length]);
 
   useEffect(() => {
-    if (isOpen) setActiveView('menu');
+    if (isOpen) setShowCart(false);
   }, [isOpen]);
 
   // Get unique categories from menu
@@ -163,7 +163,7 @@ export function WaiterOrderEntry({
       await onSubmitOrder(orderItems, orderNotes || undefined);
       setCart([]);
       setOrderNotes('');
-      setActiveView('menu');
+      setShowCart(false);
       onClose();
     } catch (error) {
       console.error('Failed to submit order:', error);
@@ -293,20 +293,14 @@ export function WaiterOrderEntry({
           <div className="mb-3 flex items-start justify-between gap-3">
             <div className="flex items-center gap-3">
               <button
-                onClick={() => {
-                  if (activeView === 'cart') {
-                    setActiveView('menu');
-                  } else {
-                    onClose();
-                  }
-                }}
+                onClick={onClose}
                 className="p-2 rounded-full hover:bg-slate-800 transition-colors"
               >
-                <ChevronLeftIcon className="w-6 h-6 text-slate-300" />
+                <XIcon className="w-6 h-6 text-slate-300" />
               </button>
               <div>
                 <h2 className="text-lg font-bold text-slate-100 sm:text-xl">
-                  {activeView === 'menu' ? `Take Order - Table ${tableNumber}` : `Cart - Table ${tableNumber}`}
+                  Take Order - Table {tableNumber}
                 </h2>
                 <p className="text-sm text-slate-400">
                   {cartItemCount} item{cartItemCount !== 1 ? 's' : ''} • {formatPrice(cartTotal)}
@@ -325,164 +319,142 @@ export function WaiterOrderEntry({
               <Button
                 variant="secondary"
                 size="sm"
-                onClick={() => setActiveView(activeView === 'menu' ? 'cart' : 'menu')}
+                onClick={() => setShowCart(true)}
                 className="items-center gap-2 bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700"
               >
                 <ShoppingCartIcon className="w-4 h-4" />
-                {activeView === 'menu' ? `Cart (${cartItemCount})` : 'Back to Menu'}
+                Cart ({cartItemCount})
               </Button>
-              {cart.length > 0 && activeView === 'cart' && (
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={handleSubmit}
-                  isLoading={isSubmitting}
-                  className="items-center gap-2"
-                >
-                  <CheckIcon className="w-4 h-4" />
-                  Submit Order
-                </Button>
-              )}
             </div>
           </div>
 
-          {activeView === 'menu' && (
-            <>
-              {/* Search */}
-              <div className="relative">
-                <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
-                <input
-                  type="text"
-                  placeholder="Search menu items..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                />
-              </div>
+          {/* Search */}
+          <div className="relative">
+            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
+            <input
+              type="text"
+              placeholder="Search menu items..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+            />
+          </div>
 
-              {/* Categories */}
-              <div className="-mx-4 mt-3 flex gap-2 overflow-x-auto px-4 pb-2">
-                {categories.map((category) => (
-                  <button
-                    key={category}
-                    onClick={() => setActiveCategory(category)}
-                    className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
-                      activeCategory === category
-                        ? 'bg-amber-500 text-slate-900 shadow-[0_12px_30px_-18px_rgba(245,158,11,0.9)]'
-                        : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-                    }`}
-                  >
-                    {categoryNames[category] || category}
-                  </button>
-                ))}
-              </div>
-              <div className="mt-1 flex items-center justify-between gap-3 text-xs text-slate-500">
-                <span>
-                  Showing {filteredItems.length} item{filteredItems.length !== 1 ? 's' : ''}
-                </span>
-                <span className="inline-flex items-center gap-1 text-amber-400">
-                  <SparklesIcon className="h-3.5 w-3.5" />
-                  Quick add enabled
-                </span>
-              </div>
-            </>
-          )}
+          {/* Categories */}
+          <div className="-mx-4 mt-3 flex gap-2 overflow-x-auto px-4 pb-2">
+            {categories.map((category) => (
+              <button
+                key={category}
+                onClick={() => setActiveCategory(category)}
+                className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
+                  activeCategory === category
+                    ? 'bg-amber-500 text-slate-900 shadow-[0_12px_30px_-18px_rgba(245,158,11,0.9)]'
+                    : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                }`}
+              >
+                {categoryNames[category] || category}
+              </button>
+            ))}
+          </div>
+          <div className="mt-1 flex items-center justify-between gap-3 text-xs text-slate-500">
+            <span>
+              Showing {filteredItems.length} item{filteredItems.length !== 1 ? 's' : ''}
+            </span>
+            <span className="inline-flex items-center gap-1 text-amber-400">
+              <SparklesIcon className="h-3.5 w-3.5" />
+              Quick add enabled
+            </span>
+          </div>
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-hidden">
-          {activeView === 'menu' ? (
-            <div className="h-full overflow-y-auto p-4">
-              {isLoading ? (
-                <div className="flex items-center justify-center py-12">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-500"></div>
-                </div>
-              ) : filteredItems.length === 0 ? (
-                <div className="text-center py-12 text-slate-500">
-                  <UtensilsIcon className="w-12 h-12 mx-auto mb-3 text-slate-700" />
-                  <p>No menu items found</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-                  {filteredItems.map((item) => (
-                    <motion.button
-                      key={item.id}
-                      layout
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      whileHover={{ y: -2 }}
-                      className="flex items-center gap-3 rounded-3xl border border-slate-700 bg-slate-900/90 p-3 text-left transition-colors hover:border-amber-500/50 hover:bg-slate-800"
-                      onClick={() => {
-                        setShowItemDetail(item);
-                        setItemQuantity(1);
-                      }}
-                    >
-                      <span className="text-3xl">{item.emoji}</span>
-                      <div className="flex-1 min-w-0">
-                        <div className="mb-1 flex flex-wrap items-center gap-2">
-                          <Badge variant="secondary" size="sm" className="bg-slate-700 text-slate-200">
-                            {item.category}
-                          </Badge>
-                          {!!item.prepTime && (
-                            <Badge variant="primary" size="sm" className="bg-amber-500/20 text-amber-300">
-                              {item.prepTime}m prep
-                            </Badge>
-                          )}
-                        </div>
-                        <h3 className="font-semibold text-slate-100 truncate">
-                          {item.name}
-                        </h3>
-                        <p className="text-sm text-slate-400 truncate">
-                          {item.description}
-                        </p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className="text-amber-300 font-semibold">
-                            {formatPrice(item.price)}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex flex-shrink-0 items-center gap-2 rounded-2xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-amber-300">
-                        <PlusIcon className="w-4 h-4" />
-                        <span className="hidden text-xs font-semibold sm:inline">Add</span>
-                      </div>
-                    </motion.button>
-                  ))}
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="h-full flex flex-col bg-slate-950">
-              <div className="border-b border-slate-800 p-4">
-                <div className="mb-1 flex items-center justify-between gap-3">
-                  <h3 className="font-semibold text-slate-100 flex items-center gap-2">
-                    <ShoppingCartIcon className="w-5 h-5" />
-                    Order Items
-                  </h3>
-                  <Badge variant="count" size="sm">{cartItemCount}</Badge>
-                </div>
-                <p className="text-xs text-slate-500">Review the basket before sending it to the kitchen or bar.</p>
+        <div className="flex flex-1 min-h-0">
+          <div className="flex-1 overflow-y-auto p-4 bg-slate-950">
+            {isLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-500"></div>
               </div>
-              {cart.length === 0 ? (
-                <div className="flex-1 flex flex-col items-center justify-center text-slate-500 gap-2">
-                  <ShoppingCartIcon className="w-10 h-10 text-slate-700" />
-                  <p className="text-sm">Your cart is empty</p>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => setActiveView('menu')}
-                    className="bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700"
+            ) : filteredItems.length === 0 ? (
+              <div className="text-center py-12 text-slate-500">
+                <UtensilsIcon className="w-12 h-12 mx-auto mb-3 text-slate-700" />
+                <p>No menu items found</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                {filteredItems.map((item) => (
+                  <motion.button
+                    key={item.id}
+                    layout
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    whileHover={{ y: -2 }}
+                    className="flex items-center gap-3 rounded-3xl border border-slate-700 bg-slate-900/90 p-3 text-left transition-colors hover:border-amber-500/50 hover:bg-slate-800"
+                    onClick={() => {
+                      setShowItemDetail(item);
+                      setItemQuantity(1);
+                    }}
                   >
-                    Back to Menu
-                  </Button>
-                </div>
-              ) : (
-                <>
-                  {renderCartItems()}
-                  {renderCartFooter('Submit Order')}
-                </>
-              )}
+                    <span className="text-3xl">{item.emoji}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="mb-1 flex flex-wrap items-center gap-2">
+                        <Badge variant="secondary" size="sm" className="bg-slate-700 text-slate-200">
+                          {item.category}
+                        </Badge>
+                        {!!item.prepTime && (
+                          <Badge variant="primary" size="sm" className="bg-amber-500/20 text-amber-300">
+                            {item.prepTime}m prep
+                          </Badge>
+                        )}
+                      </div>
+                      <h3 className="font-semibold text-slate-100 truncate">{item.name}</h3>
+                      <p className="text-sm text-slate-400 truncate">{item.description}</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-amber-300 font-semibold">{formatPrice(item.price)}</span>
+                      </div>
+                    </div>
+                    <div className="flex flex-shrink-0 items-center gap-2 rounded-2xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-amber-300">
+                      <PlusIcon className="w-4 h-4" />
+                      <span className="hidden text-xs font-semibold sm:inline">Add</span>
+                    </div>
+                  </motion.button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div
+            className={`fixed inset-0 z-30 lg:static lg:z-auto lg:flex flex-col w-full lg:w-[22rem] xl:w-[24rem] bg-slate-900 border-l border-slate-800 transition-transform duration-200 ${showCart ? 'flex' : 'hidden lg:flex'}`}
+          >
+            <div className="border-b border-slate-800 p-4 flex items-center justify-between gap-3">
+              <div>
+                <h3 className="font-semibold text-slate-100 flex items-center gap-2">
+                  <ShoppingCartIcon className="w-5 h-5" />
+                  Order Items
+                </h3>
+                <p className="text-xs text-slate-500 mt-1">Review and submit, then print from served orders.</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge variant="count" size="sm">{cartItemCount}</Badge>
+                <button
+                  onClick={() => setShowCart(false)}
+                  className="lg:hidden p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800"
+                >
+                  <XIcon className="w-4 h-4" />
+                </button>
+              </div>
             </div>
-          )}
+            {cart.length === 0 ? (
+              <div className="flex-1 flex flex-col items-center justify-center text-slate-500 gap-2 p-4">
+                <ShoppingCartIcon className="w-10 h-10 text-slate-700" />
+                <p className="text-sm">Your cart is empty</p>
+              </div>
+            ) : (
+              <>
+                {renderCartItems()}
+                {renderCartFooter('Submit Order')}
+              </>
+            )}
+          </div>
         </div>
       </div>
 
