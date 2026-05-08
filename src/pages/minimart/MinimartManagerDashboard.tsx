@@ -985,7 +985,7 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
     <div className="flex flex-col min-h-screen bg-slate-950 text-slate-100">
       {/* Header */}
       <header className="sticky top-0 z-40 bg-slate-900 border-b border-emerald-900/60">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
+        <div className="max-w-[1600px] 2xl:max-w-[1800px] mx-auto px-3 sm:px-4 py-3 flex items-center justify-between gap-3">
           <div>
             <p className="font-semibold text-slate-100 truncate">{restaurantName}</p>
             <p className="text-xs text-slate-400">{manager.name} &middot; <span className="capitalize">{manager.role}</span></p>
@@ -1004,10 +1004,11 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
         </div>
       </header>
 
-      <main className="flex-1 max-w-7xl mx-auto w-full px-4 py-6">
+      <main className="flex-1 max-w-[1600px] 2xl:max-w-[1800px] mx-auto w-full px-3 sm:px-4 py-5 sm:py-6">
         <div className="flex flex-col lg:flex-row gap-4 lg:gap-6">
-          <aside className="lg:w-56 lg:shrink-0">
-            <nav className="bg-slate-900 border border-slate-800 rounded-2xl p-2 lg:sticky lg:top-24">
+          <aside className="lg:w-60 lg:shrink-0">
+            <nav className="bg-slate-900 border border-slate-800 rounded-2xl p-2 lg:sticky lg:top-24 overflow-x-auto lg:overflow-visible">
+              <div className="flex lg:flex-col gap-1 min-w-max lg:min-w-0">
               {navItems.map((item) => {
                 const Icon = item.icon;
                 const active = page === item.key;
@@ -1015,7 +1016,7 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
                   <button
                     key={item.key}
                     onClick={() => setPage(item.key)}
-                    className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors mb-1 last:mb-0 ${
+                    className={`w-auto lg:w-full shrink-0 flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                       active
                         ? 'bg-emerald-600 text-white'
                         : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
@@ -1031,6 +1032,7 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
                   </button>
                 );
               })}
+              </div>
             </nav>
           </aside>
 
@@ -1300,8 +1302,8 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
         {/* ── Transactions ── */}
         {page === 'transactions' && (
           <>
-            <div className="flex flex-wrap items-center gap-2 mb-6">
-              <div className="flex gap-2">
+            <div className="mb-6 space-y-2.5">
+              <div className="flex flex-wrap items-center gap-2">
                 {(['today', '7d', '30d'] as DateFilter[]).map((f) => (
                   <button
                     key={f}
@@ -1313,20 +1315,20 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
                     {f === 'today' ? 'Today' : f === '7d' ? 'Last 7 days' : 'Last 30 days'}
                   </button>
                 ))}
-              </div>
-              <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 sm:ml-1">
+                  <span className="text-xs text-slate-500 hidden sm:inline">Custom:</span>
                 <input
                   type="date"
                   value={txnDateFrom}
                   onChange={(e) => setTxnDateFrom(e.target.value)}
-                  className="px-2 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-xs text-slate-100 focus:outline-none focus:border-amber-500"
+                  className="px-2 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-xs text-slate-100 focus:outline-none focus:border-amber-500 w-[132px]"
                 />
                 <span className="text-xs text-slate-500">–</span>
                 <input
                   type="date"
                   value={txnDateTo}
                   onChange={(e) => setTxnDateTo(e.target.value)}
-                  className="px-2 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-xs text-slate-100 focus:outline-none focus:border-amber-500"
+                  className="px-2 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-xs text-slate-100 focus:outline-none focus:border-amber-500 w-[132px]"
                 />
                 {(txnDateFrom || txnDateTo) && (
                   <button
@@ -1337,17 +1339,18 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
                   </button>
                 )}
               </div>
-              <div className="ml-auto flex items-center gap-2">
+              </div>
+              <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2">
                 <input
                   value={txnSearch}
                   onChange={(e) => setTxnSearch(e.target.value)}
                   placeholder="Search order, cashier…"
-                  className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500 w-44"
+                  className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500 w-full sm:w-56"
                 />
                 <select
                   value={txnCashierFilter}
                   onChange={(e) => setTxnCashierFilter(e.target.value)}
-                  className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-xs text-slate-100 focus:outline-none focus:border-amber-500"
+                  className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-xs text-slate-100 focus:outline-none focus:border-amber-500 w-full sm:w-auto"
                 >
                   <option value="all">All cashiers</option>
                   {txnCashierOptions.map((cashier) => (
@@ -1357,7 +1360,7 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
                 <select
                   value={txnPaymentFilter}
                   onChange={(e) => setTxnPaymentFilter(e.target.value)}
-                  className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-xs text-slate-100 focus:outline-none focus:border-amber-500"
+                  className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-xs text-slate-100 focus:outline-none focus:border-amber-500 w-full sm:w-auto"
                 >
                   <option value="all">All payments</option>
                   {txnPaymentOptions.map((method) => (
@@ -1367,16 +1370,16 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
                 <select
                   value={txnSort}
                   onChange={(e) => setTxnSort(e.target.value as TransactionSort)}
-                  className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-xs text-slate-100 focus:outline-none focus:border-amber-500"
+                  className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-xs text-slate-100 focus:outline-none focus:border-amber-500 w-full sm:w-auto"
                 >
                   <option value="newest">Newest first</option>
                   <option value="oldest">Oldest first</option>
                 </select>
-                <span className="text-xs text-slate-500">{filteredTxns.length} records</span>
+                <span className="text-xs text-slate-500 sm:ml-auto">{filteredTxns.length} records</span>
                 <button
                   onClick={() => exportTransactionsToCsv(filteredTxns)}
                   disabled={filteredTxns.length === 0}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-300 text-xs font-medium transition-colors"
+                  className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-300 text-xs font-medium transition-colors w-full sm:w-auto"
                 >
                   <DownloadIcon className="w-3.5 h-3.5" /> Export CSV
                 </button>
@@ -1394,7 +1397,38 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
                   <p className="text-sm">{transactions.length === 0 ? 'No transactions found' : 'No matches for your search'}</p>
                 </div>
               ) : (
-                <div className="overflow-x-auto">
+                <>
+                <div className="sm:hidden divide-y divide-slate-800">
+                  {filteredTxns.map((t) => (
+                    <div key={t.id} className="px-3 py-3 space-y-2.5">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-semibold text-slate-100">#{t.orderNumber}</p>
+                          <p className="text-[11px] text-slate-500">{new Date(t.createdAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}</p>
+                        </div>
+                        <p className="text-sm font-bold text-emerald-400">{formatPrice(t.total)}</p>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-slate-400">
+                        <span>{t.cashierName}</span>
+                        <span className="text-slate-600">•</span>
+                        <span className="inline-flex rounded-full bg-amber-900/40 px-2 py-0.5 text-[11px] font-medium text-amber-300">
+                          {t.paymentMethod}
+                        </span>
+                        <span className="text-slate-600">•</span>
+                        <span>{t.itemCount} item{t.itemCount !== 1 ? 's' : ''}</span>
+                      </div>
+                      <p className="text-xs text-slate-500 line-clamp-2">
+                        {t.items.length > 0
+                          ? t.items
+                            .slice(0, 3)
+                            .map((item: any) => `${item.menu_item_name || item.menuItemName || item.name || 'Item'} x${item.quantity || 1}`)
+                            .join(', ')
+                          : 'No items recorded'}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+                <div className="hidden sm:block overflow-x-auto">
                   <table className="min-w-full divide-y divide-slate-800">
                     <thead className="bg-slate-900/90">
                       <tr>
@@ -1447,6 +1481,7 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
                     </tbody>
                   </table>
                 </div>
+                </>
               )}
             </div>
           </>

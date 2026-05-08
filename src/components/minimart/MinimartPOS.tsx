@@ -872,7 +872,7 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
     <div className="flex flex-col h-screen bg-slate-950 overflow-hidden">
       {/* ── Top bar ── */}
       <header className="shrink-0 bg-slate-900 border-b border-slate-800/80">
-        <div className="flex items-center gap-3 px-4 pt-3 pb-2">
+        <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 sm:gap-3 px-3 sm:px-4 pt-3 pb-2">
           {/* Brand */}
           <div className="flex items-center gap-2.5 flex-1 min-w-0">
             <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center shrink-0 shadow-lg shadow-amber-500/20">
@@ -924,7 +924,7 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
         </div>
 
         {/* Shift summary widget */}
-        <div className="px-4 pb-2">
+        <div className="px-3 sm:px-4 pb-2">
           {holdCart && (
             <div className="flex justify-end mb-1.5">
               <button
@@ -985,7 +985,7 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
         {/* ── Product panel ── */}
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-slate-950">
           {/* Barcode / SKU quick-add */}
-          <div className="flex gap-2 px-4 pt-3 pb-1 shrink-0 bg-slate-900/50">
+          <div className="flex gap-2 px-3 sm:px-4 pt-3 pb-1 shrink-0 bg-slate-900/50">
             <div className="relative flex-1">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-500 uppercase tracking-wider select-none">SKU</span>
               <input
@@ -1020,11 +1020,11 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
             </button>
           </div>
           {barcodeError && (
-            <p className="px-4 pb-1 text-xs text-red-400 shrink-0 bg-slate-900/50">{barcodeError}</p>
+            <p className="px-3 sm:px-4 pb-1 text-xs text-red-400 shrink-0 bg-slate-900/50">{barcodeError}</p>
           )}
 
           {/* Search + refresh */}
-          <div className="flex gap-2 px-4 py-2 shrink-0 bg-slate-900/50 border-b border-slate-800/60">
+          <div className="flex gap-2 px-3 sm:px-4 py-2 shrink-0 bg-slate-900/50 border-b border-slate-800/60">
             <div className="relative flex-1">
               <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
               <input
@@ -1045,7 +1045,7 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
           </div>
 
           {/* Category tabs */}
-          <div className="flex gap-1.5 px-4 py-2.5 overflow-x-auto shrink-0 scrollbar-none border-b border-slate-800/60">
+          <div className="flex gap-1.5 px-3 sm:px-4 py-2.5 overflow-x-auto shrink-0 scrollbar-none border-b border-slate-800/60">
             {categories.map((cat) => (
               <button
                 key={cat}
@@ -1062,7 +1062,7 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
           </div>
 
           {/* Product grid */}
-          <div className="flex-1 overflow-y-auto p-4">
+          <div className="flex-1 overflow-y-auto p-3 sm:p-4">
             {loading ? (
               <div className="flex flex-col items-center justify-center h-48 text-slate-400 gap-2">
                 <RefreshCwIcon className="w-6 h-6 animate-spin text-amber-500" />
@@ -1077,7 +1077,7 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
                 <p className="text-xs text-slate-600">Try a different search or category</p>
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3">
                 {filtered.map((product) => {
                   const inCart = cart.find((l) => l.item.id === product.id);
                   const stock = stockMap[product.id] ?? null;
@@ -1140,7 +1140,7 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
         <div
           className={`
             fixed inset-0 z-40 sm:static sm:z-auto sm:flex
-            flex-col w-full sm:w-80 xl:w-96
+            flex-col w-full sm:w-[22rem] xl:w-[24rem] 2xl:w-[28rem]
             bg-slate-900 border-l border-slate-800/80
             transition-transform duration-200
             ${showCart ? 'flex' : 'hidden sm:flex'}
@@ -1362,7 +1362,7 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
                     <p className="text-xs font-medium">No transactions match the current filters</p>
                   </div>
                 ) : (
-                  <div className="min-w-[560px]">
+                  <div className="min-w-[460px] sm:min-w-[560px]">
                     <table className="w-full text-xs">
                       <thead className="sticky top-0 bg-slate-900/95 z-10 border-b border-slate-800">
                         <tr>
