@@ -279,7 +279,7 @@ export function WaiterOrderEntry({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-40 flex items-stretch justify-center">
+    <div className="fixed inset-0 z-[70] flex items-stretch justify-center">
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
@@ -289,8 +289,8 @@ export function WaiterOrderEntry({
       {/* Main Content */}
       <div className="relative flex h-full w-full flex-col overflow-hidden bg-slate-950 shadow-2xl">
         {/* Header */}
-        <div className="sticky top-0 z-10 border-b border-slate-800 bg-slate-900/95 p-4 backdrop-blur">
-          <div className="mb-3 flex items-start justify-between gap-3">
+        <div className="sticky top-0 z-10 border-b border-slate-800 bg-slate-900/95 p-3 sm:p-4 backdrop-blur">
+          <div className="mb-2 flex items-start justify-between gap-3">
             <div className="flex items-center gap-3">
               <button
                 onClick={onClose}
@@ -302,17 +302,9 @@ export function WaiterOrderEntry({
                 <h2 className="text-lg font-bold text-slate-100 sm:text-xl">
                   Take Order - Table {tableNumber}
                 </h2>
-                <p className="text-sm text-slate-400">
+                <p className="text-xs sm:text-sm text-slate-400">
                   {cartItemCount} item{cartItemCount !== 1 ? 's' : ''} • {formatPrice(cartTotal)}
                 </p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  <Badge variant="primary" size="sm" className="bg-amber-500/20 text-amber-300">
-                    Floor order
-                  </Badge>
-                  <Badge variant="secondary" size="sm" className="bg-slate-700 text-slate-300">
-                    Live menu sync
-                  </Badge>
-                </div>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -329,7 +321,8 @@ export function WaiterOrderEntry({
           </div>
 
           {/* Search */}
-          <div className="relative">
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
             <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
             <input
               type="text"
@@ -338,15 +331,30 @@ export function WaiterOrderEntry({
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-10 pr-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
             />
+            </div>
+            <button
+              onClick={() => setSearchQuery(searchQuery.trim())}
+              className="px-3 py-2.5 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 text-sm font-medium hover:bg-slate-700 transition-colors"
+            >
+              Search
+            </button>
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="px-3 py-2.5 rounded-lg bg-slate-800 border border-slate-700 text-slate-400 text-sm hover:text-slate-200 hover:bg-slate-700 transition-colors"
+              >
+                Clear
+              </button>
+            )}
           </div>
 
           {/* Categories */}
-          <div className="-mx-4 mt-3 flex gap-2 overflow-x-auto px-4 pb-2">
+          <div className="-mx-3 sm:-mx-4 mt-2.5 flex gap-2 overflow-x-auto px-3 sm:px-4 pb-2">
             {categories.map((category) => (
               <button
                 key={category}
                 onClick={() => setActiveCategory(category)}
-                className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
+                className={`px-3 py-1.5 rounded-full text-xs sm:text-sm font-medium whitespace-nowrap transition-colors ${
                   activeCategory === category
                     ? 'bg-amber-500 text-slate-900 shadow-[0_12px_30px_-18px_rgba(245,158,11,0.9)]'
                     : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
@@ -369,7 +377,7 @@ export function WaiterOrderEntry({
 
         {/* Content */}
         <div className="flex flex-1 min-h-0">
-          <div className="flex-1 overflow-y-auto p-4 bg-slate-950">
+          <div className="flex-1 overflow-y-auto p-3 sm:p-4 bg-slate-950">
             {isLoading ? (
               <div className="flex items-center justify-center py-12">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-500"></div>
@@ -380,7 +388,7 @@ export function WaiterOrderEntry({
                 <p>No menu items found</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-2.5 sm:gap-3">
                 {filteredItems.map((item) => (
                   <motion.button
                     key={item.id}
@@ -388,33 +396,33 @@ export function WaiterOrderEntry({
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     whileHover={{ y: -2 }}
-                    className="flex items-center gap-3 rounded-3xl border border-slate-700 bg-slate-900/90 p-3 text-left transition-colors hover:border-amber-500/50 hover:bg-slate-800"
+                    className="relative flex flex-col items-start rounded-2xl border border-slate-700 bg-slate-900/90 p-3 text-left transition-colors hover:border-amber-500/50 hover:bg-slate-800"
                     onClick={() => {
                       setShowItemDetail(item);
                       setItemQuantity(1);
                     }}
                   >
-                    <span className="text-3xl">{item.emoji}</span>
-                    <div className="flex-1 min-w-0">
-                      <div className="mb-1 flex flex-wrap items-center gap-2">
-                        <Badge variant="secondary" size="sm" className="bg-slate-700 text-slate-200">
-                          {item.category}
-                        </Badge>
-                        {!!item.prepTime && (
-                          <Badge variant="primary" size="sm" className="bg-amber-500/20 text-amber-300">
-                            {item.prepTime}m prep
-                          </Badge>
-                        )}
-                      </div>
-                      <h3 className="font-semibold text-slate-100 truncate">{item.name}</h3>
-                      <p className="text-sm text-slate-400 truncate">{item.description}</p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className="text-amber-300 font-semibold">{formatPrice(item.price)}</span>
-                      </div>
+                    <span className="text-2xl sm:text-3xl mb-1">{item.emoji}</span>
+                    <div className="mb-1 flex flex-wrap items-center gap-1.5">
+                      <Badge variant="secondary" size="sm" className="bg-slate-700 text-slate-200">
+                        {item.category}
+                      </Badge>
                     </div>
-                    <div className="flex flex-shrink-0 items-center gap-2 rounded-2xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-amber-300">
+                    <h3 className="font-semibold text-slate-100 text-sm sm:text-base line-clamp-2 leading-tight">
+                      {item.name}
+                    </h3>
+                    <p className="text-xs sm:text-sm text-slate-400 line-clamp-2 mt-1">
+                      {item.description}
+                    </p>
+                    <div className="mt-2 flex items-center justify-between w-full gap-2">
+                      <span className="text-amber-300 font-semibold text-sm sm:text-base">{formatPrice(item.price)}</span>
+                      {!!item.prepTime && (
+                        <span className="text-[11px] text-slate-400">{item.prepTime}m</span>
+                      )}
+                    </div>
+                    <div className="absolute top-2 right-2 flex flex-shrink-0 items-center gap-1 rounded-xl border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-amber-300">
                       <PlusIcon className="w-4 h-4" />
-                      <span className="hidden text-xs font-semibold sm:inline">Add</span>
+                      <span className="hidden sm:inline text-xs font-semibold">Add</span>
                     </div>
                   </motion.button>
                 ))}
