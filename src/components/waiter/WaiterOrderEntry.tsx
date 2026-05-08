@@ -53,7 +53,7 @@ export function WaiterOrderEntry({
   const [showItemDetail, setShowItemDetail] = useState<MenuItem | null>(null);
   const [itemQuantity, setItemQuantity] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showMobileCart, setShowMobileCart] = useState(false);
+  const [activeView, setActiveView] = useState<'menu' | 'cart'>('menu');
 
   // Load existing order items into cart if editing
   useEffect(() => {
@@ -67,6 +67,10 @@ export function WaiterOrderEntry({
       setCart(existingCart);
     }
   }, [existingOrder, isOpen, cart.length]);
+
+  useEffect(() => {
+    if (isOpen) setActiveView('menu');
+  }, [isOpen]);
 
   // Get unique categories from menu
   const categories = useMemo(() => {
@@ -159,6 +163,7 @@ export function WaiterOrderEntry({
       await onSubmitOrder(orderItems, orderNotes || undefined);
       setCart([]);
       setOrderNotes('');
+      setActiveView('menu');
       onClose();
     } catch (error) {
       console.error('Failed to submit order:', error);
@@ -187,20 +192,20 @@ export function WaiterOrderEntry({
       {cart.map((item) => (
         <div
           key={item.tempId}
-          className="rounded-2xl border border-gray-200 bg-white p-3 shadow-sm shadow-amber-100/40"
+          className="rounded-2xl border border-slate-700 bg-slate-900/80 p-3"
         >
           <div className="flex items-start justify-between gap-2">
             <div className="flex-1 min-w-0">
-              <h4 className="font-medium text-gray-900 text-sm">
+              <h4 className="font-medium text-slate-100 text-sm">
                 {item.menuItemName}
               </h4>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-slate-500">
                 {formatPrice(item.unitPrice || 0)} each
               </p>
             </div>
             <button
               onClick={() => removeFromCart(item.tempId)}
-              className="p-1 text-gray-400 hover:text-red-500 transition-colors"
+              className="p-1 text-slate-500 hover:text-red-400 transition-colors"
             >
               <TrashIcon className="w-4 h-4" />
             </button>
@@ -210,27 +215,27 @@ export function WaiterOrderEntry({
             <div className="flex items-center gap-2">
               <button
                 onClick={() => updateCartItemQuantity(item.tempId, -1)}
-                className="p-1.5 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
+                className="p-1.5 rounded-full bg-slate-800 hover:bg-slate-700 transition-colors"
               >
-                <MinusIcon className="w-4 h-4" />
+                <MinusIcon className="w-4 h-4 text-slate-200" />
               </button>
-              <span className="w-8 text-center font-semibold text-gray-900">
+              <span className="w-8 text-center font-semibold text-slate-100">
                 {item.quantity}
               </span>
               <button
                 onClick={() => updateCartItemQuantity(item.tempId, 1)}
-                className="p-1.5 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
+                className="p-1.5 rounded-full bg-slate-800 hover:bg-slate-700 transition-colors"
               >
-                <PlusIcon className="w-4 h-4" />
+                <PlusIcon className="w-4 h-4 text-slate-200" />
               </button>
             </div>
-            <span className="font-semibold text-amber-600">
+            <span className="font-semibold text-amber-300">
               {formatPrice(item.totalPrice || 0)}
             </span>
           </div>
 
           {item.notes && (
-            <p className="mt-2 text-xs italic text-gray-500">
+            <p className="mt-2 text-xs italic text-slate-500">
               Note: {item.notes}
             </p>
           )}
@@ -241,20 +246,20 @@ export function WaiterOrderEntry({
 
   const renderCartFooter = (buttonLabel: string) => (
     <>
-      <div className="border-t border-gray-200 p-4">
+      <div className="border-t border-slate-800 p-4">
         <textarea
           placeholder="Order notes (optional)..."
           value={orderNotes}
           onChange={(e) => setOrderNotes(e.target.value)}
-          className="w-full resize-none rounded-xl border border-gray-200 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+          className="w-full resize-none rounded-xl border border-slate-700 bg-slate-900 p-3 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500"
           rows={2}
         />
       </div>
 
-      <div className="border-t border-gray-200 bg-white p-4">
+      <div className="border-t border-slate-800 bg-slate-950 p-4">
         <div className="mb-3 flex items-center justify-between">
-          <span className="text-gray-600">Total</span>
-          <span className="text-xl font-bold text-gray-900">
+          <span className="text-slate-400">Total</span>
+          <span className="text-xl font-bold text-slate-100">
             {formatPrice(cartTotal)}
           </span>
         </div>
@@ -274,7 +279,7 @@ export function WaiterOrderEntry({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-40 flex items-end md:items-center justify-center">
+    <div className="fixed inset-0 z-40 flex items-stretch justify-center">
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
@@ -282,103 +287,123 @@ export function WaiterOrderEntry({
       />
 
       {/* Main Content */}
-      <div className="relative flex max-h-[100dvh] w-full max-w-6xl flex-col overflow-hidden bg-[linear-gradient(180deg,#ffffff_0%,#fffaf2_100%)] shadow-2xl md:max-h-[92vh] md:rounded-3xl">
+      <div className="relative flex h-full w-full flex-col overflow-hidden bg-slate-950 shadow-2xl">
         {/* Header */}
-        <div className="sticky top-0 z-10 border-b border-gray-200 bg-white/95 p-4 backdrop-blur">
+        <div className="sticky top-0 z-10 border-b border-slate-800 bg-slate-900/95 p-4 backdrop-blur">
           <div className="mb-3 flex items-start justify-between gap-3">
             <div className="flex items-center gap-3">
               <button
-                onClick={onClose}
-                className="p-2 rounded-full hover:bg-gray-100 transition-colors"
+                onClick={() => {
+                  if (activeView === 'cart') {
+                    setActiveView('menu');
+                  } else {
+                    onClose();
+                  }
+                }}
+                className="p-2 rounded-full hover:bg-slate-800 transition-colors"
               >
-                <ChevronLeftIcon className="w-6 h-6 text-gray-600" />
+                <ChevronLeftIcon className="w-6 h-6 text-slate-300" />
               </button>
               <div>
-                <h2 className="text-lg font-bold text-gray-900 sm:text-xl">
-                  Take Order - Table {tableNumber}
+                <h2 className="text-lg font-bold text-slate-100 sm:text-xl">
+                  {activeView === 'menu' ? `Take Order - Table ${tableNumber}` : `Cart - Table ${tableNumber}`}
                 </h2>
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-slate-400">
                   {cartItemCount} item{cartItemCount !== 1 ? 's' : ''} • {formatPrice(cartTotal)}
                 </p>
                 <div className="mt-2 flex flex-wrap gap-2">
-                  <Badge variant="primary" size="sm" className="bg-amber-100 text-amber-700">
+                  <Badge variant="primary" size="sm" className="bg-amber-500/20 text-amber-300">
                     Floor order
                   </Badge>
-                  <Badge variant="secondary" size="sm">
+                  <Badge variant="secondary" size="sm" className="bg-slate-700 text-slate-300">
                     Live menu sync
                   </Badge>
                 </div>
               </div>
             </div>
-            {cart.length > 0 && (
+            <div className="flex items-center gap-2">
               <Button
-                variant="primary"
+                variant="secondary"
                 size="sm"
-                onClick={handleSubmit}
-                isLoading={isSubmitting}
-                className="hidden items-center gap-2 lg:flex"
+                onClick={() => setActiveView(activeView === 'menu' ? 'cart' : 'menu')}
+                className="items-center gap-2 bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700"
               >
-                <CheckIcon className="w-4 h-4" />
-                Submit Order
+                <ShoppingCartIcon className="w-4 h-4" />
+                {activeView === 'menu' ? `Cart (${cartItemCount})` : 'Back to Menu'}
               </Button>
-            )}
+              {cart.length > 0 && activeView === 'cart' && (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={handleSubmit}
+                  isLoading={isSubmitting}
+                  className="items-center gap-2"
+                >
+                  <CheckIcon className="w-4 h-4" />
+                  Submit Order
+                </Button>
+              )}
+            </div>
           </div>
 
-          {/* Search */}
-          <div className="relative">
-            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search menu items..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-            />
-          </div>
+          {activeView === 'menu' && (
+            <>
+              {/* Search */}
+              <div className="relative">
+                <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
+                <input
+                  type="text"
+                  placeholder="Search menu items..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                />
+              </div>
 
-          {/* Categories */}
-          <div className="-mx-4 mt-3 flex gap-2 overflow-x-auto px-4 pb-2">
-            {categories.map((category) => (
-              <button
-                key={category}
-                onClick={() => setActiveCategory(category)}
-                className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
-                  activeCategory === category
-                    ? 'bg-amber-500 text-white shadow-[0_12px_30px_-18px_rgba(245,158,11,0.9)]'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-              >
-                {categoryNames[category] || category}
-              </button>
-            ))}
-          </div>
-          <div className="mt-1 flex items-center justify-between gap-3 text-xs text-gray-500">
-            <span>
-              Showing {filteredItems.length} item{filteredItems.length !== 1 ? 's' : ''}
-            </span>
-            <span className="inline-flex items-center gap-1 text-amber-600">
-              <SparklesIcon className="h-3.5 w-3.5" />
-              Quick add enabled
-            </span>
-          </div>
+              {/* Categories */}
+              <div className="-mx-4 mt-3 flex gap-2 overflow-x-auto px-4 pb-2">
+                {categories.map((category) => (
+                  <button
+                    key={category}
+                    onClick={() => setActiveCategory(category)}
+                    className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
+                      activeCategory === category
+                        ? 'bg-amber-500 text-slate-900 shadow-[0_12px_30px_-18px_rgba(245,158,11,0.9)]'
+                        : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                    }`}
+                  >
+                    {categoryNames[category] || category}
+                  </button>
+                ))}
+              </div>
+              <div className="mt-1 flex items-center justify-between gap-3 text-xs text-slate-500">
+                <span>
+                  Showing {filteredItems.length} item{filteredItems.length !== 1 ? 's' : ''}
+                </span>
+                <span className="inline-flex items-center gap-1 text-amber-400">
+                  <SparklesIcon className="h-3.5 w-3.5" />
+                  Quick add enabled
+                </span>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Content */}
         <div className="flex-1 overflow-hidden">
-          <div className="grid h-full lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_360px]">
-            {/* Menu Items List */}
-            <div className="flex-1 overflow-y-auto p-4">
+          {activeView === 'menu' ? (
+            <div className="h-full overflow-y-auto p-4">
               {isLoading ? (
                 <div className="flex items-center justify-center py-12">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-500"></div>
                 </div>
               ) : filteredItems.length === 0 ? (
-                <div className="text-center py-12 text-gray-500">
-                  <UtensilsIcon className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                <div className="text-center py-12 text-slate-500">
+                  <UtensilsIcon className="w-12 h-12 mx-auto mb-3 text-slate-700" />
                   <p>No menu items found</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 2xl:grid-cols-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
                   {filteredItems.map((item) => (
                     <motion.button
                       key={item.id}
@@ -386,7 +411,7 @@ export function WaiterOrderEntry({
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       whileHover={{ y: -2 }}
-                      className="flex items-center gap-3 rounded-3xl border border-gray-200 bg-white/90 p-3 text-left shadow-sm shadow-amber-100/40 transition-colors hover:border-amber-300/60 hover:bg-amber-50/80"
+                      className="flex items-center gap-3 rounded-3xl border border-slate-700 bg-slate-900/90 p-3 text-left transition-colors hover:border-amber-500/50 hover:bg-slate-800"
                       onClick={() => {
                         setShowItemDetail(item);
                         setItemQuantity(1);
@@ -395,28 +420,28 @@ export function WaiterOrderEntry({
                       <span className="text-3xl">{item.emoji}</span>
                       <div className="flex-1 min-w-0">
                         <div className="mb-1 flex flex-wrap items-center gap-2">
-                          <Badge variant="secondary" size="sm" className="bg-slate-100 text-slate-600">
+                          <Badge variant="secondary" size="sm" className="bg-slate-700 text-slate-200">
                             {item.category}
                           </Badge>
-                          {item.prepTime && (
-                            <Badge variant="primary" size="sm" className="bg-amber-100 text-amber-700">
+                          {!!item.prepTime && (
+                            <Badge variant="primary" size="sm" className="bg-amber-500/20 text-amber-300">
                               {item.prepTime}m prep
                             </Badge>
                           )}
                         </div>
-                        <h3 className="font-semibold text-gray-900 truncate">
+                        <h3 className="font-semibold text-slate-100 truncate">
                           {item.name}
                         </h3>
-                        <p className="text-sm text-gray-500 truncate">
+                        <p className="text-sm text-slate-400 truncate">
                           {item.description}
                         </p>
                         <div className="flex items-center gap-2 mt-1">
-                          <span className="text-amber-600 font-semibold">
+                          <span className="text-amber-300 font-semibold">
                             {formatPrice(item.price)}
                           </span>
                         </div>
                       </div>
-                      <div className="flex flex-shrink-0 items-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-amber-700">
+                      <div className="flex flex-shrink-0 items-center gap-2 rounded-2xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-amber-300">
                         <PlusIcon className="w-4 h-4" />
                         <span className="hidden text-xs font-semibold sm:inline">Add</span>
                       </div>
@@ -425,83 +450,41 @@ export function WaiterOrderEntry({
                 </div>
               )}
             </div>
-
-            {/* Cart Sidebar (Desktop) / Bottom Sheet (Mobile) */}
-            {cart.length > 0 && (
-              <div className="hidden border-l border-gray-200 bg-gray-50 lg:flex lg:flex-col">
-                <div className="border-b border-gray-200 p-4">
-                  <div className="mb-1 flex items-center justify-between gap-3">
-                    <h3 className="font-semibold text-gray-900 flex items-center gap-2">
-                      <ShoppingCartIcon className="w-5 h-5" />
-                      Order Items
-                    </h3>
-                    <Badge variant="count" size="sm">{cartItemCount}</Badge>
-                  </div>
-                  <p className="text-xs text-gray-500">Review the basket before sending it to the kitchen or bar.</p>
+          ) : (
+            <div className="h-full flex flex-col bg-slate-950">
+              <div className="border-b border-slate-800 p-4">
+                <div className="mb-1 flex items-center justify-between gap-3">
+                  <h3 className="font-semibold text-slate-100 flex items-center gap-2">
+                    <ShoppingCartIcon className="w-5 h-5" />
+                    Order Items
+                  </h3>
+                  <Badge variant="count" size="sm">{cartItemCount}</Badge>
                 </div>
-                {renderCartItems()}
-                {renderCartFooter('Submit Order')}
+                <p className="text-xs text-slate-500">Review the basket before sending it to the kitchen or bar.</p>
               </div>
-            )}
-          </div>
+              {cart.length === 0 ? (
+                <div className="flex-1 flex flex-col items-center justify-center text-slate-500 gap-2">
+                  <ShoppingCartIcon className="w-10 h-10 text-slate-700" />
+                  <p className="text-sm">Your cart is empty</p>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setActiveView('menu')}
+                    className="bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700"
+                  >
+                    Back to Menu
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  {renderCartItems()}
+                  {renderCartFooter('Submit Order')}
+                </>
+              )}
+            </div>
+          )}
         </div>
-
-        {/* Mobile Cart Summary */}
-        {cart.length > 0 && (
-          <div className="border-t border-gray-200 bg-white/95 p-4 shadow-[0_-14px_30px_-24px_rgba(15,23,42,0.35)] lg:hidden">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-gray-600">Total ({cartItemCount} items)</span>
-              <span className="text-xl font-bold text-gray-900">
-                {formatPrice(cartTotal)}
-              </span>
-            </div>
-            <div className="flex gap-2">
-              <Button
-                variant="secondary"
-                onClick={() => setShowMobileCart(true)}
-                className="flex-1"
-              >
-                View Cart ({cartItemCount})
-              </Button>
-              <Button
-                variant="primary"
-                onClick={handleSubmit}
-                isLoading={isSubmitting}
-                className="flex-1"
-              >
-                Submit
-              </Button>
-            </div>
-          </div>
-        )}
       </div>
-
-      {cart.length > 0 && showMobileCart && (
-        <div className="absolute inset-0 z-20 flex items-end lg:hidden">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setShowMobileCart(false)} />
-          <motion.div
-            initial={{ y: '100%' }}
-            animate={{ y: 0 }}
-            exit={{ y: '100%' }}
-            className="relative flex max-h-[78vh] w-full flex-col rounded-t-3xl bg-[linear-gradient(180deg,#f9fafb_0%,#fff7ed_100%)]"
-          >
-            <div className="flex items-center justify-between border-b border-gray-200 bg-white px-4 py-3">
-              <div>
-                <h3 className="font-semibold text-gray-900">Cart Summary</h3>
-                <p className="text-sm text-gray-500">{cartItemCount} item{cartItemCount !== 1 ? 's' : ''}</p>
-              </div>
-              <button
-                onClick={() => setShowMobileCart(false)}
-                className="rounded-full p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
-              >
-                <XIcon className="h-5 w-5" />
-              </button>
-            </div>
-            {renderCartItems()}
-            {renderCartFooter('Submit Order')}
-          </motion.div>
-        </div>
-      )}
 
       {/* Item Detail Modal */}
       <Modal
@@ -510,7 +493,6 @@ export function WaiterOrderEntry({
           setShowItemDetail(null);
           setItemQuantity(1);
         }}
-        variant="light"
       >
         {showItemDetail && (
           <div className="p-6">
@@ -518,15 +500,15 @@ export function WaiterOrderEntry({
               <div className="flex-1">
                 <span className="text-6xl mb-4 block">{showItemDetail.emoji}</span>
                 <div className="mb-3 flex flex-wrap gap-2">
-                  <Badge variant="secondary" size="sm">{showItemDetail.category}</Badge>
-                  <Badge variant="primary" size="sm" className="bg-amber-100 text-amber-700">
+                  <Badge variant="secondary" size="sm" className="bg-slate-700 text-slate-200">{showItemDetail.category}</Badge>
+                  <Badge variant="primary" size="sm" className="bg-amber-500/20 text-amber-300">
                     {showItemDetail.prepTime}m prep
                   </Badge>
                 </div>
-                <h3 className="text-2xl font-bold text-gray-900">
+                <h3 className="text-2xl font-bold text-slate-100">
                   {showItemDetail.name}
                 </h3>
-                <p className="text-gray-500 text-sm mt-2 leading-relaxed">
+                <p className="text-slate-400 text-sm mt-2 leading-relaxed">
                   {showItemDetail.description}
                 </p>
               </div>
@@ -535,27 +517,27 @@ export function WaiterOrderEntry({
                   setShowItemDetail(null);
                   setItemQuantity(1);
                 }}
-                className="p-2 rounded-full hover:bg-gray-100 transition-colors"
+                className="p-2 rounded-full hover:bg-slate-800 transition-colors"
               >
-                <XIcon className="w-5 h-5 text-gray-400" />
+                <XIcon className="w-5 h-5 text-slate-400" />
               </button>
             </div>
 
             <div className="flex items-center gap-2 mb-6">
-              <div className="p-1.5 bg-amber-100 rounded-lg">
+              <div className="p-1.5 bg-amber-500/20 rounded-lg">
                 <ClockIcon className="w-4 h-4 text-amber-600" />
               </div>
-              <span className="text-sm text-gray-600">
+              <span className="text-sm text-slate-400">
                 {showItemDetail.prepTime} minutes preparation time
               </span>
             </div>
 
             <div className="flex items-center justify-between mb-6">
               <div>
-                <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">
+                <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">
                   Price
                 </p>
-                <span className="text-2xl font-bold text-amber-600">
+                <span className="text-2xl font-bold text-amber-300">
                   {formatPrice(showItemDetail.price)}
                 </span>
               </div>
@@ -563,18 +545,18 @@ export function WaiterOrderEntry({
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => setItemQuantity(Math.max(1, itemQuantity - 1))}
-                  className="p-3 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
+                  className="p-3 rounded-full bg-slate-800 hover:bg-slate-700 transition-colors"
                 >
-                  <MinusIcon className="w-5 h-5 text-gray-600" />
+                  <MinusIcon className="w-5 h-5 text-slate-200" />
                 </button>
-                <span className="text-xl font-semibold w-12 text-center text-gray-900">
+                <span className="text-xl font-semibold w-12 text-center text-slate-100">
                   {itemQuantity}
                 </span>
                 <button
                   onClick={() => setItemQuantity(itemQuantity + 1)}
-                  className="p-3 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
+                  className="p-3 rounded-full bg-slate-800 hover:bg-slate-700 transition-colors"
                 >
-                  <PlusIcon className="w-5 h-5 text-gray-600" />
+                  <PlusIcon className="w-5 h-5 text-slate-200" />
                 </button>
               </div>
             </div>

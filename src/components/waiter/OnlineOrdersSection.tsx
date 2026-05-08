@@ -59,11 +59,6 @@ export function OnlineOrdersForWaiter({ orders, onUpdateStatus }: OnlineOrdersFo
     [onlineOrders]
   );
 
-  const totalOnlineRevenue = useMemo(
-    () => onlineOrders.reduce((sum, order) => sum + ((order as any).total || order.total || 0), 0),
-    [onlineOrders]
-  );
-
   const statusTheme: Record<string, { panel: string; badge: string; title: string; border: string }> = {
     pending: {
       panel: 'border-red-500/30 bg-red-500/10',
@@ -261,7 +256,7 @@ export function OnlineOrdersForWaiter({ orders, onUpdateStatus }: OnlineOrdersFo
             </p>
           </div>
 
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:min-w-[460px]">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:min-w-[380px]">
             <div className={`rounded-xl border p-3 ${statusTheme.ready.panel}`}>
               <div className="text-[11px] uppercase tracking-[0.16em] text-slate-400">Ready</div>
               <div className="mt-1 text-2xl font-semibold text-slate-100">{readyOrders.length}</div>
@@ -273,10 +268,6 @@ export function OnlineOrdersForWaiter({ orders, onUpdateStatus }: OnlineOrdersFo
             <div className={`rounded-xl border p-3 ${statusTheme.pending.panel}`}>
               <div className="text-[11px] uppercase tracking-[0.16em] text-slate-400">Awaiting Approval</div>
               <div className="mt-1 text-2xl font-semibold text-slate-100">{pendingApprovalOrders.length}</div>
-            </div>
-            <div className="rounded-xl border border-slate-700 bg-slate-800/80 p-3">
-              <div className="text-[11px] uppercase tracking-[0.16em] text-slate-500">Revenue</div>
-              <div className="mt-1 text-2xl font-semibold text-amber-300">{formatPrice(totalOnlineRevenue)}</div>
             </div>
           </div>
         </div>
