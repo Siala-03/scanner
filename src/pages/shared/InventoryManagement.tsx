@@ -1582,7 +1582,9 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                                 <p className="text-white font-medium text-sm hover:text-amber-300 underline underline-offset-2">{row.item.name || row.item.id}</p>
                                 {(() => {
                                   const linkedItem = menuItemMap[row.item.id];
-                                  const sku = linkedItem?.sku ?? (row.rec as any)?.sku ?? null;
+                                  const linkedItemAny: any = linkedItem;
+                                  const linkedSku = linkedItemAny?.sku ?? null;
+                                  const sku = linkedSku ?? (row.rec as any)?.sku ?? null;
                                   return sku ? (
                                     <p className="text-[10px] font-mono text-amber-500/70 mt-0.5 tracking-wide">{sku}</p>
                                   ) : !linkedItem ? (

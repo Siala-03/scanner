@@ -1,5 +1,7 @@
 import { supabase, type MenuItem } from '../lib/supabase';
 
+let menuSkuColumnSupported: boolean | null = null;
+
 function isMissingColumnError(error: any, column: string): boolean {
   const msg = String(error?.message || '').toLowerCase();
   const col = column.toLowerCase();
@@ -8,6 +10,27 @@ function isMissingColumnError(error: any, column: string): boolean {
     (msg.includes('column') && msg.includes(col) && msg.includes('does not exist')) ||
     (msg.includes('schema cache') && msg.includes(col))
   );
+}
+
+async function supportsMenuSkuColumn(): Promise<boolean> {
+  if (menuSkuColumnSupported !== null) return menuSkuColumnSupported;
+
+  const { error } = await supabase
+    .from('menu_items')
+    .select('sku')
+    .limit(1);
+
+  if (!error) {
+    menuSkuColumnSupported = true;
+    return true;
+  }
+
+  if (isMissingColumnError(error, 'sku')) {
+    menuSkuColumnSupported = false;
+    return false;
+  }
+
+  throw error;
 }
 
 export function generateSku(name: string, sequence: number): string {
@@ -108,10 +131,11 @@ export async function createMenuItem(item: Partial<MenuItem> & { sku?: string })
   if (!restaurantId) throw new Error('No company selected');
 
   const id = `item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  const canUseSku = await supportsMenuSkuColumn();
 
   // Auto-generate SKU if not provided
-  let sku = item.sku?.trim() || null;
-  if (!sku && item.name) {
+  let sku = canUseSku ? (item.sku?.trim() || null) : null;
+  if (canUseSku && !sku && item.name) {
     const { count } = await supabase
       .from('menu_items')
       .select('*', { count: 'exact', head: true })
@@ -144,10 +168,11 @@ export async function createMenuItem(item: Partial<MenuItem> & { sku?: string })
       id,
     );
 
-  let payload = buildPayload(true);
+  let payload = buildPayload(canUseSku);
   let res = await supabase.from('menu_items').insert(payload).select().single();
 
   if (res.error && isMissingColumnError(res.error, 'sku')) {
+    menuSkuColumnSupported = false;
     payload = buildPayload(false);
     res = await supabase.from('menu_items').insert(payload).select().single();
   }
@@ -159,6 +184,7 @@ export async function createMenuItem(item: Partial<MenuItem> & { sku?: string })
 export async function updateMenuItem(id: string, updates: Partial<MenuItem> & { sku?: string }): Promise<MenuItem> {
   const restaurantId = await resolveRestaurantId();
   if (!restaurantId) throw new Error('No company selected');
+  const canUseSku = await supportsMenuSkuColumn();
 
   const payload: Record<string, any> = { updated_at: new Date().toISOString() };
   if (updates.name           !== undefined) payload.name            = updates.name;
@@ -176,7 +202,7 @@ export async function updateMenuItem(id: string, updates: Partial<MenuItem> & { 
   if ((updates as any).requiresKitchen !== undefined) payload.requires_kitchen = (updates as any).requiresKitchen;
   if ((updates as any).prep_time !== undefined) payload.prep_time   = (updates as any).prep_time;
   if ((updates as any).prepTime  !== undefined) payload.prep_time   = (updates as any).prepTime;
-  if (updates.sku !== undefined) payload.sku = updates.sku?.trim() || null;
+  if (updates.sku !== undefined && canUseSku) payload.sku = updates.sku?.trim() || null;
 
   let res = await supabase
     .from('menu_items')
@@ -187,6 +213,7 @@ export async function updateMenuItem(id: string, updates: Partial<MenuItem> & { 
     .single();
 
   if (res.error && isMissingColumnError(res.error, 'sku') && 'sku' in payload) {
+    menuSkuColumnSupported = false;
     const { sku: _omitSku, ...withoutSku } = payload;
     res = await supabase
       .from('menu_items')
@@ -221,10 +248,12 @@ export async function toggleMenuItemAvailability(id: string, isAvailable: boolea
 export async function uploadMenu(items: Partial<MenuItem>[]): Promise<{ message: string; count: number }> {
   const restaurantId = await resolveRestaurantId();
   if (!restaurantId) throw new Error('No company selected');
+  const canUseSku = await supportsMenuSkuColumn();
   
-  const itemsToInsert = items.map((item, index) =>
-    toDbMenuItem(item as Partial<MenuItem> & Record<string, any>, restaurantId, `item-${Date.now()}-${index}`)
-  );
+  const itemsToInsert = items.map((item, index) => {
+    const normalized = canUseSku ? item : ({ ...item, sku: undefined } as Partial<MenuItem>);
+    return toDbMenuItem(normalized as Partial<MenuItem> & Record<string, any>, restaurantId, `item-${Date.now()}-${index}`);
+  });
 
   const { error } = await supabase.from('menu_items').upsert(itemsToInsert, { onConflict: 'id' });
   if (error) throw error;
