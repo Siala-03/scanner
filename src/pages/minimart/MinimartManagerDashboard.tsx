@@ -1005,10 +1005,10 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
       </header>
 
       <main className="flex-1 max-w-[1600px] 2xl:max-w-[1800px] mx-auto w-full px-3 sm:px-4 py-5 sm:py-6">
-        <div className="flex flex-col lg:flex-row gap-4 lg:gap-6">
-          <aside className="lg:w-60 lg:shrink-0">
-            <nav className="bg-slate-900 border border-slate-800 rounded-2xl p-2 lg:sticky lg:top-24 overflow-x-auto lg:overflow-visible">
-              <div className="flex lg:flex-col gap-1 min-w-max lg:min-w-0">
+        <div className="flex flex-col xl:flex-row gap-4 xl:gap-6">
+          <aside className="xl:w-60 xl:shrink-0">
+            <nav className="bg-slate-900 border border-slate-800 rounded-2xl p-2 xl:sticky xl:top-24 overflow-x-auto xl:overflow-visible">
+              <div className="flex xl:flex-col gap-1 min-w-max xl:min-w-0">
               {navItems.map((item) => {
                 const Icon = item.icon;
                 const active = page === item.key;
@@ -1016,7 +1016,7 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
                   <button
                     key={item.key}
                     onClick={() => setPage(item.key)}
-                    className={`w-auto lg:w-full shrink-0 flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    className={`w-auto xl:w-full shrink-0 flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                       active
                         ? 'bg-emerald-600 text-white'
                         : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
@@ -1398,7 +1398,7 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
                 </div>
               ) : (
                 <>
-                <div className="sm:hidden divide-y divide-slate-800">
+                <div className="lg:hidden divide-y divide-slate-800">
                   {filteredTxns.map((t) => (
                     <div key={t.id} className="px-3 py-3 space-y-2.5">
                       <div className="flex items-start justify-between gap-3">
@@ -1428,7 +1428,7 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
                     </div>
                   ))}
                 </div>
-                <div className="hidden sm:block overflow-x-auto">
+                <div className="hidden lg:block overflow-x-auto">
                   <table className="min-w-full divide-y divide-slate-800">
                     <thead className="bg-slate-900/90">
                       <tr>
@@ -1678,7 +1678,7 @@ export function MinimartManagerDashboard({ restaurantId, restaurantName, manager
                               Till Reconciliation
                               {shiftTxnsForCloseLoading && <span className="ml-2 text-amber-400 normal-case tracking-normal">Loading…</span>}
                             </p>
-                            <div className="grid grid-cols-3 gap-3 text-xs">
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
                               <div className="bg-slate-800 rounded-xl p-3">
                                 <p className="text-slate-500 mb-1">Opening Float</p>
                                 <p className="font-bold text-slate-200">{formatPrice(shift.openingFloat)}</p>

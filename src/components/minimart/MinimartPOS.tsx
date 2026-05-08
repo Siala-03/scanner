@@ -885,7 +885,7 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
           </div>
 
           {/* Cashier badge (desktop) */}
-          <div className="hidden sm:flex items-center gap-2 bg-slate-800/60 border border-slate-700/50 rounded-xl px-3 py-1.5">
+          <div className="hidden md:flex items-center gap-2 bg-slate-800/60 border border-slate-700/50 rounded-xl px-3 py-1.5">
             <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-[10px] font-bold text-white">
               {cashierInitials}
             </div>
@@ -895,7 +895,7 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
           {/* Cart toggle (mobile) */}
           <button
             onClick={() => setShowCart(true)}
-            className="relative sm:hidden p-2 rounded-xl bg-slate-800 text-slate-300 border border-slate-700/50"
+            className="relative lg:hidden p-2 rounded-xl bg-slate-800 text-slate-300 border border-slate-700/50"
           >
             <ShoppingCartIcon className="w-4 h-4" />
             {cartCount > 0 && (
@@ -953,7 +953,7 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
                 </div>
               )}
               {shiftSales.count > 0 && (
-                <div className="hidden sm:flex flex-col items-center px-4 py-2.5 flex-1">
+                <div className="hidden md:flex flex-col items-center px-4 py-2.5 flex-1">
                   <span className="text-[9px] text-slate-500 uppercase tracking-wider mb-0.5">Avg Sale</span>
                   <span className="text-sm font-bold text-slate-300">{formatPrice(Math.round(shiftSales.total / shiftSales.count))}</span>
                 </div>
@@ -1139,11 +1139,11 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
         {/* ── Cart sidebar ── */}
         <div
           className={`
-            fixed inset-0 z-40 sm:static sm:z-auto sm:flex
-            flex-col w-full sm:w-[22rem] xl:w-[24rem] 2xl:w-[28rem]
+            fixed inset-0 z-40 lg:static lg:z-auto lg:flex
+            flex-col w-full lg:w-[22rem] xl:w-[24rem] 2xl:w-[28rem]
             bg-slate-900 border-l border-slate-800/80
             transition-transform duration-200
-            ${showCart ? 'flex' : 'hidden sm:flex'}
+            ${showCart ? 'flex' : 'hidden lg:flex'}
           `}
         >
           {/* Cart/Txns header with tab strip */}
@@ -1197,7 +1197,7 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
                   )}
                   <button
                     onClick={() => setShowCart(false)}
-                    className="sm:hidden p-1.5 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
+                    className="lg:hidden p-1.5 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
                   >
                     <XIcon className="w-4 h-4" />
                   </button>
