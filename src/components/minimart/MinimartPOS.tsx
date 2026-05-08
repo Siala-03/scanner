@@ -19,6 +19,7 @@ import { fetchInventory, updateInventoryRecord } from '../../api/inventory';
 import type { InventoryRecord } from '../../api/inventory';
 import { requestRefund } from '../../api/refunds';
 import { getMinimartSettings } from '../../api/minimartSettings';
+import { getActiveShift } from '../../api/shifts';
 import { RefundModal, type RefundableTxn } from './RefundModal';
 import type { MenuItem, Staff } from '../../types';
 import type { RestaurantReceiptSettings } from '../../api/restaurants';
@@ -101,6 +102,7 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
   const [receipt, setReceipt] = useState<Receipt | null>(null);
   const [showCart, setShowCart] = useState(false);
   const [shiftSales, setShiftSales] = useState({ count: 0, total: 0, byPayment: {} as Record<string, number> });
+    const [openingFloat, setOpeningFloat] = useState<number | null>(null);
   const [receiptSettings, setReceiptSettings] = useState<RestaurantReceiptSettings>({});
   // Hold cart
   const [holdCart, setHoldCart] = useState<CartLine[] | null>(null);
@@ -182,7 +184,8 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
       const byPayment: Record<string, number> = {};
       rows.forEach((o: any) => {
         const method = o.payment_type ?? o.payment_method ?? 'Unknown';
-        const label = method === 'cash' ? 'Cash' : method === 'card' ? 'Card' : method === 'mobile_money' ? 'Mobile Money' : method;
+        if (!method || method === 'Unknown') return;
+        const label = method === 'cash' ? 'Cash' : method === 'card' ? 'Card' : method === 'mobile_money' ? 'Mobile Money' : method === 'momo' ? 'MoMo' : method;
         byPayment[label] = (byPayment[label] ?? 0) + (o.total || 0);
       });
       setShiftSales({
@@ -319,6 +322,12 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
 
   useEffect(() => { loadProducts(); }, [loadProducts]);
   useEffect(() => { loadShiftStats(); }, [loadShiftStats]);
+    useEffect(() => {
+      if (!activeRestaurantId || !cashier?.id) return;
+      getActiveShift(activeRestaurantId, cashier.id)
+        .then((shift) => { if (shift) setOpeningFloat(shift.openingFloat); })
+        .catch(() => {});
+    }, [activeRestaurantId, cashier?.id]);
   useEffect(() => {
     const id = setInterval(() => { loadShiftStats(); }, 15000);
     return () => clearInterval(id);
@@ -937,6 +946,12 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
                 <span className="text-[9px] text-emerald-600 uppercase tracking-wider mb-0.5">Revenue</span>
                 <span className="text-sm font-bold text-emerald-400">{formatPrice(shiftSales.total)}</span>
               </div>
+              {openingFloat !== null && (
+                <div className="flex flex-col items-center px-4 py-2.5 flex-1">
+                  <span className="text-[9px] text-amber-500/80 uppercase tracking-wider mb-0.5">Float</span>
+                  <span className="text-sm font-bold text-amber-400">{formatPrice(openingFloat)}</span>
+                </div>
+              )}
               {shiftSales.count > 0 && (
                 <div className="hidden sm:flex flex-col items-center px-4 py-2.5 flex-1">
                   <span className="text-[9px] text-slate-500 uppercase tracking-wider mb-0.5">Avg Sale</span>
