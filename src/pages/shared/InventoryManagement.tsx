@@ -696,6 +696,11 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
     let failed = 0;
     let firstError = '';
 
+    // Build a row lookup keyed by row.item.id so we can reach both rec and item.name.
+    // inventoryMap is keyed by menuItemId which may differ from row.item.id when
+    // a record's menuItemId is empty and the row falls back to rec.id.
+    const rowById = new Map(inventoryRows.map((row) => [row.item.id, row]));
+
     // Build a fresh lookup in case menu changed outside this page.
     const latestMenu = await fetchMenu().catch(() => menuItems as any[]);
     const menuByName = new Map<string, any>();
@@ -705,11 +710,15 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
     });
 
     for (const id of idsToCreate) {
-      const rec = inventoryMap[id];
-      const productName = (rec?.description || rec?.menuItemId || '').trim();
-      const productPrice = rec?.price ?? rec?.unitCost ?? 0;
+      const row = rowById.get(id);
+      const rec = row?.rec ?? inventoryMap[id];
+      // item.name is always set (falls back to menuItemId/rec.id in otherRows builder).
+      const productName = (rec?.description || row?.item.name || rec?.menuItemId || '').trim();
+      // Use || so unitCost is actually used when price is 0 (not null/undefined).
+      // Price of 0 is fine — menu item price is editable after linking.
+      const productPrice = rec?.price || rec?.unitCost || 0;
 
-      if (!productName || productPrice <= 0) {
+      if (!productName) {
         skipped += 1;
         continue;
       }
@@ -724,10 +733,11 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
         }
 
         const batchSku = standaloneCodeToSku(rec?.menuItemId ?? '');
+        const category = row?.item.category && row.item.category !== 'Other' ? row.item.category : 'Uncategorized';
         const payload: any = {
           name: productName,
           price: productPrice,
-          category: 'Uncategorized',
+          category,
           is_available: true,
           requires_kitchen: false,
           prep_time: 0,
