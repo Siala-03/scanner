@@ -7,8 +7,7 @@ import {
   XIcon,
   ShoppingCartIcon,
   TrashIcon,
-  UtensilsIcon,
-  SparklesIcon
+  UtensilsIcon
 } from 'lucide-react';
 import { MenuItem, OrderItem, CartItem } from '../../types/index';
 import { Button } from '../ui/Button';
@@ -57,7 +56,7 @@ export function WaiterOrderEntry({
         tempId: `existing-${index}`,
         notes: item.specialInstructions || '',
         modifiers: []
-      }));
+      })) as LocalCartItem[];
       setCart(existingCart);
     }
   }, [existingOrder, isOpen, cart.length]);
@@ -198,7 +197,7 @@ export function WaiterOrderEntry({
   };
 
   const renderCartItems = () => (
-    <div className="flex-1 overflow-y-auto p-3 space-y-2">
+    <div className="flex-1 overflow-y-auto p-2.5 space-y-2">
       {cart.map((item) => (
         <div
           key={item.tempId}
@@ -256,26 +255,26 @@ export function WaiterOrderEntry({
 
   const renderCartFooter = (buttonLabel: string) => (
     <>
-      <div className="border-t border-slate-800 p-4">
+      <div className="border-t border-slate-800 p-2.5">
         <textarea
           placeholder="Order notes (optional)..."
           value={orderNotes}
           onChange={(e) => setOrderNotes(e.target.value)}
-          className="w-full resize-none rounded-xl border border-slate-700 bg-slate-900 p-3 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500"
+          className="w-full resize-none rounded-xl border border-slate-700 bg-slate-900 p-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500"
           rows={2}
         />
       </div>
 
-      <div className="border-t border-slate-800 bg-slate-950 p-4">
-        <div className="mb-3 flex items-center justify-between">
-          <span className="text-slate-400">Total</span>
-          <span className="text-xl font-bold text-slate-100">
+      <div className="border-t border-slate-800 bg-slate-950 p-2.5">
+        <div className="mb-2 flex items-center justify-between">
+          <span className="text-slate-400 text-sm">Total</span>
+          <span className="font-bold text-slate-100">
             {formatPrice(cartTotal)}
           </span>
         </div>
         <Button
           variant="primary"
-          size="lg"
+          size="sm"
           onClick={handleSubmit}
           isLoading={isSubmitting}
           className="w-full"
@@ -339,19 +338,19 @@ export function WaiterOrderEntry({
               placeholder="Search menu items..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+              className="w-full pl-10 pr-4 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
             />
             </div>
             <button
               onClick={() => setSearchQuery(searchQuery.trim())}
-              className="px-3 py-2.5 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 text-sm font-medium hover:bg-slate-700 transition-colors"
+              className="px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 text-sm font-medium hover:bg-slate-700 transition-colors"
             >
               Search
             </button>
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
-                className="px-3 py-2.5 rounded-lg bg-slate-800 border border-slate-700 text-slate-400 text-sm hover:text-slate-200 hover:bg-slate-700 transition-colors"
+                className="px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-slate-400 text-sm hover:text-slate-200 hover:bg-slate-700 transition-colors"
               >
                 Clear
               </button>
@@ -374,13 +373,9 @@ export function WaiterOrderEntry({
               </button>
             ))}
           </div>
-          <div className="mt-1 flex items-center justify-between gap-3 text-xs text-slate-500">
+          <div className="mt-1 text-xs text-slate-500">
             <span>
               Showing {filteredItems.length} item{filteredItems.length !== 1 ? 's' : ''}
-            </span>
-            <span className="inline-flex items-center gap-1 text-amber-400">
-              <SparklesIcon className="h-3.5 w-3.5" />
-              Quick add enabled
             </span>
           </div>
         </div>
@@ -440,23 +435,17 @@ export function WaiterOrderEntry({
           <div
             className={`fixed inset-0 z-30 lg:static lg:z-auto lg:flex flex-col w-full lg:w-[22rem] xl:w-[24rem] bg-slate-900 border-l border-slate-800 transition-transform duration-200 ${showCart ? 'flex' : 'hidden lg:flex'}`}
           >
-            <div className="border-b border-slate-800 p-4 flex items-center justify-between gap-3">
-              <div>
-                <h3 className="font-semibold text-slate-100 flex items-center gap-2">
-                  <ShoppingCartIcon className="w-5 h-5" />
-                  Order Items
-                </h3>
-                <p className="text-xs text-slate-500 mt-1">Review and submit, then print from served orders.</p>
-              </div>
-              <div className="flex items-center gap-2">
+            <div className="border-b border-slate-800 p-2.5 flex items-center justify-between gap-3">
+              <h3 className="font-semibold text-slate-100 flex items-center gap-2">
+                <ShoppingCartIcon className="w-5 h-5" />
                 <Badge variant="count" size="sm">{cartItemCount}</Badge>
-                <button
-                  onClick={() => setShowCart(false)}
-                  className="lg:hidden p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800"
-                >
-                  <XIcon className="w-4 h-4" />
-                </button>
-              </div>
+              </h3>
+              <button
+                onClick={() => setShowCart(false)}
+                className="lg:hidden p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800"
+              >
+                <XIcon className="w-4 h-4" />
+              </button>
             </div>
             {cart.length === 0 ? (
               <div className="flex-1 flex flex-col items-center justify-center text-slate-500 gap-2 p-4">
