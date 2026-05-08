@@ -66,19 +66,6 @@ const PAYMENT_METHODS = [
   { code: '04', label: 'Mobile Money' },
 ];
 
-function decodeJwtPayload(token: string): Record<string, any> | null {
-  try {
-    const parts = token.split('.');
-    if (parts.length < 2) return null;
-    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-    const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
-    const json = atob(padded);
-    return JSON.parse(json);
-  } catch {
-    return null;
-  }
-}
-
 // ── Main POS ─────────────────────────────────────────────────────────────────
 
 interface MinimartPOSProps {
@@ -130,19 +117,6 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
   const [taxRate, setTaxRate] = useState(0);
   const [taxLabel, setTaxLabel] = useState('Tax');
 
-  useEffect(() => {
-    let mounted = true;
-    supabase.auth.getSession().then(({ data }) => {
-      if (!mounted) return;
-      const token = data.session?.access_token;
-      const payload = token ? decodeJwtPayload(token) : null;
-      const claim = payload?.restaurant_id;
-      if (typeof claim === 'string' && claim.trim()) {
-        setSessionRestaurantId(claim.trim());
-      }
-    }).catch(() => {});
-    return () => { mounted = false; };
-  }, []);
 
   const loadShiftStats = useCallback(async () => {
     if (!activeRestaurantId || !cashier?.id) return;

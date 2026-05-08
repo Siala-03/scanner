@@ -9,18 +9,7 @@ function toDate(value: unknown): Date {
   return value instanceof Date ? value : new Date(String(value ?? Date.now()));
 }
 
-function decodeJwtPayload(token: string): Record<string, any> | null {
-  try {
-    const parts = token.split('.');
-    if (parts.length < 2) return null;
-    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-    const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
-    const json = atob(padded);
-    return JSON.parse(json);
-  } catch {
-    return null;
-  }
-}
+
 
 function mapCustomer(row: any): Customer {
   return {
@@ -104,20 +93,8 @@ function getRestaurantIdFromStorage(): string | undefined {
   return undefined;
 }
 
-async function resolveRestaurantId(): Promise<string | undefined> {
-  const fromStorage = getRestaurantIdFromStorage();
-  if (fromStorage) return fromStorage;
-
-  const { data } = await supabase.auth.getSession();
-  const token = data.session?.access_token;
-  const payload = token ? decodeJwtPayload(token) : null;
-  const claimId = payload?.restaurant_id;
-  if (typeof claimId === 'string' && claimId.trim()) {
-    localStorage.setItem('restaurantId', claimId.trim());
-    return claimId.trim();
-  }
-
-  return undefined;
+function resolveRestaurantId(): string | undefined {
+  return getRestaurantIdFromStorage() ?? undefined;
 }
 
 // Customer management
