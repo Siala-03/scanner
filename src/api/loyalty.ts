@@ -111,6 +111,18 @@ export async function createOrFindCustomer(customerData: {
   const email = customerData.email?.trim();
   const name = customerData.name?.trim();
 
+  // Prefer backend route for customer-portal flows where Supabase RLS may block direct writes.
+  try {
+    const customer = await apiRequest<any>('/loyalty/customers', {
+      method: 'POST',
+      includeAuthHeaders: false,
+      json: { phone, email, name, restaurantId },
+    });
+    return mapCustomer(customer);
+  } catch {
+    // Fallback to direct Supabase access.
+  }
+
   let found: any | null = null;
   if (phone) {
     found = await findCustomerBy('phone', phone, restaurantId);
@@ -119,7 +131,30 @@ export async function createOrFindCustomer(customerData: {
     found = await findCustomerBy('email', email, restaurantId);
   }
 
-  if (found) return mapCustomer(found);
+  if (found) {
+    const nextName = name || found.name || null;
+    const nextEmail = email || found.email || null;
+
+    // Keep customer profile fresh when an existing record is identified by phone/email.
+    if (nextName !== found.name || nextEmail !== found.email) {
+      const updated = await db
+        .from('customers')
+        .update({
+          name: nextName,
+          email: nextEmail,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', found.id)
+        .select('*')
+        .single();
+
+      if (!updated.error) {
+        return mapCustomer(updated.data);
+      }
+    }
+
+    return mapCustomer(found);
+  }
 
   const id = `cust-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
   const insertPayload = {

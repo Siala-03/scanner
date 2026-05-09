@@ -83,6 +83,7 @@ export interface Expense {
   approvedBy?: string; // user id who approved
   approvedAt?: string; // ISO timestamp
   createdBy: string; // user id who created
+  createdByName?: string;
   createdByRole?: UserRole;
   createdAt: string;
   updatedAt: string;

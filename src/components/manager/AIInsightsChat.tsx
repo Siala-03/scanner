@@ -6,6 +6,14 @@ interface Message {
   role: 'user' | 'assistant';
   content: string;
   actions?: string[];
+  insightCards?: Array<{
+    title: string;
+    metric: string;
+    value: string;
+    trend: 'up' | 'down' | 'flat' | 'mixed';
+    impact: 'high' | 'medium' | 'low';
+    recommendation: string;
+  }>;
 }
 
 interface AIInsightsChatProps {
@@ -52,7 +60,12 @@ export function AIInsightsChat(_props: AIInsightsChatProps) {
       const data = await askAIAnalyst(text);
       setMessages(prev => [
         ...prev,
-        { role: 'assistant', content: data.answer, actions: data.suggestedActions },
+        {
+          role: 'assistant',
+          content: data.answer,
+          actions: data.suggestedActions,
+          insightCards: data.insightCards || data.structured?.insightCards || [],
+        },
       ]);
     } catch (error: any) {
       const msg = error?.message || 'An error occurred. Please try again.';
@@ -137,6 +150,20 @@ export function AIInsightsChat(_props: AIInsightsChatProps) {
                           {action.replace(/_/g, ' ')}
                           <ArrowRight className="w-2.5 h-2.5" />
                         </span>
+                      ))}
+                    </div>
+                  )}
+                  {msg.insightCards && msg.insightCards.length > 0 && (
+                    <div className="mt-2.5 pt-2.5 border-t border-slate-700 space-y-2">
+                      {msg.insightCards.slice(0, 4).map((card) => (
+                        <div key={`${card.title}-${card.metric}`} className="rounded-lg border border-slate-700 bg-slate-900/60 p-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-xs font-semibold text-amber-300">{card.title}</p>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-700 text-slate-300">{card.impact}</span>
+                          </div>
+                          <p className="text-[11px] text-slate-300 mt-1">{card.metric}: <span className="text-slate-100 font-medium">{card.value}</span></p>
+                          <p className="text-[11px] text-slate-400 mt-1">{card.recommendation}</p>
+                        </div>
                       ))}
                     </div>
                   )}

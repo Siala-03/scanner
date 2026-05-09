@@ -286,7 +286,7 @@ export default function ManagerExpenseApproval() {
     }
   };
 
-  const renderExpenseTable = (expenses: ExpenseWithDetails[], showActions: boolean) => (
+  const renderExpenseTable = (expenses: ExpenseWithDetails[]) => (
     <div className="overflow-x-auto">
       <table className="w-full">
         <thead className="bg-slate-800 border-b border-slate-700">
@@ -320,7 +320,7 @@ export default function ManagerExpenseApproval() {
               </td>
               <td className="px-3 md:px-6 py-4 text-sm md:text-base text-slate-100">
                 <span className="inline-block px-2 py-1 bg-amber-900/40 text-amber-200 rounded text-xs border border-amber-700">
-                  {expense.createdByRole || expense.createdBy?.split('@')[0] || 'Staff'}
+                  {expense.createdByName || expense.createdByRole || expense.createdBy?.split('@')[0] || 'Staff'}
                 </span>
               </td>
               <td className="px-3 md:px-6 py-4 space-x-2">
@@ -430,7 +430,7 @@ export default function ManagerExpenseApproval() {
         {tab === 'pending' && (
           <div className="overflow-hidden">
             {pendingExpenses.length > 0 ? (
-              renderExpenseTable(pendingExpenses, true)
+              renderExpenseTable(pendingExpenses)
             ) : (
               <p className="p-6 text-center text-slate-400">
                 No pending expenses for approval
@@ -443,7 +443,7 @@ export default function ManagerExpenseApproval() {
         {tab === 'approved' && (
           <div className="overflow-hidden">
             {approvedExpenses.length > 0 ? (
-              renderExpenseTable(approvedExpenses, true)
+              renderExpenseTable(approvedExpenses)
             ) : (
               <p className="p-6 text-center text-slate-400">
                 No approved expenses
@@ -456,7 +456,7 @@ export default function ManagerExpenseApproval() {
         {tab === 'rejected' && (
           <div className="overflow-hidden">
             {rejectedExpenses.length > 0 ? (
-              renderExpenseTable(rejectedExpenses, false)
+              renderExpenseTable(rejectedExpenses)
             ) : (
               <p className="p-6 text-center text-slate-400">
                 No rejected expenses
@@ -626,7 +626,7 @@ export default function ManagerExpenseApproval() {
                 <div>
                   <p className="text-sm text-slate-400">Created By</p>
                   <p className="font-medium text-slate-100">
-                    {selectedExpense.createdByRole || selectedExpense.createdBy?.split('@')[0] || 'Staff'}
+                    {selectedExpense.createdByName || selectedExpense.createdByRole || selectedExpense.createdBy?.split('@')[0] || 'Staff'}
                   </p>
                 </div>
               </div>

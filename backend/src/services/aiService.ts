@@ -51,6 +51,36 @@ interface AiSnapshot {
   };
 }
 
+interface AiInsightCard {
+  title: string;
+  metric: string;
+  value: string;
+  trend: 'up' | 'down' | 'flat' | 'mixed';
+  impact: 'high' | 'medium' | 'low';
+  recommendation: string;
+}
+
+interface AiStructuredResponse {
+  executiveSummary: string[];
+  crossModuleFindings: {
+    inventory: string[];
+    sales: string[];
+    waste: string[];
+    finance: string[];
+    marketing: string[];
+    reservations: string[];
+    customers: string[];
+    staffing: string[];
+  };
+  priorityActions: {
+    now: string[];
+    thisWeek: string[];
+    thisMonth: string[];
+  };
+  risksAndDataGaps: string[];
+  insightCards: AiInsightCard[];
+}
+
 export const analyzeRestaurantData = async (restaurantId: string, userPrompt: string) => {
   const apiKey = process.env.GEMINI_API_KEY;
 
@@ -159,9 +189,13 @@ export const analyzeRestaurantData = async (restaurantId: string, userPrompt: st
     throw new Error('The AI returned an empty response. Please rephrase your question and try again.');
   }
 
+  const structured = parseStructuredResponse(answerText);
+
   return {
-    answer: answerText,
+    answer: structured ? formatStructuredAnswer(structured) : answerText,
     suggestedActions: deriveActionsFromContext(snapshot),
+    structured,
+    insightCards: structured?.insightCards ?? [],
     timestamp: new Date()
   };
 };
@@ -614,16 +648,147 @@ STRICT OUTPUT RULES
 4) Prefer specific actions with expected impact and priority.
 
 RESPONSE FORMAT
-Return the answer with these sections:
-1. Executive Summary (3-5 bullets)
-2. Cross-Module Findings (Inventory, Sales, Waste, Finance, Marketing, Reservations, Customers, Staffing)
-3. Priority Actions (Now / This Week / This Month)
-4. Risks & Data Gaps
+Return ONLY a valid JSON object (no markdown, no code fences, no extra text) using this exact schema:
+{
+  "executiveSummary": ["string"],
+  "crossModuleFindings": {
+    "inventory": ["string"],
+    "sales": ["string"],
+    "waste": ["string"],
+    "finance": ["string"],
+    "marketing": ["string"],
+    "reservations": ["string"],
+    "customers": ["string"],
+    "staffing": ["string"]
+  },
+  "priorityActions": {
+    "now": ["string"],
+    "thisWeek": ["string"],
+    "thisMonth": ["string"]
+  },
+  "risksAndDataGaps": ["string"],
+  "insightCards": [
+    {
+      "title": "string",
+      "metric": "string",
+      "value": "string",
+      "trend": "up|down|flat|mixed",
+      "impact": "high|medium|low",
+      "recommendation": "string"
+    }
+  ]
+}
 
 CURRENT SNAPSHOT
 ${JSON.stringify(snapshot, null, 2)}
 `.trim();
 };
+
+function parseStructuredResponse(rawText: string): AiStructuredResponse | null {
+  const parsed = extractJsonObject(rawText);
+  if (!parsed || typeof parsed !== 'object') {
+    return null;
+  }
+
+  const value = parsed as Partial<AiStructuredResponse>;
+  if (!value.executiveSummary || !Array.isArray(value.executiveSummary)) {
+    return null;
+  }
+
+  return {
+    executiveSummary: toStringArray(value.executiveSummary),
+    crossModuleFindings: {
+      inventory: toStringArray(value.crossModuleFindings?.inventory),
+      sales: toStringArray(value.crossModuleFindings?.sales),
+      waste: toStringArray(value.crossModuleFindings?.waste),
+      finance: toStringArray(value.crossModuleFindings?.finance),
+      marketing: toStringArray(value.crossModuleFindings?.marketing),
+      reservations: toStringArray(value.crossModuleFindings?.reservations),
+      customers: toStringArray(value.crossModuleFindings?.customers),
+      staffing: toStringArray(value.crossModuleFindings?.staffing),
+    },
+    priorityActions: {
+      now: toStringArray(value.priorityActions?.now),
+      thisWeek: toStringArray(value.priorityActions?.thisWeek),
+      thisMonth: toStringArray(value.priorityActions?.thisMonth),
+    },
+    risksAndDataGaps: toStringArray(value.risksAndDataGaps),
+    insightCards: Array.isArray(value.insightCards)
+      ? value.insightCards
+          .map((card) => ({
+            title: String((card as any)?.title ?? '').trim(),
+            metric: String((card as any)?.metric ?? '').trim(),
+            value: String((card as any)?.value ?? '').trim(),
+            trend: normalizeTrend((card as any)?.trend),
+            impact: normalizeImpact((card as any)?.impact),
+            recommendation: String((card as any)?.recommendation ?? '').trim(),
+          }))
+          .filter((card) => card.title && card.metric)
+      : [],
+  };
+}
+
+function extractJsonObject(rawText: string): unknown {
+  const text = rawText.trim();
+  try {
+    return JSON.parse(text);
+  } catch {
+    const match = text.match(/\{[\s\S]*\}/);
+    if (!match) return null;
+    try {
+      return JSON.parse(match[0]);
+    } catch {
+      return null;
+    }
+  }
+}
+
+function toStringArray(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.map((entry) => String(entry ?? '').trim()).filter(Boolean)
+    : [];
+}
+
+function normalizeTrend(value: unknown): AiInsightCard['trend'] {
+  const v = String(value ?? '').toLowerCase();
+  if (v === 'up' || v === 'down' || v === 'flat' || v === 'mixed') return v;
+  return 'mixed';
+}
+
+function normalizeImpact(value: unknown): AiInsightCard['impact'] {
+  const v = String(value ?? '').toLowerCase();
+  if (v === 'high' || v === 'medium' || v === 'low') return v;
+  return 'medium';
+}
+
+function formatStructuredAnswer(data: AiStructuredResponse): string {
+  const lines: string[] = [];
+  lines.push('Executive Summary');
+  for (const item of data.executiveSummary) lines.push(`- ${item}`);
+
+  lines.push('');
+  lines.push('Cross-Module Findings');
+  lines.push(`- Inventory: ${data.crossModuleFindings.inventory.join(' | ') || 'No major signal.'}`);
+  lines.push(`- Sales: ${data.crossModuleFindings.sales.join(' | ') || 'No major signal.'}`);
+  lines.push(`- Waste: ${data.crossModuleFindings.waste.join(' | ') || 'No major signal.'}`);
+  lines.push(`- Finance: ${data.crossModuleFindings.finance.join(' | ') || 'No major signal.'}`);
+  lines.push(`- Marketing: ${data.crossModuleFindings.marketing.join(' | ') || 'No major signal.'}`);
+  lines.push(`- Reservations: ${data.crossModuleFindings.reservations.join(' | ') || 'No major signal.'}`);
+  lines.push(`- Customers: ${data.crossModuleFindings.customers.join(' | ') || 'No major signal.'}`);
+  lines.push(`- Staffing: ${data.crossModuleFindings.staffing.join(' | ') || 'No major signal.'}`);
+
+  lines.push('');
+  lines.push('Priority Actions');
+  lines.push(`- Now: ${data.priorityActions.now.join(' | ') || 'None.'}`);
+  lines.push(`- This Week: ${data.priorityActions.thisWeek.join(' | ') || 'None.'}`);
+  lines.push(`- This Month: ${data.priorityActions.thisMonth.join(' | ') || 'None.'}`);
+
+  lines.push('');
+  lines.push('Risks & Data Gaps');
+  for (const item of data.risksAndDataGaps) lines.push(`- ${item}`);
+
+  return lines.join('\n');
+}
 
 function deriveActionsFromContext(snapshot: AiSnapshot): string[] {
   const actions: string[] = [];

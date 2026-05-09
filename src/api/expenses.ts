@@ -132,9 +132,40 @@ function normalizeExpense(raw: any): Expense {
     approvedBy: raw.approved_by,
     approvedAt: raw.approved_at,
     createdBy: raw.created_by || raw.submitted_by || 'system',
+    createdByName: raw.created_by_name || raw.createdByName || undefined,
     createdAt: raw.created_at,
     updatedAt: raw.updated_at,
   };
+}
+
+async function withCreatorNames(rawRows: any[], restaurantId: string): Promise<any[]> {
+  if (!Array.isArray(rawRows) || rawRows.length === 0) return rawRows;
+
+  const ids = Array.from(
+    new Set(
+      rawRows
+        .map((row) => String(row.created_by || row.submitted_by || '').trim())
+        .filter((id) => id.startsWith('staff-'))
+    )
+  );
+
+  if (ids.length === 0) return rawRows;
+
+  const staffResult = await supabase
+    .from('staff')
+    .select('id,name')
+    .eq('restaurant_id', restaurantId)
+    .in('id', ids);
+
+  if (staffResult.error || !staffResult.data) {
+    return rawRows;
+  }
+
+  const nameById = new Map<string, string>(staffResult.data.map((row: any) => [row.id, row.name]));
+  return rawRows.map((row) => ({
+    ...row,
+    created_by_name: nameById.get(String(row.created_by || row.submitted_by || '')) || row.created_by_name || null,
+  }));
 }
 
 // ============================================
@@ -309,10 +340,12 @@ export async function fetchExpenses(filters?: ExpenseFilters): Promise<Expense[]
 
   const { data, error } = await query;
   if (error) { console.error('fetchExpenses error:', error); return []; }
-  return (data || []).map(normalizeExpense);
+  const enrichedRows = await withCreatorNames(data || [], restaurantId);
+  return enrichedRows.map(normalizeExpense);
 }
 
 export async function fetchExpense(id: string): Promise<Expense> {
+  const restaurantId = getRestaurantId();
   const { data, error } = await supabase
     .from('expenses')
     .select('*')
@@ -320,7 +353,8 @@ export async function fetchExpense(id: string): Promise<Expense> {
     .single();
 
   if (error) { console.error('fetchExpense error:', error); throw error; }
-  return normalizeExpense(data);
+  const enriched = restaurantId ? await withCreatorNames([data], restaurantId) : [data];
+  return normalizeExpense(enriched[0]);
 }
 
 export async function createExpense(data: ExpenseFormData): Promise<Expense> {

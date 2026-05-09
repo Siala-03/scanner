@@ -4,6 +4,32 @@ export interface AIResponse {
   answer: string;
   suggestedActions: string[];
   timestamp: string;
+  structured?: {
+    executiveSummary: string[];
+    crossModuleFindings: Record<string, string[]>;
+    priorityActions: {
+      now: string[];
+      thisWeek: string[];
+      thisMonth: string[];
+    };
+    risksAndDataGaps: string[];
+    insightCards: Array<{
+      title: string;
+      metric: string;
+      value: string;
+      trend: 'up' | 'down' | 'flat' | 'mixed';
+      impact: 'high' | 'medium' | 'low';
+      recommendation: string;
+    }>;
+  } | null;
+  insightCards?: Array<{
+    title: string;
+    metric: string;
+    value: string;
+    trend: 'up' | 'down' | 'flat' | 'mixed';
+    impact: 'high' | 'medium' | 'low';
+    recommendation: string;
+  }>;
 }
 
 /**

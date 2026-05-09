@@ -171,7 +171,7 @@ export default function ExpenseApprovalV2() {
                 <td className="px-4 py-3">{expense.description}</td>
                 <td className="px-4 py-3">{categoryName(expense.categoryId)}</td>
                 <td className="px-4 py-3">RWF {Number(expense.amount || 0).toFixed(0)}</td>
-                <td className="px-4 py-3">{expense.createdBy || 'staff'}</td>
+                <td className="px-4 py-3">{expense.createdByName || expense.createdBy || 'staff'}</td>
                 <td className="px-4 py-3">{expense.approvalStatus}</td>
                 {tab === 'pending' && (
                   <td className="px-4 py-3 space-y-2">
