@@ -9,8 +9,9 @@ export class ApiError extends Error {
   }
 }
 
-// API base URL - defaults to production backend, override with VITE_API_URL if needed
-const API_BASE = import.meta.env.VITE_API_URL || '';
+// API base URL — defaults to /api for same-origin deployments.
+// Override VITE_API_URL with a full URL (e.g. https://backend.example.com/api) for external backends.
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
 export async function apiRequest<T>(

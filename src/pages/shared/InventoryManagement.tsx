@@ -230,7 +230,7 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
     const nonMenuItems = inventory
       .map(rec => normalizeInventoryRecord(rec))
       .filter(rec => !menuItemSet.has(rec.menuItemId))
-      .map(rec => ({ id: rec.menuItemId, name: rec.menuItemId, isMenuItem: false }));
+      .map(rec => ({ id: rec.menuItemId, name: (rec as any).description || rec.menuItemId, isMenuItem: false }));
     return [
       ...menuItems.map(m => ({ id: m.id, name: m.name, isMenuItem: true })),
       ...nonMenuItems,
@@ -1859,10 +1859,11 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                                     onClick={async () => {
                                       if (linkedMenuItem) {
                                         const linkedName = linkedMenuItem.name;
-                                        if (!window.confirm(`Unlink this inventory record from "${linkedName}"?\nStock tracking will stop until re-linked.`)) return;
+                                        if (!window.confirm(`Unlink this inventory record from "${linkedName}"?\nStock tracking will pause until re-linked.`)) return;
                                         try {
                                           await apiDelinkInventoryRecord(row.rec?.id ?? row.item.id);
                                           await refresh();
+                                          alert(`"${linkedName}" unlinked. Stock tracking paused until re-linked.`);
                                         } catch (err) {
                                           alert('Failed to unlink: ' + getErrorMessage(err));
                                         }
@@ -1882,6 +1883,8 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                                           const existing = latestMenu.find((m: any) => String(m?.name || '').trim().toLowerCase() === name.toLowerCase());
                                           if (existing?.id) {
                                             await apiRelinkInventoryRecord(recId, existing.id);
+                                            await refresh();
+                                            alert(`Linked to existing ${isMinimartScope ? 'product' : 'menu item'} "${existing.name}". Sales will auto-deduct stock.`);
                                           } else {
                                             const payload: any = { name, price, category, is_available: true };
                                             if (isMinimartScope) { payload.requires_kitchen = false; payload.prep_time = 0; }
@@ -1889,8 +1892,9 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                                             if (preservedSku) payload.sku = preservedSku;
                                             const newItem = await createMenuItem(payload);
                                             await apiRelinkInventoryRecord(recId, newItem.id);
+                                            await refresh();
+                                            alert(`"${newItem.name}" added to ${isMinimartScope ? 'products' : 'menu'} and linked. Sales will auto-deduct stock.`);
                                           }
-                                          await refresh();
                                         } catch (err) {
                                           alert('Failed to link: ' + getErrorMessage(err));
                                         } finally {
@@ -2802,20 +2806,38 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                 <div key={idx} className="grid grid-cols-[1fr_80px_90px_90px_28px] gap-2 items-center p-2 bg-slate-800/50 rounded-lg border border-slate-700/30">
                   <select
                     value={item.menuItemId}
-                    onChange={(e) => setNewPOItems((v) => v.map((i, j) => j === idx ? { ...i, menuItemId: e.target.value } : i))}
+                    onChange={(e) => {
+                      const id = e.target.value;
+                      const rec = inventoryMap[id];
+                      setNewPOItems((v) => v.map((i, j) => j === idx ? {
+                        ...i,
+                        menuItemId: id,
+                        unitCost: rec?.unitCost && rec.unitCost > 0 ? rec.unitCost : i.unitCost,
+                      } : i));
+                    }}
                     className="px-2 py-2 rounded-lg bg-slate-900 border border-slate-600 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
                   >
                     <option value="">Select Item</option>
                     <optgroup label="Menu Items">
-                      {menuItems.map((m) => (
-                        <option key={m.id} value={m.id}>{m.name}</option>
-                      ))}
+                      {menuItems.map((m) => {
+                        const stock = inventoryMap[m.id]?.stock ?? null;
+                        return (
+                          <option key={m.id} value={m.id}>
+                            {m.name}{stock !== null ? ` — ${stock} in stock` : ''}
+                          </option>
+                        );
+                      })}
                     </optgroup>
                     {allInventoryItems.filter(i => !i.isMenuItem).length > 0 && (
                       <optgroup label="Other Inventory Items">
-                        {allInventoryItems.filter(i => !i.isMenuItem).map((item) => (
-                          <option key={item.id} value={item.id}>{item.name}</option>
-                        ))}
+                        {allInventoryItems.filter(i => !i.isMenuItem).map((invItem) => {
+                          const stock = inventoryMap[invItem.id]?.stock ?? null;
+                          return (
+                            <option key={invItem.id} value={invItem.id}>
+                              {invItem.name}{stock !== null ? ` — ${stock} in stock` : ''}
+                            </option>
+                          );
+                        })}
                       </optgroup>
                     )}
                   </select>

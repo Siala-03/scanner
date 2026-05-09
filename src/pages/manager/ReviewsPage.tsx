@@ -177,7 +177,7 @@ export function ReviewsPage() {
                     {r.customerName && <span className="text-xs text-slate-500">· {r.customerName}</span>}
                   </div>
                   <time className="text-xs text-slate-500 flex-shrink-0">
-                    {new Date(r.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    {r.createdAt ? new Date(r.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
                   </time>
                 </div>
                 {r.comment && <p className="text-sm text-slate-300 italic">"{r.comment}"</p>}
@@ -209,7 +209,7 @@ export function ReviewsPage() {
                       <Stars rating={r.rating} />
                       {r.customerName && <span className="text-xs text-slate-500">· {r.customerName}</span>}
                       <time className="text-xs text-slate-500">
-                        {new Date(r.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        {r.createdAt ? new Date(r.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
                       </time>
                     </div>
                     {r.comment && <p className="text-sm text-slate-300 italic">"{r.comment}"</p>}

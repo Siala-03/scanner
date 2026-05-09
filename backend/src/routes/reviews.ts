@@ -147,12 +147,21 @@ router.get('/menu-items/stats', async (req: Request, res: Response) => {
 router.delete('/menu-items/:id', authenticate, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const restaurantId = req.restaurantId;
-    if (!restaurantId) return res.status(400).json({ error: 'restaurantId required' });
 
-    const result = await pool.query(
-      'DELETE FROM menu_item_reviews WHERE id = $1 AND restaurant_id = $2 RETURNING id',
-      [req.params.id, restaurantId]
-    );
+    // Build query based on whether restaurantId is available
+    let result;
+    if (restaurantId) {
+      result = await pool.query(
+        'DELETE FROM menu_item_reviews WHERE id = $1 AND restaurant_id = $2 RETURNING id',
+        [req.params.id, restaurantId]
+      );
+    } else {
+      // Fallback if staff member doesn't have restaurant_id (legacy compatibility)
+      result = await pool.query(
+        'DELETE FROM menu_item_reviews WHERE id = $1 RETURNING id',
+        [req.params.id]
+      );
+    }
 
     if (result.rowCount === 0) {
       return res.status(404).json({ error: 'Review not found' });
