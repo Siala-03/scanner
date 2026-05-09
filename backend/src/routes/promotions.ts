@@ -5,6 +5,12 @@ import { rowsToCamelCase, toCamelCase } from '../utils/camelCase.js';
 
 const router = Router();
 
+interface PromotionPayload {
+  minOrderAmount: number;
+  type: 'percentage' | 'fixed';
+  discountValue: number;
+}
+
 function promoId(): string {
   return `promo_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
 }
@@ -46,7 +52,7 @@ router.post('/validate', async (req, res: Response) => {
       return res.status(404).json({ error: 'Invalid or expired promo code' });
     }
 
-    const promo = toCamelCase(result.rows[0]);
+    const promo = toCamelCase(result.rows[0]) as PromotionPayload;
     const subtotal = orderSubtotal || 0;
 
     if (subtotal < promo.minOrderAmount) {

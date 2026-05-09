@@ -6,6 +6,14 @@ import { notifyReservationConfirmed } from '../services/notificationService.js';
 
 const router = Router();
 
+interface ReservationPayload {
+  customerPhone: string;
+  customerName: string;
+  reservationDate: string;
+  reservationTime: string;
+  tableNumber: number | null;
+}
+
 function reservationId(): string {
   return `rsv_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
 }
@@ -116,7 +124,7 @@ router.put('/:id', authenticate, async (req: AuthenticatedRequest, res: Response
       return res.status(404).json({ error: 'Reservation not found' });
     }
 
-    const reservation = toCamelCase(result.rows[0]);
+    const reservation = toCamelCase(result.rows[0]) as ReservationPayload;
 
     // Send SMS when manager confirms a reservation
     if (status === 'confirmed') {
@@ -125,7 +133,7 @@ router.put('/:id', authenticate, async (req: AuthenticatedRequest, res: Response
         reservation.customerName,
         reservation.reservationDate,
         reservation.reservationTime,
-        reservation.tableNumber
+        reservation.tableNumber ?? undefined
       ).catch(() => {});
     }
 

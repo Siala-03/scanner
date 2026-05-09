@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { HttpError } from '../http.js';
+import { pool } from '../db.js';
 
 export interface AuthenticatedRequest extends Request {
   staffId?: string;
@@ -31,31 +32,52 @@ export async function authenticate(
       throw new HttpError(500, 'Server misconfiguration: Supabase credentials not set.');
     }
 
-    // Verify the staff member exists in Supabase
-    const response = await fetch(
-      `${supabaseUrl}/rest/v1/staff?id=eq.${encodeURIComponent(staffId)}&select=id,role,restaurant_id&limit=1`,
-      {
-        headers: {
-          apikey: supabaseServiceKey,
-          Authorization: `Bearer ${supabaseServiceKey}`,
-          Accept: 'application/json',
-        },
+    let authenticated = false;
+
+    // Primary auth path: verify the staff member in Supabase.
+    try {
+      const response = await fetch(
+        `${supabaseUrl}/rest/v1/staff?id=eq.${encodeURIComponent(staffId)}&select=id,role,restaurant_id&limit=1`,
+        {
+          headers: {
+            apikey: supabaseServiceKey,
+            Authorization: `Bearer ${supabaseServiceKey}`,
+            Accept: 'application/json',
+          },
+        }
+      );
+
+      if (response.ok) {
+        const rows = (await response.json()) as Array<{ id: string; role: string; restaurant_id: string }>;
+        if (rows.length > 0) {
+          req.staffId = rows[0].id;
+          req.userId = rows[0].id;
+          req.staffRole = rows[0].role;
+          req.restaurantId = rows[0].restaurant_id;
+          authenticated = true;
+        }
       }
-    );
-
-    if (!response.ok) {
-      throw new HttpError(401, 'Authentication failed');
+    } catch {
+      // Fall through to Postgres fallback.
     }
 
-    const rows: any[] = await response.json();
-    if (!rows.length) {
-      throw new HttpError(401, 'Invalid authentication');
-    }
+    // Fallback auth path: local Postgres staff table.
+    if (!authenticated) {
+      const localResult = await pool.query(
+        'SELECT id, role, restaurant_id FROM staff WHERE id = $1 LIMIT 1',
+        [staffId]
+      );
 
-    req.staffId = rows[0].id;
-    req.userId = rows[0].id;
-    req.staffRole = rows[0].role;
-    req.restaurantId = rows[0].restaurant_id;
+      if (!localResult.rows.length) {
+        throw new HttpError(401, 'Invalid authentication');
+      }
+
+      const row = localResult.rows[0] as { id: string; role: string; restaurant_id: string };
+      req.staffId = row.id;
+      req.userId = row.id;
+      req.staffRole = row.role;
+      req.restaurantId = row.restaurant_id;
+    }
 
     next();
   } catch (error) {
