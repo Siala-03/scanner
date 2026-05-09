@@ -188,8 +188,17 @@ export async function createOrFindCustomer(customerData: {
 
 export async function getCustomers(): Promise<Customer[]> {
   try {
-    const restaurantId = await resolveRestaurantId();
+    const restaurantId = resolveRestaurantId();
     if (!restaurantId) return [];
+
+    // Try backend API first — createOrFindCustomer writes to PostgreSQL via the backend,
+    // so the manager view must read from the same store.
+    try {
+      const customers = await apiRequest<any[]>(`${LOYALTY_BASE}/customers`);
+      return customers.map(mapCustomer);
+    } catch {
+      // Backend unavailable or not configured — fall through to Supabase.
+    }
 
     const result = await db
       .from('customers')

@@ -1,13 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ClockIcon, ReceiptIcon, StarIcon } from 'lucide-react';
+import { ClockIcon, ReceiptIcon, StarIcon, MessageSquareIcon } from 'lucide-react';
 import { Order, OrderStatus } from '../../types';
 import { OrderTracker } from '../../components/customer/OrderTracker';
 import { ServiceReviewModal } from '../../components/customer/ServiceReviewModal';
 import { Card } from '../../components/ui/Card';
 import { EmptyState } from '../../components/ui/EmptyState';
+import { Button } from '../../components/ui/Button';
 import { formatPrice } from '../../utils/currency';
 import { hasReviewForOrder } from '../../utils/reviewsStorage';
-import { submitMenuItemReview } from '../../api/reviews';
+import { submitMenuItemReview, submitReview } from '../../api/reviews';
 import { hasReviewedMenuItem, markMenuItemReviewed } from '../../utils/menuItemReviewsStorage';
 import {
   closeExpiredTableSessions,
@@ -76,8 +77,34 @@ export function OrderStatusPage({ orders, tableNumber }: OrderStatusPageProps) {
 
   const [reviewingOrder, setReviewingOrder] = useState<Order | null>(null);
 
-  // Per-item ratings: menuItemId → { rating, submitted }
-  const [itemRatings, setItemRatings] = useState<Record<string, { rating: number; submitted: boolean }>>({});
+  // General service/experience rating (not waiter-specific)
+  const expRatingKey = `expRated_table_${tableNumber}`;
+  const [expRating, setExpRating] = useState(5);
+  const [expComment, setExpComment] = useState('');
+  const [expSubmitting, setExpSubmitting] = useState(false);
+  const [expSubmitted, setExpSubmitted] = useState(() => !!localStorage.getItem(expRatingKey));
+
+  const handleSubmitExpRating = async () => {
+    if (expSubmitting || expSubmitted) return;
+    const restaurantId = localStorage.getItem('restaurantId');
+    if (!restaurantId) return;
+    setExpSubmitting(true);
+    try {
+      await submitReview({
+        restaurantId,
+        tableNumber,
+        rating: expRating,
+        comment: expComment.trim() || undefined,
+      });
+    } catch {
+      // persist locally even if network fails
+    } finally {
+      localStorage.setItem(expRatingKey, '1');
+      setExpSubmitted(true);
+      setExpSubmitting(false);
+    }
+  };
+
 
   const handleItemRatingChange = (menuItemId: string, rating: number) => {
     setItemRatings((prev) => ({ ...prev, [menuItemId]: { rating, submitted: false } }));
@@ -269,6 +296,58 @@ export function OrderStatusPage({ orders, tableNumber }: OrderStatusPageProps) {
             </Card>
           </div>
         }
+
+        {/* Overall experience rating — always available once orders exist */}
+        <div className="mt-6">
+          <h2 className="font-semibold text-slate-700 mb-3">Rate Your Experience</h2>
+          <Card className="bg-white rounded-2xl shadow-sm border border-slate-100">
+            {expSubmitted ? (
+              <div className="flex items-center gap-2 text-sm text-green-600 py-1">
+                <StarIcon className="w-4 h-4 fill-green-500 text-green-500 flex-shrink-0" />
+                Thank you for your feedback!
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <MessageSquareIcon className="w-4 h-4 text-amber-500" />
+                  <p className="text-sm font-medium text-slate-800">How was your overall experience?</p>
+                </div>
+                <div className="flex gap-2">
+                  {[1, 2, 3, 4, 5].map((v) => (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => setExpRating(v)}
+                      className="p-0.5 touch-manipulation transition-transform active:scale-95"
+                      aria-label={`${v} stars`}
+                    >
+                      <StarIcon
+                        className={`w-8 h-8 transition-colors ${
+                          v <= expRating ? 'fill-amber-500 text-amber-500' : 'text-slate-300 hover:text-amber-300'
+                        }`}
+                      />
+                    </button>
+                  ))}
+                </div>
+                <textarea
+                  value={expComment}
+                  onChange={(e) => setExpComment(e.target.value)}
+                  rows={2}
+                  placeholder="Tell us what you loved or how we can improve... (optional)"
+                  className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 bg-slate-50 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 resize-none"
+                />
+                <Button
+                  variant="primary"
+                  fullWidth
+                  isLoading={expSubmitting}
+                  onClick={handleSubmitExpRating}
+                >
+                  Submit Feedback
+                </Button>
+              </div>
+            )}
+          </Card>
+        </div>
       </div>
       <ServiceReviewModal
         order={reviewingOrder}
