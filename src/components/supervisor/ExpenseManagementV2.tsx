@@ -167,12 +167,15 @@ export default function SupervisorExpenseManagementV2() {
           <label className="text-sm space-y-1">
             <span className="text-slate-300">Amount</span>
             <input
-              type="number"
-              min="1"
-              step="1"
-              value={form.amount}
-              onChange={(e) => setForm((prev) => ({ ...prev, amount: Number(e.target.value) }))}
+              type="text"
+              inputMode="decimal"
+              value={form.amount || ''}
+              onChange={(e) => {
+                const raw = e.target.value.replace(/,/g, '').trim();
+                setForm((prev) => ({ ...prev, amount: raw === '' ? 0 : Number(raw) }));
+              }}
               className="w-full rounded border border-slate-600 bg-slate-900 px-3 py-2"
+              placeholder="e.g., 273875.95"
               required
             />
           </label>

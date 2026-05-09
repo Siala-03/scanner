@@ -531,16 +531,18 @@ export default function ManagerExpenseApproval() {
                     Amount*
                   </label>
                   <input
-                    type="number"
-                    value={formData.amount}
-                    onChange={e =>
+                    type="text"
+                    inputMode="decimal"
+                    value={formData.amount || ''}
+                    onChange={e => {
+                      const raw = e.target.value.replace(/,/g, '').trim();
                       setFormData({
                         ...formData,
-                        amount: parseFloat(e.target.value),
-                      })
-                    }
+                        amount: raw === '' ? 0 : Number(raw),
+                      });
+                    }}
                     className="w-full border border-slate-600 bg-slate-700 text-slate-200 rounded-lg px-3 py-2 md:py-3 text-sm md:text-base focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500"
-                    step="0.01"
+                    placeholder="e.g., 273875.95"
                     required
                   />
                 </div>

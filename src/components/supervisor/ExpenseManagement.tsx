@@ -182,7 +182,7 @@ export default function SupervisorExpenseManagement() {
       return;
     }
 
-    const computedTaxAmount = Math.round((normalizedAmount * normalizedTaxRate) / 100);
+    const computedTaxAmount = Math.round(((normalizedAmount * normalizedTaxRate) / 100) * 100) / 100;
 
     try {
       setLoading(true);
@@ -628,17 +628,19 @@ export default function SupervisorExpenseManagement() {
                   {expense.currency} {Math.round(Number(expense.amount)).toLocaleString()}
                 </td>
                 <td className="px-6 py-4">
-                  <span
-                    className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(
-                      expense.approvalStatus
-                    )}`}
-                  >
-                    {expense.approvalStatus}
-                  </span>
-                </td>
-                <td className="px-6 py-4 space-x-2">
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={formData.amount || ''}
+                    onChange={e => {
+                      const raw = e.target.value.replace(/,/g, '').trim();
+                      setFormData({
+                        ...formData,
+                        amount: raw === '' ? 0 : Number(raw),
+                      });
+                    }}
                   <button
-                    onClick={() => handleViewDetails(expense)}
+                    placeholder="e.g., 273875.95"
                     className="text-blue-600 hover:text-blue-800 text-sm"
                   >
                     View
