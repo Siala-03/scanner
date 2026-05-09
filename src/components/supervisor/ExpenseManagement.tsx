@@ -631,6 +631,7 @@ export default function SupervisorExpenseManagement() {
                   <input
                     type="text"
                     inputMode="decimal"
+                    placeholder="e.g., 273875.95"
                     value={formData.amount || ''}
                     onChange={e => {
                       const raw = e.target.value.replace(/,/g, '').trim();
@@ -639,8 +640,8 @@ export default function SupervisorExpenseManagement() {
                         amount: raw === '' ? 0 : Number(raw),
                       });
                     }}
+                  />
                   <button
-                    placeholder="e.g., 273875.95"
                     className="text-blue-600 hover:text-blue-800 text-sm"
                   >
                     View
