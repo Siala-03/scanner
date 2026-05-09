@@ -236,6 +236,7 @@ export function CartPage({
         <CustomerIdentification
           onCustomerIdentified={setIdentifiedCustomer}
           identifiedCustomer={identifiedCustomer}
+          restaurantId={restaurantId}
         />
 
         {/* Loyalty program rewards */}

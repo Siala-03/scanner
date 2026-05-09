@@ -38,10 +38,11 @@ export async function submitReview(data: {
 
 export async function getMenuItemReviews(
   restaurantId: string,
-  menuItemId: string,
+  menuItemId?: string,
   limit = 10
 ): Promise<MenuItemReview[]> {
-  const q = new URLSearchParams({ restaurantId, menuItemId, limit: String(limit) });
+  const q = new URLSearchParams({ restaurantId, limit: String(limit) });
+  if (menuItemId) q.set('menuItemId', menuItemId);
   return apiRequest(`/reviews/menu-items?${q}`);
 }
 
@@ -63,4 +64,8 @@ export async function submitMenuItemReview(data: {
   customerName?: string;
 }): Promise<MenuItemReview> {
   return apiRequest('/reviews/menu-items', { method: 'POST', json: data });
+}
+
+export async function deleteMenuItemReview(id: string): Promise<void> {
+  await apiRequest(`/reviews/menu-items/${id}`, { method: 'DELETE' });
 }

@@ -143,6 +143,27 @@ router.get('/menu-items/stats', async (req: Request, res: Response) => {
   }
 });
 
+// DELETE /api/reviews/menu-items/:id  (manager only)
+router.delete('/menu-items/:id', authenticate, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const restaurantId = req.restaurantId;
+    if (!restaurantId) return res.status(400).json({ error: 'restaurantId required' });
+
+    const result = await pool.query(
+      'DELETE FROM menu_item_reviews WHERE id = $1 AND restaurant_id = $2 RETURNING id',
+      [req.params.id, restaurantId]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: 'Review not found' });
+    }
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error deleting menu item review:', err);
+    res.status(500).json({ error: 'Failed to delete review' });
+  }
+});
+
 // POST /api/reviews/menu-items  (public — submitted by customers)
 router.post('/menu-items', async (req: Request, res: Response) => {
   try {

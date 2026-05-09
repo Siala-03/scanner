@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ClockIcon, ReceiptIcon, StarIcon, MessageSquareIcon } from 'lucide-react';
-import { Order, OrderStatus } from '../../types';
+import { Order } from '../../types';
 import { OrderTracker } from '../../components/customer/OrderTracker';
 import { ServiceReviewModal } from '../../components/customer/ServiceReviewModal';
 import { Card } from '../../components/ui/Card';
@@ -76,6 +76,9 @@ export function OrderStatusPage({ orders, tableNumber }: OrderStatusPageProps) {
     !hasReviewForOrder(latestServedOrder.id);
 
   const [reviewingOrder, setReviewingOrder] = useState<Order | null>(null);
+
+  // Per-item ratings: menuItemId → { rating, submitted }
+  const [itemRatings, setItemRatings] = useState<Record<string, { rating: number; submitted: boolean }>>({});
 
   // General service/experience rating (not waiter-specific)
   const expRatingKey = `expRated_table_${tableNumber}`;

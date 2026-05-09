@@ -9,11 +9,13 @@ import type { Customer } from '../../types';
 interface CustomerIdentificationProps {
   onCustomerIdentified: (customer: Customer | null) => void;
   identifiedCustomer?: Customer | null;
+  restaurantId?: string;
 }
 
 export function CustomerIdentification({
   onCustomerIdentified,
-  identifiedCustomer
+  identifiedCustomer,
+  restaurantId: restaurantIdProp,
 }: CustomerIdentificationProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [phone, setPhone] = useState('');
@@ -33,7 +35,7 @@ export function CustomerIdentification({
 
     setIsLoading(true);
     try {
-      const restaurantId = localStorage.getItem('restaurantId');
+      const restaurantId = restaurantIdProp || localStorage.getItem('restaurantId');
       if (!restaurantId) {
         setError('Unable to join loyalty program: restaurant context is missing.');
         return;

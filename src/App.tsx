@@ -663,6 +663,7 @@ export function App() {
           tableNumber={tableNumber}
           orders={orders}
           restaurantName={restaurantName}
+          restaurantId={currentRestaurantId || undefined}
           initialTab={customerInitialTab}
           onPlaceOrder={handlePlaceOrder}
           onCallWaiter={() => handleCallWaiter(tableNumber)}
