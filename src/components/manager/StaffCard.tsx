@@ -77,7 +77,7 @@ export function StaffCard({
               <div className="flex items-center justify-center gap-1">
                 <StarIcon className="w-4 h-4 text-amber-400 fill-amber-400" />
                 <span className="text-lg font-bold text-white">
-                  {staff.performance.rating}
+                  {staff.performance.rating != null ? staff.performance.rating : '—'}
                 </span>
               </div>
               <p className="text-xs text-slate-400">Rating</p>

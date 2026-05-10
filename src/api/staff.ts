@@ -22,12 +22,13 @@ function getRestaurantId(): string | undefined {
   return undefined;
 }
 
-function normalizeStaff(raw: any): Staff {
+function normalizeStaff(raw: any, ratingMap?: Record<string, number | null>): Staff {
   const perf: Record<string, any> = raw.performance || {};
+  const realRating = ratingMap?.[raw.id] ?? null;
   const performance: StaffPerformance = {
     ordersServed:   perf.ordersServed   ?? perf.orders_served   ?? 0,
     avgServiceTime: perf.avgServiceTime ?? perf.avg_service_time ?? 15,
-    rating:         perf.rating         ?? 4.5,
+    rating:         realRating,
     totalRevenue:   perf.totalRevenue   ?? perf.total_revenue   ?? 0,
     shiftsThisWeek: perf.shiftsThisWeek ?? perf.shifts_this_week ?? 0,
   };
@@ -55,9 +56,28 @@ export async function fetchStaff(): Promise<Staff[]> {
     query = query.eq('restaurant_id', restaurantId);
   }
 
-  const { data, error } = await query;
+  // Fetch real ratings from reviews in parallel
+  const reviewsQuery = restaurantId
+    ? supabase.from('reviews').select('waiter_id, rating').eq('restaurant_id', restaurantId).not('waiter_id', 'is', null)
+    : Promise.resolve({ data: [] as any[], error: null });
+
+  const [{ data, error }, { data: reviewRows }] = await Promise.all([query, reviewsQuery]);
   if (error) throw error;
-  return (data || []).map(normalizeStaff);
+
+  // Compute per-waiter average rating from real review data
+  const ratingAgg: Record<string, { sum: number; count: number }> = {};
+  (reviewRows || []).forEach((r: any) => {
+    if (!r.waiter_id) return;
+    if (!ratingAgg[r.waiter_id]) ratingAgg[r.waiter_id] = { sum: 0, count: 0 };
+    ratingAgg[r.waiter_id].sum += r.rating;
+    ratingAgg[r.waiter_id].count++;
+  });
+  const ratingMap: Record<string, number | null> = {};
+  Object.entries(ratingAgg).forEach(([id, { sum, count }]) => {
+    ratingMap[id] = count > 0 ? Math.round((sum / count) * 10) / 10 : null;
+  });
+
+  return (data || []).map((row) => normalizeStaff(row, ratingMap));
 }
 
 export async function fetchStaffById(id: string): Promise<Staff> {

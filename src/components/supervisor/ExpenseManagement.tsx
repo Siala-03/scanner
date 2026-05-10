@@ -620,7 +620,11 @@ export default function SupervisorExpenseManagement() {
           <tbody className="divide-y">
             {filteredExpenses.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map(expense => (
               <tr key={expense.id} className="hover:bg-slate-700/50 text-slate-200">
-                <td className="px-6 py-4 text-sm">{expense.description}</td>
+                <td className="px-6 py-4 text-sm">
+                  <div className="font-medium">{expense.description}</div>
+                  {expense.vendorName && <div className="text-xs text-slate-400 mt-0.5">{expense.vendorName}</div>}
+                  {expense.expenseDate && <div className="text-xs text-slate-500 mt-0.5">{new Date(expense.expenseDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</div>}
+                </td>
                 <td className="px-6 py-4 text-sm">
                   {expense.category?.name || categoryNameById.get(expense.categoryId) || expense.categoryId || 'Uncategorized'}
                 </td>
@@ -628,39 +632,34 @@ export default function SupervisorExpenseManagement() {
                   {expense.currency} {Math.round(Number(expense.amount)).toLocaleString()}
                 </td>
                 <td className="px-6 py-4">
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    placeholder="e.g., 273875.95"
-                    value={formData.amount || ''}
-                    onChange={e => {
-                      const raw = e.target.value.replace(/,/g, '').trim();
-                      setFormData({
-                        ...formData,
-                        amount: raw === '' ? 0 : Number(raw),
-                      });
-                    }}
-                  />
-                  <button
-                    className="text-blue-600 hover:text-blue-800 text-sm"
-                  >
-                    View
-                  </button>
-                  {(expense.approvalStatus === 'draft' || expense.approvalStatus === 'pending_approval') && (
+                  <span className={`inline-block px-2 py-1 rounded-full text-xs font-semibold ${getStatusColor(expense.approvalStatus)}`}>
+                    {expense.approvalStatus === 'pending_approval' ? 'Pending' : (expense.approvalStatus || 'draft').charAt(0).toUpperCase() + (expense.approvalStatus || 'draft').slice(1)}
+                  </span>
+                </td>
+                <td className="px-6 py-4">
+                  <div className="flex items-center gap-3 flex-wrap">
                     <button
-                      onClick={() => handleSubmitForApproval(expense.id)}
-                      disabled={loading}
-                      className="text-green-600 hover:text-green-800 text-sm"
+                      onClick={() => handleViewDetails(expense)}
+                      className="text-blue-400 hover:text-blue-300 text-sm font-medium"
                     >
-                      Submit
+                      View
                     </button>
-                  )}
-                  <button
-                    onClick={() => handleGenerateReceipt(expense.id)}
-                    className="text-purple-600 hover:text-purple-800 text-sm"
-                  >
-                    Receipt
-                  </button>
+                    {(expense.approvalStatus === 'draft' || expense.approvalStatus === 'pending_approval') && (
+                      <button
+                        onClick={() => handleSubmitForApproval(expense.id)}
+                        disabled={loading}
+                        className="text-emerald-400 hover:text-emerald-300 text-sm font-medium disabled:opacity-50"
+                      >
+                        Submit
+                      </button>
+                    )}
+                    <button
+                      onClick={() => handleGenerateReceipt(expense.id)}
+                      className="text-purple-400 hover:text-purple-300 text-sm font-medium"
+                    >
+                      Receipt
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}

@@ -185,7 +185,7 @@ export interface OnlineQRCode {
 export interface StaffPerformance {
   ordersServed: number;
   avgServiceTime: number; // in minutes
-  rating: number; // 1-5
+  rating: number | null; // null = no reviews yet
   totalRevenue: number;
   shiftsThisWeek: number;
 }
