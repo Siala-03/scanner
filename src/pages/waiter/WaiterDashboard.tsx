@@ -29,7 +29,7 @@ import { QRScanner } from '../../components/waiter/QRScanner';
 import { WaiterOrderEntry } from '../../components/waiter/WaiterOrderEntry';
 import { loadReviews } from '../../utils/reviewsStorage';
 import { useStaffKPIs } from '../../hooks/useKPIs';
-import { buildReceiptHtml, orderToReceiptData } from '../../utils/receipt';
+import { orderToReceiptData } from '../../utils/receipt';
 import { printOrderReceipt as printThermal } from '../../utils/sunmiPrinter';
 import type { PaymentEntry } from '../../utils/receipt';
 import { ReceiptShareModal } from '../../components/ui/ReceiptShareModal';

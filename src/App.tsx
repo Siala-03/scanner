@@ -14,6 +14,7 @@ import { RevenueReports } from './pages/supervisor/RevenueReports';
 import { StaffPerformance } from './pages/supervisor/StaffPerformance';
 import { OrderHistoryPage } from './pages/supervisor/OrderHistoryPage';
 import { PaymentApprovalPanel } from './components/supervisor/PaymentApprovalPanel';
+import { AttendancePanel } from './components/supervisor/AttendancePanel';
 import { OnlineOrdersPage } from './pages/supervisor/OnlineOrdersPage';
 import { ManagerDashboard } from './pages/manager/ManagerDashboard';
 import { MenuManagement } from './pages/manager/MenuManagement';
@@ -47,7 +48,7 @@ import { StaffOrderPage } from './pages/shared/StaffOrderPage';
 
 type UserRole = 'customer' | 'waiter' | 'cashier' | 'supervisor' | 'manager' | 'kitchen' | 'superadmin' | 'supplier' | null;
 type ManagerPage = 'dashboard' | 'menu' | 'staff' | 'analytics' | 'performance' | 'qrcodes' | 'inventory' | 'history' | 'expenses' | 'credit' | 'loyalty' | 'promotions' | 'reservations' | 'scheduling' | 'reviews' | 'settings' | 'ebm';
-type SupervisorPage = 'dashboard' | 'revenue' | 'staff' | 'qrcodes' | 'inventory' | 'history' | 'expenses' | 'online-orders' | 'payments' | 'take-order';
+type SupervisorPage = 'dashboard' | 'revenue' | 'staff' | 'qrcodes' | 'inventory' | 'history' | 'expenses' | 'online-orders' | 'payments' | 'attendance' | 'take-order';
 
 const MANAGER_NAV_GROUPS: Array<{
   id: string;
@@ -841,6 +842,13 @@ export function App() {
               )}
             </Button>
             <Button
+              variant={supervisorPage === 'attendance' ? 'primary' : 'ghost'}
+              size="sm"
+              onClick={() => setSupervisorPage('attendance')}
+            >
+              Attendance
+            </Button>
+            <Button
               variant={supervisorPage === 'take-order' ? 'primary' : 'ghost'}
               size="sm"
               onClick={() => setSupervisorPage('take-order')}
@@ -889,6 +897,13 @@ export function App() {
               restaurantId={authUser?.restaurantId || localStorage.getItem('restaurantId') || undefined}
               staffId={authUser?.id}
               staffName={authUser?.name}
+            />
+          </div>
+        )}
+        {supervisorPage === 'attendance' && (
+          <div className="p-4 md:p-6">
+            <AttendancePanel
+              restaurantId={authUser?.restaurantId || localStorage.getItem('restaurantId') || undefined}
             />
           </div>
         )}
