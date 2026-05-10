@@ -110,7 +110,7 @@ export function LoyaltyManagement() {
       c.phone || '',
       c.email || '',
       String(c.totalPoints || 0),
-      c.createdAt ? new Date(c.createdAt).toLocaleDateString() : '',
+      c.joinDate ? new Date(c.joinDate).toLocaleDateString() : '',
     ]);
     const csvContent = [headers, ...rows]
       .map(row => row.map(cell => `"${cell.replace(/"/g, '""')}"`).join(','))
@@ -395,7 +395,7 @@ export function LoyaltyManagement() {
                         <div className="flex items-center gap-1.5">
                           <CalendarIcon className="w-3 h-3 text-slate-500" />
                           <span className="text-xs text-slate-400">
-                            {customer.createdAt ? new Date(customer.createdAt).toLocaleDateString() : '—'}
+                            {customer.joinDate ? new Date(customer.joinDate).toLocaleDateString() : '—'}
                           </span>
                         </div>
                       </td>

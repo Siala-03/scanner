@@ -10,7 +10,9 @@ const admin = () => createClient(
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return optionsResponse();
   const url = new URL(req.url);
-  const path = url.pathname.replace(/^\/inventory/, '');
+  const path = url.pathname
+    .replace(/^\/functions\/v1\/inventory/, '')
+    .replace(/^\/inventory/, '');
   const db = admin();
 
   try {
@@ -84,13 +86,28 @@ Deno.serve(async (req: Request) => {
       return cors(data);
     }
 
-    // DELETE /inventory/:id
+    // DELETE /inventory/:id — soft-delete inventory record
     if (req.method === 'DELETE' && idMatch) {
       await db.from('inventory_records')
         .update({ is_deleted: true })
         .eq('id', idMatch[1])
         .eq('restaurant_id', restaurantId);
       return cors({ message: 'Deleted' });
+    }
+
+    // DELETE /inventory/menu-items/:id — hard-delete a menu item (manager only)
+    const menuItemDeleteMatch = path.match(/^\/menu-items\/([^/]+)$/);
+    if (req.method === 'DELETE' && menuItemDeleteMatch) {
+      const menuItemId = menuItemDeleteMatch[1];
+      // Soft-delete any linked inventory records first
+      await db.from('inventory_records')
+        .update({ is_deleted: true })
+        .eq('menu_item_id', menuItemId)
+        .eq('restaurant_id', restaurantId);
+      // Hard-delete the menu item
+      const { error } = await db.from('menu_items').delete().eq('id', menuItemId).eq('restaurant_id', restaurantId);
+      if (error) return err(error.message);
+      return cors({ success: true });
     }
 
     // PATCH /inventory/:id/adjust

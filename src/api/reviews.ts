@@ -1,4 +1,4 @@
-import { apiRequest } from './http';
+import { callEdgeFn } from '../lib/supabase';
 import { Review, MenuItemReview, MenuItemRatingSummary } from '../types';
 
 export interface ReviewStats {
@@ -12,16 +12,15 @@ export async function getReviews(
   restaurantId: string,
   params?: { rating?: number; waiterId?: string; limit?: number }
 ): Promise<Review[]> {
-  const q = new URLSearchParams({ restaurantId });
-  if (params?.rating)   q.set('rating', String(params.rating));
-  if (params?.waiterId) q.set('waiterId', params.waiterId);
-  if (params?.limit)    q.set('limit', String(params.limit));
-  return apiRequest(`/reviews?${q}`);
+  const p: Record<string, string> = { restaurantId };
+  if (params?.rating)   p.rating   = String(params.rating);
+  if (params?.waiterId) p.waiterId = params.waiterId;
+  if (params?.limit)    p.limit    = String(params.limit);
+  return callEdgeFn('reviews', { params: p });
 }
 
 export async function getReviewStats(restaurantId: string): Promise<ReviewStats> {
-  const q = new URLSearchParams({ restaurantId });
-  return apiRequest(`/reviews/stats?${q}`);
+  return callEdgeFn('reviews/stats', { params: { restaurantId } });
 }
 
 export async function submitReview(data: {
@@ -33,7 +32,7 @@ export async function submitReview(data: {
   customerName?: string;
   waiterId?: string;
 }): Promise<Review> {
-  return apiRequest('/reviews', { method: 'POST', json: data });
+  return callEdgeFn('reviews', { method: 'POST', body: data, includeStaffHeader: false });
 }
 
 export async function getMenuItemReviews(
@@ -41,18 +40,18 @@ export async function getMenuItemReviews(
   menuItemId?: string,
   limit = 10
 ): Promise<MenuItemReview[]> {
-  const q = new URLSearchParams({ restaurantId, limit: String(limit) });
-  if (menuItemId) q.set('menuItemId', menuItemId);
-  return apiRequest(`/reviews/menu-items?${q}`);
+  const p: Record<string, string> = { restaurantId, limit: String(limit) };
+  if (menuItemId) p.menuItemId = menuItemId;
+  return callEdgeFn('reviews/menu-items', { params: p });
 }
 
 export async function getMenuItemRatingStats(
   restaurantId: string,
   menuItemIds?: string[]
 ): Promise<MenuItemRatingSummary[]> {
-  const q = new URLSearchParams({ restaurantId });
-  if (menuItemIds?.length) q.set('menuItemIds', menuItemIds.join(','));
-  return apiRequest(`/reviews/menu-items/stats?${q}`);
+  const p: Record<string, string> = { restaurantId };
+  if (menuItemIds?.length) p.menuItemIds = menuItemIds.join(',');
+  return callEdgeFn('reviews/menu-items/stats', { params: p });
 }
 
 export async function submitMenuItemReview(data: {
@@ -63,9 +62,9 @@ export async function submitMenuItemReview(data: {
   comment?: string;
   customerName?: string;
 }): Promise<MenuItemReview> {
-  return apiRequest('/reviews/menu-items', { method: 'POST', json: data });
+  return callEdgeFn('reviews/menu-items', { method: 'POST', body: data, includeStaffHeader: false });
 }
 
 export async function deleteMenuItemReview(id: string): Promise<void> {
-  await apiRequest(`/reviews/menu-items/${id}`, { method: 'DELETE' });
+  await callEdgeFn('reviews/menu-items', { method: 'DELETE', params: { id } });
 }

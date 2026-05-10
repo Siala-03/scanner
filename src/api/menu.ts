@@ -1,4 +1,4 @@
-import { supabase, type MenuItem } from '../lib/supabase';
+import { supabase, callEdgeFn, type MenuItem } from '../lib/supabase';
 
 let menuSkuColumnSupported: boolean | null = null;
 
@@ -232,8 +232,7 @@ export async function updateMenuItem(id: string, updates: Partial<MenuItem> & { 
 }
 
 export async function deleteMenuItem(id: string): Promise<void> {
-  const { error } = await supabase.from('menu_items').delete().eq('id', id);
-  if (error) throw error;
+  await callEdgeFn(`inventory/menu-items/${id}`, { method: 'DELETE' });
 }
 
 export async function toggleMenuItemAvailability(id: string, isAvailable: boolean): Promise<MenuItem> {

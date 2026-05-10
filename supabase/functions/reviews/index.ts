@@ -12,7 +12,9 @@ function uid() { return `rev-${Date.now().toString(36)}-${Math.random().toString
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return optionsResponse();
   const url = new URL(req.url);
-  const path = url.pathname.replace(/^\/reviews/, '');
+  const path = url.pathname
+    .replace(/^\/functions\/v1\/reviews/, '')
+    .replace(/^\/reviews/, '');
   const db = admin();
 
   try {
@@ -75,7 +77,18 @@ Deno.serve(async (req: Request) => {
       if (waiterId) q = q.eq('waiter_id', waiterId);
       const { data, error } = await q;
       if (error) return err(error.message);
-      return cors(data ?? []);
+      return cors((data ?? []).map((r: any) => ({
+        id: r.id,
+        restaurantId: r.restaurant_id,
+        orderId: r.order_id,
+        tableNumber: r.table_number,
+        rating: r.rating,
+        comment: r.comment,
+        customerName: r.customer_name,
+        waiterId: r.waiter_id,
+        waiterName: r.waiter_name,
+        createdAt: r.created_at,
+      })));
     }
 
     // ── Menu-item reviews (public) ──────────────────────────────────────────
@@ -146,6 +159,20 @@ Deno.serve(async (req: Request) => {
         orderId: data.order_id, rating: data.rating, comment: data.comment,
         customerName: data.customer_name, createdAt: data.created_at,
       }, { status: 201 });
+    }
+
+    // DELETE /reviews/menu-items?id=X — auth required
+    if (req.method === 'DELETE' && path === '/menu-items') {
+      const ctx = await authenticate(req);
+      const id = url.searchParams.get('id');
+      if (!id) return err('id is required', 400);
+      const { error } = await db
+        .from('menu_item_reviews')
+        .delete()
+        .eq('id', id)
+        .eq('restaurant_id', ctx.restaurantId);
+      if (error) return err(error.message);
+      return cors({ success: true });
     }
 
     return err('Not found', 404);
