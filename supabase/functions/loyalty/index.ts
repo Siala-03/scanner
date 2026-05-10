@@ -67,7 +67,6 @@ Deno.serve(async (req: Request) => {
           restaurant_id: restaurantId,
           total_points: 0,
           visit_count: 0,
-          join_date: new Date().toISOString(),
         })
         .select('*')
         .single();
@@ -86,7 +85,7 @@ Deno.serve(async (req: Request) => {
         .from('customers')
         .select('*')
         .eq('restaurant_id', restaurantId)
-        .order('join_date', { ascending: false, nullsFirst: false });
+        .order('created_at', { ascending: false, nullsFirst: false });
       if (error) return err(error.message);
       return cors(data ?? []);
     }

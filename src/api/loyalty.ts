@@ -18,8 +18,8 @@ function mapCustomer(row: any): Customer {
     name: row.name ?? undefined,
     totalPoints: Number(row.total_points ?? row.totalPoints ?? 0),
     totalSpent: Number(row.total_spent ?? row.totalSpent ?? 0),
-    joinDate: toDate(row.join_date ?? row.joinDate),
-    lastVisit: row.last_visit || row.lastVisit ? toDate(row.last_visit ?? row.lastVisit) : undefined,
+    joinDate: toDate(row.created_at ?? row.join_date ?? row.joinDate),
+    lastVisit: undefined,
     visitCount: Number(row.visit_count ?? row.visitCount ?? 0),
   };
 }
