@@ -4,7 +4,7 @@ import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Modal } from '../../components/ui/Modal';
 import { Input } from '../../components/ui/Input';
-import { changePassword, signUpStaff } from '../../api/auth';
+import { changePassword } from '../../api/auth';
 import { fetchRestaurants, createRestaurant, updateRestaurant, deleteRestaurant, type Restaurant, type OutletType } from '../../api/restaurants';
 import { fetchTablesForRestaurant, deleteTable } from '../../api/tables';
 
@@ -141,24 +141,17 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
           outlet_type: formData.outlet_type,
         });
       } else {
-        // 1. Create the restaurant
-        const newRestaurant = await createRestaurant({
-          name:        formData.name,
-          email:       formData.email,
-          phone:       formData.phone,
-          address:     formData.address,
-          outlet_type: formData.outlet_type,
-        });
-
-        // 2. Create the manager staff account linked to this restaurant
-        await signUpStaff({
-          name: formData.managerName,
-          email: formData.managerEmail,
-          phone: formData.managerPhone,
-          role: 'manager',
-          username: formData.managerUsername,
-          password: formData.managerPassword,
-          restaurantId: newRestaurant.id,
+        await createRestaurant({
+          name:            formData.name,
+          email:           formData.email,
+          phone:           formData.phone,
+          address:         formData.address,
+          outlet_type:     formData.outlet_type,
+          managerName:     formData.managerName,
+          managerEmail:    formData.managerEmail,
+          managerPhone:    formData.managerPhone,
+          managerUsername: formData.managerUsername,
+          managerPassword: formData.managerPassword,
         });
       }
 
@@ -198,12 +191,13 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this company?')) return;
+    if (!confirm('Are you sure you want to delete this company? This cannot be undone.')) return;
     try {
       await deleteRestaurant(id);
       await loadRestaurants();
     } catch (error) {
       console.error('Failed to delete restaurant:', error);
+      alert(error instanceof Error ? error.message : 'Failed to delete company. Please try again.');
     }
   };
 

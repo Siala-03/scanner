@@ -1,4 +1,5 @@
 ﻿import { supabase } from '../lib/supabase';
+import { apiRequest } from './http';
 
 export type OutletType = 'restaurant' | 'bar' | 'minimart' | 'hotel' | 'cafe';
 
@@ -29,18 +30,13 @@ export interface RestaurantReceiptSettings {
 }
 
 export async function fetchRestaurants(): Promise<Restaurant[]> {
-  console.log('Fetching all restaurants');
-  const { data, error } = await supabase
-    .from('restaurants')
-    .select('*')
-    .order('created_at', { ascending: false });
-
-  if (error) {
-    console.error('Error fetching restaurants:', error);
+  try {
+    const rows = await apiRequest<Restaurant[]>('/restaurants');
+    return rows;
+  } catch (err) {
+    console.error('Error fetching restaurants:', err);
     return [];
   }
-  console.log('Restaurants fetched:', data);
-  return (data || []) as Restaurant[];
 }
 
 export async function fetchRestaurant(restaurantId: string): Promise<Restaurant> {
@@ -59,66 +55,46 @@ export async function fetchRestaurant(restaurantId: string): Promise<Restaurant>
   return data as Restaurant;
 }
 
-export async function createRestaurant(restaurant: Partial<Restaurant>): Promise<Restaurant> {
-  console.log('Creating restaurant:', restaurant);
-  const id = Math.random().toString(36).slice(2, 8).toUpperCase();
-
-  const { data, error } = await supabase
-    .from('restaurants')
-    .insert({
-      id,
-      name:        restaurant.name        || '',
-      email:       restaurant.email       || '',
-      phone:       restaurant.phone       || '',
-      address:     restaurant.address     || '',
-      outlet_type: restaurant.outlet_type || 'restaurant',
-    })
-    .select()
-    .single();
-
-  if (error) {
-    console.error('Error creating restaurant:', error);
-    throw error;
-  }
-  console.log('Restaurant created:', data);
-  return data as Restaurant;
+export async function createRestaurant(restaurant: Partial<Restaurant> & {
+  managerName?: string;
+  managerEmail?: string;
+  managerPhone?: string;
+  managerUsername?: string;
+  managerPassword?: string;
+}): Promise<Restaurant> {
+  const result = await apiRequest<{ restaurant: Restaurant; manager: unknown }>('/restaurants', {
+    method: 'POST',
+    json: {
+      name:            restaurant.name        || '',
+      email:           restaurant.email       || '',
+      phone:           restaurant.phone       || '',
+      address:         restaurant.address     || '',
+      outlet_type:     restaurant.outlet_type || 'restaurant',
+      managerName:     restaurant.managerName,
+      managerEmail:    restaurant.managerEmail,
+      managerPhone:    restaurant.managerPhone,
+      managerUsername: restaurant.managerUsername,
+      managerPassword: restaurant.managerPassword,
+    },
+  });
+  return result.restaurant;
 }
 
 export async function updateRestaurant(id: string, restaurant: Partial<Restaurant>): Promise<Restaurant> {
-  console.log('Updating restaurant:', id, restaurant);
-  const payload: Record<string, unknown> = {
-    name:    restaurant.name,
-    email:   restaurant.email,
-    phone:   restaurant.phone,
-    address: restaurant.address,
-  };
-  if (restaurant.outlet_type) payload.outlet_type = restaurant.outlet_type;
-
-  const { data, error } = await supabase
-    .from('restaurants')
-    .update(payload)
-    .eq('id', id)
-    .select()
-    .single();
-
-  if (error) {
-    console.error('Error updating restaurant:', error);
-    throw error;
-  }
-  return data as Restaurant;
+  return apiRequest<Restaurant>(`/restaurants/${id}`, {
+    method: 'PUT',
+    json: {
+      name:        restaurant.name,
+      email:       restaurant.email,
+      phone:       restaurant.phone,
+      address:     restaurant.address,
+      outlet_type: restaurant.outlet_type,
+    },
+  });
 }
 
 export async function deleteRestaurant(id: string): Promise<void> {
-  console.log('Deleting restaurant:', id);
-  const { error } = await supabase
-    .from('restaurants')
-    .delete()
-    .eq('id', id);
-
-  if (error) {
-    console.error('Error deleting restaurant:', error);
-    throw error;
-  }
+  await apiRequest<void>(`/restaurants/${id}`, { method: 'DELETE' });
 }
 
 /**
