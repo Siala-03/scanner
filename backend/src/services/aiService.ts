@@ -19,6 +19,10 @@ interface AiSnapshot {
   inventory: {
     criticalItems: SqlRow[];
     inventorySummary: SqlRow[];
+    fullInventory: SqlRow[];
+  };
+  menu: {
+    catalog: SqlRow[];
   };
   sales: {
     kpis: SqlRow[];
@@ -95,6 +99,8 @@ export const analyzeRestaurantData = async (restaurantId: string, userPrompt: st
     restaurant,
     criticalItems,
     inventorySummary,
+    fullInventory,
+    menuCatalog,
     salesKpis,
     topSales,
     salesTrend,
@@ -114,6 +120,8 @@ export const analyzeRestaurantData = async (restaurantId: string, userPrompt: st
     getRestaurantProfile(restaurantId),
     getInventoryRiskContext(restaurantId),
     getInventorySummaryContext(restaurantId),
+    getFullInventoryContext(restaurantId),
+    getMenuCatalogContext(restaurantId),
     getSalesKpisContext(restaurantId),
     getTopSalesContext(restaurantId),
     getSalesTrendContext(restaurantId),
@@ -136,6 +144,10 @@ export const analyzeRestaurantData = async (restaurantId: string, userPrompt: st
     inventory: {
       criticalItems,
       inventorySummary,
+      fullInventory,
+    },
+    menu: {
+      catalog: menuCatalog,
     },
     sales: {
       kpis: salesKpis,
@@ -241,12 +253,13 @@ const getInventoryRiskContext = async (restaurantId: string): Promise<SqlRow[]> 
       SELECT
         mi.name,
         ir.stock,
+        ir.unit,
         ir.low_stock_threshold,
         ir.reorder_point,
         CASE
           WHEN ir.stock <= 0 THEN 'out_of_stock'
-          WHEN ir.stock <= COALESCE(ir.low_stock_threshold, 0) THEN 'low_stock'
-          WHEN ir.stock <= COALESCE(ir.reorder_point, 0) THEN 'below_reorder'
+          WHEN ir.low_stock_threshold IS NOT NULL AND ir.stock <= ir.low_stock_threshold THEN 'low_stock'
+          WHEN ir.reorder_point IS NOT NULL AND ir.stock <= ir.reorder_point THEN 'below_reorder'
           ELSE 'ok'
         END AS risk_level
       FROM inventory_records ir
@@ -254,13 +267,14 @@ const getInventoryRiskContext = async (restaurantId: string): Promise<SqlRow[]> 
       WHERE ir.restaurant_id = $1
         AND mi.restaurant_id = $1
         AND (
-          ir.stock <= COALESCE(ir.low_stock_threshold, 0)
-          OR ir.stock <= COALESCE(ir.reorder_point, 0)
+          ir.stock <= 0
+          OR (ir.low_stock_threshold IS NOT NULL AND ir.stock <= ir.low_stock_threshold)
+          OR (ir.reorder_point IS NOT NULL AND ir.stock <= ir.reorder_point)
         )
       ORDER BY
         CASE
           WHEN ir.stock <= 0 THEN 1
-          WHEN ir.stock <= COALESCE(ir.low_stock_threshold, 0) THEN 2
+          WHEN ir.low_stock_threshold IS NOT NULL AND ir.stock <= ir.low_stock_threshold THEN 2
           ELSE 3
         END,
         ir.stock ASC
@@ -280,8 +294,8 @@ const getInventorySummaryContext = async (restaurantId: string): Promise<SqlRow[
       SELECT
         COUNT(*)::int AS total_items,
         COUNT(*) FILTER (WHERE stock <= 0)::int AS out_of_stock_count,
-        COUNT(*) FILTER (WHERE stock <= COALESCE(low_stock_threshold, 0))::int AS low_stock_count,
-        COUNT(*) FILTER (WHERE stock <= COALESCE(reorder_point, 0))::int AS below_reorder_count,
+        COUNT(*) FILTER (WHERE low_stock_threshold IS NOT NULL AND stock > 0 AND stock <= low_stock_threshold)::int AS low_stock_count,
+        COUNT(*) FILTER (WHERE reorder_point IS NOT NULL AND stock > 0 AND stock <= reorder_point)::int AS below_reorder_count,
         COALESCE(SUM(stock * COALESCE(unit_cost, 0)), 0)::numeric AS total_stock_value
       FROM inventory_records
       WHERE restaurant_id = $1
@@ -326,7 +340,7 @@ const getTopSalesContext = async (restaurantId: string): Promise<SqlRow[]> => {
         item->>'menu_item_name' AS menu_item_name,
         COUNT(*)::int AS order_count,
         COALESCE(SUM((item->>'quantity')::numeric), 0)::numeric AS total_qty,
-        COALESCE(SUM(((item->>'price')::numeric) * ((item->>'quantity')::numeric)), 0)::numeric AS gross_sales
+        COALESCE(SUM(COALESCE((item->>'unit_price')::numeric, (item->>'price')::numeric, 0) * ((item->>'quantity')::numeric)), 0)::numeric AS gross_sales
       FROM orders o,
         jsonb_array_elements(o.items) AS item
       WHERE o.restaurant_id = $1
@@ -527,9 +541,9 @@ const getLoyaltyContext = async (restaurantId: string): Promise<SqlRow[]> => {
       `
       SELECT
         COUNT(*)::int AS total_customers,
-        COUNT(*) FILTER (WHERE last_visit >= NOW() - INTERVAL '30 days')::int AS active_customers_30d,
+        COUNT(*) FILTER (WHERE updated_at >= NOW() - INTERVAL '30 days')::int AS active_customers_30d,
         COALESCE(SUM(total_points), 0)::numeric AS total_points_balance,
-        COALESCE(SUM(total_spent), 0)::numeric AS cumulative_loyalty_spend
+        COALESCE(AVG(visit_count), 0)::numeric(6,2) AS avg_visit_count
       FROM customers
       WHERE restaurant_id = $1
       `,
@@ -625,6 +639,72 @@ const getWeeklyScheduleCoverageContext = async (restaurantId: string): Promise<S
     return res.rows as SqlRow[];
   } catch (e) {
     console.warn('AI Context Warning (Schedule Coverage):', getErrorMessage(e));
+    return [];
+  }
+};
+
+const getFullInventoryContext = async (restaurantId: string): Promise<SqlRow[]> => {
+  try {
+    const res = await pool.query(
+      `
+      SELECT
+        mi.name,
+        mi.category,
+        COALESCE(ir.stock, 0)::numeric AS stock,
+        ir.unit,
+        ir.low_stock_threshold,
+        ir.reorder_point,
+        ir.unit_cost,
+        CASE
+          WHEN ir.id IS NULL THEN 'no_record'
+          WHEN ir.stock <= 0 THEN 'out_of_stock'
+          WHEN ir.low_stock_threshold IS NOT NULL AND ir.stock <= ir.low_stock_threshold THEN 'low_stock'
+          WHEN ir.reorder_point IS NOT NULL AND ir.stock <= ir.reorder_point THEN 'below_reorder'
+          ELSE 'ok'
+        END AS stock_status
+      FROM menu_items mi
+      LEFT JOIN inventory_records ir
+        ON ir.menu_item_id = mi.id AND ir.restaurant_id = $1
+      WHERE mi.restaurant_id = $1
+      ORDER BY
+        CASE
+          WHEN ir.id IS NULL THEN 5
+          WHEN ir.stock <= 0 THEN 1
+          WHEN ir.low_stock_threshold IS NOT NULL AND ir.stock <= ir.low_stock_threshold THEN 2
+          WHEN ir.reorder_point IS NOT NULL AND ir.stock <= ir.reorder_point THEN 3
+          ELSE 4
+        END,
+        mi.name ASC
+      LIMIT 100
+      `,
+      [restaurantId]
+    );
+    return res.rows as SqlRow[];
+  } catch (e) {
+    console.warn('AI Context Warning (Full Inventory):', getErrorMessage(e));
+    return [];
+  }
+};
+
+const getMenuCatalogContext = async (restaurantId: string): Promise<SqlRow[]> => {
+  try {
+    const res = await pool.query(
+      `
+      SELECT
+        name,
+        category,
+        price,
+        description
+      FROM menu_items
+      WHERE restaurant_id = $1
+      ORDER BY category, name
+      LIMIT 150
+      `,
+      [restaurantId]
+    );
+    return res.rows as SqlRow[];
+  } catch (e) {
+    console.warn('AI Context Warning (Menu Catalog):', getErrorMessage(e));
     return [];
   }
 };

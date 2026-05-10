@@ -47,8 +47,8 @@ export async function generateInventoryForecast(
   const historicalData = await getHistoricalConsumption(menuItemId, 90);
   
   if (historicalData.length === 0) {
-    // No historical data - use default conservative forecast
-    return createDefaultForecast(menuItemId, menuItemName, daysAhead);
+    const currentStock = await getCurrentStock(menuItemId);
+    return createDefaultForecast(menuItemId, menuItemName, daysAhead, currentStock);
   }
 
   // Calculate base consumption using weighted moving average (more recent = more weight)
@@ -133,9 +133,16 @@ export async function generateAllForecasts(restaurantId: string): Promise<Foreca
       
       const forecast = await generateInventoryForecast(row.menu_item_id, menuItemName, 7);
       forecasts.push(forecast);
-      
-      // Store forecast in database
-      await storeForecast(forecast);
+
+      try {
+        await storeForecast(forecast);
+      } catch (storeErr) {
+        if (isForecastSchemaError(storeErr)) {
+          console.warn('inventory_forecasts table not ready; skipping storage.');
+        } else {
+          console.error(`Failed to store forecast for ${row.menu_item_id}:`, storeErr);
+        }
+      }
     } catch (error) {
       console.error(`Failed to generate forecast for ${row.menu_item_id}:`, error);
     }
@@ -280,36 +287,32 @@ function calculateWeightedMovingAverage(data: HistoricalData[], days: number): n
 
 function calculateSeasonalityFactor(data: HistoricalData[]): number {
   if (data.length < 7) return 1;
-  
-  // Group by day of week
+
   const dayConsumption: { [key: number]: number[] } = {};
-  
+
   for (const row of data) {
     const day = row.dayOfWeek;
-    if (!dayConsumption[day]) {
-      dayConsumption[day] = [];
-    }
+    if (!dayConsumption[day]) dayConsumption[day] = [];
     dayConsumption[day].push(row.consumption);
   }
-  
-  // Calculate average consumption for each day
-  const dayAverages: number[] = [];
+
+  // Build a day-keyed map (0=Sun … 6=Sat) so currentDay lookup is correct
+  const dayAverages: { [key: number]: number } = {};
   for (let i = 0; i < 7; i++) {
     if (dayConsumption[i] && dayConsumption[i].length > 0) {
-      const avg = dayConsumption[i].reduce((a, b) => a + b, 0) / dayConsumption[i].length;
-      dayAverages.push(avg);
+      dayAverages[i] = dayConsumption[i].reduce((a, b) => a + b, 0) / dayConsumption[i].length;
     }
   }
-  
-  if (dayAverages.length === 0) return 1;
-  
-  const overallAvg = dayAverages.reduce((a, b) => a + b, 0) / dayAverages.length;
+
+  const avgValues = Object.values(dayAverages);
+  if (avgValues.length === 0) return 1;
+
+  const overallAvg = avgValues.reduce((a, b) => a + b, 0) / avgValues.length;
   if (overallAvg === 0) return 1;
-  
-  // Get current day's factor
+
   const currentDay = new Date().getDay();
-  const currentDayAvg = dayAverages[currentDay] || overallAvg;
-  
+  const currentDayAvg = dayAverages[currentDay] ?? overallAvg;
+
   return currentDayAvg / overallAvg;
 }
 
@@ -351,24 +354,27 @@ function calculateConfidence(data: HistoricalData[], baseConsumption: number): n
 function createDefaultForecast(
   menuItemId: string,
   menuItemName: string,
-  daysAhead: number
+  daysAhead: number,
+  currentStock: number = 0
 ): ForecastResult {
   const forecastId = `fc_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
-  
+  // Without sales history we cannot predict consumption, only report current stock status
+  const alertStatus: 'none' | 'warning' | 'critical' = currentStock <= 0 ? 'critical' : 'none';
+
   return {
     id: forecastId,
     menuItemId,
     menuItemName,
     forecastDate: new Date().toISOString().split('T')[0],
-    predictedConsumption: 5, // Conservative default
+    predictedConsumption: 0,
     confidenceLevel: 0.1,
-    recommendedReorderQty: 50,
+    recommendedReorderQty: currentStock <= 0 ? 50 : 0,
     leadTimeDays: 3,
     seasonalityFactor: 1,
     trendFactor: 1,
-    lastStockLevel: 0,
-    daysUntilStockout: 0,
-    alertStatus: 'critical',
+    lastStockLevel: currentStock,
+    daysUntilStockout: currentStock > 0 ? 999 : 0,
+    alertStatus,
   };
 }
 
