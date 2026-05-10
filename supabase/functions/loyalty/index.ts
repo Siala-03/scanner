@@ -86,7 +86,7 @@ Deno.serve(async (req: Request) => {
         .from('customers')
         .select('*')
         .eq('restaurant_id', restaurantId)
-        .order('last_visit', { ascending: false, nullsFirst: false });
+        .order('join_date', { ascending: false, nullsFirst: false });
       if (error) return err(error.message);
       return cors(data ?? []);
     }
@@ -116,7 +116,6 @@ Deno.serve(async (req: Request) => {
       await db.from('customers').update({
         total_points: (customer?.total_points ?? 0) + points,
         visit_count: (customer?.visit_count ?? 0) + 1,
-        last_visit: new Date().toISOString(),
       }).eq('id', customerId);
 
       return cors({ success: true, transactionId: txId });
