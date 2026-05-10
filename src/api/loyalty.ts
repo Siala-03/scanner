@@ -1,8 +1,7 @@
-﻿import { apiRequest, ApiError } from './http';
-import { supabase } from '../lib/supabase';
+﻿import { ApiError } from './http';
+import { supabase, callEdgeFn } from '../lib/supabase';
 import type { Customer, LoyaltyTransaction, Reward, RewardRedemption, LoyaltySummary } from '../types';
 
-const LOYALTY_BASE = '/loyalty';
 const db = supabase;
 
 function toDate(value: unknown): Date {
@@ -104,115 +103,27 @@ export async function createOrFindCustomer(customerData: {
   name?: string;
   restaurantId?: string;
 }): Promise<Customer> {
-  const restaurantId = customerData.restaurantId || await resolveRestaurantId();
+  const restaurantId = customerData.restaurantId || resolveRestaurantId();
   if (!restaurantId) throw new Error('No company selected');
 
   const phone = customerData.phone?.trim();
   const email = customerData.email?.trim();
   const name = customerData.name?.trim();
 
-  // Prefer backend route for customer-portal flows where Supabase RLS may block direct writes.
-  try {
-    const customer = await apiRequest<any>('/loyalty/customers', {
-      method: 'POST',
-      includeAuthHeaders: false,
-      json: { phone, email, name, restaurantId },
-    });
-    return mapCustomer(customer);
-  } catch {
-    // Fallback to direct Supabase access.
-  }
-
-  let found: any | null = null;
-  if (phone) {
-    found = await findCustomerBy('phone', phone, restaurantId);
-  }
-  if (!found && email) {
-    found = await findCustomerBy('email', email, restaurantId);
-  }
-
-  if (found) {
-    const nextName = name || found.name || null;
-    const nextEmail = email || found.email || null;
-
-    // Keep customer profile fresh when an existing record is identified by phone/email.
-    if (nextName !== found.name || nextEmail !== found.email) {
-      const updated = await db
-        .from('customers')
-        .update({
-          name: nextName,
-          email: nextEmail,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', found.id)
-        .select('*')
-        .single();
-
-      if (!updated.error) {
-        return mapCustomer(updated.data);
-      }
-    }
-
-    return mapCustomer(found);
-  }
-
-  const id = `cust-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
-  const insertPayload = {
-    id,
-    phone: phone || null,
-    email: email || null,
-    name: name || null,
-    restaurant_id: restaurantId,
-  };
-
-  const inserted = await db
-    .from('customers')
-    .insert(insertPayload)
-    .select('*')
-    .single();
-
-  if (inserted.error?.code === '42703') {
-    const legacyInsert = await db
-      .from('customers')
-      .insert({ id, phone: phone || null, email: email || null, name: name || null })
-      .select('*')
-      .single();
-
-    if (legacyInsert.error) throw legacyInsert.error;
-    return mapCustomer(legacyInsert.data);
-  }
-
-  if (inserted.error) throw inserted.error;
-  return mapCustomer(inserted.data);
+  // Use the loyalty Edge Function — uses service role key so RLS doesn't block.
+  // Public route: no staff auth required (customer portal flow).
+  const row = await callEdgeFn('loyalty/customers', {
+    method: 'POST',
+    body: { phone, email, name, restaurantId },
+    includeStaffHeader: false,
+  });
+  return mapCustomer(row);
 }
 
 export async function getCustomers(): Promise<Customer[]> {
   try {
-    const restaurantId = resolveRestaurantId();
-    if (!restaurantId) return [];
-
-    // Try backend API first — createOrFindCustomer writes to PostgreSQL via the backend,
-    // so the manager view must read from the same store.
-    try {
-      const customers = await apiRequest<any[]>(`${LOYALTY_BASE}/customers`);
-      return customers.map(mapCustomer);
-    } catch {
-      // Backend unavailable or not configured — fall through to Supabase.
-    }
-
-    const result = await db
-      .from('customers')
-      .select('*')
-      .eq('restaurant_id', restaurantId)
-      .order('last_visit', { ascending: false });
-
-    if (result.error?.code === '42703') {
-      // Fail closed for tenant isolation when schema lacks restaurant scoping.
-      return [];
-    }
-
-    if (result.error) throw result.error;
-    return (result.data || []).map(mapCustomer);
+    const rows = await callEdgeFn('loyalty/customers', { method: 'GET' });
+    return (rows || []).map(mapCustomer);
   } catch (error) {
     if (
       error instanceof ApiError &&
@@ -220,7 +131,6 @@ export async function getCustomers(): Promise<Customer[]> {
     ) {
       return [];
     }
-
     throw error;
   }
 }
@@ -278,10 +188,7 @@ export async function awardPoints(data: {
   points: number;
   description: string;
 }): Promise<{ success: boolean; transactionId: string }> {
-  return apiRequest<{ success: boolean; transactionId: string }>(`${LOYALTY_BASE}/points/earn`, {
-    method: 'POST',
-    json: data,
-  });
+  return callEdgeFn('loyalty/points/earn', { method: 'POST', body: data });
 }
 
 // Rewards management
@@ -312,10 +219,7 @@ export async function createReward(rewardData: {
   discountPercentage?: number;
   freeItemId?: string;
 }): Promise<Reward> {
-  return apiRequest<Reward>(`${LOYALTY_BASE}/rewards`, {
-    method: 'POST',
-    json: rewardData,
-  });
+  return callEdgeFn('loyalty/rewards', { method: 'POST', body: rewardData });
 }
 
 export async function redeemReward(data: {
@@ -328,13 +232,5 @@ export async function redeemReward(data: {
   reward: Reward;
   remainingPoints: number;
 }> {
-  return apiRequest<{
-    success: boolean;
-    redemptionId: string;
-    reward: Reward;
-    remainingPoints: number;
-  }>(`${LOYALTY_BASE}/rewards/redeem`, {
-    method: 'POST',
-    json: data,
-  });
+  return callEdgeFn('loyalty/rewards/redeem', { method: 'POST', body: data });
 }

@@ -10,12 +10,86 @@ const admin = () => createClient(
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return optionsResponse();
   const url = new URL(req.url);
-  const path = url.pathname.replace(/^\/loyalty/, '');
+  const path = url.pathname
+    .replace(/^\/functions\/v1\/loyalty/, '')
+    .replace(/^\/loyalty/, '');
   const db = admin();
 
   try {
+    // POST /loyalty/customers — public, no staff auth (customer portal)
+    if (req.method === 'POST' && path === '/customers') {
+      const { phone, email, name, restaurantId } = await req.json();
+      if (!restaurantId) return err('restaurantId is required', 400);
+      if (!phone && !email) return err('phone or email is required', 400);
+
+      // Try to find existing customer by phone or email
+      let existing: any = null;
+      if (phone) {
+        const { data } = await db
+          .from('customers')
+          .select('*')
+          .eq('phone', phone.trim())
+          .eq('restaurant_id', restaurantId)
+          .maybeSingle();
+        existing = data;
+      }
+      if (!existing && email) {
+        const { data } = await db
+          .from('customers')
+          .select('*')
+          .eq('email', email.trim())
+          .eq('restaurant_id', restaurantId)
+          .maybeSingle();
+        existing = data;
+      }
+
+      if (existing) {
+        // Update name/email if newly provided
+        const updates: Record<string, unknown> = {};
+        if (name && name.trim() && name.trim() !== existing.name) updates.name = name.trim();
+        if (email && email.trim() && email.trim() !== existing.email) updates.email = email.trim();
+        if (Object.keys(updates).length > 0) {
+          await db.from('customers').update(updates).eq('id', existing.id);
+          Object.assign(existing, updates);
+        }
+        return cors(existing);
+      }
+
+      // Create new customer
+      const id = `cust-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+      const { data, error } = await db
+        .from('customers')
+        .insert({
+          id,
+          phone: phone?.trim() || null,
+          email: email?.trim() || null,
+          name: name?.trim() || null,
+          restaurant_id: restaurantId,
+          total_points: 0,
+          visit_count: 0,
+          join_date: new Date().toISOString(),
+        })
+        .select('*')
+        .single();
+
+      if (error) return err(error.message, 400);
+      return cors(data, { status: 201 });
+    }
+
+    // All routes below require staff authentication
     const ctx = await authenticate(req);
     const restaurantId = ctx.restaurantId;
+
+    // GET /loyalty/customers — manager view
+    if (req.method === 'GET' && path === '/customers') {
+      const { data, error } = await db
+        .from('customers')
+        .select('*')
+        .eq('restaurant_id', restaurantId)
+        .order('last_visit', { ascending: false, nullsFirst: false });
+      if (error) return err(error.message);
+      return cors(data ?? []);
+    }
 
     // POST /loyalty/points/earn
     if (req.method === 'POST' && path === '/points/earn') {
