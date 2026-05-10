@@ -367,7 +367,7 @@ export async function updateOrderStatus(
 
 export async function confirmPayment(
   orderId: string,
-  opts: { paymentType?: string; confirmedBy?: string; confirmedByName?: string; restaurantId?: string }
+  opts: { paymentType?: string; confirmedBy?: string; confirmedByName?: string; restaurantId?: string; note?: string }
 ): Promise<Order> {
   const now = new Date().toISOString();
 
@@ -379,15 +379,15 @@ export async function confirmPayment(
       payment_confirmed_by: opts.confirmedBy || null,
       payment_confirmed_by_name: opts.confirmedByName || null,
       payment_confirmed_at: now,
+      payment_note: opts.note || null,
       updated_at: now,
     })
     .eq('id', orderId)
     .select()
     .single();
 
-  // Fallback 1: payment_confirmed_at / payment_confirmed_by columns not yet present
-  if (result.error?.code === 'PGRST204') {
-    console.warn('[confirmPayment] payment audit columns missing, retrying without them:', result.error.message);
+  // Fallback 1: payment_confirmed_at / payment_confirmed_by / payment_note columns not yet present
+  if (result.error?.code === 'PGRST204' || result.error) {
     result = await db
       .from('orders')
       .update({ payment_status: 'confirmed', updated_at: now })

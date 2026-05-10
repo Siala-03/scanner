@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { CheckCircleIcon, ClockIcon, BanknoteIcon, CreditCardIcon, SmartphoneIcon, RefreshCwIcon } from 'lucide-react';
+import { CheckCircleIcon, ClockIcon, BanknoteIcon, CreditCardIcon, SmartphoneIcon, RefreshCwIcon, UserIcon } from 'lucide-react';
 import { fetchOrders, confirmPayment } from '../../api/orders';
 import { fiscalizeOrder } from '../../api/ebm';
 import { formatPrice } from '../../utils/currency';
@@ -20,12 +20,14 @@ interface Order {
   payment_status?: string;
   createdAt?: string | Date;
   created_at?: string;
+  assigned_waiter_id?: string;
+  assignedWaiterId?: string;
 }
 
 const PAYMENT_METHODS = [
   { code: '01', label: 'Cash', icon: BanknoteIcon },
   { code: '02', label: 'Card', icon: CreditCardIcon },
-  { code: '04', label: 'Mobile Money', icon: SmartphoneIcon },
+  { code: '04', label: 'MoMo', icon: SmartphoneIcon },
 ];
 
 interface PaymentApprovalPanelProps {
@@ -36,9 +38,11 @@ interface PaymentApprovalPanelProps {
 
 export function PaymentApprovalPanel({ restaurantId, staffId, staffName }: PaymentApprovalPanelProps) {
   const [orders, setOrders] = useState<Order[]>([]);
+  const [staffMap, setStaffMap] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [confirming, setConfirming] = useState<string | null>(null);
   const [selectedMethod, setSelectedMethod] = useState<Record<string, string>>({});
+  const [notes, setNotes] = useState<Record<string, string>>({});
   const [justConfirmed, setJustConfirmed] = useState<Set<string>>(new Set());
 
   const loadPendingOrders = useCallback(async () => {
@@ -47,7 +51,6 @@ export function PaymentApprovalPanel({ restaurantId, staffId, staffName }: Payme
       const pending = (all as any[]).filter((o) => {
         const ps = o.paymentStatus ?? o.payment_status;
         const st = o.status;
-        // Show any order that hasn't had payment explicitly confirmed, across all channels
         const unpaid = ps == null || ps === '' || ps === 'unpaid' || ps === 'pending' || ps === 'paid';
         return unpaid && st !== 'cancelled' && st !== 'completed';
       });
@@ -59,10 +62,25 @@ export function PaymentApprovalPanel({ restaurantId, staffId, staffName }: Payme
     }
   }, [restaurantId]);
 
+  // Load staff names once for waiter lookup
+  useEffect(() => {
+    if (!restaurantId) return;
+    supabase
+      .from('staff')
+      .select('id, name')
+      .eq('restaurant_id', restaurantId)
+      .then(({ data }) => {
+        if (data) {
+          const map: Record<string, string> = {};
+          data.forEach((s: any) => { map[s.id] = s.name; });
+          setStaffMap(map);
+        }
+      });
+  }, [restaurantId]);
+
   useEffect(() => {
     loadPendingOrders();
 
-    // Realtime subscription
     if (!restaurantId) return;
     const channel = supabase
       .channel(`payment-approval-${restaurantId}`)
@@ -76,6 +94,7 @@ export function PaymentApprovalPanel({ restaurantId, staffId, staffName }: Payme
 
   const handleConfirm = async (orderId: string) => {
     const paymentType = selectedMethod[orderId] || '01';
+    const note = notes[orderId]?.trim() || undefined;
     setConfirming(orderId);
     try {
       await confirmPayment(orderId, {
@@ -83,9 +102,9 @@ export function PaymentApprovalPanel({ restaurantId, staffId, staffName }: Payme
         confirmedBy: staffId,
         confirmedByName: staffName,
         restaurantId,
+        note,
       });
 
-      // Fire-and-forget: skip silently if restaurant has no EBM config
       if (restaurantId) {
         fiscalizeOrder(orderId, { restaurantId, paymentType })
           .catch((err) => console.warn('[EBM] Fiscalization skipped:', err));
@@ -108,6 +127,12 @@ export function PaymentApprovalPanel({ restaurantId, staffId, staffName }: Payme
     const num = order.orderNumber ?? order.order_number ?? order.id.slice(-6).toUpperCase();
     const table = order.tableNumber ?? order.table_number;
     return table ? `#${num} — Table ${table}` : `#${num}`;
+  };
+
+  const getWaiterName = (order: Order) => {
+    const wid = order.assigned_waiter_id ?? order.assignedWaiterId;
+    if (!wid) return null;
+    return staffMap[wid] || null;
   };
 
   const getStatus = (order: Order) => order.status;
@@ -156,6 +181,9 @@ export function PaymentApprovalPanel({ restaurantId, staffId, staffName }: Payme
           {orders.map((order) => {
             const confirmed = justConfirmed.has(order.id);
             const busy = confirming === order.id;
+            const waiterName = getWaiterName(order);
+            const method = selectedMethod[order.id] ?? '01';
+            const isMomo = method === '04';
 
             return (
               <div
@@ -167,7 +195,7 @@ export function PaymentApprovalPanel({ restaurantId, staffId, staffName }: Payme
                 }`}
               >
                 {/* Header */}
-                <div className="flex items-start justify-between mb-3">
+                <div className="flex items-start justify-between mb-2">
                   <div>
                     <p className="font-semibold text-slate-100 text-sm">{getOrderLabel(order)}</p>
                     {(order.customerName || order.customer_name) && (
@@ -178,6 +206,14 @@ export function PaymentApprovalPanel({ restaurantId, staffId, staffName }: Payme
                     {getStatus(order)}
                   </span>
                 </div>
+
+                {/* Waiter */}
+                {waiterName && (
+                  <div className="flex items-center gap-1.5 mb-2 text-xs text-slate-400">
+                    <UserIcon className="w-3 h-3 text-slate-500" />
+                    <span>Served by <span className="text-slate-300 font-medium">{waiterName}</span></span>
+                  </div>
+                )}
 
                 {/* Items summary */}
                 {order.items && order.items.length > 0 && (
@@ -201,13 +237,13 @@ export function PaymentApprovalPanel({ restaurantId, staffId, staffName }: Payme
                 </div>
 
                 {/* Payment method selector */}
-                <div className="flex gap-1.5 mb-3">
+                <div className="flex gap-1.5 mb-2">
                   {PAYMENT_METHODS.map(({ code, label, icon: Icon }) => (
                     <button
                       key={code}
                       onClick={() => setSelectedMethod((prev) => ({ ...prev, [order.id]: code }))}
                       className={`flex-1 flex flex-col items-center gap-0.5 py-1.5 rounded-lg border text-xs transition-all ${
-                        (selectedMethod[order.id] ?? '01') === code
+                        method === code
                           ? 'border-indigo-500 bg-indigo-500/15 text-indigo-300'
                           : 'border-slate-600 bg-slate-700/40 text-slate-400 hover:border-slate-500'
                       }`}
@@ -217,6 +253,30 @@ export function PaymentApprovalPanel({ restaurantId, staffId, staffName }: Payme
                     </button>
                   ))}
                 </div>
+
+                {/* Note field — always visible for MoMo, optional for others */}
+                {isMomo ? (
+                  <div className="mb-3">
+                    <label className="block text-xs text-slate-400 mb-1">MoMo Ref / Transaction ID <span className="text-slate-500">(required)</span></label>
+                    <input
+                      type="text"
+                      value={notes[order.id] || ''}
+                      onChange={(e) => setNotes((prev) => ({ ...prev, [order.id]: e.target.value }))}
+                      placeholder="e.g. 1234567890"
+                      className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-1.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                ) : (
+                  <div className="mb-3">
+                    <input
+                      type="text"
+                      value={notes[order.id] || ''}
+                      onChange={(e) => setNotes((prev) => ({ ...prev, [order.id]: e.target.value }))}
+                      placeholder="Note (optional)"
+                      className="w-full bg-slate-700/50 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-slate-500"
+                    />
+                  </div>
+                )}
 
                 {/* Confirm button */}
                 {confirmed ? (
@@ -230,7 +290,7 @@ export function PaymentApprovalPanel({ restaurantId, staffId, staffName }: Payme
                 ) : (
                   <button
                     onClick={() => handleConfirm(order.id)}
-                    disabled={busy}
+                    disabled={busy || (isMomo && !notes[order.id]?.trim())}
                     className="w-full py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium transition-colors flex items-center justify-center gap-2"
                   >
                     {busy ? (
