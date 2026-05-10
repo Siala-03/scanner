@@ -525,6 +525,23 @@ export function printReceipt(html: string): void {
 }
 
 // ============================================
+// HTML DOWNLOAD
+// ============================================
+
+export function downloadReceiptHtml(receipt: ReceiptData, filename?: string): void {
+  const html = buildReceiptHtml(receipt);
+  const blob = new Blob([html], { type: 'text/html' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename || `receipt-${receipt.orderNumber || Date.now()}.html`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// ============================================
 // CONVENIENCE FUNCTION
 // ============================================
 

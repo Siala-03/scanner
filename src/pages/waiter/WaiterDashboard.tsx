@@ -29,7 +29,8 @@ import { QRScanner } from '../../components/waiter/QRScanner';
 import { WaiterOrderEntry } from '../../components/waiter/WaiterOrderEntry';
 import { loadReviews } from '../../utils/reviewsStorage';
 import { useStaffKPIs } from '../../hooks/useKPIs';
-import { buildReceiptHtml, orderToReceiptData, printReceipt } from '../../utils/receipt';
+import { buildReceiptHtml, orderToReceiptData } from '../../utils/receipt';
+import { printOrderReceipt as printThermal } from '../../utils/sunmiPrinter';
 import type { PaymentEntry } from '../../utils/receipt';
 import { ReceiptShareModal } from '../../components/ui/ReceiptShareModal';
 import { PaymentCaptureModal } from '../../components/ui/PaymentCaptureModal';
@@ -1047,25 +1048,23 @@ export function WaiterDashboard({
       const combinedNotes = [cleanSourceTag(order.notes), receiptNote?.trim() || '']
         .filter(Boolean)
         .join('\n');
-      const html = buildReceiptHtml(
-        orderToReceiptData(order, {
-          restaurantName: restaurantName || 'Company',
-          restaurantAddress: restaurantInfo?.address || '',
-          restaurantPhone: restaurantInfo?.phone || '',
-          restaurantEmail: restaurantInfo?.email || '',
-          restaurantLogo: restaurantInfo?.logo,
-          restaurantCity: restaurantInfo?.city,
-          restaurantCountry: restaurantInfo?.country,
-          taxRate: 0,
-          serverName: waiterName,
-          orderType: order.deliveryAddress ? 'delivery' : 'dine-in',
-          payments,
-          paymentStatus: 'paid',
-          change,
-          notes: combinedNotes || undefined,
-        })
-      );
-      printReceipt(html);
+      const receiptData = orderToReceiptData(order, {
+        restaurantName: restaurantName || 'Company',
+        restaurantAddress: restaurantInfo?.address || '',
+        restaurantPhone: restaurantInfo?.phone || '',
+        restaurantEmail: restaurantInfo?.email || '',
+        restaurantLogo: restaurantInfo?.logo,
+        restaurantCity: restaurantInfo?.city,
+        restaurantCountry: restaurantInfo?.country,
+        taxRate: 0,
+        serverName: waiterName,
+        orderType: order.deliveryAddress ? 'delivery' : 'dine-in',
+        payments,
+        paymentStatus: 'paid',
+        change,
+        notes: combinedNotes || undefined,
+      });
+      await printThermal(receiptData);
       if (order.tableNumber != null) {
         await markTableSessionPendingCloseFromReceipt(order.tableNumber);
       }

@@ -213,16 +213,6 @@ export function OnlineOrderingPage({ qrCodeToken, restaurantName }: OnlineOrderi
             >
               Place Another Order
             </Button>
-            <Button
-              onClick={() => {
-                // Could integrate with order tracking here
-                alert('Order tracking coming soon!');
-              }}
-              variant="secondary"
-              className="w-full"
-            >
-              Track Order
-            </Button>
           </div>
         </div>
       </div>

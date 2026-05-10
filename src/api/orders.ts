@@ -376,7 +376,7 @@ export async function confirmPayment(
     .from('orders')
     .update({
       payment_status: 'confirmed',
-      status: 'completed',
+      status: 'served',
       payment_confirmed_by: opts.confirmedBy || null,
       payment_confirmed_by_name: opts.confirmedByName || null,
       payment_confirmed_at: now,
@@ -392,7 +392,7 @@ export async function confirmPayment(
   if (result.error?.code === 'PGRST204' || result.error) {
     result = await db
       .from('orders')
-      .update({ payment_status: 'confirmed', status: 'completed', completed_at: now, updated_at: now })
+      .update({ payment_status: 'confirmed', status: 'served', completed_at: now, updated_at: now })
       .eq('id', orderId)
       .select()
       .single();
@@ -403,7 +403,7 @@ export async function confirmPayment(
     console.warn('[confirmPayment] payment_status unavailable, marking updated_at only:', result.error.message);
     result = await db
       .from('orders')
-      .update({ status: 'completed', completed_at: now, updated_at: now })
+      .update({ status: 'served', completed_at: now, updated_at: now })
       .eq('id', orderId)
       .select()
       .single();
