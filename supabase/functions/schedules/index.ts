@@ -12,7 +12,7 @@ function uid() { return `sch-${Date.now().toString(36)}-${Math.random().toString
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return optionsResponse();
   const url = new URL(req.url);
-  const path = url.pathname.replace(/^\/schedules/, '');
+  const path = url.pathname.replace(/^\/functions\/v1\/schedules/, '').replace(/^\/schedules/, '');
   const db = admin();
 
   try {
@@ -41,6 +41,8 @@ Deno.serve(async (req: Request) => {
         endTime: r.end_time,
         notes: r.notes ?? null,
         createdAt: r.created_at,
+        arrivedAt: r.arrived_at ?? null,
+        departedAt: r.departed_at ?? null,
       }));
       return cors(rows);
     }
@@ -76,6 +78,22 @@ Deno.serve(async (req: Request) => {
     }
 
     const idMatch = path.match(/^\/([^/]+)$/);
+
+    // PATCH /schedules/:id — mark arrival or departure
+    if (req.method === 'PATCH' && idMatch) {
+      const body = await req.json();
+      const update: Record<string, unknown> = {};
+      if (body.arrivedAt !== undefined) update.arrived_at = body.arrivedAt;
+      if (body.departedAt !== undefined) update.departed_at = body.departedAt;
+      const { data, error } = await db.from('staff_schedules').update(update)
+        .eq('id', idMatch[1]).eq('restaurant_id', restaurantId).select('*').single();
+      if (error) return err(error.message);
+      return cors({
+        id: data.id,
+        arrivedAt: data.arrived_at ?? null,
+        departedAt: data.departed_at ?? null,
+      });
+    }
 
     // PUT /schedules/:id
     if (req.method === 'PUT' && idMatch) {

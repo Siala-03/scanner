@@ -180,30 +180,6 @@ export interface ExpenseAuditLog {
   createdAt: string;
 }
 
-// ── Expense Budgets ─────────────────────────────────────────────────────────
-export type BudgetPeriodType = 'weekly' | 'monthly' | 'quarterly' | 'yearly';
-
-export interface ExpenseBudget {
-  id: string;
-  restaurantId: string;
-  categoryId: string;
-  budgetAmount: number;
-  periodType: BudgetPeriodType;
-  startDate: string; // ISO date
-  endDate: string; // ISO date
-  alertThreshold: number; // percentage to trigger alert
-  isActive: boolean;
-  createdBy: string;
-  createdAt: string;
-  updatedAt: string;
-  // Joined data
-  category?: ExpenseCategory;
-  // Computed fields
-  spentAmount?: number;
-  remainingAmount?: number;
-  percentageUsed?: number;
-}
-
 // ── Expense Analytics ───────────────────────────────────────────────────────
 export interface ExpenseAnalytics {
   totalExpenses: number;
@@ -296,15 +272,6 @@ export interface ExpenseCategoryFormData {
   description?: string;
   color: string;
   icon: string;
-}
-
-export interface ExpenseBudgetFormData {
-  categoryId: string;
-  budgetAmount: number;
-  periodType: BudgetPeriodType;
-  startDate: string;
-  endDate: string;
-  alertThreshold: number;
 }
 
 // ── Filter Types ────────────────────────────────────────────────────────────

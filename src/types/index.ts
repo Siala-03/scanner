@@ -455,6 +455,8 @@ export interface StaffSchedule {
   role?: string;
   notes?: string;
   createdAt: string;
+  arrivedAt?: string;
+  departedAt?: string;
 }
 
 export interface Review {

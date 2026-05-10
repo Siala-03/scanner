@@ -683,6 +683,8 @@ export function WaiterDashboard({
     const now = Date.now();
     orders.forEach((o) => {
       if (!['pending', 'verified', 'preparing', 'ready'].includes(o.status)) return;
+      const ps = o.paymentStatus ?? (o as any).payment_status;
+      if (ps === 'confirmed') return;
       const tNum = o.tableNumber ?? (o as any).table_number;
       if (tNum == null || tNum === 999) return;
       const age = (now - new Date(o.createdAt).getTime()) / 60000;

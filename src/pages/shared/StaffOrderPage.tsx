@@ -160,6 +160,10 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
       (active as any[]).forEach((order) => {
         const tNum: number | undefined = order.tableNumber ?? order.table_number;
         if (tNum == null || tNum === 999) return;
+        // Skip orders already confirmed/completed — table is free
+        const ps = order.paymentStatus ?? order.payment_status;
+        const st = order.status;
+        if (ps === 'confirmed' || st === 'completed' || st === 'cancelled') return;
         const createdAt = order.createdAt ?? order.created_at;
         const age = createdAt ? (now - new Date(createdAt).getTime()) / 60000 : 0;
         const next: TableStatus = age > 15 ? 'urgent' : 'occupied';

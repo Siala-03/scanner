@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
-import { CalendarDaysIcon, ChevronLeftIcon, ChevronRightIcon, PlusIcon, TrashIcon, XIcon } from 'lucide-react';
+import { CalendarDaysIcon, ChevronLeftIcon, ChevronRightIcon, PlusIcon, TrashIcon, XIcon, LogInIcon, LogOutIcon } from 'lucide-react';
 import { StaffSchedule } from '../../types';
 import { Staff } from '../../types';
-import { getSchedules, createSchedule, deleteSchedule } from '../../api/schedules';
+import { getSchedules, createSchedule, deleteSchedule, confirmArrival, confirmDeparture } from '../../api/schedules';
 import { fetchStaff } from '../../api/staff';
 
 function restaurantId() { return localStorage.getItem('restaurantId') || ''; }
@@ -73,8 +73,10 @@ export function SchedulingPage() {
   const [form, setForm] = useState(emptyForm(toDateStr(new Date())));
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
+  const [markingId, setMarkingId] = useState<string | null>(null);
   const authRetryRef = useRef(0);
   const authRetryTimerRef = useRef<number | null>(null);
+  const todayStr = toDateStr(new Date());
 
   const weekEnd = addDays(weekStart, 6);
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
@@ -179,6 +181,26 @@ export function SchedulingPage() {
     } catch { alert('Failed to delete shift'); }
   }
 
+  async function handleMarkArrival(id: string) {
+    setMarkingId(id);
+    try {
+      const time = new Date().toTimeString().slice(0, 5);
+      await confirmArrival(id, time);
+      setSchedules((prev) => prev.map((s) => s.id === id ? { ...s, arrivedAt: time } : s));
+    } catch { alert('Failed to mark arrival. Check that the arrived_at column exists in staff_schedules.'); }
+    finally { setMarkingId(null); }
+  }
+
+  async function handleMarkDeparture(id: string) {
+    setMarkingId(id);
+    try {
+      const time = new Date().toTimeString().slice(0, 5);
+      await confirmDeparture(id, time);
+      setSchedules((prev) => prev.map((s) => s.id === id ? { ...s, departedAt: time } : s));
+    } catch { alert('Failed to mark departure. Check that the departed_at column exists in staff_schedules.'); }
+    finally { setMarkingId(null); }
+  }
+
   const fmtWeekRange = `${weekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} – ${weekEnd.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
 
   return (
@@ -243,20 +265,64 @@ export function SchedulingPage() {
                     </button>
                   </div>
                   <div className="space-y-1">
-                    {dayShifts.map((shift) => (
+                    {dayShifts.map((shift) => {
+                      const isPast = dateStr <= todayStr;
+                      const busy = markingId === shift.id;
+                      return (
                       <div
                         key={shift.id}
-                        className={`group flex items-start justify-between gap-1 text-xs px-2 py-1.5 rounded-lg border ${staffColorMap.get(shift.staffId) || 'bg-slate-700 border-slate-600 text-slate-300'}`}
+                        className={`group text-xs px-2 py-1.5 rounded-lg border ${staffColorMap.get(shift.staffId) || 'bg-slate-700 border-slate-600 text-slate-300'}`}
                       >
-                        <div className="min-w-0">
-                          <p className="font-semibold truncate">{shift.staffName || 'Staff'}</p>
-                          <p className="opacity-70">{fmtTime(shift.startTime)}–{fmtTime(shift.endTime)}</p>
+                        <div className="flex items-start justify-between gap-1">
+                          <div className="min-w-0">
+                            <p className="font-semibold truncate">{shift.staffName || 'Staff'}</p>
+                            <p className="opacity-70">{fmtTime(shift.startTime)}–{fmtTime(shift.endTime)}</p>
+                          </div>
+                          <button onClick={() => handleDelete(shift.id)} className="opacity-0 group-hover:opacity-100 p-0.5 hover:text-red-400 transition-opacity flex-shrink-0 mt-0.5">
+                            <XIcon className="w-3 h-3" />
+                          </button>
                         </div>
-                        <button onClick={() => handleDelete(shift.id)} className="opacity-0 group-hover:opacity-100 p-0.5 hover:text-red-400 transition-opacity flex-shrink-0">
-                          <XIcon className="w-3 h-3" />
-                        </button>
+                        {isPast && (
+                          <div className="mt-1 pt-1 border-t border-current/20 space-y-0.5">
+                            <div className="flex items-center gap-1">
+                              <LogInIcon className="w-2.5 h-2.5 opacity-60 flex-shrink-0" />
+                              {shift.arrivedAt ? (
+                                <span className="text-emerald-400 font-medium">{fmtTime(shift.arrivedAt)}</span>
+                              ) : isToday ? (
+                                <button
+                                  disabled={busy}
+                                  onClick={() => handleMarkArrival(shift.id)}
+                                  className="text-amber-400 hover:text-amber-300 disabled:opacity-50 font-medium"
+                                >
+                                  {busy ? '…' : 'Mark In'}
+                                </button>
+                              ) : (
+                                <span className="opacity-40">No record</span>
+                              )}
+                            </div>
+                            {shift.arrivedAt && (
+                              <div className="flex items-center gap-1">
+                                <LogOutIcon className="w-2.5 h-2.5 opacity-60 flex-shrink-0" />
+                                {shift.departedAt ? (
+                                  <span className="text-sky-400 font-medium">{fmtTime(shift.departedAt)}</span>
+                                ) : isToday ? (
+                                  <button
+                                    disabled={busy}
+                                    onClick={() => handleMarkDeparture(shift.id)}
+                                    className="text-slate-400 hover:text-slate-200 disabled:opacity-50 font-medium"
+                                  >
+                                    {busy ? '…' : 'Mark Out'}
+                                  </button>
+                                ) : (
+                                  <span className="opacity-40">No record</span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
-                    ))}
+                      );
+                    })}
                     {dayShifts.length === 0 && <p className="text-xs text-slate-600 text-center py-2">—</p>}
                   </div>
                 </div>
@@ -288,18 +354,60 @@ export function SchedulingPage() {
                     <p className="text-xs text-slate-600">No shifts scheduled</p>
                   ) : (
                     <div className="space-y-2">
-                      {dayShifts.map((shift) => (
-                        <div key={shift.id} className={`flex items-center justify-between text-sm px-3 py-2 rounded-lg border ${staffColorMap.get(shift.staffId) || 'bg-slate-700 border-slate-600 text-slate-300'}`}>
-                          <div>
-                            <span className="font-semibold">{shift.staffName || 'Staff'}</span>
-                            <span className="ml-2 opacity-70 text-xs">{fmtTime(shift.startTime)} – {fmtTime(shift.endTime)}</span>
-                            {shift.notes && <p className="text-xs opacity-60 mt-0.5 italic">{shift.notes}</p>}
+                      {dayShifts.map((shift) => {
+                        const isPast = dateStr <= todayStr;
+                        const busy = markingId === shift.id;
+                        return (
+                        <div key={shift.id} className={`text-sm px-3 py-2 rounded-lg border ${staffColorMap.get(shift.staffId) || 'bg-slate-700 border-slate-600 text-slate-300'}`}>
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <span className="font-semibold">{shift.staffName || 'Staff'}</span>
+                              <span className="ml-2 opacity-70 text-xs">{fmtTime(shift.startTime)} – {fmtTime(shift.endTime)}</span>
+                              {shift.notes && <p className="text-xs opacity-60 mt-0.5 italic">{shift.notes}</p>}
+                            </div>
+                            <button onClick={() => handleDelete(shift.id)} className="p-1.5 hover:text-red-400 transition-colors">
+                              <TrashIcon className="w-3.5 h-3.5" />
+                            </button>
                           </div>
-                          <button onClick={() => handleDelete(shift.id)} className="p-1.5 hover:text-red-400 transition-colors">
-                            <TrashIcon className="w-3.5 h-3.5" />
-                          </button>
+                          {isPast && (
+                            <div className="mt-2 pt-2 border-t border-current/20 flex gap-3 text-xs">
+                              <div className="flex items-center gap-1.5">
+                                <LogInIcon className="w-3.5 h-3.5 opacity-60" />
+                                {shift.arrivedAt ? (
+                                  <span className="text-emerald-400 font-semibold">{fmtTime(shift.arrivedAt)}</span>
+                                ) : isToday ? (
+                                  <button
+                                    disabled={busy}
+                                    onClick={() => handleMarkArrival(shift.id)}
+                                    className="px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25 disabled:opacity-50 font-medium"
+                                  >
+                                    {busy ? 'Saving…' : 'Mark In'}
+                                  </button>
+                                ) : (
+                                  <span className="opacity-40">—</span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                <LogOutIcon className="w-3.5 h-3.5 opacity-60" />
+                                {shift.departedAt ? (
+                                  <span className="text-sky-400 font-semibold">{fmtTime(shift.departedAt)}</span>
+                                ) : shift.arrivedAt && isToday ? (
+                                  <button
+                                    disabled={busy}
+                                    onClick={() => handleMarkDeparture(shift.id)}
+                                    className="px-2 py-0.5 rounded-md bg-sky-500/15 text-sky-400 hover:bg-sky-500/25 disabled:opacity-50 font-medium"
+                                  >
+                                    {busy ? 'Saving…' : 'Mark Out'}
+                                  </button>
+                                ) : (
+                                  <span className="opacity-40">—</span>
+                                )}
+                              </div>
+                            </div>
+                          )}
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </div>

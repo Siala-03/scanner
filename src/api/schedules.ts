@@ -1,5 +1,6 @@
 import { apiRequest } from './http';
 import { StaffSchedule } from '../types';
+import { supabase } from '../lib/supabase';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 const SCHEDULES_BASE_PATH = API_BASE.includes('/functions/v1') ? '/schedules' : '/api/schedules';
@@ -17,6 +18,8 @@ function rowToSchedule(row: Record<string, unknown>): StaffSchedule {
     role: (row.role ?? undefined) as string | undefined,
     notes: (row.notes ?? undefined) as string | undefined,
     createdAt: String(row.created_at ?? row.createdAt ?? ''),
+    arrivedAt: ((row.arrived_at ?? row.arrivedAt) as string | undefined) || undefined,
+    departedAt: ((row.departed_at ?? row.departedAt) as string | undefined) || undefined,
   };
 }
 
@@ -67,4 +70,16 @@ export async function updateSchedule(
 
 export async function deleteSchedule(id: string): Promise<void> {
   await apiRequest<void>(`${SCHEDULES_BASE_PATH}/${id}`, { method: 'DELETE' });
+}
+
+export async function confirmArrival(id: string, time?: string): Promise<void> {
+  const t = time || new Date().toTimeString().slice(0, 5);
+  const { error } = await supabase.from('staff_schedules').update({ arrived_at: t }).eq('id', id);
+  if (error) throw error;
+}
+
+export async function confirmDeparture(id: string, time?: string): Promise<void> {
+  const t = time || new Date().toTimeString().slice(0, 5);
+  const { error } = await supabase.from('staff_schedules').update({ departed_at: t }).eq('id', id);
+  if (error) throw error;
 }

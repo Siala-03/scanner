@@ -4,12 +4,10 @@ import type {
   Expense,
   ExpenseCategory,
   RecurringExpense,
-  ExpenseBudget,
   ExpenseFilters,
   ExpenseFormData,
   RecurringExpenseFormData,
   ExpenseCategoryFormData,
-  ExpenseBudgetFormData,
   ExpenseAnalytics,
   ApprovalStatus,
 } from '../types/expenses';
@@ -678,26 +676,6 @@ export async function deleteRecurringExpense(id: string): Promise<void> {
 
 export async function generateRecurringExpenses(): Promise<{ generated: number }> {
   return { generated: 0 };
-}
-
-// ============================================
-// EXPENSE BUDGETS (not in schema, placeholder)
-// ============================================
-
-export async function fetchBudgets(): Promise<ExpenseBudget[]> {
-  return [];
-}
-
-export async function createBudget(_data: ExpenseBudgetFormData): Promise<ExpenseBudget> {
-  throw new Error('Budgets not implemented');
-}
-
-export async function updateBudget(_id: string, _data: Partial<ExpenseBudgetFormData>): Promise<ExpenseBudget> {
-  throw new Error('Budgets not implemented');
-}
-
-export async function deleteBudget(_id: string): Promise<void> {
-  throw new Error('Budgets not implemented');
 }
 
 // ============================================
