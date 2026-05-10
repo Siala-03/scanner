@@ -142,9 +142,93 @@ Deno.serve(async (req: Request) => {
       requireRole(ctx, 'superadmin');
       const id = idMatch[1];
 
-      // Delete related records first to avoid FK violations
-      await db.from('staff_credentials').delete().eq('restaurant_id', id);
-      await db.from('staff').delete().eq('restaurant_id', id);
+      // Cascade-delete all restaurant-dependent records in dependency order.
+      // Order: deepest dependents first, then their parents, staff last before restaurant.
+      const d = (table: string) => db.from(table).delete().eq('restaurant_id', id);
+
+      // Order items / transactions (depend on orders, customers, rewards)
+      await d('minimart_refund_requests');
+      await d('minimart_refunds');
+      await d('loyalty_transactions');
+      await d('reward_redemptions');
+      await d('order_items');
+      await d('orders');
+
+      // Menu
+      await d('menu_item_reviews');
+      await d('recipe_ingredients');
+      await d('menu_items');
+
+      // Expenses
+      await d('expense_attachments');
+      await d('expense_audit_log');
+      await d('expense_notes');
+      await d('expense_receipts');
+      await d('expenses');
+      await d('expense_categories');
+      await d('recurring_expenses');
+      await d('expense_budgets');
+
+      // Inventory
+      await d('stock_movements');
+      await d('stock_movements_enhanced');
+      await d('waste_entries');
+      await d('waste_entries_enhanced');
+      await d('inventory_lots');
+      await d('inventory_stock');
+      await d('inventory_alerts');
+      await d('inventory_forecasts');
+      await d('inventory_reports');
+      await d('inventory_records');
+      await d('par_levels');
+      await d('cycle_count_items');
+      await d('cycle_counts');
+      await d('inventory_items');
+      await d('inventory_locations');
+
+      // Suppliers / purchase orders
+      await d('purchase_order_status_history');
+      await d('purchase_orders');
+      await d('supplier_prices');
+      await d('supplier_performance');
+      await d('supplier_notifications');
+      await d('supplier_users');
+      await d('suppliers');
+
+      // Customers / loyalty
+      await d('credit_transactions');
+      await d('credit_alerts');
+      await d('credit_accounts');
+      await d('credit_applications');
+      await d('customer_analytics');
+      await d('customers');
+      await d('rewards');
+      await d('reviews');
+      await d('reservations');
+      await d('promotions');
+
+      // Analytics / config
+      await d('analytics_alerts');
+      await d('dashboard_configs');
+      await d('minimart_settings');
+      await d('ebm_invoices');
+      await d('ebm_config');
+      await d('cashier_shifts');
+      await d('table_service_sessions');
+      await d('monthly_consumption');
+      await d('operational_metrics');
+      await d('predictive_analytics');
+      await d('forecast_runs');
+      await d('seasonal_patterns');
+
+      // Staff
+      await d('staff_kpi_progress');
+      await d('staff_performance_analytics');
+      await d('kpis');
+      await d('staff_schedules');
+      await d('tables');
+      await d('staff_credentials');
+      await d('staff');
 
       const { error } = await db.from('restaurants').delete().eq('id', id);
       if (error) return err(error.message);
