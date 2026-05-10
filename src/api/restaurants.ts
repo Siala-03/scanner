@@ -1,5 +1,4 @@
-﻿import { supabase } from '../lib/supabase';
-import { apiRequest } from './http';
+﻿import { supabase, callEdgeFn } from '../lib/supabase';
 
 export type OutletType = 'restaurant' | 'bar' | 'minimart' | 'hotel' | 'cafe';
 
@@ -31,8 +30,8 @@ export interface RestaurantReceiptSettings {
 
 export async function fetchRestaurants(): Promise<Restaurant[]> {
   try {
-    const rows = await apiRequest<Restaurant[]>('/restaurants');
-    return rows;
+    const rows = await callEdgeFn('restaurants');
+    return (rows || []) as Restaurant[];
   } catch (err) {
     console.error('Error fetching restaurants:', err);
     return [];
@@ -62,9 +61,9 @@ export async function createRestaurant(restaurant: Partial<Restaurant> & {
   managerUsername?: string;
   managerPassword?: string;
 }): Promise<Restaurant> {
-  const result = await apiRequest<{ restaurant: Restaurant; manager: unknown }>('/restaurants', {
+  const result = await callEdgeFn('restaurants', {
     method: 'POST',
-    json: {
+    body: {
       name:            restaurant.name        || '',
       email:           restaurant.email       || '',
       phone:           restaurant.phone       || '',
@@ -81,9 +80,10 @@ export async function createRestaurant(restaurant: Partial<Restaurant> & {
 }
 
 export async function updateRestaurant(id: string, restaurant: Partial<Restaurant>): Promise<Restaurant> {
-  return apiRequest<Restaurant>(`/restaurants/${id}`, {
+  return callEdgeFn('restaurants', {
     method: 'PUT',
-    json: {
+    params: { id },
+    body: {
       name:        restaurant.name,
       email:       restaurant.email,
       phone:       restaurant.phone,
@@ -94,7 +94,7 @@ export async function updateRestaurant(id: string, restaurant: Partial<Restauran
 }
 
 export async function deleteRestaurant(id: string): Promise<void> {
-  await apiRequest<void>(`/restaurants/${id}`, { method: 'DELETE' });
+  await callEdgeFn('restaurants', { method: 'DELETE', params: { id } });
 }
 
 /**

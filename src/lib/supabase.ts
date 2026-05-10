@@ -15,7 +15,7 @@ const edgeFunctionsBase = `${supabaseUrl}/functions/v1`;
 export async function callEdgeFn(
   fnName: string,
   options: {
-    method?: 'GET' | 'POST' | 'DELETE';
+    method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
     body?: unknown;
     params?: Record<string, string>;
     includeStaffHeader?: boolean;
