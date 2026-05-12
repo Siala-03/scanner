@@ -1189,29 +1189,7 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
       const rows = await importInventoryFromFile(file);
       if (rows.length === 0) throw new Error('No valid rows found in file');
 
-      const canonicalItemId = (value: string) => String(value || '').trim().toLowerCase();
-      const existingItemIds = new Set(
-        inventory
-          .map(normalizeInventoryRecord)
-          .map((rec) => canonicalItemId(rec.menuItemId || ''))
-          .filter(Boolean)
-      );
-
-      const uniqueByItemId = new Map<string, (typeof rows)[number]>();
       for (const row of rows) {
-        const itemId = String(row.menuItemId || '').trim();
-        if (!itemId) continue;
-        const key = canonicalItemId(itemId);
-        uniqueByItemId.set(key, { ...row, menuItemId: itemId });
-      }
-
-      const uniqueRows = Array.from(uniqueByItemId.values());
-      const duplicateRows = Math.max(0, rows.length - uniqueRows.length);
-
-      let created = 0;
-      let updated = 0;
-
-      for (const row of uniqueRows) {
         const hasDescription = row.description !== undefined;
         const descriptionValue = row.description ?? '';
         const hasCategory = row.category !== undefined;
@@ -1236,20 +1214,9 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
         if (!isMinimartScope && hasDescription && menuItemMap[row.menuItemId]) {
           await apiUpdateMenuItem(row.menuItemId, { description: descriptionValue } as any);
         }
-
-        const rowItemKey = canonicalItemId(row.menuItemId);
-        if (existingItemIds.has(rowItemKey)) {
-          updated++;
-        } else {
-          created++;
-          existingItemIds.add(rowItemKey);
-        }
       }
       await refresh();
-      const dedupeSuffix = duplicateRows > 0
-        ? ` ${duplicateRows} duplicate row${duplicateRows !== 1 ? 's were' : ' was'} merged by Item ID.`
-        : '';
-      alert(`Inventory import complete: ${created} created, ${updated} updated.${dedupeSuffix}`);
+      alert(`Successfully imported ${rows.length} inventory record(s).`);
     } catch (err) {
       alert(`Import failed: ${getErrorMessage(err)}`);
     } finally {
