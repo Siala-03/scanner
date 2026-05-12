@@ -253,7 +253,7 @@ const getInventoryRiskContext = async (restaurantId: string): Promise<SqlRow[]> 
       SELECT
         mi.name,
         ir.stock,
-        ir.unit,
+        ir.unit_measurement AS unit,
         ir.low_stock_threshold,
         ir.reorder_point,
         CASE
@@ -651,7 +651,7 @@ const getFullInventoryContext = async (restaurantId: string): Promise<SqlRow[]> 
         mi.name,
         mi.category,
         COALESCE(ir.stock, 0)::numeric AS stock,
-        ir.unit,
+        ir.unit_measurement AS unit,
         ir.low_stock_threshold,
         ir.reorder_point,
         ir.unit_cost,
