@@ -41,6 +41,36 @@ function getStaffId(): string | null {
   return null;
 }
 
+function getStaffName(): string | null {
+  if (typeof window === 'undefined') return null;
+  const raw = localStorage.getItem('authUser');
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    const name = parsed?.name;
+    return typeof name === 'string' && name.trim() ? name.trim() : null;
+  } catch {
+    return null;
+  }
+}
+
+export interface OrderCancellationRequest {
+  id: string;
+  order_id: string;
+  restaurant_id: string;
+  status: 'pending' | 'approved' | 'rejected';
+  reason: string | null;
+  requested_by: string | null;
+  requested_by_name: string | null;
+  requested_at: string;
+  reviewed_by: string | null;
+  reviewed_by_name: string | null;
+  reviewed_at: string | null;
+  review_notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 function generateShortOrderNumber(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let value = '';
@@ -485,6 +515,132 @@ export async function cancelOrder(id: string): Promise<void> {
     .eq('id', id);
 
   if (error) throw error;
+}
+
+export async function requestOrderCancellation(
+  orderId: string,
+  opts?: { reason?: string; restaurantId?: string; requestedBy?: string; requestedByName?: string }
+): Promise<OrderCancellationRequest> {
+  const restaurantId = opts?.restaurantId || getRestaurantId();
+  if (!restaurantId) throw new Error('No company selected');
+
+  const { data: existingPending, error: existingError } = await db
+    .from('order_cancellation_requests')
+    .select('*')
+    .eq('order_id', orderId)
+    .eq('restaurant_id', restaurantId)
+    .eq('status', 'pending')
+    .maybeSingle();
+
+  if (existingError) throw existingError;
+  if (existingPending) return existingPending as OrderCancellationRequest;
+
+  const now = new Date().toISOString();
+  const payload = {
+    id: `ocr-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+    order_id: orderId,
+    restaurant_id: restaurantId,
+    status: 'pending' as const,
+    reason: opts?.reason?.trim() || null,
+    requested_by: opts?.requestedBy || getStaffId(),
+    requested_by_name: opts?.requestedByName || getStaffName(),
+    requested_at: now,
+    reviewed_by: null,
+    reviewed_by_name: null,
+    reviewed_at: null,
+    review_notes: null,
+    updated_at: now,
+  };
+
+  const { data, error } = await db
+    .from('order_cancellation_requests')
+    .insert(payload)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data as OrderCancellationRequest;
+}
+
+export async function fetchOrderCancellationRequests(
+  status: 'pending' | 'approved' | 'rejected' | 'all' = 'all',
+  restaurantId?: string
+): Promise<OrderCancellationRequest[]> {
+  const tenantId = restaurantId || getRestaurantId();
+  if (!tenantId) return [];
+
+  let query = db
+    .from('order_cancellation_requests')
+    .select('*')
+    .eq('restaurant_id', tenantId)
+    .order('created_at', { ascending: false });
+
+  if (status !== 'all') query = query.eq('status', status);
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data || []) as OrderCancellationRequest[];
+}
+
+export async function approveOrderCancellationRequest(
+  requestId: string,
+  opts?: { reviewNotes?: string; reviewedBy?: string; reviewedByName?: string }
+): Promise<OrderCancellationRequest> {
+  const { data: request, error: requestError } = await db
+    .from('order_cancellation_requests')
+    .select('*')
+    .eq('id', requestId)
+    .single();
+
+  if (requestError) throw requestError;
+  if (!request) throw new Error('Cancellation request not found');
+
+  if (request.status === 'approved') return request as OrderCancellationRequest;
+  if (request.status === 'rejected') throw new Error('Request is already rejected');
+
+  await cancelOrder(request.order_id as string);
+
+  const now = new Date().toISOString();
+  const { data, error } = await db
+    .from('order_cancellation_requests')
+    .update({
+      status: 'approved',
+      reviewed_by: opts?.reviewedBy || getStaffId(),
+      reviewed_by_name: opts?.reviewedByName || getStaffName(),
+      reviewed_at: now,
+      review_notes: opts?.reviewNotes?.trim() || null,
+      updated_at: now,
+    })
+    .eq('id', requestId)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data as OrderCancellationRequest;
+}
+
+export async function rejectOrderCancellationRequest(
+  requestId: string,
+  opts?: { reviewNotes?: string; reviewedBy?: string; reviewedByName?: string }
+): Promise<OrderCancellationRequest> {
+  const now = new Date().toISOString();
+  const { data, error } = await db
+    .from('order_cancellation_requests')
+    .update({
+      status: 'rejected',
+      reviewed_by: opts?.reviewedBy || getStaffId(),
+      reviewed_by_name: opts?.reviewedByName || getStaffName(),
+      reviewed_at: now,
+      review_notes: opts?.reviewNotes?.trim() || null,
+      updated_at: now,
+    })
+    .eq('id', requestId)
+    .eq('status', 'pending')
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data as OrderCancellationRequest;
 }
 
 export async function seedTestOrders(): Promise<{ message: string; count: number }> {

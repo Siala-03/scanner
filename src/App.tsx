@@ -28,6 +28,7 @@ import { ReservationsPage } from './pages/manager/ReservationsPage';
 import { SchedulingPage } from './pages/manager/SchedulingPage';
 import { ReviewsPage } from './pages/manager/ReviewsPage';
 import ExpenseApproval from './components/manager/ExpenseApproval';
+import { OrderCancellationRequestsPanel } from './components/manager/OrderCancellationRequestsPanel';
 import SupervisorExpenseManagement from './components/supervisor/ExpenseManagement';
 import { InventoryManagement } from './pages/shared/InventoryManagement';
 import { KitchenDisplay } from './pages/kitchen/KitchenDisplay';
@@ -47,7 +48,7 @@ import { EbmSettings } from './pages/manager/EbmSettings';
 import { StaffOrderPage } from './pages/shared/StaffOrderPage';
 
 type UserRole = 'customer' | 'waiter' | 'cashier' | 'supervisor' | 'manager' | 'kitchen' | 'superadmin' | 'supplier' | null;
-type ManagerPage = 'dashboard' | 'menu' | 'staff' | 'analytics' | 'performance' | 'qrcodes' | 'inventory' | 'history' | 'expenses' | 'credit' | 'loyalty' | 'promotions' | 'reservations' | 'scheduling' | 'reviews' | 'settings' | 'ebm';
+type ManagerPage = 'dashboard' | 'menu' | 'staff' | 'analytics' | 'performance' | 'qrcodes' | 'inventory' | 'history' | 'expenses' | 'payment-cancellations' | 'credit' | 'loyalty' | 'promotions' | 'reservations' | 'scheduling' | 'reviews' | 'settings' | 'ebm';
 type SupervisorPage = 'dashboard' | 'revenue' | 'staff' | 'qrcodes' | 'inventory' | 'history' | 'expenses' | 'online-orders' | 'payments' | 'attendance' | 'take-order';
 
 const MANAGER_NAV_GROUPS: Array<{
@@ -79,6 +80,7 @@ const MANAGER_NAV_GROUPS: Array<{
     items: [
       { id: 'analytics', label: 'Analytics' },
       { id: 'expenses', label: 'Expenses' },
+      { id: 'payment-cancellations', label: 'Payment Cancellations' },
       { id: 'credit', label: 'Credit' },
     ],
   },
@@ -1064,6 +1066,13 @@ export function App() {
               />
             )}
             {managerPage === 'expenses' && <ExpenseApproval />}
+            {managerPage === 'payment-cancellations' && (
+              <OrderCancellationRequestsPanel
+                restaurantId={authUser?.restaurantId || localStorage.getItem('restaurantId') || undefined}
+                managerId={authUser?.id}
+                managerName={authUser?.name}
+              />
+            )}
             {managerPage === 'credit' && <CreditManagement />}
             {managerPage === 'loyalty' && <LoyaltyManagement />}
             {managerPage === 'promotions' && <PromotionsManagement />}

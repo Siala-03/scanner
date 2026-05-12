@@ -1188,8 +1188,27 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
     try {
       const rows = await importInventoryFromFile(file);
       if (rows.length === 0) throw new Error('No valid rows found in file');
-      let updated = 0;
+      const existingItemIds = new Set(
+        inventory
+          .map(normalizeInventoryRecord)
+          .map((rec) => String(rec.menuItemId || '').trim())
+          .filter(Boolean)
+      );
+
+      const uniqueByItemId = new Map<string, (typeof rows)[number]>();
       for (const row of rows) {
+        const id = String(row.menuItemId || '').trim();
+        if (!id) continue;
+        uniqueByItemId.set(id, { ...row, menuItemId: id });
+      }
+
+      const uniqueRows = Array.from(uniqueByItemId.values());
+      const duplicateRows = Math.max(0, rows.length - uniqueRows.length);
+
+      let created = 0;
+      let updated = 0;
+
+      for (const row of uniqueRows) {
         const hasDescription = row.description !== undefined;
         const descriptionValue = row.description ?? '';
         const hasCategory = row.category !== undefined;
@@ -1214,10 +1233,19 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
         if (!isMinimartScope && hasDescription && menuItemMap[row.menuItemId]) {
           await apiUpdateMenuItem(row.menuItemId, { description: descriptionValue } as any);
         }
-        updated++;
+
+        if (existingItemIds.has(row.menuItemId)) {
+          updated++;
+        } else {
+          created++;
+          existingItemIds.add(row.menuItemId);
+        }
       }
       await refresh();
-      alert(`Successfully imported ${updated} inventory record${updated !== 1 ? 's' : ''}.`);
+      const dedupeSuffix = duplicateRows > 0
+        ? ` ${duplicateRows} duplicate row${duplicateRows !== 1 ? 's were' : ' was'} merged by Item ID.`
+        : '';
+      alert(`Inventory import complete: ${created} created, ${updated} updated.${dedupeSuffix}`);
     } catch (err) {
       alert(`Import failed: ${getErrorMessage(err)}`);
     } finally {

@@ -3,7 +3,7 @@ import {
   CheckCircleIcon, ClockIcon, BanknoteIcon, CreditCardIcon,
   SmartphoneIcon, RefreshCwIcon, UserIcon, PlusIcon, XIcon,
 } from 'lucide-react';
-import { fetchOrders, confirmPayment, cancelOrder } from '../../api/orders';
+import { fetchOrders, confirmPayment, fetchOrderCancellationRequests, requestOrderCancellation } from '../../api/orders';
 import { fiscalizeOrder } from '../../api/ebm';
 import { formatPrice } from '../../utils/currency';
 import { supabase } from '../../lib/supabase';
@@ -98,12 +98,16 @@ export function PaymentApprovalPanel({ restaurantId, staffId, staffName }: Payme
   const [loading,      setLoading]      = useState(true);
   const [confirming,   setConfirming]   = useState<string | null>(null);
   const [cancelling,   setCancelling]   = useState<string | null>(null);
+  const [pendingCancelRequests, setPendingCancelRequests] = useState<Set<string>>(new Set());
   const [splitsMap,    setSplitsMap]    = useState<Record<string, SplitEntry[]>>({});
   const [justConfirmed, setJustConfirmed] = useState<Set<string>>(new Set());
 
   const loadPendingOrders = useCallback(async () => {
     try {
-      const all = await fetchOrders('all', restaurantId);
+      const [all, cancellationRequests] = await Promise.all([
+        fetchOrders('all', restaurantId),
+        fetchOrderCancellationRequests('pending', restaurantId),
+      ]);
       const pending = (all as any[]).filter((o) => {
         const ps = o.paymentStatus ?? o.payment_status;
         const st = o.status;
@@ -111,6 +115,7 @@ export function PaymentApprovalPanel({ restaurantId, staffId, staffName }: Payme
         return unpaid && st !== 'cancelled' && st !== 'completed';
       });
       setOrders(pending);
+      setPendingCancelRequests(new Set(cancellationRequests.map((r) => r.order_id)));
     } catch (err) {
       console.error('Failed to load pending orders:', err);
     } finally {
@@ -148,14 +153,17 @@ export function PaymentApprovalPanel({ restaurantId, staffId, staffName }: Payme
   // ── Cancel ─────────────────────────────────────────────────────────────────
 
   const handleCancel = async (order: Order) => {
-    if (!window.confirm(`Cancel order ${getOrderLabel(order)}?`)) return;
+    if (!window.confirm(`Send cancellation request for order ${getOrderLabel(order)} to manager?`)) return;
     setCancelling(order.id);
     try {
-      await cancelOrder(order.id);
-      setOrders((prev) => prev.filter((o) => o.id !== order.id));
+      await requestOrderCancellation(order.id, {
+        requestedBy: staffId,
+        requestedByName: staffName,
+      });
+      setPendingCancelRequests((prev) => new Set(prev).add(order.id));
     } catch (err) {
-      console.error('Failed to cancel order:', err);
-      alert('Failed to cancel order. Please try again.');
+      console.error('Failed to send cancellation request:', err);
+      alert('Failed to send cancellation request. Please try again.');
     } finally {
       setCancelling(null);
     }
@@ -297,6 +305,7 @@ export function PaymentApprovalPanel({ restaurantId, staffId, staffName }: Payme
             const momoEntry = splits.find((s) => s.code === '04');
             const momoRefMissing = !!momoEntry && !momoEntry.momoRef.trim();
             const canConfirm = valid && !momoRefMissing;
+            const cancellationRequested = pendingCancelRequests.has(order.id);
 
             return (
               <div
@@ -470,13 +479,15 @@ export function PaymentApprovalPanel({ restaurantId, staffId, staffName }: Payme
                     )}
                     <button
                       onClick={() => handleCancel(order)}
-                      disabled={busy || cancelling === order.id}
+                      disabled={busy || cancelling === order.id || cancellationRequested}
                       className="w-full mt-2 py-1.5 rounded-lg border border-red-500/40 bg-red-500/10 hover:bg-red-500/20 disabled:opacity-50 disabled:cursor-not-allowed text-red-400 text-xs font-medium transition-colors flex items-center justify-center gap-1.5"
                     >
                       {cancelling === order.id ? (
-                        <><RefreshCwIcon className="w-3 h-3 animate-spin" /> Cancelling…</>
+                        <><RefreshCwIcon className="w-3 h-3 animate-spin" /> Sending Request…</>
+                      ) : cancellationRequested ? (
+                        <><ClockIcon className="w-3 h-3" /> Awaiting Manager Approval</>
                       ) : (
-                        <><XIcon className="w-3 h-3" /> Cancel Order</>
+                        <><XIcon className="w-3 h-3" /> Request Cancellation</>
                       )}
                     </button>
                   </>
