@@ -1188,18 +1188,21 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
     try {
       const rows = await importInventoryFromFile(file);
       if (rows.length === 0) throw new Error('No valid rows found in file');
+
+      const canonicalItemId = (value: string) => String(value || '').trim().toLowerCase();
       const existingItemIds = new Set(
         inventory
           .map(normalizeInventoryRecord)
-          .map((rec) => String(rec.menuItemId || '').trim())
+          .map((rec) => canonicalItemId(rec.menuItemId || ''))
           .filter(Boolean)
       );
 
       const uniqueByItemId = new Map<string, (typeof rows)[number]>();
       for (const row of rows) {
-        const id = String(row.menuItemId || '').trim();
-        if (!id) continue;
-        uniqueByItemId.set(id, { ...row, menuItemId: id });
+        const itemId = String(row.menuItemId || '').trim();
+        if (!itemId) continue;
+        const key = canonicalItemId(itemId);
+        uniqueByItemId.set(key, { ...row, menuItemId: itemId });
       }
 
       const uniqueRows = Array.from(uniqueByItemId.values());
@@ -1234,11 +1237,12 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
           await apiUpdateMenuItem(row.menuItemId, { description: descriptionValue } as any);
         }
 
-        if (existingItemIds.has(row.menuItemId)) {
+        const rowItemKey = canonicalItemId(row.menuItemId);
+        if (existingItemIds.has(rowItemKey)) {
           updated++;
         } else {
           created++;
-          existingItemIds.add(row.menuItemId);
+          existingItemIds.add(rowItemKey);
         }
       }
       await refresh();
