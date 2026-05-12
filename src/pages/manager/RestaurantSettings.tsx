@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { BuildingIcon, PhoneIcon, MailIcon, MapPinIcon, GlobeIcon, ImageIcon, SaveIcon, UploadIcon, XIcon, CoinsIcon } from 'lucide-react';
-import { fetchReceiptSettings, saveReceiptSettings } from '../../api/restaurants';
+import { BuildingIcon, PhoneIcon, MailIcon, MapPinIcon, GlobeIcon, ImageIcon, SaveIcon, UploadIcon, XIcon, CoinsIcon, ShieldCheckIcon, WifiIcon, RefreshCwIcon } from 'lucide-react';
+import { fetchReceiptSettings, saveReceiptSettings, fetchIpRestriction, saveIpRestriction } from '../../api/restaurants';
 import type { RestaurantReceiptSettings } from '../../api/restaurants';
 import { setCurrency, CURRENCY_OPTIONS, getCurrency, CurrencyCode } from '../../utils/currency';
+import { getClientPublicIp, parseAllowedIps, formatAllowedIps, clearIpRestrictionCache } from '../../utils/ipRestriction';
 
 interface RestaurantSettingsProps {
   restaurantId: string;
@@ -47,6 +48,14 @@ export function RestaurantSettings({ restaurantId, restaurantName, onNameChange,
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  // IP restriction state
+  const [ipEnabled, setIpEnabled] = useState(false);
+  const [ipListRaw, setIpListRaw] = useState('');
+  const [ipSaving, setIpSaving] = useState(false);
+  const [ipMsg, setIpMsg] = useState<'success' | 'error' | null>(null);
+  const [detectingIp, setDetectingIp] = useState(false);
+  const [detectedIp, setDetectedIp] = useState<string | null>(null);
+
   // Sync name from parent if it changes externally
   useEffect(() => { setName(restaurantName); }, [restaurantName]);
 
@@ -54,14 +63,55 @@ export function RestaurantSettings({ restaurantId, restaurantName, onNameChange,
   useEffect(() => {
     if (!restaurantId) return;
     setLoading(true);
-    fetchReceiptSettings(restaurantId)
-      .then((s) => {
+    Promise.all([
+      fetchReceiptSettings(restaurantId),
+      fetchIpRestriction(restaurantId),
+    ])
+      .then(([s, ip]) => {
         setSettings(s);
         if (s.logo) setLogoPreview(s.logo);
+        setIpEnabled(ip.enabled);
+        setIpListRaw(formatAllowedIps(ip.allowedIps));
       })
       .catch(() => {/* treat missing as empty */})
       .finally(() => setLoading(false));
   }, [restaurantId]);
+
+  const handleDetectIp = async () => {
+    setDetectingIp(true);
+    const ip = await getClientPublicIp();
+    setDetectedIp(ip);
+    setDetectingIp(false);
+  };
+
+  const handleAddCurrentIp = async () => {
+    setDetectingIp(true);
+    const ip = await getClientPublicIp();
+    setDetectedIp(ip);
+    setDetectingIp(false);
+    if (!ip) return;
+    const current = parseAllowedIps(ipListRaw);
+    if (!current.includes(ip)) {
+      setIpListRaw(formatAllowedIps([...current, ip]));
+    }
+  };
+
+  const handleSaveIpRestriction = async () => {
+    if (!restaurantId) return;
+    setIpSaving(true);
+    setIpMsg(null);
+    try {
+      const allowedIps = parseAllowedIps(ipListRaw);
+      await saveIpRestriction(restaurantId, { enabled: ipEnabled, allowedIps });
+      clearIpRestrictionCache(restaurantId);
+      setIpMsg('success');
+    } catch {
+      setIpMsg('error');
+    } finally {
+      setIpSaving(false);
+      setTimeout(() => setIpMsg(null), 3500);
+    }
+  };
 
   const handleLogoFile = async (file: File) => {
     if (!file.type.startsWith('image/')) return;
@@ -255,6 +305,98 @@ export function RestaurantSettings({ restaurantId, restaurantName, onNameChange,
       <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 text-sm text-amber-300">
         <strong className="text-amber-200">Receipt preview:</strong> The logo, name, address, city, country, phone and
         email will all appear at the top of every customer receipt printed from the waiter or kitchen portal.
+      </div>
+
+      {/* ── IP Restriction ── */}
+      <div className="bg-slate-800/60 rounded-xl border border-slate-700 p-6 space-y-5">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-sm font-semibold text-slate-200 uppercase tracking-wider flex items-center gap-2">
+              <ShieldCheckIcon className="w-4 h-4 text-amber-400" /> Network Order Restriction
+            </h2>
+            <p className="text-xs text-slate-400 mt-1.5">
+              When enabled, orders can only be placed from the restaurant's network (IP address).
+              Staff working from home will be blocked from creating orders.
+            </p>
+          </div>
+          <button
+            onClick={() => setIpEnabled((v) => !v)}
+            className={`relative shrink-0 w-11 h-6 rounded-full transition-colors ${ipEnabled ? 'bg-amber-500' : 'bg-slate-600'}`}
+            role="switch"
+            aria-checked={ipEnabled}
+          >
+            <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${ipEnabled ? 'translate-x-5' : 'translate-x-0'}`} />
+          </button>
+        </div>
+
+        {ipEnabled && (
+          <div className="space-y-4">
+            {/* Detect current IP */}
+            <div className="flex items-center gap-3 bg-slate-900/60 border border-slate-700 rounded-xl p-3">
+              <WifiIcon className="w-4 h-4 text-slate-400 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-slate-400">Your current public IP</p>
+                <p className="text-sm font-mono font-semibold text-slate-200 mt-0.5">
+                  {detectingIp ? 'Detecting…' : (detectedIp ?? '—')}
+                </p>
+              </div>
+              <button
+                onClick={handleDetectIp}
+                disabled={detectingIp}
+                className="shrink-0 p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-700 transition-colors disabled:opacity-50"
+                title="Refresh IP"
+              >
+                <RefreshCwIcon className={`w-3.5 h-3.5 ${detectingIp ? 'animate-spin' : ''}`} />
+              </button>
+            </div>
+
+            {/* IP list textarea */}
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-semibold text-slate-400 uppercase tracking-wide">
+                  Allowed IP Addresses
+                </label>
+                <button
+                  onClick={handleAddCurrentIp}
+                  disabled={detectingIp}
+                  className="text-xs text-amber-400 hover:text-amber-300 disabled:opacity-50 transition-colors font-medium"
+                >
+                  + Add current IP
+                </button>
+              </div>
+              <textarea
+                value={ipListRaw}
+                onChange={(e) => setIpListRaw(e.target.value)}
+                rows={4}
+                placeholder={'Enter one IP per line, e.g.:\n41.217.64.100\n41.217.64.101'}
+                className="w-full px-3 py-2.5 bg-slate-800 border border-slate-600 rounded-xl text-sm font-mono text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-amber-500 resize-none transition-all"
+              />
+              <p className="text-xs text-slate-500 mt-1.5">
+                One IP per line. To find your restaurant's IP, click "Add current IP" while connected to the restaurant Wi-Fi.
+                Online orders (QR takeaway) are never blocked.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleSaveIpRestriction}
+                disabled={ipSaving}
+                className="flex items-center gap-2 px-5 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-slate-900 font-semibold text-sm transition"
+              >
+                <SaveIcon className="w-4 h-4" />
+                {ipSaving ? 'Saving…' : 'Save Restriction'}
+              </button>
+              {ipMsg === 'success' && <span className="text-sm text-emerald-400">Saved.</span>}
+              {ipMsg === 'error' && <span className="text-sm text-red-400">Failed to save. Please try again.</span>}
+            </div>
+          </div>
+        )}
+
+        {!ipEnabled && (
+          <p className="text-xs text-slate-600 italic">
+            Restriction is off — staff can place orders from any network.
+          </p>
+        )}
       </div>
 
       {/* ── Save ── */}

@@ -1,4 +1,5 @@
 ﻿import { supabase, callEdgeFn } from '../lib/supabase';
+import type { IpRestrictionSettings } from '../utils/ipRestriction';
 
 export type OutletType = 'restaurant' | 'bar' | 'minimart' | 'hotel' | 'cafe';
 
@@ -216,6 +217,47 @@ export async function saveReceiptSettings(
   if (Object.keys(corePayload).length === 0 && !hasReceiptValues) return;
 
   throw lastError || new Error('Failed to persist restaurant receipt settings');
+}
+
+export async function fetchIpRestriction(restaurantId: string): Promise<IpRestrictionSettings> {
+  const { data } = await supabase
+    .from('restaurants')
+    .select('settings')
+    .eq('id', restaurantId)
+    .maybeSingle();
+
+  const raw = (data?.settings as Record<string, unknown> | undefined)?.ip_restriction as Record<string, unknown> | undefined;
+  return {
+    enabled: Boolean(raw?.enabled ?? false),
+    allowedIps: Array.isArray(raw?.allowed_ips) ? (raw.allowed_ips as string[]) : [],
+  };
+}
+
+export async function saveIpRestriction(
+  restaurantId: string,
+  settings: IpRestrictionSettings,
+): Promise<void> {
+  const { data: current } = await supabase
+    .from('restaurants')
+    .select('settings')
+    .eq('id', restaurantId)
+    .maybeSingle();
+
+  const existing = ((current as any)?.settings as Record<string, unknown>) || {};
+  const merged = {
+    ...existing,
+    ip_restriction: {
+      enabled: settings.enabled,
+      allowed_ips: settings.allowedIps,
+    },
+  };
+
+  const { error } = await supabase
+    .from('restaurants')
+    .update({ settings: merged })
+    .eq('id', restaurantId);
+
+  if (error) throw error;
 }
 
 export async function fetchRestaurantPublic(restaurantId: string): Promise<Restaurant> {

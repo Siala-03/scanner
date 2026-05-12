@@ -1,6 +1,12 @@
 import { supabase } from '../lib/supabase';
 import type { Order, CreateOrderInput, UpdateOrderStatusInput } from '../types/orders';
 import { decrementInventoryForOrder } from './inventory';
+import { fetchIpRestriction } from './restaurants';
+import {
+  getClientPublicIp,
+  getCachedIpRestrictionSettings,
+  cacheIpRestrictionSettings,
+} from '../utils/ipRestriction';
 
 const db = supabase;
 
@@ -138,6 +144,31 @@ async function lookupAssignedWaiter(restaurantId: string, tableNumber: number): 
 export async function createOrder(order: CreateOrderInput): Promise<Order> {
   const restaurantId = (order as any).restaurantId || getRestaurantId();
   if (!restaurantId) throw new Error('No company selected');
+
+  // IP restriction — skip for online orders (table 999 = delivery/takeaway via QR)
+  const isOnline = order.tableNumber === 999;
+  if (!isOnline && typeof window !== 'undefined') {
+    try {
+      let ipSettings = getCachedIpRestrictionSettings(restaurantId);
+      if (!ipSettings) {
+        ipSettings = await fetchIpRestriction(restaurantId);
+        cacheIpRestrictionSettings(restaurantId, ipSettings);
+      }
+      if (ipSettings.enabled && ipSettings.allowedIps.length > 0) {
+        const clientIp = await getClientPublicIp();
+        if (!clientIp || !ipSettings.allowedIps.includes(clientIp)) {
+          throw new Error(
+            'Orders can only be placed from within the restaurant network. ' +
+            'Please connect to the restaurant Wi-Fi and try again.'
+          );
+        }
+      }
+    } catch (err: any) {
+      // Re-throw IP restriction errors; swallow transient lookup failures
+      if (err.message?.includes('restaurant network')) throw err;
+      console.warn('[createOrder] IP restriction check failed (non-blocking):', err.message);
+    }
+  }
 
   const staffId = getStaffId();
   const staffRole = typeof window !== 'undefined' ? localStorage.getItem('staffRole') : null;
