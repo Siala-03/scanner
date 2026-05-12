@@ -1189,9 +1189,12 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
       const rows = await importInventoryFromFile(file);
       if (rows.length === 0) throw new Error('No valid rows found in file');
 
+      console.log(`Starting import: ${rows.length} total rows parsed from file`);
+
       let successful = 0;
       let failed = 0;
       const errors: string[] = [];
+      const failedItems: string[] = [];
 
       for (const row of rows) {
         if (!row.menuItemId || !row.menuItemId.trim()) {
@@ -1205,6 +1208,14 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
           const descriptionValue = row.description ?? '';
           const hasCategory = row.category !== undefined;
           const categoryValue = row.category ?? '';
+          
+          console.log(`Importing item: ${row.menuItemId}`, {
+            stock: row.stock,
+            unitCost: row.unitCost,
+            price: row.price,
+            location: row.location,
+          });
+
           await apiUpdateInventoryRecord(row.menuItemId, {
             stock:             row.stock,
             lowStockThreshold: row.lowStockThreshold,
@@ -1227,19 +1238,33 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
           }
 
           successful++;
+          console.log(`✓ Item ${row.menuItemId} imported successfully`);
         } catch (itemErr) {
           failed++;
-          errors.push(`Item ${row.menuItemId}: ${getErrorMessage(itemErr)}`);
+          const errorMsg = getErrorMessage(itemErr);
+          errors.push(`Item ${row.menuItemId}: ${errorMsg}`);
+          failedItems.push(row.menuItemId);
+          console.error(`✗ Item ${row.menuItemId} failed:`, itemErr, 'Data:', {
+            stock: row.stock,
+            unitCost: row.unitCost,
+            price: row.price,
+            qtyStart: row.qtyStart,
+          });
         }
       }
 
       await refresh();
 
+      console.log(`Import complete: ${successful} successful, ${failed} failed out of ${rows.length} total`);
+      console.log('Failed items:', failedItems);
+
       let message = `Import completed: ${successful} successful`;
       if (failed > 0) {
         message += `, ${failed} failed`;
-        if (errors.length > 0 && errors.length <= 5) {
-          message += `.\n\nFirst few errors:\n${errors.slice(0, 5).join('\n')}`;
+        if (errors.length > 0 && errors.length <= 10) {
+          message += `.\n\nErrors:\n${errors.slice(0, 10).join('\n')}`;
+        } else if (errors.length > 10) {
+          message += `.\n\nFirst 10 errors:\n${errors.slice(0, 10).join('\n')}\n\n...and ${errors.length - 10} more. Check console for details.`;
         }
       }
       message += '.';
