@@ -491,14 +491,12 @@ export function buildReceiptHtml(receipt: ReceiptData): string {
 
 <script>
   if (window.opener || window.name === 'receipt_print') {
-    window.addEventListener('load', function() {
-      setTimeout(function() {
-        window.print();
-        window.addEventListener('afterprint', function() {
-          setTimeout(function() { window.close(); }, 300);
-        });
-      }, 300);
-    });
+    setTimeout(function() {
+      window.print();
+      window.addEventListener('afterprint', function() {
+        setTimeout(function() { window.close(); }, 300);
+      });
+    }, 500);
   }
 <\/script>
 
@@ -725,14 +723,12 @@ export function buildExpenseReceiptHtml(
 
 <script>
   if (window.opener || window.name === 'receipt_print') {
-    window.addEventListener('load', function() {
-      setTimeout(function() {
-        window.print();
-        window.addEventListener('afterprint', function() {
-          setTimeout(function() { window.close(); }, 300);
-        });
-      }, 300);
-    });
+    setTimeout(function() {
+      window.print();
+      window.addEventListener('afterprint', function() {
+        setTimeout(function() { window.close(); }, 300);
+      });
+    }, 500);
   }
 <\/script>
 </body>

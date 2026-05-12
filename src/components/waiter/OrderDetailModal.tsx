@@ -18,6 +18,7 @@ interface OrderDetailModalProps {
   onClose: () => void;
   onApprove?: (order: Order) => void;
   onReject?: (orderId: string) => void;
+  onCancel?: (orderId: string) => void;
   onMarkReady?: (orderId: string) => void;
   onMarkServed?: (orderId: string) => void;
   onPrintReceipt?: (order: Order) => void;
@@ -28,6 +29,7 @@ export function OrderDetailModal({
   onClose,
   onApprove,
   onReject,
+  onCancel,
   onMarkReady,
   onMarkServed,
   onPrintReceipt,
@@ -222,6 +224,18 @@ export function OrderDetailModal({
               Close
             </Button>
           }
+          {!['served', 'cancelled'].includes(order.status) && onCancel && (
+            <Button
+              variant="danger"
+              fullWidth
+              onClick={() => {
+                onCancel(order.id);
+                onClose();
+              }}
+            >
+              Cancel Order
+            </Button>
+          )}
         </div>
       </div>
     </Modal>);

@@ -181,14 +181,12 @@ function printViaHtmlPopup(textLines: string[]): void {
 <pre>${escaped}</pre>
 <script>
   if (window.opener || window.name === 'receipt_print') {
-    window.addEventListener('load', function() {
-      setTimeout(function() {
-        window.print();
-        window.addEventListener('afterprint', function() {
-          setTimeout(function() { window.close(); }, 300);
-        });
-      }, 300);
-    });
+    setTimeout(function() {
+      window.print();
+      window.addEventListener('afterprint', function() {
+        setTimeout(function() { window.close(); }, 300);
+      });
+    }, 500);
   }
 <\/script>
 </body>

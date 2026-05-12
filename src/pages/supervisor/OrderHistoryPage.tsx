@@ -5,7 +5,7 @@ import type { Order as OrderType, OrderStatus } from '../../types';
 import { Card } from '../../components/ui/Card';
 import { OrdersHistoryTable } from '../../components/supervisor/OrdersHistoryTable';
 import { OrderDetailModal } from '../../components/waiter/OrderDetailModal';
-import { fetchOrders } from '../../api/orders';
+import { fetchOrders, cancelOrder } from '../../api/orders';
 import { downloadCsv, buildOrdersCsv } from '../../utils/csv';
 
 // Type alias to handle both API and local Order types
@@ -106,6 +106,16 @@ export function OrderHistoryPage({ onBack, existingOrders }: OrderHistoryPagePro
       order.id === orderId ? { ...order, status } : order
     ));
     setSelectedOrder(null);
+  };
+
+  const handleCancelOrder = async (orderId: string) => {
+    try {
+      await cancelOrder(orderId);
+      handleUpdateOrderStatus(orderId, 'cancelled');
+    } catch (err) {
+      console.error('Failed to cancel order:', err);
+      alert('Failed to cancel order. Please try again.');
+    }
   };
 
   const handlePrintReceipt = (_order: Order) => {
@@ -256,6 +266,7 @@ export function OrderHistoryPage({ onBack, existingOrders }: OrderHistoryPagePro
         onClose={() => setSelectedOrder(null)}
         onApprove={(order) => handleUpdateOrderStatus(order.id, 'verified')}
         onReject={(id) => handleUpdateOrderStatus(id, 'cancelled')}
+        onCancel={handleCancelOrder}
         onMarkReady={(id) => handleUpdateOrderStatus(id, 'ready')}
         onMarkServed={(id) => handleUpdateOrderStatus(id, 'served')}
         onPrintReceipt={handlePrintReceipt}

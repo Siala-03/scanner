@@ -3,7 +3,7 @@ import {
   CheckCircleIcon, ClockIcon, BanknoteIcon, CreditCardIcon,
   SmartphoneIcon, RefreshCwIcon, UserIcon, PlusIcon, XIcon,
 } from 'lucide-react';
-import { fetchOrders, confirmPayment } from '../../api/orders';
+import { fetchOrders, confirmPayment, cancelOrder } from '../../api/orders';
 import { fiscalizeOrder } from '../../api/ebm';
 import { formatPrice } from '../../utils/currency';
 import { supabase } from '../../lib/supabase';
@@ -97,6 +97,7 @@ export function PaymentApprovalPanel({ restaurantId, staffId, staffName }: Payme
   const [staffMap,     setStaffMap]     = useState<Record<string, string>>({});
   const [loading,      setLoading]      = useState(true);
   const [confirming,   setConfirming]   = useState<string | null>(null);
+  const [cancelling,   setCancelling]   = useState<string | null>(null);
   const [splitsMap,    setSplitsMap]    = useState<Record<string, SplitEntry[]>>({});
   const [justConfirmed, setJustConfirmed] = useState<Set<string>>(new Set());
 
@@ -143,6 +144,22 @@ export function PaymentApprovalPanel({ restaurantId, staffId, staffName }: Payme
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [restaurantId, loadPendingOrders]);
+
+  // ── Cancel ─────────────────────────────────────────────────────────────────
+
+  const handleCancel = async (order: Order) => {
+    if (!window.confirm(`Cancel order ${getOrderLabel(order)}?`)) return;
+    setCancelling(order.id);
+    try {
+      await cancelOrder(order.id);
+      setOrders((prev) => prev.filter((o) => o.id !== order.id));
+    } catch (err) {
+      console.error('Failed to cancel order:', err);
+      alert('Failed to cancel order. Please try again.');
+    } finally {
+      setCancelling(null);
+    }
+  };
 
   // ── Split helpers ────────────────────────────────────────────────────────
 
@@ -277,7 +294,6 @@ export function PaymentApprovalPanel({ restaurantId, staffId, staffName }: Payme
             const allocated = enteredTotal(splits);
             const remaining = order.total - allocated;
             const valid     = splitsValid(splits, order.total);
-            // MoMo ref required if MoMo is in splits
             const momoEntry = splits.find((s) => s.code === '04');
             const momoRefMissing = !!momoEntry && !momoEntry.momoRef.trim();
             const canConfirm = valid && !momoRefMissing;
@@ -437,17 +453,33 @@ export function PaymentApprovalPanel({ restaurantId, staffId, staffName }: Payme
                     {staffName && <p className="text-xs text-slate-500">by {staffName}</p>}
                   </div>
                 ) : (
-                  <button
-                    onClick={() => handleConfirm(order)}
-                    disabled={busy || !canConfirm}
-                    className="w-full py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium transition-colors flex items-center justify-center gap-2"
-                  >
-                    {busy ? (
-                      <><RefreshCwIcon className="w-3.5 h-3.5 animate-spin" /> Confirming…</>
-                    ) : (
-                      <><CheckCircleIcon className="w-3.5 h-3.5" /> Confirm Payment</>
+                  <>
+                    <button
+                      onClick={() => handleConfirm(order)}
+                      disabled={busy || cancelling === order.id || !canConfirm}
+                      className="w-full py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                    >
+                      {busy ? (
+                        <><RefreshCwIcon className="w-3.5 h-3.5 animate-spin" /> Confirming…</>
+                      ) : (
+                        <><CheckCircleIcon className="w-3.5 h-3.5" /> Confirm Payment</>
+                      )}
+                    </button>
+                    {momoRefMissing && valid && (
+                      <p className="text-xs text-amber-400 text-center mt-1">Enter MoMo transaction ref above to confirm</p>
                     )}
-                  </button>
+                    <button
+                      onClick={() => handleCancel(order)}
+                      disabled={busy || cancelling === order.id}
+                      className="w-full mt-2 py-1.5 rounded-lg border border-red-500/40 bg-red-500/10 hover:bg-red-500/20 disabled:opacity-50 disabled:cursor-not-allowed text-red-400 text-xs font-medium transition-colors flex items-center justify-center gap-1.5"
+                    >
+                      {cancelling === order.id ? (
+                        <><RefreshCwIcon className="w-3 h-3 animate-spin" /> Cancelling…</>
+                      ) : (
+                        <><XIcon className="w-3 h-3" /> Cancel Order</>
+                      )}
+                    </button>
+                  </>
                 )}
 
                 <div className="flex items-center gap-1 mt-2 text-xs text-slate-500">

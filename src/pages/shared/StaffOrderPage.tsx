@@ -320,11 +320,9 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
     if (!data) return;
     setIsPrintingReceipt(true);
     try {
-      await printThermal(data);
+      printReceipt(buildReceiptHtml(data));
     } catch {
-      // thermal failed — fall back to the note-modal HTML path
-      setReceiptNote('');
-      setShowReceiptNoteModal(true);
+      alert('Could not open print window. Please allow pop-ups in your browser.');
     } finally {
       setIsPrintingReceipt(false);
     }

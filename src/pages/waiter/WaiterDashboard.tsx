@@ -29,8 +29,7 @@ import { QRScanner } from '../../components/waiter/QRScanner';
 import { WaiterOrderEntry } from '../../components/waiter/WaiterOrderEntry';
 import { loadReviews } from '../../utils/reviewsStorage';
 import { useStaffKPIs } from '../../hooks/useKPIs';
-import { orderToReceiptData } from '../../utils/receipt';
-import { printOrderReceipt as printThermal } from '../../utils/sunmiPrinter';
+import { orderToReceiptData, buildReceiptHtml, printReceipt } from '../../utils/receipt';
 import type { PaymentEntry } from '../../utils/receipt';
 import { ReceiptShareModal } from '../../components/ui/ReceiptShareModal';
 import { PaymentCaptureModal } from '../../components/ui/PaymentCaptureModal';
@@ -1064,7 +1063,11 @@ export function WaiterDashboard({
         change,
         notes: combinedNotes || undefined,
       });
-      await printThermal(receiptData);
+      try {
+        printReceipt(buildReceiptHtml(receiptData));
+      } catch {
+        alert('Could not open print window. Please allow pop-ups in your browser.');
+      }
       if (order.tableNumber != null) {
         await markTableSessionPendingCloseFromReceipt(order.tableNumber);
       }
