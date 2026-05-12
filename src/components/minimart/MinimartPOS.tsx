@@ -144,13 +144,15 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
           rows = (res.data || []).filter((o: any) => {
             const ps = String(o.payment_status || '').toLowerCase();
             const statusMatch = !ps || ['confirmed', 'paid', 'completed'].includes(ps);
-            // Only fall back to "show all" when neither tracking column exists in the schema
-            const hasTracking = 'payment_confirmed_by' in o || 'created_by' in o;
-            const cashierMatch = !hasTracking || (
-              o.payment_confirmed_by === cashier.id ||
-              o.created_by === cashier.id
-            );
-            return cashierMatch && statusMatch;
+            // Isolate by cashier when ownership data is available.
+            // If both columns exist but are null (old/unowned orders) show them —
+            // only block rows explicitly confirmed or created by a different cashier.
+            const confirmedBy: string | null = o.payment_confirmed_by ?? null;
+            const createdBy: string | null = o.created_by ?? null;
+            const ownedByOther =
+              (confirmedBy !== null && confirmedBy !== cashier.id) &&
+              (createdBy === null || createdBy !== cashier.id);
+            return !ownedByOther && statusMatch;
           });
           break;
         }
@@ -239,13 +241,15 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
           data = (res.data || []).filter((o: any) => {
             const ps = String(o.payment_status || '').toLowerCase();
             const statusMatch = !ps || ['confirmed', 'paid', 'completed'].includes(ps);
-            // Only fall back to "show all" when neither tracking column exists in the schema
-            const hasTracking = 'payment_confirmed_by' in o || 'created_by' in o;
-            const cashierMatch = !hasTracking || (
-              o.payment_confirmed_by === cashier.id ||
-              o.created_by === cashier.id
-            );
-            return cashierMatch && statusMatch;
+            // Isolate by cashier when ownership data is available.
+            // If both columns exist but are null (old/unowned orders) show them —
+            // only block rows explicitly confirmed or created by a different cashier.
+            const confirmedBy: string | null = o.payment_confirmed_by ?? null;
+            const createdBy: string | null = o.created_by ?? null;
+            const ownedByOther =
+              (confirmedBy !== null && confirmedBy !== cashier.id) &&
+              (createdBy === null || createdBy !== cashier.id);
+            return !ownedByOther && statusMatch;
           });
           break;
         }
