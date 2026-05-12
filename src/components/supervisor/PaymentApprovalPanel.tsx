@@ -53,24 +53,37 @@ function enteredTotal(splits: SplitEntry[]): number {
   return splits.reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
 }
 
+/**
+ * Resolve effective amounts: single split gets the full total;
+ * in multi-split the last entry auto-fills the remainder.
+ */
+function resolveAmounts(splits: SplitEntry[], total: number): Array<SplitEntry & { effectiveAmount: number }> {
+  if (splits.length === 1) {
+    return [{ ...splits[0], effectiveAmount: total }];
+  }
+  const nonLastSum = splits.slice(0, -1).reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
+  const remainder = Math.max(0, total - nonLastSum);
+  return splits.map((s, i) => ({
+    ...s,
+    effectiveAmount: i === splits.length - 1 ? remainder : (parseFloat(s.amount) || 0),
+  }));
+}
+
 /** True when amounts are valid for the given order total. */
 function splitsValid(splits: SplitEntry[], total: number): boolean {
-  if (splits.length === 1) return true; // single method — full amount implied
-  const sum = enteredTotal(splits);
-  return Math.abs(sum - total) < 0.5; // allow tiny rounding
+  if (splits.length === 1) return true;
+  const resolved = resolveAmounts(splits, total);
+  return resolved.every((s) => s.effectiveAmount > 0);
 }
 
 /** Build a human-readable note for the split, e.g. "Cash: 5000, MoMo: 3000 (ref: 123456)" */
 function buildNote(splits: SplitEntry[], orderTotal: number): string | undefined {
-  if (splits.length <= 1 && !splits[0]?.momoRef) return undefined;
-  const parts = splits.map((s, i) => {
-    const amt = splits.length === 1
-      ? orderTotal
-      : parseFloat(s.amount) || 0;
+  const resolved = resolveAmounts(splits, orderTotal);
+  if (resolved.length <= 1 && !resolved[0]?.momoRef) return undefined;
+  return resolved.map((s) => {
     const ref = s.momoRef ? ` (ref: ${s.momoRef})` : '';
-    return `${s.label}: ${formatPrice(amt)}${ref}`;
-  });
-  return parts.join(' + ');
+    return `${s.label}: ${formatPrice(s.effectiveAmount)}${ref}`;
+  }).join(' + ');
 }
 
 interface PaymentApprovalPanelProps {
@@ -165,10 +178,9 @@ export function PaymentApprovalPanel({ restaurantId, staffId, staffName }: Payme
 
   const handleConfirm = async (order: Order) => {
     const splits = getSplits(splitsMap, order.id);
-    // Primary method = the one with the largest amount (or only one)
-    const primary = splits.length === 1
-      ? splits[0]
-      : splits.reduce((a, b) => (parseFloat(a.amount) || 0) >= (parseFloat(b.amount) || 0) ? a : b);
+    const resolved = resolveAmounts(splits, order.total);
+    // Primary method = the one with the largest effective amount
+    const primary = resolved.reduce((a, b) => a.effectiveAmount >= b.effectiveAmount ? a : b);
 
     const note = buildNote(splits, order.total);
     setConfirming(order.id);
