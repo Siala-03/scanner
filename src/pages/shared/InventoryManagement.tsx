@@ -1189,34 +1189,61 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
       const rows = await importInventoryFromFile(file);
       if (rows.length === 0) throw new Error('No valid rows found in file');
 
-      for (const row of rows) {
-        const hasDescription = row.description !== undefined;
-        const descriptionValue = row.description ?? '';
-        const hasCategory = row.category !== undefined;
-        const categoryValue = row.category ?? '';
-        await apiUpdateInventoryRecord(row.menuItemId, {
-          stock:             row.stock,
-          lowStockThreshold: row.lowStockThreshold,
-          reorderPoint:      row.reorderPoint,
-          reorderQty:        row.reorderQty,
-          unitCost:          row.unitCost,
-          cost:              row.unitCost,
-          price:             row.price,
-          location:          row.location,
-          unitMeasurement:   row.unitMeasurement,
-          ...(hasDescription ? { description: descriptionValue } : {}),
-          ...(hasCategory ? { category: categoryValue } : {}),
-          expiryDate:        row.expiryDate,
-          purchaseDate:      row.purchaseDate,
-          qtyStart:          row.qtyStart,
-        });
+      let successful = 0;
+      let failed = 0;
+      const errors: string[] = [];
 
-        if (!isMinimartScope && hasDescription && menuItemMap[row.menuItemId]) {
-          await apiUpdateMenuItem(row.menuItemId, { description: descriptionValue } as any);
+      for (const row of rows) {
+        if (!row.menuItemId || !row.menuItemId.trim()) {
+          failed++;
+          errors.push(`Row skipped: missing or empty Item ID`);
+          continue;
+        }
+
+        try {
+          const hasDescription = row.description !== undefined;
+          const descriptionValue = row.description ?? '';
+          const hasCategory = row.category !== undefined;
+          const categoryValue = row.category ?? '';
+          await apiUpdateInventoryRecord(row.menuItemId, {
+            stock:             row.stock,
+            lowStockThreshold: row.lowStockThreshold,
+            reorderPoint:      row.reorderPoint,
+            reorderQty:        row.reorderQty,
+            unitCost:          row.unitCost,
+            cost:              row.unitCost,
+            price:             row.price,
+            location:          row.location,
+            unitMeasurement:   row.unitMeasurement,
+            ...(hasDescription ? { description: descriptionValue } : {}),
+            ...(hasCategory ? { category: categoryValue } : {}),
+            expiryDate:        row.expiryDate,
+            purchaseDate:      row.purchaseDate,
+            qtyStart:          row.qtyStart,
+          });
+
+          if (!isMinimartScope && hasDescription && menuItemMap[row.menuItemId]) {
+            await apiUpdateMenuItem(row.menuItemId, { description: descriptionValue } as any);
+          }
+
+          successful++;
+        } catch (itemErr) {
+          failed++;
+          errors.push(`Item ${row.menuItemId}: ${getErrorMessage(itemErr)}`);
         }
       }
+
       await refresh();
-      alert(`Successfully imported ${rows.length} inventory record(s).`);
+
+      let message = `Import completed: ${successful} successful`;
+      if (failed > 0) {
+        message += `, ${failed} failed`;
+        if (errors.length > 0 && errors.length <= 5) {
+          message += `.\n\nFirst few errors:\n${errors.slice(0, 5).join('\n')}`;
+        }
+      }
+      message += '.';
+      alert(message);
     } catch (err) {
       alert(`Import failed: ${getErrorMessage(err)}`);
     } finally {
