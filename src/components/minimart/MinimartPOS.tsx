@@ -126,6 +126,7 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
 
       let rows: any[] = [];
       for (const cols of [
+        'total, payment_type, payment_method, payment_status, payment_confirmed_by, created_by, created_at',
         'total, payment_type, payment_method, payment_status, payment_confirmed_by, created_at',
         'total, payment_type, payment_method, payment_status, created_at',
         'total, payment_type, payment_method, created_at',
@@ -142,8 +143,13 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
         if (!res.error) {
           rows = (res.data || []).filter((o: any) => {
             const ps = String(o.payment_status || '').toLowerCase();
-            const cashierMatch = o.payment_confirmed_by ? o.payment_confirmed_by === cashier.id : true;
             const statusMatch = !ps || ['confirmed', 'paid', 'completed'].includes(ps);
+            // Only fall back to "show all" when neither tracking column exists in the schema
+            const hasTracking = 'payment_confirmed_by' in o || 'created_by' in o;
+            const cashierMatch = !hasTracking || (
+              o.payment_confirmed_by === cashier.id ||
+              o.created_by === cashier.id
+            );
             return cashierMatch && statusMatch;
           });
           break;
@@ -212,6 +218,7 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
       const todayStart = new Date();
       todayStart.setHours(0, 0, 0, 0);
       const candidateSelects = [
+        'id, order_number, total, items, created_at, payment_type, payment_method, payment_status, payment_confirmed_by, created_by',
         'id, order_number, total, items, created_at, payment_type, payment_method, payment_status, payment_confirmed_by',
         'id, order_number, total, items, created_at, payment_method, payment_status, payment_confirmed_by',
         'id, order_number, total, items, created_at, payment_method, payment_status',
@@ -231,8 +238,13 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
         if (!res.error) {
           data = (res.data || []).filter((o: any) => {
             const ps = String(o.payment_status || '').toLowerCase();
-            const cashierMatch = o.payment_confirmed_by ? o.payment_confirmed_by === cashier.id : true;
             const statusMatch = !ps || ['confirmed', 'paid', 'completed'].includes(ps);
+            // Only fall back to "show all" when neither tracking column exists in the schema
+            const hasTracking = 'payment_confirmed_by' in o || 'created_by' in o;
+            const cashierMatch = !hasTracking || (
+              o.payment_confirmed_by === cashier.id ||
+              o.created_by === cashier.id
+            );
             return cashierMatch && statusMatch;
           });
           break;
