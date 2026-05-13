@@ -117,6 +117,14 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
   const [taxRate, setTaxRate] = useState(0);
   const [taxLabel, setTaxLabel] = useState('Tax');
 
+  const isTxnOwnedByCashier = useCallback(
+    (order: { payment_confirmed_by?: string | null; created_by?: string | null }) => {
+      if (!cashier?.id) return false;
+      return order.payment_confirmed_by === cashier.id || order.created_by === cashier.id;
+    },
+    [cashier?.id]
+  );
+
 
   const loadShiftStats = useCallback(async () => {
     if (!activeRestaurantId || !cashier?.id) return;
@@ -144,15 +152,7 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
           rows = (res.data || []).filter((o: any) => {
             const ps = String(o.payment_status || '').toLowerCase();
             const statusMatch = !ps || ['confirmed', 'paid', 'completed'].includes(ps);
-            // Isolate by cashier when ownership data is available.
-            // If both columns exist but are null (old/unowned orders) show them —
-            // only block rows explicitly confirmed or created by a different cashier.
-            const confirmedBy: string | null = o.payment_confirmed_by ?? null;
-            const createdBy: string | null = o.created_by ?? null;
-            const ownedByOther =
-              (confirmedBy !== null && confirmedBy !== cashier.id) &&
-              (createdBy === null || createdBy !== cashier.id);
-            return !ownedByOther && statusMatch;
+            return statusMatch && isTxnOwnedByCashier(o);
           });
           break;
         }
@@ -178,7 +178,7 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
     } catch {
       // non-fatal
     }
-  }, [activeRestaurantId, cashier?.id]);
+  }, [activeRestaurantId, cashier?.id, isTxnOwnedByCashier]);
 
   const loadProducts = useCallback(async () => {
     setLoading(true);
@@ -241,15 +241,7 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
           data = (res.data || []).filter((o: any) => {
             const ps = String(o.payment_status || '').toLowerCase();
             const statusMatch = !ps || ['confirmed', 'paid', 'completed'].includes(ps);
-            // Isolate by cashier when ownership data is available.
-            // If both columns exist but are null (old/unowned orders) show them —
-            // only block rows explicitly confirmed or created by a different cashier.
-            const confirmedBy: string | null = o.payment_confirmed_by ?? null;
-            const createdBy: string | null = o.created_by ?? null;
-            const ownedByOther =
-              (confirmedBy !== null && confirmedBy !== cashier.id) &&
-              (createdBy === null || createdBy !== cashier.id);
-            return !ownedByOther && statusMatch;
+            return statusMatch && isTxnOwnedByCashier(o);
           });
           break;
         }
@@ -308,7 +300,7 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
     } finally {
       setTxnsLoading(false);
     }
-  }, [activeRestaurantId, cashier?.id]);
+  }, [activeRestaurantId, cashier?.id, isTxnOwnedByCashier]);
 
   useEffect(() => { loadProducts(); }, [loadProducts]);
   useEffect(() => { loadShiftStats(); }, [loadShiftStats]);
