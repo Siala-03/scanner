@@ -85,13 +85,15 @@ export function useTables() {
       // If a mutation happened while we were waiting, discard the stale response
       if (mutationCountRef.current !== mutationAtStart) return;
 
+      // Merge backend + localStorage so optimistically-added tables are never lost.
+      // Only mutations (addTable/removeTable) may write localStorage.
+      const localTables = getStoredTables(restaurantId);
       if (backendTables && backendTables.length > 0) {
-        const tableNumbers = backendTables.map(t => t.tableNumber || t.table_number);
-        setTables(tableNumbers);
-        setStoredTables(restaurantId, tableNumbers); // Also store locally
+        const backendNumbers = backendTables.map(t => t.tableNumber || t.table_number);
+        const merged = [...new Set([...backendNumbers, ...localTables])].sort((a, b) => a - b);
+        setTables(merged);
       } else {
-        // If no backend tables, use locally stored ones
-        const localTables = getStoredTables(restaurantId);
+        // Backend has no tables — trust localStorage
         setTables(localTables);
       }
     } catch (err) {
