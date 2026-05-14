@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import {
   getEbmConfig, saveEbmConfig, initializeEbmDevice,
-  getEbmInvoices,
+  getEbmInvoices, getEbmMockStatus,
   type EbmConfig, type EbmConfigInput, type EbmInvoice,
 } from '../../api/ebm';
 import { formatPrice } from '../../utils/currency';
@@ -57,6 +57,7 @@ export function EbmSettings({ restaurantId }: EbmSettingsProps) {
   const [initializing, setInitializing] = useState(false);
   const [saveMsg, setSaveMsg] = useState<'saved' | 'error' | null>(null);
   const [initResult, setInitResult] = useState<{ ok: boolean; msg: string } | null>(null);
+  const [mockMode, setMockMode] = useState(false);
 
   const [invoices, setInvoices] = useState<EbmInvoice[]>([]);
   const [invoicesLoading, setInvoicesLoading] = useState(false);
@@ -99,6 +100,7 @@ export function EbmSettings({ restaurantId }: EbmSettingsProps) {
 
   useEffect(() => { loadConfig(); }, [loadConfig]);
   useEffect(() => { loadInvoices(invoiceOffset, invoiceFilter); }, [loadInvoices, invoiceOffset, invoiceFilter]);
+  useEffect(() => { getEbmMockStatus().then(r => setMockMode(r.mockMode)).catch(() => {}); }, []);
 
   const handleSave = async () => {
     setSaving(true);
@@ -138,7 +140,19 @@ export function EbmSettings({ restaurantId }: EbmSettingsProps) {
 
   return (
     <div className="space-y-6 max-w-4xl">
-      {/* ── Device Configuration ── */}
+      {/* ── Mock Mode Banner ── */}
+      {mockMode && (
+        <div className="flex items-center gap-3 bg-amber-500/10 border border-amber-500/40 rounded-xl px-4 py-3">
+          <AlertTriangleIcon className="w-5 h-5 text-amber-400 shrink-0" />
+          <div>
+            <p className="text-sm font-semibold text-amber-300">EBM Mock Mode Active</p>
+            <p className="text-xs text-amber-400/80 mt-0.5">
+              All fiscalization calls return simulated responses. No real transactions are sent to VSDC or RRA.
+              Set <code className="bg-amber-500/20 px-1 rounded">EBM_MOCK=false</code> in backend/.env to go live.
+            </p>
+          </div>
+        </div>
+      )}      {/* ── Device Configuration ── */}
       <div className="bg-slate-800 rounded-xl border border-slate-700 p-5">
         <div className="flex items-center gap-2 mb-5">
           <ServerIcon className="w-5 h-5 text-indigo-400" />

@@ -16,6 +16,118 @@ export interface EbmResponse<T = Record<string, unknown>> {
   data?: T;
 }
 
+// ─── Mock Mode ────────────────────────────────────────────────────────────────
+// Set EBM_MOCK=true in backend/.env to test the full SERVV→EBM flow
+// without a real VSDC instance. All calls return realistic responses.
+// No real credentials needed, no RRA network requests.
+
+export const EBM_MOCK_MODE = process.env.EBM_MOCK === 'true';
+
+let _mockRcptCounter = 1000;
+
+function mockDateTime(): string {
+  return new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14);
+}
+
+function mockResponse<T>(data?: T): EbmResponse<T> {
+  return {
+    resultCd: '000',
+    resultMsg: '[MOCK] Success',
+    resultDt: mockDateTime(),
+    ...(data !== undefined ? { data } : {}),
+  };
+}
+
+function getMockResponse<T = Record<string, unknown>>(path: string, body: Record<string, unknown>): EbmResponse<T> {
+  const tpin    = (body.tpin    as string) || 'MOCK_TPIN';
+  const bhfId   = (body.bhfId   as string) || '000';
+  const dvcSrlNo = (body.dvcSrlNo as string) || 'MOCK-SRL-001';
+
+  switch (true) {
+    case path.includes('selectInitInfo'):
+      return mockResponse({
+        tpin,
+        taxprNm: '[MOCK] Test Business Ltd',
+        bhfId,
+        bhfNm: '[MOCK] Main Branch',
+        bhfOpenDt: '20240101',
+        prvncNm: 'Kigali',
+        dstrtNm: 'Nyarugenge',
+        sctrNm: 'Nyarugenge',
+        locDesc: '[MOCK] Test Location',
+        mgrNm: '[MOCK] Manager',
+        mgrTelNo: '0780000000',
+        mgrEmail: 'mock@test.com',
+        dvcSrlNo,
+      } as unknown as T);
+
+    case path.includes('selectCodes'):
+      return mockResponse({ clsList: [] } as unknown as T);
+
+    case path.includes('selectItemsClass'):
+      return mockResponse({ itemClsList: [] } as unknown as T);
+
+    case path.includes('selectNotices'):
+      return mockResponse({ noticeList: [] } as unknown as T);
+
+    case path.includes('selectBranches'):
+      return mockResponse({ bhfList: [{ bhfId, bhfNm: '[MOCK] Main Branch', bhfSttsCd: '01' }] } as unknown as T);
+
+    case path.includes('selectCustomer'):
+      return mockResponse({
+        custTin: body.custTin || 'MOCK_CUST_TIN',
+        custNm: '[MOCK] Walk-in Customer',
+        adrs: '[MOCK] Kigali, Rwanda',
+      } as unknown as T);
+
+    case path.includes('saveItem'):
+    case path.includes('updateItem'):
+      return mockResponse({ itemCd: body.itemCd || 'MOCK-ITEM' } as unknown as T);
+
+    case path.includes('selectItems'):
+      return mockResponse({ itemList: [] } as unknown as T);
+
+    case path.includes('selectItem'):
+      return mockResponse(null as unknown as T);
+
+    case path.includes('saveSales'): {
+      const rcptNo = ++_mockRcptCounter;
+      const sign = Buffer.from(`MOCK-${tpin}-${rcptNo}-${Date.now()}`).toString('base64').slice(0, 20);
+      return mockResponse({
+        rcptNo,
+        intrlData: `MOCK-INTRL-${rcptNo}`,
+        rcptSign: sign,
+        sdcId: 'MOCK-SDC-001',
+        totRcptNo: rcptNo,
+      } as unknown as T);
+    }
+
+    case path.includes('selectInvoice'):
+    case path.includes('selectPrincipals'):
+      return mockResponse({ itemList: [] } as unknown as T);
+
+    case path.includes('savePurchase'):
+      return mockResponse({ invcNo: body.invcNo || 'MOCK-PURCH' } as unknown as T);
+
+    case path.includes('selectTrnsPurchaseSales'):
+      return mockResponse({ itemList: [] } as unknown as T);
+
+    case path.includes('saveStockMaster'):
+    case path.includes('saveStockItems'):
+      return mockResponse({ sarNo: `MOCK-SAR-${Date.now()}` } as unknown as T);
+
+    case path.includes('selectStockItems'):
+      return mockResponse({ stockList: [] } as unknown as T);
+
+    case path.includes('selectImportItems'):
+    case path.includes('updateImportItems'):
+      return mockResponse({ itemList: [] } as unknown as T);
+
+    default:
+      return mockResponse(undefined);
+  }
+}
+
 // ─── Transport ────────────────────────────────────────────────────────────────
 
 async function vsdcPost<T = Record<string, unknown>>(
@@ -23,6 +135,11 @@ async function vsdcPost<T = Record<string, unknown>>(
   path: string,
   body: object
 ): Promise<EbmResponse<T>> {
+  if (EBM_MOCK_MODE) {
+    console.log(`[EBM MOCK] ${path}`);
+    return getMockResponse<T>(path, body as Record<string, unknown>);
+  }
+
   const url = `${baseUrl.replace(/\/$/, '')}${path}`;
   const response = await fetch(url, {
     method: 'POST',

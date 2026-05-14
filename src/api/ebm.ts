@@ -76,6 +76,9 @@ export const getEbmConfig = (restaurantId: string) =>
 export const saveEbmConfig = (config: EbmConfigInput) =>
   apiRequest<EbmConfig>('/api/ebm/config', { method: 'POST', json: config });
 
+export const getEbmMockStatus = () =>
+  apiRequest<{ mockMode: boolean }>('/api/ebm/mock-status');
+
 // ─── Device Initialization ────────────────────────────────────────────────────
 
 export const initializeEbmDevice = (restaurantId: string) =>

@@ -118,9 +118,17 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
   const [taxLabel, setTaxLabel] = useState('Tax');
 
   const isTxnOwnedByCashier = useCallback(
-    (order: { payment_confirmed_by?: string | null; created_by?: string | null }) => {
+    (order: {
+      payment_confirmed_by?: string | null;
+      paymentConfirmedBy?: string | null;
+      created_by?: string | null;
+      createdBy?: string | null;
+    }) => {
       if (!cashier?.id) return false;
-      return order.payment_confirmed_by === cashier.id || order.created_by === cashier.id;
+      const cashierId = String(cashier.id).trim();
+      const paymentOwner = order.payment_confirmed_by ?? order.paymentConfirmedBy ?? null;
+      const creatorOwner = order.created_by ?? order.createdBy ?? null;
+      return String(paymentOwner ?? '').trim() === cashierId || String(creatorOwner ?? '').trim() === cashierId;
     },
     [cashier?.id]
   );

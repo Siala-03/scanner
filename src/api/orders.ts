@@ -432,7 +432,7 @@ export async function confirmPayment(
 ): Promise<Order> {
   const now = new Date().toISOString();
 
-  // Full update — requires migrations 040 + 041
+  // Full update — newest schema
   let result = await db
     .from('orders')
     .update({
@@ -449,8 +449,41 @@ export async function confirmPayment(
     .select()
     .single();
 
-  // Fallback 1: payment_confirmed_at / payment_confirmed_by / payment_note columns not yet present
-  if (result.error?.code === 'PGRST204' || result.error) {
+  // Fallback 1: keep cashier ownership even if newer metadata columns are missing
+  if (result.error) {
+    result = await db
+      .from('orders')
+      .update({
+        payment_status: 'confirmed',
+        status: 'served',
+        payment_confirmed_by: opts.confirmedBy || null,
+        payment_confirmed_by_name: opts.confirmedByName || null,
+        completed_at: now,
+        updated_at: now,
+      })
+      .eq('id', orderId)
+      .select()
+      .single();
+  }
+
+  // Fallback 2: payment_confirmed_by_name missing, still keep payment_confirmed_by
+  if (result.error) {
+    result = await db
+      .from('orders')
+      .update({
+        payment_status: 'confirmed',
+        status: 'served',
+        payment_confirmed_by: opts.confirmedBy || null,
+        completed_at: now,
+        updated_at: now,
+      })
+      .eq('id', orderId)
+      .select()
+      .single();
+  }
+
+  // Fallback 3: ownership columns unavailable in very old schemas
+  if (result.error) {
     result = await db
       .from('orders')
       .update({ payment_status: 'confirmed', status: 'served', completed_at: now, updated_at: now })
@@ -459,7 +492,7 @@ export async function confirmPayment(
       .single();
   }
 
-  // Fallback 2: payment_status column missing or check constraint mismatch — mark updated only
+  // Fallback 4: payment_status missing or check mismatch — mark served only
   if (result.error?.code === 'PGRST204' || result.error?.code === '23514') {
     console.warn('[confirmPayment] payment_status unavailable, marking updated_at only:', result.error.message);
     result = await db

@@ -24,6 +24,7 @@ import {
   updateImportItems,
   buildSalesFromOrder,
   EbmConfig,
+  EBM_MOCK_MODE,
 } from '../services/ebmService.js';
 
 const router = Router();
@@ -45,6 +46,13 @@ function requireRestaurantId(req: Request, res: Response): string | null {
   if (!id) { res.status(400).json({ error: 'restaurantId is required' }); return null; }
   return id;
 }
+
+// ─── Mock Mode Status ─────────────────────────────────────────────────────────
+
+// GET /api/ebm/mock-status  → tells the frontend if mock mode is active
+router.get('/mock-status', (_req: Request, res: Response) => {
+  res.json({ mockMode: EBM_MOCK_MODE });
+});
 
 // ─── EBM Configuration ────────────────────────────────────────────────────────
 
