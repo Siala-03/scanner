@@ -232,7 +232,24 @@ export async function updateMenuItem(id: string, updates: Partial<MenuItem> & { 
 }
 
 export async function deleteMenuItem(id: string): Promise<void> {
-  await callEdgeFn(`inventory/menu-items/${id}`, { method: 'DELETE' });
+  const restaurantId = await resolveRestaurantId();
+  if (!restaurantId) throw new Error('No company selected');
+
+  const { error } = await supabase
+    .from('menu_items')
+    .delete()
+    .eq('id', id)
+    .eq('restaurant_id', restaurantId);
+
+  if (!error) return;
+
+  // Compatibility fallback for older deployments that route deletes via edge functions.
+  try {
+    await callEdgeFn(`inventory/menu-items/${id}`, { method: 'DELETE' });
+    return;
+  } catch {
+    throw error;
+  }
 }
 
 export async function toggleMenuItemAvailability(id: string, isAvailable: boolean): Promise<MenuItem> {

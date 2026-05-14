@@ -385,7 +385,32 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
         };
       });
 
-    return [...menuRows, ...otherRows]
+    const minimartRows = inventory
+      .map(normalizeInventoryRecord)
+      .map((rec) => {
+        const linkedMenuItem = menuItemMap[rec.menuItemId];
+        const item = {
+          id: rec.menuItemId || rec.id,
+          name: linkedMenuItem?.name || rec.description || rec.menuItemId || rec.id,
+          category: rec.category || linkedMenuItem?.category || 'Other',
+        };
+        const stock = rec.stock;
+        const threshold = rec.lowStockThreshold;
+        const lastUpdatedDays = rec.updatedAt ? Math.max(0, Math.floor((Date.now() - new Date(rec.updatedAt).getTime()) / (1000 * 60 * 60 * 24))) : null;
+        return {
+          item,
+          rec,
+          stock,
+          threshold,
+          isOut: stock === 0,
+          isLow: stock > 0 && stock <= threshold,
+          lastUpdatedDays,
+        };
+      });
+
+    const rows = isMinimartScope ? minimartRows : [...menuRows, ...otherRows];
+
+    return rows
       .filter((row) => {
         if (q) {
           const match =
@@ -411,7 +436,7 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
         if (a.isLow !== b.isLow) return Number(b.isLow) - Number(a.isLow);
         return a.item.name.localeCompare(b.item.name);
       });
-  }, [query, categoryFilter, locationFilter, statusFilter, inventory, menuItems, menuItemMap]);
+  }, [query, categoryFilter, locationFilter, statusFilter, inventory, menuItems, menuItemMap, isMinimartScope]);
 
   const totalInventoryPages = useMemo(
     () => Math.max(1, Math.ceil(inventoryRows.length / inventoryRowsPerPage)),
@@ -604,23 +629,8 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
   const handleDeleteInventoryItem = async (menuItemId: string) => {
     if (!isManager) return;
     try {
-      let inventoryDeleteError: unknown = null;
-      try {
-        await apiDeleteInventoryRecord(menuItemId);
-      } catch (err) {
-        inventoryDeleteError = err;
-      }
-
-      let menuDeleteError: unknown = null;
-      // Rows are menu-driven in both scopes; for minimart this keeps cashier catalog in sync.
-      try {
-        await apiDeleteMenuItem(menuItemId);
-      } catch (err) {
-        menuDeleteError = err;
-      }
-
-      // Success if either delete path succeeded.
-      if (inventoryDeleteError && menuDeleteError) throw inventoryDeleteError;
+      await apiDeleteInventoryRecord(menuItemId);
+      await apiDeleteMenuItem(menuItemId);
 
       // Remove immediately from local state so the card disappears without waiting for a full refresh
       removeInventoryRecord(menuItemId);
@@ -645,23 +655,8 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
         // selectedId may be inventory_records.id for unlinked rows; resolve the real menu_item_id key.
         const resolvedInventoryId = inventoryMap[selectedId]?.menuItemId || selectedId;
         try {
-          let inventoryDeleteError: unknown = null;
-          try {
-            await apiDeleteInventoryRecord(resolvedInventoryId);
-          } catch (err) {
-            inventoryDeleteError = err;
-          }
-
-          let menuDeleteError: unknown = null;
-          try {
-            await apiDeleteMenuItem(resolvedInventoryId);
-          } catch (err) {
-            menuDeleteError = err;
-          }
-
-          if (inventoryDeleteError && menuDeleteError) {
-            throw inventoryDeleteError;
-          }
+          await apiDeleteInventoryRecord(resolvedInventoryId);
+          await apiDeleteMenuItem(resolvedInventoryId);
 
           removeInventoryRecord(resolvedInventoryId);
           if (resolvedInventoryId !== selectedId) {
