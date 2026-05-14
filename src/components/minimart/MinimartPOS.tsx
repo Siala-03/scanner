@@ -121,16 +121,38 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
     (order: {
       payment_confirmed_by?: string | null;
       paymentConfirmedBy?: string | null;
+      payment_confirmed_by_name?: string | null;
+      paymentConfirmedByName?: string | null;
       created_by?: string | null;
       createdBy?: string | null;
+      created_by_name?: string | null;
+      createdByName?: string | null;
     }) => {
-      if (!cashier?.id) return false;
-      const cashierId = String(cashier.id).trim();
+      const cashierId = String(cashier?.id ?? '').trim();
+      const cashierName = String(cashier?.name ?? '').trim().toLowerCase();
       const paymentOwner = order.payment_confirmed_by ?? order.paymentConfirmedBy ?? null;
+      const paymentOwnerName = order.payment_confirmed_by_name ?? order.paymentConfirmedByName ?? null;
       const creatorOwner = order.created_by ?? order.createdBy ?? null;
-      return String(paymentOwner ?? '').trim() === cashierId || String(creatorOwner ?? '').trim() === cashierId;
+      const creatorOwnerName = order.created_by_name ?? order.createdByName ?? null;
+
+      if (cashierId) {
+        if (String(paymentOwner ?? '').trim() === cashierId || String(creatorOwner ?? '').trim() === cashierId) {
+          return true;
+        }
+      }
+
+      if (cashierName) {
+        if (
+          String(paymentOwnerName ?? '').trim().toLowerCase() === cashierName ||
+          String(creatorOwnerName ?? '').trim().toLowerCase() === cashierName
+        ) {
+          return true;
+        }
+      }
+
+      return false;
     },
-    [cashier?.id]
+    [cashier?.id, cashier?.name]
   );
 
 
@@ -142,6 +164,8 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
 
       let rows: any[] = [];
       for (const cols of [
+        'total, payment_type, payment_method, payment_status, payment_confirmed_by, payment_confirmed_by_name, created_by, created_by_name, created_at',
+        'total, payment_type, payment_method, payment_status, payment_confirmed_by, payment_confirmed_by_name, created_by, created_at',
         'total, payment_type, payment_method, payment_status, payment_confirmed_by, created_by, created_at',
         'total, payment_type, payment_method, payment_status, payment_confirmed_by, created_at',
         'total, payment_type, payment_method, payment_status, created_at',
@@ -228,6 +252,8 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
       const todayStart = new Date();
       todayStart.setHours(0, 0, 0, 0);
       const candidateSelects = [
+        'id, order_number, total, items, created_at, payment_type, payment_method, payment_status, payment_confirmed_by, payment_confirmed_by_name, created_by, created_by_name',
+        'id, order_number, total, items, created_at, payment_type, payment_method, payment_status, payment_confirmed_by, payment_confirmed_by_name, created_by',
         'id, order_number, total, items, created_at, payment_type, payment_method, payment_status, payment_confirmed_by, created_by',
         'id, order_number, total, items, created_at, payment_type, payment_method, payment_status, payment_confirmed_by',
         'id, order_number, total, items, created_at, payment_method, payment_status, payment_confirmed_by',
@@ -322,6 +348,53 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
     const id = setInterval(() => { loadShiftStats(); }, 15000);
     return () => clearInterval(id);
   }, [loadShiftStats]);
+  useEffect(() => {
+    if (!activeRestaurantId) return;
+
+    const channel = supabase
+      .channel(`minimart-pos-catalog-${activeRestaurantId}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'menu_items',
+        filter: `restaurant_id=eq.${activeRestaurantId}`,
+      }, () => {
+        loadProducts();
+      })
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'inventory_records',
+        filter: `restaurant_id=eq.${activeRestaurantId}`,
+      }, () => {
+        loadStockMap();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [activeRestaurantId, loadProducts, loadStockMap]);
+  useEffect(() => {
+    if (!activeRestaurantId) return;
+
+    const channel = supabase
+      .channel(`minimart-pos-orders-${activeRestaurantId}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'orders',
+        filter: `restaurant_id=eq.${activeRestaurantId}`,
+      }, () => {
+        loadShiftStats();
+        loadShiftTxns();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [activeRestaurantId, loadShiftStats, loadShiftTxns]);
   useEffect(() => { loadStockMap(); }, [loadStockMap]);
   useEffect(() => {
     if (!activeRestaurantId) return;

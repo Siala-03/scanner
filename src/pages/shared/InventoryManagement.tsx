@@ -507,6 +507,18 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
     const isDescriptionChanged =
       editValues.description !== undefined && editValues.description !== currentDescription;
     const shouldUpdateMenuDescription = !isMinimartScope && isDescriptionChanged && !!menuItemMap[menuItemId];
+    const minimartMenuPayload: Record<string, any> = {};
+    if (isMinimartScope && menuItemMap[menuItemId]) {
+      if (editValues.price !== undefined && editValues.price !== menuItemMap[menuItemId].price) {
+        minimartMenuPayload.price = editValues.price;
+      }
+      if (editValues.category !== undefined && editValues.category !== menuItemMap[menuItemId].category) {
+        minimartMenuPayload.category = editValues.category;
+      }
+      if (isDescriptionChanged) {
+        minimartMenuPayload.description = editValues.description ?? '';
+      }
+    }
     
     // Check each field and add to payload if it changed
     if (editValues.stock !== undefined && editValues.stock !== current.stock) {
@@ -549,12 +561,14 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
       updatePayload.description = editValues.description;
     }
 
-    if (Object.keys(updatePayload).length === 0 && !shouldUpdateMenuDescription) {
+    if (Object.keys(updatePayload).length === 0 && !shouldUpdateMenuDescription && Object.keys(minimartMenuPayload).length === 0) {
       alert('No changes made');
       setEditingRow(null);
       setEditValues({});
       return;
     }
+
+    const shouldRefreshMenu = shouldUpdateMenuDescription || Object.keys(minimartMenuPayload).length > 0;
 
     try {
       console.log('Saving inventory item:', { menuItemId, updatePayload });
@@ -566,10 +580,13 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
           description: editValues.description ?? '',
         } as any);
       }
+      if (Object.keys(minimartMenuPayload).length > 0) {
+        await apiUpdateMenuItem(menuItemId, minimartMenuPayload as any);
+      }
       
       // Refresh the data
       await refresh();
-      if (!isMinimartScope && shouldUpdateMenuDescription) {
+      if (shouldRefreshMenu) {
         await refreshMenu();
       }
       
@@ -595,26 +612,21 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
       }
 
       let menuDeleteError: unknown = null;
-      // In restobar scope, rows are menu-driven, so remove menu item as well.
-      if (!isMinimartScope) {
-        try {
-          await apiDeleteMenuItem(menuItemId);
-        } catch (err) {
-          menuDeleteError = err;
-        }
+      // Rows are menu-driven in both scopes; for minimart this keeps cashier catalog in sync.
+      try {
+        await apiDeleteMenuItem(menuItemId);
+      } catch (err) {
+        menuDeleteError = err;
       }
 
-      // For minimart, inventory delete must succeed. For restobar, accept success if either side deleted.
-      if (isMinimartScope && inventoryDeleteError) throw inventoryDeleteError;
-      if (!isMinimartScope && inventoryDeleteError && menuDeleteError) throw inventoryDeleteError;
+      // Success if either delete path succeeded.
+      if (inventoryDeleteError && menuDeleteError) throw inventoryDeleteError;
 
       // Remove immediately from local state so the card disappears without waiting for a full refresh
       removeInventoryRecord(menuItemId);
       // Then sync with the server in the background
       await refresh();
-      if (!isMinimartScope) {
-        await refreshMenu();
-      }
+      await refreshMenu();
       alert('Inventory item deleted successfully');
     } catch (err) {
       console.error('Failed to delete inventory record', err);
@@ -641,19 +653,13 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
           }
 
           let menuDeleteError: unknown = null;
-          if (!isMinimartScope) {
-            try {
-              await apiDeleteMenuItem(resolvedInventoryId);
-            } catch (err) {
-              menuDeleteError = err;
-            }
+          try {
+            await apiDeleteMenuItem(resolvedInventoryId);
+          } catch (err) {
+            menuDeleteError = err;
           }
 
-          if (isMinimartScope && inventoryDeleteError) {
-            throw inventoryDeleteError;
-          }
-
-          if (!isMinimartScope && inventoryDeleteError && menuDeleteError) {
+          if (inventoryDeleteError && menuDeleteError) {
             throw inventoryDeleteError;
           }
 
@@ -667,9 +673,7 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
       }
 
       await refresh();
-      if (!isMinimartScope) {
-        await refreshMenu();
-      }
+      await refreshMenu();
 
       if (failed > 0) alert(`${ids.length - failed} deleted, ${failed} failed.`);
     } finally {
