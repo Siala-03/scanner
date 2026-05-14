@@ -109,6 +109,17 @@ export function useTables() {
     };
   }, [loadTables]);
 
+  // Listen for table mutations from other hook instances (e.g. manager QR page → supervisor take-order)
+  useEffect(() => {
+    const handleTablesUpdated = () => {
+      loadTables();
+    };
+    window.addEventListener('tablesUpdated', handleTablesUpdated);
+    return () => {
+      window.removeEventListener('tablesUpdated', handleTablesUpdated);
+    };
+  }, [loadTables]);
+
   // Add table
   const addTable = async () => {
     const restaurantId = resolveRestaurantId();
@@ -131,8 +142,10 @@ export function useTables() {
         console.log('useTables: Table created in backend');
       } catch (backendError) {
         console.warn('useTables: Backend not available, table stored locally only:', backendError);
-        // Table is already added locally, so this is fine
       }
+
+      // Notify other useTables instances to reload
+      window.dispatchEvent(new CustomEvent('tablesUpdated'));
     } catch (err) {
       console.error('useTables: Failed to add table:', err);
       throw err;
@@ -162,6 +175,9 @@ export function useTables() {
       const newTables = tables.filter(t => t !== tableNumber);
       setTables(newTables);
       setStoredTables(restaurantId, newTables);
+
+      // Notify other useTables instances to reload
+      window.dispatchEvent(new CustomEvent('tablesUpdated'));
     } catch (err) {
       console.error('Failed to delete table:', err);
       throw err;

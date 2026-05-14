@@ -1,7 +1,9 @@
 import dotenv from 'dotenv';
 import { z } from 'zod';
 
-dotenv.config();
+// Load backend-local env first, then root env as fallback for local setups.
+dotenv.config({ path: '.env' });
+dotenv.config({ path: '../.env' });
 
 const EnvSchema = z.object({
   PORT: z.coerce.number().int().positive().default(4000),
@@ -24,9 +26,12 @@ export type Env = z.infer<typeof EnvSchema>;
 
 export const env: Env = EnvSchema.parse({
   PORT: process.env.PORT ?? 4000,
-  DATABASE_URL: process.env.DATABASE_URL,
-  SUPABASE_URL: process.env.SUPABASE_URL,
-  SUPABASE_SERVICE_KEY: process.env.SUPABASE_SERVICE_KEY,
+  DATABASE_URL: process.env.DATABASE_URL ?? 'postgres://scanner:scanner@localhost:5432/scanner',
+  SUPABASE_URL: process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL,
+  SUPABASE_SERVICE_KEY:
+    process.env.SUPABASE_SERVICE_KEY ??
+    process.env.SUPABASE_ANON_KEY ??
+    process.env.VITE_SUPABASE_ANON_KEY,
   GEMINI_API_KEY: process.env.GEMINI_API_KEY,
   WEB_ORIGIN: process.env.WEB_ORIGIN ?? 'http://localhost:5173',
   NODE_ENV: process.env.NODE_ENV ?? 'development',
