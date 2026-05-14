@@ -109,16 +109,21 @@ export function useTables() {
     };
   }, [loadTables]);
 
-  // Listen for table mutations from other hook instances (e.g. manager QR page → supervisor take-order)
+  // Listen for table mutations from other hook instances (e.g. manager QR page → supervisor take-order).
+  // Sync from localStorage (already updated by the mutating instance) to avoid a backend re-fetch race
+  // where the backend response arrives before the DB commit and wipes the optimistic state.
   useEffect(() => {
     const handleTablesUpdated = () => {
-      loadTables();
+      const restaurantId = resolveRestaurantId();
+      if (!restaurantId) return;
+      const localTables = getStoredTables(restaurantId);
+      setTables(localTables);
     };
     window.addEventListener('tablesUpdated', handleTablesUpdated);
     return () => {
       window.removeEventListener('tablesUpdated', handleTablesUpdated);
     };
-  }, [loadTables]);
+  }, []);
 
   // Add table
   const addTable = async () => {
