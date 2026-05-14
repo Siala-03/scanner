@@ -150,6 +150,16 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
         }
       }
 
+      const hasOwnerInfo =
+        String(paymentOwner ?? '').trim() ||
+        String(creatorOwner ?? '').trim() ||
+        String(paymentOwnerName ?? '').trim() ||
+        String(creatorOwnerName ?? '').trim();
+      if (!hasOwnerInfo) {
+        // Legacy schemas may not persist ownership columns; fall back to restaurant-scoped totals.
+        return true;
+      }
+
       return false;
     },
     [cashier?.id, cashier?.name]
@@ -164,14 +174,14 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
 
       let rows: any[] = [];
       for (const cols of [
-        'total, payment_type, payment_method, payment_status, payment_confirmed_by, payment_confirmed_by_name, created_by, created_by_name, created_at',
-        'total, payment_type, payment_method, payment_status, payment_confirmed_by, payment_confirmed_by_name, created_by, created_at',
-        'total, payment_type, payment_method, payment_status, payment_confirmed_by, created_by, created_at',
-        'total, payment_type, payment_method, payment_status, payment_confirmed_by, created_at',
-        'total, payment_type, payment_method, payment_status, created_at',
-        'total, payment_type, payment_method, created_at',
-        'total, payment_method, created_at',
-        'total, created_at',
+        'total, status, payment_type, payment_method, payment_status, payment_confirmed_by, payment_confirmed_by_name, created_by, created_by_name, created_at',
+        'total, status, payment_type, payment_method, payment_status, payment_confirmed_by, payment_confirmed_by_name, created_by, created_at',
+        'total, status, payment_type, payment_method, payment_status, payment_confirmed_by, created_by, created_at',
+        'total, status, payment_type, payment_method, payment_status, payment_confirmed_by, created_at',
+        'total, status, payment_type, payment_method, payment_status, created_at',
+        'total, status, payment_type, payment_method, created_at',
+        'total, status, payment_method, created_at',
+        'total, status, created_at',
       ]) {
         const res = await supabase
           .from('orders')
@@ -183,7 +193,11 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
         if (!res.error) {
           rows = (res.data || []).filter((o: any) => {
             const ps = String(o.payment_status || '').toLowerCase();
-            const statusMatch = !ps || ['confirmed', 'paid', 'completed'].includes(ps);
+            const os = String(o.status || '').toLowerCase();
+            const statusMatch =
+              ['confirmed', 'paid', 'completed'].includes(ps) ||
+              ['served', 'completed', 'paid'].includes(os) ||
+              (!ps && !os);
             return statusMatch && isTxnOwnedByCashier(o);
           });
           break;
@@ -252,14 +266,14 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
       const todayStart = new Date();
       todayStart.setHours(0, 0, 0, 0);
       const candidateSelects = [
-        'id, order_number, total, items, created_at, payment_type, payment_method, payment_status, payment_confirmed_by, payment_confirmed_by_name, created_by, created_by_name',
-        'id, order_number, total, items, created_at, payment_type, payment_method, payment_status, payment_confirmed_by, payment_confirmed_by_name, created_by',
-        'id, order_number, total, items, created_at, payment_type, payment_method, payment_status, payment_confirmed_by, created_by',
-        'id, order_number, total, items, created_at, payment_type, payment_method, payment_status, payment_confirmed_by',
-        'id, order_number, total, items, created_at, payment_method, payment_status, payment_confirmed_by',
-        'id, order_number, total, items, created_at, payment_method, payment_status',
-        'id, order_number, total, items, created_at, payment_method',
-        'id, order_number, total, items, created_at',
+        'id, order_number, total, items, created_at, status, payment_type, payment_method, payment_status, payment_confirmed_by, payment_confirmed_by_name, created_by, created_by_name',
+        'id, order_number, total, items, created_at, status, payment_type, payment_method, payment_status, payment_confirmed_by, payment_confirmed_by_name, created_by',
+        'id, order_number, total, items, created_at, status, payment_type, payment_method, payment_status, payment_confirmed_by, created_by',
+        'id, order_number, total, items, created_at, status, payment_type, payment_method, payment_status, payment_confirmed_by',
+        'id, order_number, total, items, created_at, status, payment_method, payment_status, payment_confirmed_by',
+        'id, order_number, total, items, created_at, status, payment_method, payment_status',
+        'id, order_number, total, items, created_at, status, payment_method',
+        'id, order_number, total, items, created_at, status',
       ];
       let data: any[] = [];
 
@@ -274,7 +288,11 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
         if (!res.error) {
           data = (res.data || []).filter((o: any) => {
             const ps = String(o.payment_status || '').toLowerCase();
-            const statusMatch = !ps || ['confirmed', 'paid', 'completed'].includes(ps);
+            const os = String(o.status || '').toLowerCase();
+            const statusMatch =
+              ['confirmed', 'paid', 'completed'].includes(ps) ||
+              ['served', 'completed', 'paid'].includes(os) ||
+              (!ps && !os);
             return statusMatch && isTxnOwnedByCashier(o);
           });
           break;
