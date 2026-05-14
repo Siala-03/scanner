@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { fetchTables, createTable, deleteTable } from '../api/tables';
 
 const resolveRestaurantId = (): string | undefined => {
@@ -63,6 +63,9 @@ const getNextAvailableTableNumber = (tableNumbers: number[]): number => {
 export function useTables() {
   const [tables, setTables] = useState<number[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  // Incremented on every mutation (addTable/removeTable). loadTables checks this
+  // before committing its response so stale fetches don't overwrite fresh local state.
+  const mutationCountRef = useRef(0);
 
   // Fetch tables from backend
   const loadTables = useCallback(async () => {
@@ -73,9 +76,15 @@ export function useTables() {
       return;
     }
 
+    const mutationAtStart = mutationCountRef.current;
+
     try {
       setIsLoading(true);
       const backendTables = await fetchTables();
+
+      // If a mutation happened while we were waiting, discard the stale response
+      if (mutationCountRef.current !== mutationAtStart) return;
+
       if (backendTables && backendTables.length > 0) {
         const tableNumbers = backendTables.map(t => t.tableNumber || t.table_number);
         setTables(tableNumbers);
@@ -130,6 +139,7 @@ export function useTables() {
     const restaurantId = resolveRestaurantId();
     if (!restaurantId) throw new Error('No restaurant context');
 
+    mutationCountRef.current++;
     try {
       console.log('useTables: Adding table...');
       const nextTableNumber = getNextAvailableTableNumber(tables);
@@ -162,6 +172,7 @@ export function useTables() {
     const restaurantId = resolveRestaurantId();
     if (!restaurantId) throw new Error('No restaurant context');
 
+    mutationCountRef.current++;
     try {
       // Try to delete from backend
       try {
