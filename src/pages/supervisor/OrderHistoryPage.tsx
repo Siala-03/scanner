@@ -6,6 +6,8 @@ import { Card } from '../../components/ui/Card';
 import { OrdersHistoryTable } from '../../components/supervisor/OrdersHistoryTable';
 import { OrderDetailModal } from '../../components/waiter/OrderDetailModal';
 import { fetchOrders, cancelOrder } from '../../api/orders';
+import type { RestaurantReceiptSettings } from '../../api/restaurants';
+import { buildReceiptHtml, orderToReceiptData, printReceipt } from '../../utils/receipt';
 import { downloadCsv, buildOrdersCsv } from '../../utils/csv';
 
 // Type alias to handle both API and local Order types
@@ -19,9 +21,11 @@ type Order = OrderType & {
 interface OrderHistoryPageProps {
   onBack: () => void;
   existingOrders?: Order[];
+  restaurantName?: string;
+  receiptSettings?: RestaurantReceiptSettings;
 }
 
-export function OrderHistoryPage({ onBack, existingOrders }: OrderHistoryPageProps) {
+export function OrderHistoryPage({ onBack, existingOrders, restaurantName = '', receiptSettings = {} }: OrderHistoryPageProps) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -118,8 +122,45 @@ export function OrderHistoryPage({ onBack, existingOrders }: OrderHistoryPagePro
     }
   };
 
-  const handlePrintReceipt = (_order: Order) => {
-    window.print();
+  const handlePrintReceipt = (order: Order) => {
+    const rawItems = Array.isArray(order.items)
+      ? order.items
+      : typeof order.items === 'string'
+        ? (() => {
+            try {
+              const parsed = JSON.parse(order.items);
+              return Array.isArray(parsed) ? parsed : [];
+            } catch {
+              return [];
+            }
+          })()
+        : [];
+
+    const normalizedOrder = {
+      ...order,
+      items: rawItems,
+    } as OrderType;
+
+    try {
+      const receiptData = orderToReceiptData(normalizedOrder, {
+        restaurantName: restaurantName || 'Company',
+        restaurantAddress: receiptSettings.address || '',
+        restaurantPhone: receiptSettings.phone || '',
+        restaurantEmail: receiptSettings.email || '',
+        restaurantLogo: receiptSettings.logo,
+        restaurantCity: receiptSettings.city,
+        restaurantCountry: receiptSettings.country,
+        taxRate: 0,
+        serverName: 'Supervisor',
+        orderType: order.deliveryAddress ? 'delivery' : order.tableNumber == null ? 'takeout' : 'dine-in',
+        paymentStatus: 'pending',
+        payments: [{ method: 'Pending', amount: 0 }],
+      });
+      printReceipt(buildReceiptHtml(receiptData));
+    } catch (err) {
+      console.error('Failed to print order history receipt:', err);
+      alert('Could not open print window. Please allow pop-ups in your browser.');
+    }
   };
 
   return (

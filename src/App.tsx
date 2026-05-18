@@ -882,7 +882,14 @@ export function App() {
           />
         )}
         {supervisorPage === 'inventory' && <InventoryManagement role="supervisor" />}
-        {supervisorPage === 'history' && <OrderHistoryPage onBack={() => setSupervisorPage('dashboard')} existingOrders={orders} />}
+        {supervisorPage === 'history' && (
+          <OrderHistoryPage
+            onBack={() => setSupervisorPage('dashboard')}
+            existingOrders={orders}
+            restaurantName={restaurantName}
+            receiptSettings={receiptSettings}
+          />
+        )}
         {supervisorPage === 'expenses' && <SupervisorExpenseManagement />}
         {supervisorPage === 'online-orders' && <OnlineOrdersPage />}
         {supervisorPage === 'take-order' && (
@@ -1079,7 +1086,14 @@ export function App() {
             {managerPage === 'reservations' && <ReservationsPage />}
             {managerPage === 'scheduling' && <SchedulingPage />}
             {managerPage === 'reviews' && <ReviewsPage />}
-            {managerPage === 'history' && <OrderHistoryPage onBack={() => setManagerPage('dashboard')} existingOrders={orders} />}
+            {managerPage === 'history' && (
+              <OrderHistoryPage
+                onBack={() => setManagerPage('dashboard')}
+                existingOrders={orders}
+                restaurantName={restaurantName}
+                receiptSettings={receiptSettings}
+              />
+            )}
             {managerPage === 'settings' && currentRestaurantId && (
               <RestaurantSettings
                 restaurantId={currentRestaurantId}
