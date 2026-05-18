@@ -175,6 +175,29 @@ export async function createOrder(order: CreateOrderInput): Promise<Order> {
   const restaurantId = (order as any).restaurantId || getRestaurantId();
   if (!restaurantId) throw new Error('No company selected');
 
+  const parseOrderItems = (raw: unknown): any[] => {
+    if (Array.isArray(raw)) return raw;
+    if (typeof raw === 'string') {
+      try {
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  };
+
+  const mergeNotes = (existing: unknown, incoming: unknown): string | null => {
+    const left = typeof existing === 'string' ? existing.trim() : '';
+    const right = typeof incoming === 'string' ? incoming.trim() : '';
+    if (!left && !right) return null;
+    if (!left) return right;
+    if (!right) return left;
+    if (left === right) return left;
+    return `${left}\n${right}`;
+  };
+
   // IP restriction — skip for online orders (table 999 = delivery/takeaway via QR)
   const isOnline = order.tableNumber === 999;
   if (!isOnline && typeof window !== 'undefined') {
@@ -237,6 +260,94 @@ export async function createOrder(order: CreateOrderInput): Promise<Order> {
 
   // Generate idempotency key once per submission to prevent duplicate orders
   const idempotencyKey = (order as any).idempotencyKey || crypto.randomUUID();
+
+  const shouldAttemptTabMerge =
+    Number.isInteger(order.tableNumber) &&
+    Number(order.tableNumber) > 0 &&
+    Number(order.tableNumber) !== 999 &&
+    (order as any).allowMergeToOpenTab !== false;
+
+  if (shouldAttemptTabMerge) {
+    const mergeableStatuses = ['pending', 'verified', 'preparing', 'ready', 'served'];
+    const { data: openRows, error: openRowsError } = await db
+      .from('orders')
+      .select('*')
+      .eq('restaurant_id', restaurantId)
+      .eq('table_number', Number(order.tableNumber))
+      .in('status', mergeableStatuses)
+      .order('updated_at', { ascending: false })
+      .limit(6);
+
+    if (!openRowsError && Array.isArray(openRows) && openRows.length > 0) {
+      const mergeTarget = openRows.find((row: any) => {
+        const paymentStatus = String(row?.payment_status ?? row?.paymentStatus ?? 'unpaid').toLowerCase();
+        return paymentStatus !== 'confirmed';
+      });
+
+      if (mergeTarget) {
+        const existingItems = parseOrderItems((mergeTarget as any).items);
+        const existingSubtotal = Number((mergeTarget as any).subtotal ?? (mergeTarget as any).total ?? 0);
+        const existingTax = Number((mergeTarget as any).tax ?? 0);
+        const mergedSubtotal = existingSubtotal + total;
+        const mergedTotal = mergedSubtotal + existingTax;
+        const mergedNotes = mergeNotes((mergeTarget as any).notes, order.notes);
+
+        const mergePayloads: Array<Record<string, unknown>> = [
+          {
+            items: [...existingItems, ...items],
+            subtotal: mergedSubtotal,
+            total: mergedTotal,
+            notes: mergedNotes,
+            status: 'pending',
+            payment_status: 'unpaid',
+            requires_kitchen: Boolean((mergeTarget as any).requires_kitchen ?? (mergeTarget as any).requiresKitchen) || Boolean(order.requiresKitchen),
+            assigned_waiter_id: (mergeTarget as any).assigned_waiter_id || assignedWaiterId,
+            updated_at: new Date().toISOString(),
+          },
+          {
+            items: [...existingItems, ...items],
+            subtotal: mergedSubtotal,
+            total: mergedTotal,
+            notes: mergedNotes,
+            status: 'pending',
+            payment_status: 'unpaid',
+            updated_at: new Date().toISOString(),
+          },
+          {
+            items: [...existingItems, ...items],
+            total: mergedTotal,
+            status: 'pending',
+            updated_at: new Date().toISOString(),
+          },
+        ];
+
+        for (const payload of mergePayloads) {
+          let mergeQuery = db
+            .from('orders')
+            .update(payload)
+            .eq('id', (mergeTarget as any).id);
+
+          if ((mergeTarget as any).updated_at) {
+            mergeQuery = mergeQuery.eq('updated_at', (mergeTarget as any).updated_at);
+          }
+
+          const mergeResult = await mergeQuery.select().maybeSingle();
+          if (!mergeResult.error && mergeResult.data) {
+            decrementInventoryForOrder(
+              order.items.map(item => ({ menuItemId: item.menuItemId, quantity: item.quantity })),
+              { reference: String((mergeResult.data as any).order_number || orderNumber), performedBy: staffId || undefined }
+            ).catch(err => console.warn('[createOrder] Inventory decrement failed after merge:', err));
+            return mergeResult.data as Order;
+          }
+
+          // Optimistic lock miss (row changed) should fall back to creating a separate order safely.
+          if (!mergeResult.error && !mergeResult.data) {
+            break;
+          }
+        }
+      }
+    }
+  }
 
   // Full payload — includes optional columns that may or may not exist in the schema
   const fullPayload = {

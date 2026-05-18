@@ -434,30 +434,61 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
       } as any);
 
       const nowIso = new Date().toISOString();
-      const subtotal = checkoutCart.reduce((sum, c) => sum + c.unitPrice * c.quantity, 0);
+      const parseCreatedItems = (raw: unknown): any[] => {
+        if (Array.isArray(raw)) return raw;
+        if (typeof raw === 'string') {
+          try {
+            const parsed = JSON.parse(raw);
+            return Array.isArray(parsed) ? parsed : [];
+          } catch {
+            return [];
+          }
+        }
+        return [];
+      };
+
+      const createdItemsRaw = parseCreatedItems((created as any)?.items);
+      const fallbackSubtotal = checkoutCart.reduce((sum, c) => sum + c.unitPrice * c.quantity, 0);
+      const printableItems = createdItemsRaw.length > 0
+        ? createdItemsRaw.map((item: any, index: number) => {
+            const quantity = Number(item.quantity ?? 0);
+            const unitPrice = Number(item.unit_price ?? item.unitPrice ?? 0);
+            return {
+              id: String(item.id ?? `item-${Date.now()}-${index}`),
+              menuItemId: item.menu_item_id ?? item.menuItemId,
+              menuItemName: item.menu_item_name ?? item.menuItemName ?? 'Item',
+              quantity,
+              unitPrice,
+              totalPrice: Number(item.total_price ?? item.totalPrice ?? quantity * unitPrice),
+              specialInstructions: item.notes ?? item.specialInstructions ?? undefined,
+              status: item.status ?? 'pending',
+            };
+          })
+        : checkoutCart.map((c, index) => ({
+            id: `item-${Date.now()}-${index}`,
+            menuItem: c.menuItem,
+            menuItemId: c.menuItemId,
+            menuItemName: c.menuItemName,
+            quantity: c.quantity,
+            unitPrice: c.unitPrice,
+            totalPrice: c.unitPrice * c.quantity,
+            specialInstructions: c.notes || undefined,
+            status: 'pending',
+          }));
+
       const printableOrder: Order = {
         id: String((created as any)?.id || `order-${Date.now()}`),
         orderNumber: (created as any)?.orderNumber ?? (created as any)?.order_number,
         tableNumber: tableNum,
-        status: 'pending',
-        items: checkoutCart.map((c, index) => ({
-          id: `item-${Date.now()}-${index}`,
-          menuItem: c.menuItem,
-          menuItemId: c.menuItemId,
-          menuItemName: c.menuItemName,
-          quantity: c.quantity,
-          unitPrice: c.unitPrice,
-          totalPrice: c.unitPrice * c.quantity,
-          specialInstructions: c.notes || undefined,
-          status: 'pending',
-        })),
+        status: String((created as any)?.status || 'pending') as any,
+        items: printableItems,
         createdAt: (created as any)?.createdAt ?? (created as any)?.created_at ?? nowIso,
         updatedAt: (created as any)?.updatedAt ?? (created as any)?.updated_at ?? nowIso,
-        subtotal,
-        tax: 0,
-        total: Number((created as any)?.total ?? subtotal),
+        subtotal: Number((created as any)?.subtotal ?? fallbackSubtotal),
+        tax: Number((created as any)?.tax ?? 0),
+        total: Number((created as any)?.total ?? fallbackSubtotal),
         notes: visibleNotes || undefined,
-        requiresKitchen: needsKitchen,
+        requiresKitchen: Boolean((created as any)?.requires_kitchen ?? (created as any)?.requiresKitchen ?? needsKitchen),
       };
 
       const label = selectedTable === 'bar' ? 'Bar / Walk-up' : `Table ${selectedTable}`;
