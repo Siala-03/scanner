@@ -1,6 +1,6 @@
 import { supabase } from '../lib/supabase';
 import type { Order, CreateOrderInput, UpdateOrderStatusInput } from '../types/orders';
-import { decrementInventoryForOrder } from './inventory';
+import { decrementInventoryForOrder, restoreInventoryForOrder } from './inventory';
 import { fetchIpRestriction } from './restaurants';
 import {
   getClientPublicIp,
@@ -171,6 +171,42 @@ async function lookupAssignedWaiter(restaurantId: string, tableNumber: number): 
   return null;
 }
 
+const MERGEABLE_ORDER_STATUSES = ['pending', 'verified', 'preparing', 'ready', 'served'];
+
+export async function findMergeableOpenOrder(
+  tableNumber: number,
+  restaurantId?: string,
+  maxAgeMinutes = 120
+): Promise<Order | null> {
+  const restaurant = restaurantId || getRestaurantId();
+  if (!restaurant || !Number.isInteger(tableNumber) || tableNumber <= 0 || tableNumber === 999) {
+    return null;
+  }
+
+  const cutoff = new Date(Date.now() - maxAgeMinutes * 60_000).toISOString();
+
+  const { data, error } = await db
+    .from('orders')
+    .select('*')
+    .eq('restaurant_id', restaurant)
+    .eq('table_number', tableNumber)
+    .in('status', MERGEABLE_ORDER_STATUSES)
+    .gte('created_at', cutoff)
+    .order('updated_at', { ascending: false })
+    .limit(6);
+
+  if (error || !Array.isArray(data) || data.length === 0) {
+    return null;
+  }
+
+  const target = data.find((row: any) => {
+    const paymentStatus = String(row?.payment_status ?? row?.paymentStatus ?? 'unpaid').toLowerCase();
+    return paymentStatus !== 'confirmed';
+  });
+
+  return (target ?? null) as Order | null;
+}
+
 export async function createOrder(order: CreateOrderInput): Promise<Order> {
   const restaurantId = (order as any).restaurantId || getRestaurantId();
   if (!restaurantId) throw new Error('No company selected');
@@ -265,85 +301,71 @@ export async function createOrder(order: CreateOrderInput): Promise<Order> {
     Number.isInteger(order.tableNumber) &&
     Number(order.tableNumber) > 0 &&
     Number(order.tableNumber) !== 999 &&
-    (order as any).allowMergeToOpenTab !== false;
+    (order as any).allowMergeToOpenTab === true;
 
   if (shouldAttemptTabMerge) {
-    const mergeableStatuses = ['pending', 'verified', 'preparing', 'ready', 'served'];
-    const { data: openRows, error: openRowsError } = await db
-      .from('orders')
-      .select('*')
-      .eq('restaurant_id', restaurantId)
-      .eq('table_number', Number(order.tableNumber))
-      .in('status', mergeableStatuses)
-      .order('updated_at', { ascending: false })
-      .limit(6);
+    const mergeTarget = await findMergeableOpenOrder(Number(order.tableNumber), restaurantId);
 
-    if (!openRowsError && Array.isArray(openRows) && openRows.length > 0) {
-      const mergeTarget = openRows.find((row: any) => {
-        const paymentStatus = String(row?.payment_status ?? row?.paymentStatus ?? 'unpaid').toLowerCase();
-        return paymentStatus !== 'confirmed';
-      });
+    if (mergeTarget) {
 
-      if (mergeTarget) {
-        const existingItems = parseOrderItems((mergeTarget as any).items);
-        const existingSubtotal = Number((mergeTarget as any).subtotal ?? (mergeTarget as any).total ?? 0);
-        const existingTax = Number((mergeTarget as any).tax ?? 0);
-        const mergedSubtotal = existingSubtotal + total;
-        const mergedTotal = mergedSubtotal + existingTax;
-        const mergedNotes = mergeNotes((mergeTarget as any).notes, order.notes);
+      const existingItems = parseOrderItems((mergeTarget as any).items);
+      const existingSubtotal = Number((mergeTarget as any).subtotal ?? (mergeTarget as any).total ?? 0);
+      const existingTax = Number((mergeTarget as any).tax ?? 0);
+      const mergedSubtotal = existingSubtotal + total;
+      const mergedTotal = mergedSubtotal + existingTax;
+      const mergedNotes = mergeNotes((mergeTarget as any).notes, order.notes);
 
-        const mergePayloads: Array<Record<string, unknown>> = [
-          {
-            items: [...existingItems, ...items],
-            subtotal: mergedSubtotal,
-            total: mergedTotal,
-            notes: mergedNotes,
-            status: 'pending',
-            payment_status: 'unpaid',
-            requires_kitchen: Boolean((mergeTarget as any).requires_kitchen ?? (mergeTarget as any).requiresKitchen) || Boolean(order.requiresKitchen),
-            assigned_waiter_id: (mergeTarget as any).assigned_waiter_id || assignedWaiterId,
-            updated_at: new Date().toISOString(),
-          },
-          {
-            items: [...existingItems, ...items],
-            subtotal: mergedSubtotal,
-            total: mergedTotal,
-            notes: mergedNotes,
-            status: 'pending',
-            payment_status: 'unpaid',
-            updated_at: new Date().toISOString(),
-          },
-          {
-            items: [...existingItems, ...items],
-            total: mergedTotal,
-            status: 'pending',
-            updated_at: new Date().toISOString(),
-          },
-        ];
+      const mergePayloads: Array<Record<string, unknown>> = [
+        {
+          items: [...existingItems, ...items],
+          subtotal: mergedSubtotal,
+          total: mergedTotal,
+          notes: mergedNotes,
+          status: 'pending',
+          payment_status: 'unpaid',
+          requires_kitchen: Boolean((mergeTarget as any).requires_kitchen ?? (mergeTarget as any).requiresKitchen) || Boolean(order.requiresKitchen),
+          assigned_waiter_id: (mergeTarget as any).assigned_waiter_id || assignedWaiterId,
+          updated_at: new Date().toISOString(),
+        },
+        {
+          items: [...existingItems, ...items],
+          subtotal: mergedSubtotal,
+          total: mergedTotal,
+          notes: mergedNotes,
+          status: 'pending',
+          payment_status: 'unpaid',
+          updated_at: new Date().toISOString(),
+        },
+        {
+          items: [...existingItems, ...items],
+          total: mergedTotal,
+          status: 'pending',
+          updated_at: new Date().toISOString(),
+        },
+      ];
 
-        for (const payload of mergePayloads) {
-          let mergeQuery = db
-            .from('orders')
-            .update(payload)
-            .eq('id', (mergeTarget as any).id);
+      for (const payload of mergePayloads) {
+        let mergeQuery = db
+          .from('orders')
+          .update(payload)
+          .eq('id', (mergeTarget as any).id);
 
-          if ((mergeTarget as any).updated_at) {
-            mergeQuery = mergeQuery.eq('updated_at', (mergeTarget as any).updated_at);
-          }
+        if ((mergeTarget as any).updated_at) {
+          mergeQuery = mergeQuery.eq('updated_at', (mergeTarget as any).updated_at);
+        }
 
-          const mergeResult = await mergeQuery.select().maybeSingle();
-          if (!mergeResult.error && mergeResult.data) {
-            decrementInventoryForOrder(
-              order.items.map(item => ({ menuItemId: item.menuItemId, quantity: item.quantity })),
-              { reference: String((mergeResult.data as any).order_number || orderNumber), performedBy: staffId || undefined }
-            ).catch(err => console.warn('[createOrder] Inventory decrement failed after merge:', err));
-            return mergeResult.data as Order;
-          }
+        const mergeResult = await mergeQuery.select().maybeSingle();
+        if (!mergeResult.error && mergeResult.data) {
+          decrementInventoryForOrder(
+            order.items.map(item => ({ menuItemId: item.menuItemId, quantity: item.quantity })),
+            { reference: String((mergeResult.data as any).order_number || orderNumber), performedBy: staffId || undefined }
+          ).catch(err => console.warn('[createOrder] Inventory decrement failed after merge:', err));
+          return mergeResult.data as Order;
+        }
 
-          // Optimistic lock miss (row changed) should fall back to creating a separate order safely.
-          if (!mergeResult.error && !mergeResult.data) {
-            break;
-          }
+        // Optimistic lock miss (row changed) should fall back to creating a separate order safely.
+        if (!mergeResult.error && !mergeResult.data) {
+          break;
         }
       }
     }
@@ -537,9 +559,22 @@ export async function updateOrderStatus(
   return result.data as Order;
 }
 
+export interface PaymentBreakdownEntry {
+  method: string;   // 'Cash', 'Card', 'Mobile Money', 'Bank Transfer', etc.
+  amount: number;
+  reference?: string; // MOMO ref, card last-4, etc.
+}
+
 export async function confirmPayment(
   orderId: string,
-  opts: { paymentType?: string; confirmedBy?: string; confirmedByName?: string; restaurantId?: string; note?: string }
+  opts: {
+    paymentType?: string;
+    paymentBreakdown?: PaymentBreakdownEntry[];
+    confirmedBy?: string;
+    confirmedByName?: string;
+    restaurantId?: string;
+    note?: string;
+  }
 ): Promise<Order> {
   const now = new Date().toISOString();
 
@@ -552,6 +587,8 @@ export async function confirmPayment(
       payment_confirmed_by: opts.confirmedBy || null,
       payment_confirmed_by_name: opts.confirmedByName || null,
       payment_confirmed_at: now,
+      payment_type: opts.paymentType || null,
+      payment_breakdown: opts.paymentBreakdown || null,
       payment_note: opts.note || null,
       completed_at: now,
       updated_at: now,
@@ -649,16 +686,53 @@ export async function updateOrderItemStatus(
   return data as Order;
 }
 
-export async function cancelOrder(id: string): Promise<void> {
-  const { error } = await db
+export async function cancelOrder(id: string, reason?: string): Promise<void> {
+  // Fetch items before cancelling so we can restore inventory
+  const { data: order } = await db
+    .from('orders')
+    .select('items, order_number')
+    .eq('id', id)
+    .single();
+
+  let { error } = await db
     .from('orders')
     .update({
       status: 'cancelled',
-      updated_at: new Date().toISOString()
+      ...(reason ? { cancel_reason: reason } : {}),
+      updated_at: new Date().toISOString(),
     })
     .eq('id', id);
 
+  // PGRST204 = column not in schema cache (migration 074 not yet applied) — retry without it
+  if (error?.code === 'PGRST204') {
+    ({ error } = await db
+      .from('orders')
+      .update({ status: 'cancelled', updated_at: new Date().toISOString() })
+      .eq('id', id));
+  }
+
   if (error) throw error;
+
+  // Restore inventory for the cancelled items (best-effort, non-blocking)
+  if (order) {
+    const rawItems = typeof order.items === 'string'
+      ? (() => { try { return JSON.parse(order.items); } catch { return []; } })()
+      : (order.items ?? []);
+    const items = Array.isArray(rawItems) ? rawItems : [];
+    const restoreList = items
+      .map((item: any) => ({
+        menuItemId: item.menuItemId ?? item.menu_item_id ?? '',
+        quantity: Number(item.quantity) || 0,
+      }))
+      .filter((i) => i.menuItemId && i.quantity > 0);
+
+    if (restoreList.length > 0) {
+      restoreInventoryForOrder(restoreList, {
+        reference: order.order_number ?? id,
+        reason: reason ?? 'Order cancelled',
+      }).catch((err) => console.warn('[cancelOrder] Inventory restore failed:', err));
+    }
+  }
 }
 
 export async function requestOrderCancellation(
@@ -706,6 +780,20 @@ export async function requestOrderCancellation(
   return data as OrderCancellationRequest;
 }
 
+export async function fetchCancellationRequestByOrderId(
+  orderId: string
+): Promise<OrderCancellationRequest | null> {
+  const { data, error } = await db
+    .from('order_cancellation_requests')
+    .select('*')
+    .eq('order_id', orderId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) { console.error('fetchCancellationRequestByOrderId error:', error); return null; }
+  return data as OrderCancellationRequest | null;
+}
+
 export async function fetchOrderCancellationRequests(
   status: 'pending' | 'approved' | 'rejected' | 'all' = 'all',
   restaurantId?: string
@@ -742,7 +830,7 @@ export async function approveOrderCancellationRequest(
   if (request.status === 'approved') return request as OrderCancellationRequest;
   if (request.status === 'rejected') throw new Error('Request is already rejected');
 
-  await cancelOrder(request.order_id as string);
+  await cancelOrder(request.order_id as string, request.reason ?? undefined);
 
   const now = new Date().toISOString();
   const { data, error } = await db

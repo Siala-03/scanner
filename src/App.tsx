@@ -2,6 +2,7 @@ import { useCallback, useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowLeftIcon, QrCodeIcon, LogOutIcon, ChevronDownIcon } from 'lucide-react';
 import { CartItem, OrderStatus, Customer } from './types';
+import type { ConfirmMergeFn } from './hooks/useOrders';
 import { setCurrency, CurrencyCode } from './utils/currency';
 import { OrdersProvider, useOrdersContext } from './contexts/OrdersContext';
 import { useTables } from './hooks/useTables';
@@ -236,8 +237,8 @@ export function App() {
   }, []);
 
   const handlePlaceOrder = useCallback(
-    async (tableNum: number, items: CartItem[], specialInstructions?: string, customer?: Customer | null, delivery?: { provider: string; address: string }, loyaltyRewardId?: string, promotionCode?: string) => {
-      await addOrder(tableNum, items, specialInstructions, customer, delivery, loyaltyRewardId, promotionCode);
+    async (tableNum: number, items: CartItem[], specialInstructions?: string, customer?: Customer | null, delivery?: { provider: string; address: string }, loyaltyRewardId?: string, promotionCode?: string, confirmMerge?: ConfirmMergeFn) => {
+      await addOrder(tableNum, items, specialInstructions, customer, delivery, loyaltyRewardId, promotionCode, confirmMerge);
       handleCallWaiter(tableNum);
     },
     [addOrder, handleCallWaiter]

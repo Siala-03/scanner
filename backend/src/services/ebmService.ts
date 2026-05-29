@@ -2,11 +2,14 @@
 // Implements the VSDC API spec used by Rwanda Revenue Authority (RRA)
 // Reference: https://documenter.getpostman.com/view/20074551/2s9YXe74Jr (RRA-ALGO EBM v8.2)
 
+import type { OsdcSalesPayload } from './osdcPayloadMapper.js';
+
 export interface EbmConfig {
   tpin: string;
   bhfId: string;
   dvcSrlNo: string;
   baseUrl: string;
+  cmcKey?: string;  // Communication key for OSDC compliance (from selectInitInfo or device)
 }
 
 export interface EbmResponse<T = Record<string, unknown>> {
@@ -124,7 +127,7 @@ function getMockResponse<T = Record<string, unknown>>(path: string, body: Record
       return mockResponse({ itemList: [] } as unknown as T);
 
     default:
-      return mockResponse(undefined);
+      return mockResponse({} as T);
   }
 }
 
@@ -590,4 +593,16 @@ export function buildSalesFromOrder(
     totAmt,
     salesItemList,
   };
+}
+
+// ─── OSDC-Compliant Sales Transmission ───────────────────────────────────────
+// Sends an already-validated OsdcSalesPayload (from osdcPayloadMapper) to the
+// /trnsSales/saveSales endpoint. The payload uses OSDC field names (itemList,
+// taxTyCd, invcNo, cmcKey) instead of legacy VSDC field names.
+
+export function osdcSaveSales(
+  config: EbmConfig,
+  payload: OsdcSalesPayload
+): Promise<EbmResponse<SaveSalesData>> {
+  return vsdcPost(config.baseUrl, '/trnsSales/saveSales', payload);
 }

@@ -156,6 +156,15 @@ export interface ReceiptData {
   // Additional
   notes?: string;
   specialInstructions?: string;
+
+  // OSDC / EBM fiscal metadata
+  osdcVenueTin?: string;
+  osdcBranchId?: string;
+  osdcReceiptNo?: number | string;
+  osdcReceiptSign?: string;
+  osdcInternalData?: string;
+  osdcSdcDateTime?: string;
+  osdcQrData?: string;
 }
 
 // ============================================
@@ -182,6 +191,13 @@ export interface BuildReceiptOptions {
   change?: number;                 // explicit change override (auto-computed if omitted)
   customerPointsBalance?: number;
   notes?: string;
+  osdcVenueTin?: string;
+  osdcBranchId?: string;
+  osdcReceiptNo?: number | string;
+  osdcReceiptSign?: string;
+  osdcInternalData?: string;
+  osdcSdcDateTime?: string;
+  osdcQrData?: string;
 }
 
 export function orderToReceiptData(
@@ -263,6 +279,14 @@ export function orderToReceiptData(
 
     notes: options.notes || order.notes,
     specialInstructions: order.specialInstructions,
+
+    osdcVenueTin: options.osdcVenueTin,
+    osdcBranchId: options.osdcBranchId,
+    osdcReceiptNo: options.osdcReceiptNo ?? order.ebmRcptNo,
+    osdcReceiptSign: options.osdcReceiptSign ?? order.ebmRcptSign,
+    osdcInternalData: options.osdcInternalData,
+    osdcSdcDateTime: options.osdcSdcDateTime ?? (order.ebmFiscalizedAt ? new Date(order.ebmFiscalizedAt).toISOString().replace(/[-:TZ.]/g, '').slice(0, 14) : undefined),
+    osdcQrData: options.osdcQrData,
   };
 }
 
@@ -302,7 +326,14 @@ export function buildReceiptHtml(receipt: ReceiptData): string {
     deliveryAddress,
     loyaltyPoints,
     notes,
-    specialInstructions
+    specialInstructions,
+    osdcVenueTin,
+    osdcBranchId,
+    osdcReceiptNo,
+    osdcReceiptSign,
+    osdcInternalData,
+    osdcSdcDateTime,
+    osdcQrData
   } = receipt;
 
   // RWF: no decimals; other currencies: standard formatting
@@ -313,6 +344,15 @@ export function buildReceiptHtml(receipt: ReceiptData): string {
   const orderTypeDisplay = (orderType ?? 'dine-in').split('-').map((w: string) =>
     w.charAt(0).toUpperCase() + w.slice(1)
   ).join(' ');
+
+  const computedQrData = osdcQrData || (
+    osdcVenueTin && osdcBranchId && osdcReceiptNo && osdcSdcDateTime && osdcReceiptSign
+      ? `${osdcVenueTin}|${osdcBranchId}|${osdcReceiptNo}|${osdcSdcDateTime}|${osdcReceiptSign}`
+      : undefined
+  );
+  const qrImageUrl = computedQrData
+    ? `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=2&data=${encodeURIComponent(computedQrData)}`
+    : undefined;
 
   const itemsHtml = items.map(item => `
     <tr>
@@ -475,6 +515,18 @@ export function buildReceiptHtml(receipt: ReceiptData): string {
     <div class="pts">+${loyaltyPoints.pointsEarned} pts</div>
     <div style="font-size:8pt;color:#92400e;margin-top:3px">Balance: ${loyaltyPoints.pointsBalance} pts</div>
   </div>` : ''}
+
+  ${osdcReceiptSign || osdcReceiptNo ? `
+  <hr class="dashed">
+  <div style="font-size:8pt;line-height:1.6;color:#222">
+    <div style="font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:2px">RRA EBM Certified</div>
+    ${osdcReceiptNo ? `<div>Receipt No: <strong>${osdcReceiptNo}</strong></div>` : ''}
+    ${osdcSdcDateTime ? `<div>SDC Time: <strong>${osdcSdcDateTime}</strong></div>` : ''}
+    ${osdcReceiptSign ? `<div style="word-break:break-all">EBM Signature: <strong>${osdcReceiptSign}</strong></div>` : ''}
+    ${osdcInternalData ? `<div style="word-break:break-all">Internal Data: <strong>${osdcInternalData}</strong></div>` : ''}
+  </div>
+  ${qrImageUrl ? `<div style="text-align:center;margin-top:8px"><img src="${qrImageUrl}" alt="RRA QR" style="width:130px;height:130px;object-fit:contain" /></div>` : ''}
+  ` : ''}
 
   <hr class="solid">
 

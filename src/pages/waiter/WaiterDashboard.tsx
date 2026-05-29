@@ -1,4 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import { OpenTabModal } from '../../components/shared/OpenTabModal';
+import type { ConfirmMergeFn } from '../../hooks/useOrders';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ClipboardListIcon,
@@ -673,6 +675,17 @@ export function WaiterDashboard({
   const [reservationsExpanded, setReservationsExpanded] = useState(true);
   // Track order IDs we've already seen so we can detect truly new ones
   const knownOrderIdsRef = useRef<Set<string>>(new Set());
+
+  // Open-tab merge modal state
+  const [mergeCandidate, setMergeCandidate] = useState<Order | null>(null);
+  const mergeResolveRef = useRef<((result: boolean) => void) | null>(null);
+
+  const confirmMerge: ConfirmMergeFn = useCallback((candidate: Order) => {
+    return new Promise<boolean>((resolve) => {
+      setMergeCandidate(candidate);
+      mergeResolveRef.current = resolve;
+    });
+  }, []);
 
   const { kpis } = useStaffKPIs();
   const { tables: allTables } = useTables();
@@ -1651,7 +1664,14 @@ export function WaiterDashboard({
                 createdBy: staffId ?? undefined,
               } as any);
             } else {
-              await onCreateOrder(selectedTableNumber, items, notes);
+              // Extra args (confirmMerge) flow through as any — prop type stays simple
+              await (onCreateOrder as any)(
+                selectedTableNumber!,
+                items,
+                notes,
+                undefined, undefined, undefined, undefined,
+                confirmMerge,
+              );
             }
           }}
         />
@@ -1685,6 +1705,23 @@ export function WaiterDashboard({
           currency="RWF"
           onConfirm={handlePaymentConfirmed}
           onCancel={() => setPaymentCaptureOrder(null)}
+        />
+      )}
+
+      {mergeCandidate && (
+        <OpenTabModal
+          tableNumber={mergeCandidate.tableNumber ?? (mergeCandidate as any).table_number ?? 0}
+          candidate={mergeCandidate}
+          onAddToTab={() => {
+            mergeResolveRef.current?.(true);
+            mergeResolveRef.current = null;
+            setMergeCandidate(null);
+          }}
+          onNewOrder={() => {
+            mergeResolveRef.current?.(false);
+            mergeResolveRef.current = null;
+            setMergeCandidate(null);
+          }}
         />
       )}
 

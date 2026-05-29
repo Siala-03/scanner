@@ -5,7 +5,9 @@ import type { Order as OrderType, OrderStatus } from '../../types';
 import { Card } from '../../components/ui/Card';
 import { OrdersHistoryTable } from '../../components/supervisor/OrdersHistoryTable';
 import { OrderDetailModal } from '../../components/waiter/OrderDetailModal';
-import { fetchOrders, cancelOrder } from '../../api/orders';
+import { fetchOrders, cancelOrder, fetchCancellationRequestByOrderId } from '../../api/orders';
+import type { CancellationDetails } from '../../components/waiter/OrderDetailModal';
+import { VoidReasonModal } from '../../components/shared/VoidReasonModal';
 import type { RestaurantReceiptSettings } from '../../api/restaurants';
 import { buildReceiptHtml, orderToReceiptData, printReceipt } from '../../utils/receipt';
 import { downloadCsv, buildOrdersCsv } from '../../utils/csv';
@@ -29,8 +31,11 @@ export function OrderHistoryPage({ onBack, existingOrders, restaurantName = '', 
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [cancellationDetails, setCancellationDetails] = useState<CancellationDetails | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [usingLocalData, setUsingLocalData] = useState(false);
+  const [voidTargetId, setVoidTargetId] = useState<string | null>(null);
+  const [isVoiding, setIsVoiding] = useState(false);
 
   // Normalize orders from Supabase snake_case to camelCase
   const convertOrders = (orders: any[]): Order[] => {
@@ -112,13 +117,53 @@ export function OrderHistoryPage({ onBack, existingOrders, restaurantName = '', 
     setSelectedOrder(null);
   };
 
-  const handleCancelOrder = async (orderId: string) => {
+  const handleSelectOrder = async (order: Order) => {
+    setSelectedOrder(order);
+    setCancellationDetails(null);
+    if (order.status === 'cancelled') {
+      // Try the approval-workflow table first, then fall back to order fields
+      const req = await fetchCancellationRequestByOrderId(order.id).catch(() => null);
+      if (req) {
+        setCancellationDetails({
+          reason: req.reason || (order as any).cancel_reason || null,
+          requestedByName: req.requested_by_name,
+          requestedAt: req.requested_at,
+          approvedByName: req.reviewed_by_name,
+          approvedAt: req.reviewed_at,
+        });
+      } else {
+        // Direct cancel — only reason is stored on the order itself
+        const reason = (order as any).cancel_reason ?? (order as any).cancelReason ?? null;
+        if (reason) {
+          setCancellationDetails({
+            reason,
+            requestedByName: null,
+            requestedAt: null,
+            approvedByName: null,
+            approvedAt: null,
+          });
+        }
+      }
+    }
+  };
+
+  const handleCancelOrder = (orderId: string) => {
+    setVoidTargetId(orderId);
+  };
+
+  const handleVoidConfirmed = async (reason: string) => {
+    if (!voidTargetId) return;
+    const id = voidTargetId;
+    setVoidTargetId(null);
+    setIsVoiding(true);
     try {
-      await cancelOrder(orderId);
-      handleUpdateOrderStatus(orderId, 'cancelled');
+      await cancelOrder(id, reason);
+      handleUpdateOrderStatus(id, 'cancelled');
     } catch (err) {
       console.error('Failed to cancel order:', err);
       alert('Failed to cancel order. Please try again.');
+    } finally {
+      setIsVoiding(false);
     }
   };
 
@@ -292,7 +337,7 @@ export function OrderHistoryPage({ onBack, existingOrders, restaurantName = '', 
             ) : (
               <OrdersHistoryTable
                 orders={orders}
-                onSelectOrder={setSelectedOrder}
+                onSelectOrder={handleSelectOrder}
                 onExport={handleExport}
               />
             )}
@@ -304,14 +349,24 @@ export function OrderHistoryPage({ onBack, existingOrders, restaurantName = '', 
       <OrderDetailModal
         order={selectedOrder as any}
         isOpen={!!selectedOrder}
-        onClose={() => setSelectedOrder(null)}
+        onClose={() => { setSelectedOrder(null); setCancellationDetails(null); }}
         onApprove={(order) => handleUpdateOrderStatus(order.id, 'verified')}
         onReject={(id) => handleUpdateOrderStatus(id, 'cancelled')}
         onCancel={handleCancelOrder}
         onMarkReady={(id) => handleUpdateOrderStatus(id, 'ready')}
         onMarkServed={(id) => handleUpdateOrderStatus(id, 'served')}
         onPrintReceipt={handlePrintReceipt}
+        cancellationDetails={cancellationDetails}
       />
+
+      {voidTargetId && (
+        <VoidReasonModal
+          orderLabel={`Order ${voidTargetId.slice(-8).toUpperCase()}`}
+          isSubmitting={isVoiding}
+          onConfirm={handleVoidConfirmed}
+          onCancel={() => setVoidTargetId(null)}
+        />
+      )}
     </div>
   );
 }

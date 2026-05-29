@@ -155,20 +155,21 @@ export async function generateAllForecasts(restaurantId: string): Promise<Foreca
  * Get stored forecasts from database
  */
 export async function getStoredForecasts(restaurantId: string): Promise<ForecastResult[]> {
+  if (!restaurantId) return [];
   let result;
   try {
     result = await pool.query(
-      `SELECT * FROM inventory_forecasts 
+      `SELECT * FROM inventory_forecasts
        WHERE menu_item_id IN (SELECT menu_item_id FROM inventory_records WHERE restaurant_id = $1)
-       ORDER BY alert_status DESC, days_until_stockout ASC`,
+       ORDER BY
+         CASE alert_status WHEN 'critical' THEN 1 WHEN 'warning' THEN 2 ELSE 3 END,
+         days_until_stockout ASC`,
       [restaurantId]
     );
   } catch (error) {
-    if (isForecastSchemaError(error)) {
-      console.warn('Forecast schema not ready for getStoredForecasts; returning empty list.');
-      return [];
-    }
-    throw error;
+    // Forecasting is non-critical — degrade gracefully rather than 500ing
+    console.warn('getStoredForecasts: DB error (forecasting tables may not be provisioned):', (error as any)?.message ?? error);
+    return [];
   }
   
   return result.rows.map(row => ({
@@ -192,27 +193,21 @@ export async function getStoredForecasts(restaurantId: string): Promise<Forecast
  * Get alerts (items that need attention based on forecast)
  */
 export async function getForecastAlerts(restaurantId: string): Promise<ForecastResult[]> {
+  if (!restaurantId) return [];
   let result;
   try {
     result = await pool.query(
-      `SELECT * FROM inventory_forecasts 
+      `SELECT * FROM inventory_forecasts
        WHERE menu_item_id IN (SELECT menu_item_id FROM inventory_records WHERE restaurant_id = $1)
-       AND alert_status IN ('warning', 'critical')
-       ORDER BY 
-         CASE alert_status 
-           WHEN 'critical' THEN 1 
-           WHEN 'warning' THEN 2 
-           ELSE 3 
-         END,
+         AND alert_status IN ('warning', 'critical')
+       ORDER BY
+         CASE alert_status WHEN 'critical' THEN 1 WHEN 'warning' THEN 2 ELSE 3 END,
          days_until_stockout ASC`,
       [restaurantId]
     );
   } catch (error) {
-    if (isForecastSchemaError(error)) {
-      console.warn('Forecast schema not ready for getForecastAlerts; returning empty list.');
-      return [];
-    }
-    throw error;
+    console.warn('getForecastAlerts: DB error (forecasting tables may not be provisioned):', (error as any)?.message ?? error);
+    return [];
   }
   
   return result.rows.map(row => ({

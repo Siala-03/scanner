@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+  import React, { useEffect, useMemo, useState } from 'react';
 import { approveExpense, fetchExpenseCategories, fetchExpenses, rejectExpense } from '../../api/expenses';
 import type { Expense, ExpenseCategory } from '../../types/expenses';
 

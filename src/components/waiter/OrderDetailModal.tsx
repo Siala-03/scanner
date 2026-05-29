@@ -4,14 +4,26 @@ import {
   MapPinIcon,
   UtensilsIcon,
   WineIcon,
-  MessageSquareIcon } from
-'lucide-react';
+  MessageSquareIcon,
+  XCircleIcon,
+  UserIcon,
+  CheckCircleIcon,
+} from 'lucide-react';
 import { Order } from '../../types';
 import { Modal } from '../ui/Modal';
 import { StatusBadge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { formatPrice } from '../../utils/currency';
 import { getEffectivePrice } from '../../utils/pricing';
+
+export interface CancellationDetails {
+  reason: string | null;
+  requestedByName: string | null;
+  requestedAt: string | null;
+  approvedByName: string | null;
+  approvedAt: string | null;
+}
+
 interface OrderDetailModalProps {
   order: Order | null;
   isOpen: boolean;
@@ -22,6 +34,7 @@ interface OrderDetailModalProps {
   onMarkReady?: (orderId: string) => void;
   onMarkServed?: (orderId: string) => void;
   onPrintReceipt?: (order: Order) => void;
+  cancellationDetails?: CancellationDetails | null;
 }
 export function OrderDetailModal({
   order,
@@ -33,6 +46,7 @@ export function OrderDetailModal({
   onMarkReady,
   onMarkServed,
   onPrintReceipt,
+  cancellationDetails,
 }: OrderDetailModalProps) {
   if (!order) return null;
   const minutesAgo = Math.floor(
@@ -64,6 +78,58 @@ export function OrderDetailModal({
           </div>
           <StatusBadge status={order.status} />
         </div>
+
+        {/* ── Cancellation details (cancelled orders only) ─────────────── */}
+        {order.status === 'cancelled' && (
+          <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-4 space-y-3">
+            <div className="flex items-center gap-2 text-red-400 font-semibold text-sm">
+              <XCircleIcon className="w-4 h-4 shrink-0" />
+              Order Voided
+            </div>
+
+            {/* Reason */}
+            <div>
+              <p className="text-xs text-slate-400 mb-0.5">Reason</p>
+              <p className="text-sm text-slate-200">
+                {cancellationDetails?.reason || (order as any).cancel_reason || (order as any).cancelReason || (order as any).notes || (
+                  <span className="italic text-slate-500">No reason recorded</span>
+                )}
+              </p>
+            </div>
+
+            {/* Requested by */}
+            {cancellationDetails?.requestedByName && (
+              <div className="flex items-start gap-3">
+                <div className="flex-1">
+                  <p className="text-xs text-slate-400 mb-0.5 flex items-center gap-1">
+                    <UserIcon className="w-3 h-3" /> Requested by
+                  </p>
+                  <p className="text-sm text-slate-200">{cancellationDetails.requestedByName}</p>
+                  {cancellationDetails.requestedAt && (
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      {new Date(cancellationDetails.requestedAt).toLocaleString()}
+                    </p>
+                  )}
+                </div>
+
+                {/* Approved by */}
+                {cancellationDetails.approvedByName && (
+                  <div className="flex-1">
+                    <p className="text-xs text-slate-400 mb-0.5 flex items-center gap-1">
+                      <CheckCircleIcon className="w-3 h-3" /> Approved by
+                    </p>
+                    <p className="text-sm text-slate-200">{cancellationDetails.approvedByName}</p>
+                    {cancellationDetails.approvedAt && (
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        {new Date(cancellationDetails.approvedAt).toLocaleString()}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Order type indicator */}
         <div className="flex items-center gap-2 p-3 rounded-lg bg-slate-700/50">

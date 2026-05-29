@@ -766,6 +766,66 @@ export async function decrementInventoryForOrder(
   );
 }
 
+export async function restoreInventoryForOrder(
+  items: Array<{ menuItemId: string; quantity: number }>,
+  options?: { reference?: string; reason?: string; performedBy?: string }
+): Promise<void> {
+  const restaurantId = getRestaurantId();
+  if (!restaurantId || !items.length) return;
+  const performedBy = options?.performedBy || getStaffId();
+
+  await Promise.allSettled(
+    items.map(async ({ menuItemId, quantity }) => {
+      if (!menuItemId || !quantity) return;
+
+      const { data: rec, error: fetchErr } = await supabase
+        .from('inventory_records')
+        .select('stock')
+        .eq('menu_item_id', menuItemId)
+        .eq('restaurant_id', restaurantId)
+        .maybeSingle();
+
+      if (fetchErr || !rec) return; // No inventory record — nothing to restore
+
+      const newStock = (rec.stock ?? 0) + quantity;
+      const { error: updateErr } = await supabase
+        .from('inventory_records')
+        .update({ stock: newStock, updated_at: new Date().toISOString() })
+        .eq('menu_item_id', menuItemId)
+        .eq('restaurant_id', restaurantId);
+
+      if (updateErr) {
+        console.warn(`[restoreInventoryForOrder] Failed to restore stock for ${menuItemId}:`, updateErr.message);
+        return;
+      }
+
+      const { error: movementErr } = await supabase
+        .from('stock_movements')
+        .insert({
+          id: `mov-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          menu_item_id: menuItemId,
+          menu_item_name: menuItemId,
+          type: 'return',
+          qty: Math.abs(quantity),
+          stock_before: rec.stock ?? 0,
+          balance_after: newStock,
+          performed_by: performedBy,
+          reference: options?.reference ?? null,
+          notes: options?.reason
+            ? `Cancellation: ${options.reason}`
+            : options?.reference
+            ? `Order cancelled: ${options.reference}`
+            : 'Order cancelled — stock restored',
+          restaurant_id: restaurantId,
+        });
+
+      if (movementErr) {
+        console.warn(`[restoreInventoryForOrder] Failed to log movement for ${menuItemId}:`, movementErr.message);
+      }
+    })
+  );
+}
+
 export async function fetchLowStockItems(): Promise<InventoryRecord[]> {
   const restaurantId = getRestaurantId();
   if (!restaurantId) return [];

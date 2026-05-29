@@ -26,8 +26,11 @@ import {
   EbmConfig,
   EBM_MOCK_MODE,
 } from '../services/ebmService.js';
+import { enqueueSalesFiscalizationJob, processEbmFiscalQueueOnce } from '../services/ebmFiscalQueue.js';
+import { CmcKeyManager } from '../services/cmcKeyManager.js';
 
 const router = Router();
+const cmcKeyManager = new CmcKeyManager(pool);
 
 // ─── Config helpers ───────────────────────────────────────────────────────────
 
@@ -38,7 +41,31 @@ async function getEbmConfig(restaurantId: string): Promise<EbmConfig | null> {
   );
   if (result.rows.length === 0) return null;
   const r = result.rows[0];
-  return { tpin: r.tpin, bhfId: r.bhf_id, dvcSrlNo: r.dvc_srl_no, baseUrl: r.base_url };
+  let cmcKey = r.cmc_key || undefined;
+
+  if (!cmcKey) {
+    try {
+      const keyRow = await pool.query(
+        `SELECT cmc_key_enc, expires_at
+         FROM device_keys
+         WHERE restaurant_id = $1 AND tin = $2 AND bhf_id = $3
+         LIMIT 1`,
+        [restaurantId, r.tpin, r.bhf_id]
+      );
+      const deviceKey = keyRow.rows[0];
+      if (deviceKey?.cmc_key_enc && new Date(deviceKey.expires_at) > new Date()) {
+        cmcKey = cmcKeyManager.decrypt(deviceKey.cmc_key_enc);
+      } else if (process.env.OSDC_URL) {
+        cmcKey = await cmcKeyManager.getActiveKey(restaurantId, r.tpin, r.bhf_id, r.dvc_srl_no);
+      }
+    } catch (err) {
+      if (!cmcKey) {
+        console.warn('OSDC device key lookup/rotation failed, continuing without cmcKey', err);
+      }
+    }
+  }
+
+  return { tpin: r.tpin, bhfId: r.bhf_id, dvcSrlNo: r.dvc_srl_no, baseUrl: r.base_url, cmcKey };
 }
 
 function requireRestaurantId(req: Request, res: Response): string | null {
@@ -78,14 +105,14 @@ router.get('/config', async (req: Request, res: Response) => {
 // POST /api/ebm/config – upsert configuration
 router.post('/config', async (req: Request, res: Response) => {
   try {
-    const { restaurantId, tpin, bhfId, dvcSrlNo, baseUrl, env } = req.body;
+    const { restaurantId, tpin, bhfId, dvcSrlNo, baseUrl, env, cmcKey } = req.body;
     if (!restaurantId || !tpin || !bhfId || !dvcSrlNo) {
       return res.status(400).json({ error: 'restaurantId, tpin, bhfId, dvcSrlNo are required' });
     }
 
     const result = await pool.query(
-      `INSERT INTO ebm_config (restaurant_id, tpin, bhf_id, dvc_srl_no, base_url, env, is_active, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, true, now())
+      `INSERT INTO ebm_config (restaurant_id, tpin, bhf_id, dvc_srl_no, base_url, env, cmc_key, is_active, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, NULL, true, now())
        ON CONFLICT (restaurant_id) DO UPDATE SET
          tpin        = EXCLUDED.tpin,
          bhf_id      = EXCLUDED.bhf_id,
@@ -97,10 +124,80 @@ router.post('/config', async (req: Request, res: Response) => {
        RETURNING *`,
       [restaurantId, tpin, bhfId, dvcSrlNo, baseUrl || 'http://localhost:8088', env || 'sandbox']
     );
+
+    if (cmcKey && cmcKey.trim()) {
+      await pool.query(
+        `INSERT INTO device_keys (restaurant_id, tin, bhf_id, dvc_srl_no, cmc_key_enc, expires_at, rotated_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, NOW() + INTERVAL '90 days', now(), now())
+         ON CONFLICT (restaurant_id, tin, bhf_id) DO UPDATE SET
+           dvc_srl_no = EXCLUDED.dvc_srl_no,
+           cmc_key_enc = EXCLUDED.cmc_key_enc,
+           expires_at = EXCLUDED.expires_at,
+           rotated_at = now(),
+           updated_at = now()`,
+        [restaurantId, tpin, bhfId, dvcSrlNo, cmcKeyManager.encrypt(cmcKey.trim())]
+      );
+    }
+
     res.json(result.rows[0]);
   } catch (err) {
     console.error('POST /ebm/config error:', err);
     res.status(500).json({ error: 'Failed to save EBM config' });
+  }
+});
+
+// PATCH /api/ebm/config/cmc-key – update OSDC communication key only (separate flow)
+router.patch('/config/cmc-key', async (req: Request, res: Response) => {
+  try {
+    const restaurantId = requireRestaurantId(req, res);
+    if (!restaurantId) return;
+    const { cmcKey } = req.body;
+    if (!cmcKey || typeof cmcKey !== 'string' || cmcKey.trim().length === 0) {
+      return res.status(400).json({ error: 'cmcKey is required' });
+    }
+    const configRow = await pool.query('SELECT tpin, bhf_id, dvc_srl_no FROM ebm_config WHERE restaurant_id = $1 LIMIT 1', [restaurantId]);
+    const config = configRow.rows[0];
+    if (!config) {
+      return res.status(404).json({ error: 'EBM config not found' });
+    }
+    await pool.query(
+      `INSERT INTO device_keys (restaurant_id, tin, bhf_id, dvc_srl_no, cmc_key_enc, expires_at, rotated_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, NOW() + INTERVAL '90 days', now(), now())
+       ON CONFLICT (restaurant_id, tin, bhf_id) DO UPDATE SET
+         dvc_srl_no = EXCLUDED.dvc_srl_no,
+         cmc_key_enc = EXCLUDED.cmc_key_enc,
+         expires_at = EXCLUDED.expires_at,
+         rotated_at = now(),
+         updated_at = now()`,
+      [restaurantId, config.tpin, config.bhf_id, config.dvc_srl_no, cmcKeyManager.encrypt(cmcKey.trim())]
+    );
+    res.json({ ok: true, cmcKey: cmcKey.trim() });
+  } catch (err) {
+    console.error('PATCH /ebm/config/cmc-key error:', err);
+    res.status(500).json({ error: 'Failed to update cmcKey' });
+  }
+});
+
+// POST /api/ebm/config/cmc-key/rotate – force rotate key from OSDC and store encrypted
+router.post('/config/cmc-key/rotate', async (req: Request, res: Response) => {
+  try {
+    const restaurantId = requireRestaurantId(req, res);
+    if (!restaurantId) return;
+
+    const configRow = await pool.query(
+      'SELECT tpin, bhf_id, dvc_srl_no FROM ebm_config WHERE restaurant_id = $1 LIMIT 1',
+      [restaurantId]
+    );
+    const config = configRow.rows[0];
+    if (!config) {
+      return res.status(404).json({ error: 'EBM config not found' });
+    }
+
+    await cmcKeyManager.rotateKey(restaurantId, config.tpin, config.bhf_id, config.dvc_srl_no);
+    res.json({ ok: true, rotated: true });
+  } catch (err) {
+    console.error('POST /ebm/config/cmc-key/rotate error:', err);
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to rotate cmcKey' });
   }
 });
 
@@ -263,79 +360,27 @@ router.get('/items/:itemCd', async (req: Request, res: Response) => {
 router.post('/fiscalize/:orderId', async (req: Request, res: Response) => {
   try {
     const { orderId } = req.params;
-    const { restaurantId, paymentType, custTin } = req.body;
+    const { restaurantId, paymentType, custTin, intentKey } = req.body;
     if (!restaurantId) return res.status(400).json({ error: 'restaurantId is required' });
 
-    const orderResult = await pool.query('SELECT * FROM orders WHERE id = $1', [orderId]);
-    if (orderResult.rows.length === 0) return res.status(404).json({ error: 'Order not found' });
-    const order = orderResult.rows[0];
-    if (typeof order.items === 'string') order.items = JSON.parse(order.items);
+    const queued = await enqueueSalesFiscalizationJob({
+      restaurantId,
+      orderId,
+      paymentType,
+      custTin,
+      intentKey,
+    });
 
-    // Prevent double-fiscalization
-    const existing = await pool.query(
-      "SELECT id FROM ebm_invoices WHERE order_id = $1 AND status = 'success' AND invoice_type = 'S' LIMIT 1",
-      [orderId]
-    );
-    if (existing.rows.length > 0) {
-      return res.status(409).json({ error: 'Order already fiscalized', invoiceId: existing.rows[0].id });
-    }
+    // Trigger one immediate processing attempt; the periodic worker will keep retrying.
+    void processEbmFiscalQueueOnce('fiscalize-endpoint');
 
-    const config = await getEbmConfig(restaurantId);
-    if (!config) return res.status(404).json({ error: 'EBM config not found. Configure EBM settings first.' });
-
-    const cisInvcNo = order.order_number || `INV-${orderId.slice(-8).toUpperCase()}`;
-    const salesData = buildSalesFromOrder(
-      { ...order, customer_tin: custTin },
-      cisInvcNo,
-      paymentType || '01',
-      'S'
-    );
-
-    const invoiceId = `ebm-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}`;
-    await pool.query(
-      `INSERT INTO ebm_invoices
-         (id, restaurant_id, order_id, invoice_type, cis_invc_no, cust_tin, cust_nm,
-          pmt_ty_cd, tot_amt, tot_taxbl_amt, tot_tax_amt, raw_request, status)
-       VALUES ($1,$2,$3,'S',$4,$5,$6,$7,$8,$9,$10,$11,'pending')`,
-      [invoiceId, restaurantId, orderId, cisInvcNo, custTin || null,
-       salesData.custNm, salesData.pmtTyCd, salesData.totAmt,
-       salesData.totTaxblAmt, salesData.totTaxAmt, JSON.stringify(salesData)]
-    );
-
-    let vsdcResult;
-    try {
-      vsdcResult = await saveSales(config, salesData);
-    } catch (apiErr) {
-      await pool.query(
-        "UPDATE ebm_invoices SET status='failed', error_msg=$1 WHERE id=$2",
-        [String(apiErr), invoiceId]
-      );
-      throw apiErr;
-    }
-
-    if (vsdcResult.resultCd === '000') {
-      const d = (vsdcResult.data || {}) as SaveSalesData;
-      await pool.query(
-        `UPDATE ebm_invoices
-         SET status='success', rcpt_no=$1, intrl_data=$2, rcpt_sign=$3,
-             sdc_id=$4, tot_rcpt_no=$5, raw_response=$6, fiscalized_at=now()
-         WHERE id=$7`,
-        [d.rcptNo, d.intrlData, d.rcptSign, d.sdcId, d.totRcptNo, JSON.stringify(vsdcResult), invoiceId]
-      );
-      await pool.query(
-        `UPDATE orders
-         SET ebm_invoice_id=$1, ebm_rcpt_sign=$2, ebm_rcpt_no=$3, ebm_fiscalized_at=now(), updated_at=now()
-         WHERE id=$4`,
-        [invoiceId, d.rcptSign, d.rcptNo, orderId]
-      );
-    } else {
-      await pool.query(
-        "UPDATE ebm_invoices SET status='failed', error_msg=$1, raw_response=$2 WHERE id=$3",
-        [vsdcResult.resultMsg, JSON.stringify(vsdcResult), invoiceId]
-      );
-    }
-
-    res.json({ invoiceId, vsdcResult });
+    return res.status(queued.status === 'success' ? 200 : 202).json({
+      queued: queued.status !== 'success',
+      status: queued.status,
+      jobId: queued.jobId,
+      invoiceId: queued.invoiceId,
+      intentKey: queued.intentKey,
+    });
   } catch (err) {
     console.error('POST /ebm/fiscalize error:', err);
     res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to fiscalize order' });

@@ -36,6 +36,8 @@ import { reservationsRouter } from './routes/reservations.js';
 import { schedulesRouter } from './routes/schedules.js';
 import { reviewsRouter } from './routes/reviews.js';
 import { ebmRouter } from './routes/ebm.js';
+import { startEbmFiscalWorker } from './services/ebmFiscalQueue.js';
+import { OsdcSyncManager } from './services/osdcSyncManager.js';
 import { initSocket } from './socket.js';
 import { logger } from './logger.js';
 import { pool } from './db.js';
@@ -209,6 +211,8 @@ async function ensureSuperadminAccounts() {
 
 const app = express();
 const httpServer = createServer(app);
+let stopEbmFiscalWorker: (() => void) | null = null;
+let stopOsdcSyncManager: (() => void) | null = null;
 
 // Initialize Socket.io
 initSocket(httpServer);
@@ -320,6 +324,11 @@ httpServer.listen(env.PORT, async () => {
   // Run migrations on startup
   await runMigrations();
   await ensureSuperadminAccounts();
+  stopEbmFiscalWorker = startEbmFiscalWorker();
+  logger.info('EBM fiscal worker started');
+  const osdcSyncManager = new OsdcSyncManager(pool);
+  stopOsdcSyncManager = osdcSyncManager.startScheduler();
+  logger.info('OSDC incremental sync manager started');
 });
 
 // Graceful shutdown handling
@@ -333,6 +342,14 @@ function gracefulShutdown(signal: string) {
     }
     
     try {
+      if (stopEbmFiscalWorker) {
+        stopEbmFiscalWorker();
+        stopEbmFiscalWorker = null;
+      }
+      if (stopOsdcSyncManager) {
+        stopOsdcSyncManager();
+        stopOsdcSyncManager = null;
+      }
       await pool.end();
       logger.info('Database connections closed');
     } catch (dbErr) {

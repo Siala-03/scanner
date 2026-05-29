@@ -2,7 +2,11 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { Order, OrderStatus, CartItem, Customer } from '../types';
 import { getEffectivePrice } from '../utils/pricing';
-import { createOrder as apiCreateOrder, updateOrderStatus as apiUpdateOrderStatus, fetchOrders as apiFetchOrders } from '../api/orders';
+import {
+  createOrder as apiCreateOrder,
+  fetchOrders as apiFetchOrders,
+  findMergeableOpenOrder,
+} from '../api/orders';
 import { recordTableSessionActivity } from '../utils/tableSessions';
 
 const normalizeOrderPayload = (rawOrder: any): Order | undefined => {
@@ -107,6 +111,8 @@ function resolveRestaurantId(): string | undefined {
   return undefined;
 }
 
+export type ConfirmMergeFn = (candidate: Order) => Promise<boolean>;
+
 interface UseOrdersReturn {
   orders: Order[];
   addOrder: (
@@ -115,7 +121,9 @@ interface UseOrdersReturn {
     specialInstructions?: string,
     customer?: Customer | null,
     delivery?: { provider: string; address: string },
-    loyaltyRewardId?: string
+    loyaltyRewardId?: string,
+    promotionCode?: string,
+    confirmMerge?: ConfirmMergeFn
   ) => Promise<Order>;
   updateOrderStatus: (
     orderId: string,
@@ -143,7 +151,6 @@ export function useOrders(): UseOrdersReturn {
   // Keep restaurantId in sync whenever the app sets/changes it
   useEffect(() => {
     const handleChange = () => {
-      setRestaurantId(localStorage.getItem('restaurantId') || undefined);
     };
     window.addEventListener('restaurantIdChanged', handleChange);
     return () => window.removeEventListener('restaurantIdChanged', handleChange);
@@ -264,7 +271,8 @@ export function useOrders(): UseOrdersReturn {
       customer?: Customer | null,
       delivery?: { provider: string; address: string },
       loyaltyRewardId?: string,
-      promotionCode?: string
+      promotionCode?: string,
+      confirmMerge?: ConfirmMergeFn
     ): Promise<Order> => {
       const currentRestaurantId = resolveRestaurantId();
       if (!currentRestaurantId) {
@@ -273,6 +281,23 @@ export function useOrders(): UseOrdersReturn {
       const requiresKitchen = isFoodOrder(items);
       const payloadItems = items.map(buildOrderItemPayload);
       const localItems = items.map(buildLocalOrderItem);
+      let allowMergeToOpenTab = false;
+
+      if (Number.isInteger(tableNumber) && tableNumber > 0 && tableNumber !== 999) {
+        const mergeCandidate = await findMergeableOpenOrder(tableNumber, currentRestaurantId);
+        if (mergeCandidate) {
+          if (confirmMerge) {
+            allowMergeToOpenTab = await confirmMerge(mergeCandidate);
+          } else {
+            const candidateNumber = String(
+              (mergeCandidate as any).orderNumber || (mergeCandidate as any).order_number || mergeCandidate.id
+            ).trim().slice(0, 7).toUpperCase();
+            allowMergeToOpenTab = window.confirm(
+              `Table ${tableNumber} has an open tab (#${candidateNumber}). Click OK to merge new items into that tab, or Cancel to create a separate order.`
+            );
+          }
+        }
+      }
 
       const subtotal = localItems.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
       const total = subtotal;
@@ -321,6 +346,7 @@ export function useOrders(): UseOrdersReturn {
           loyaltyRewardId,
           promotionCode,
           idempotencyKey,
+          allowMergeToOpenTab,
         } as any);
 
         savedOrder = normalizeOrderPayload(createdOrder) ?? localOrder;
@@ -349,7 +375,8 @@ export function useOrders(): UseOrdersReturn {
   const updateOrderStatus = useCallback(
     async (orderId: string, status: OrderStatus, opts?: { assignedWaiterId?: string }) => {
       try {
-        await apiUpdateOrderStatus(orderId, { status: status as any, assignedTo: opts?.assignedWaiterId });
+        const ordersApi = await import('../api/orders');
+        await (ordersApi as any).updateOrderStatus(orderId, { status: status as any, assignedTo: opts?.assignedWaiterId });
       } catch (e) {
         console.warn('Failed to update order status:', e);
       }

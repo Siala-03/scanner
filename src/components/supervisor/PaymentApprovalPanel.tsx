@@ -4,6 +4,7 @@ import {
   SmartphoneIcon, RefreshCwIcon, UserIcon, PlusIcon, XIcon,
 } from 'lucide-react';
 import { fetchOrders, confirmPayment, fetchOrderCancellationRequests, requestOrderCancellation } from '../../api/orders';
+import { VoidReasonModal } from '../shared/VoidReasonModal';
 import { fiscalizeOrder } from '../../api/ebm';
 import { formatPrice } from '../../utils/currency';
 import { supabase } from '../../lib/supabase';
@@ -99,6 +100,7 @@ export function PaymentApprovalPanel({ restaurantId, staffId, staffName }: Payme
   const [confirming,   setConfirming]   = useState<string | null>(null);
   const [cancelling,   setCancelling]   = useState<string | null>(null);
   const [pendingCancelRequests, setPendingCancelRequests] = useState<Set<string>>(new Set());
+  const [voidTarget,   setVoidTarget]   = useState<Order | null>(null);
   const [splitsMap,    setSplitsMap]    = useState<Record<string, SplitEntry[]>>({});
   const [justConfirmed, setJustConfirmed] = useState<Set<string>>(new Set());
 
@@ -152,11 +154,18 @@ export function PaymentApprovalPanel({ restaurantId, staffId, staffName }: Payme
 
   // ── Cancel ─────────────────────────────────────────────────────────────────
 
-  const handleCancel = async (order: Order) => {
-    if (!window.confirm(`Send cancellation request for order ${getOrderLabel(order)} to manager?`)) return;
+  const handleCancel = (order: Order) => {
+    setVoidTarget(order);
+  };
+
+  const handleVoidConfirmed = async (reason: string) => {
+    const order = voidTarget;
+    if (!order) return;
+    setVoidTarget(null);
     setCancelling(order.id);
     try {
       await requestOrderCancellation(order.id, {
+        reason,
         requestedBy: staffId,
         requestedByName: staffName,
       });
@@ -208,10 +217,18 @@ export function PaymentApprovalPanel({ restaurantId, staffId, staffName }: Payme
     const primary = resolved.reduce((a, b) => a.effectiveAmount >= b.effectiveAmount ? a : b);
 
     const note = buildNote(splits, order.total);
+    const paymentBreakdown = resolved
+      .filter((s) => s.effectiveAmount > 0)
+      .map((s) => ({
+        method: s.label,
+        amount: s.effectiveAmount,
+        ...(s.momoRef ? { reference: s.momoRef } : {}),
+      }));
     setConfirming(order.id);
     try {
       await confirmPayment(order.id, {
         paymentType:     primary.code,
+        paymentBreakdown,
         confirmedBy:     staffId,
         confirmedByName: staffName,
         restaurantId,
@@ -501,6 +518,15 @@ export function PaymentApprovalPanel({ restaurantId, staffId, staffName }: Payme
             );
           })}
         </div>
+      )}
+
+      {voidTarget && (
+        <VoidReasonModal
+          orderLabel={getOrderLabel(voidTarget)}
+          isSubmitting={cancelling === voidTarget.id}
+          onConfirm={handleVoidConfirmed}
+          onCancel={() => setVoidTarget(null)}
+        />
       )}
     </div>
   );

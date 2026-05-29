@@ -9,7 +9,7 @@ const router = Router();
 router.get('/', authenticate, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const result = await pool.query(`
-      SELECT 
+      SELECT
         il.*,
         COUNT(DISTINCT ist.inventory_item_id) as total_items,
         COALESCE(SUM(ist.quantity), 0) as total_stock,
@@ -36,7 +36,11 @@ router.get('/', authenticate, async (req: AuthenticatedRequest, res: Response) =
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     })));
-  } catch (error) {
+  } catch (error: any) {
+    // 42P01 = table does not exist (migrations not yet applied) — return empty list
+    if (error?.code === '42P01' || error?.code === '42703') {
+      return res.json([]);
+    }
     console.error('Error fetching locations:', error);
     res.status(500).json({ error: 'Failed to fetch locations' });
   }

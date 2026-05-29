@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import {
   ChevronLeftIcon,
   PlusIcon,
@@ -14,7 +14,8 @@ import {
 import { useMenu } from '../../hooks/useMenu';
 import { useTables } from '../../hooks/useTables';
 import { useStaff } from '../../hooks/useStaff';
-import { createOrder } from '../../api/orders';
+import { createOrder, findMergeableOpenOrder } from '../../api/orders';
+import { OpenTabModal } from '../../components/shared/OpenTabModal';
 import { fetchKitchenOrders } from '../../api/orders';
 import { formatPrice } from '../../utils/currency';
 import { buildReceiptHtml, orderToReceiptData, printReceipt, downloadReceiptHtml } from '../../utils/receipt';
@@ -114,6 +115,8 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
   const [receiptNote, setReceiptNote] = useState('');
   const [showMobileCart, setShowMobileCart] = useState(false);
   const [confirmOccupied, setConfirmOccupied] = useState<number | null>(null);
+  const [mergeCandidate, setMergeCandidate] = useState<Order | null>(null);
+  const mergeResolveRef = useRef<((result: boolean) => void) | null>(null);
 
   const { tables, isLoading: tablesLoading } = useTables();
   const { menuItems, isLoading: menuLoading } = useMenu();
@@ -416,6 +419,18 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
       const persistedNotes = [includeSupervisorSource ? SUPERVISOR_SOURCE_TAG : '', visibleNotes].filter(Boolean).join('\n');
       const tableNum = selectedTable === 'bar' ? undefined : (selectedTable as number);
       const needsKitchen = checkoutCart.some(cartItemNeedsKitchen);
+      let allowMergeToOpenTab = false;
+
+      if (typeof tableNum === 'number' && tableNum > 0 && tableNum !== 999) {
+        const candidate = await findMergeableOpenOrder(tableNum);
+        if (candidate) {
+          allowMergeToOpenTab = await new Promise<boolean>((resolve) => {
+            setMergeCandidate(candidate);
+            mergeResolveRef.current = resolve;
+          });
+        }
+      }
+
       const created = await createOrder({
         tableNumber: tableNum,
         items: checkoutCart.map((c) => ({
@@ -431,6 +446,7 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
         createdBy: selectedStaffId || getStaffId() || undefined,
         assignedWaiterId: selectedStaffId || undefined,
         requiresKitchen: needsKitchen,
+        allowMergeToOpenTab,
       } as any);
 
       const nowIso = new Date().toISOString();
@@ -890,6 +906,23 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
             />
           </div>
         </div>
+      )}
+
+      {mergeCandidate && (
+        <OpenTabModal
+          tableNumber={mergeCandidate.tableNumber ?? (mergeCandidate as any).table_number ?? 0}
+          candidate={mergeCandidate}
+          onAddToTab={() => {
+            mergeResolveRef.current?.(true);
+            mergeResolveRef.current = null;
+            setMergeCandidate(null);
+          }}
+          onNewOrder={() => {
+            mergeResolveRef.current?.(false);
+            mergeResolveRef.current = null;
+            setMergeCandidate(null);
+          }}
+        />
       )}
 
       <Modal isOpen={showReceiptNoteModal} onClose={() => setShowReceiptNoteModal(false)} title="Add Receipt Note">
