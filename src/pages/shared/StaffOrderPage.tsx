@@ -16,6 +16,7 @@ import { useTables } from '../../hooks/useTables';
 import { useStaff } from '../../hooks/useStaff';
 import { createOrder, findMergeableOpenOrder } from '../../api/orders';
 import { OpenTabModal } from '../../components/shared/OpenTabModal';
+import { supabase } from '../../lib/supabase';
 import { fetchKitchenOrders } from '../../api/orders';
 import { formatPrice } from '../../utils/currency';
 import { buildReceiptHtml, orderToReceiptData, printReceipt, downloadReceiptHtml } from '../../utils/receipt';
@@ -188,8 +189,25 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
 
   useEffect(() => {
     loadOccupancy();
-    const id = setInterval(loadOccupancy, 15000);
-    return () => clearInterval(id);
+    // Poll every 5 seconds so waiter-placed orders appear as occupied quickly
+    const poll = setInterval(loadOccupancy, 5000);
+
+    // Realtime subscription for instant updates
+    const restaurantId = localStorage.getItem('restaurantId');
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    if (restaurantId) {
+      channel = supabase
+        .channel(`stafforder-occupancy-${restaurantId}`)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `restaurant_id=eq.${restaurantId}` }, () => {
+          loadOccupancy();
+        })
+        .subscribe();
+    }
+
+    return () => {
+      clearInterval(poll);
+      if (channel) supabase.removeChannel(channel);
+    };
   }, [loadOccupancy]);
 
   // ── Table selection ───────────────────────────────────────────────────────────

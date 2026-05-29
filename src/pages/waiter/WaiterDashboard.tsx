@@ -676,6 +676,9 @@ export function WaiterDashboard({
   // Track order IDs we've already seen so we can detect truly new ones
   const knownOrderIdsRef = useRef<Set<string>>(new Set());
 
+  // Occupied-table pre-check (mirrors StaffOrderPage behaviour)
+  const [confirmOccupied, setConfirmOccupied] = useState<number | null>(null);
+
   // Open-tab merge modal state
   const [mergeCandidate, setMergeCandidate] = useState<Order | null>(null);
   const mergeResolveRef = useRef<((result: boolean) => void) | null>(null);
@@ -727,16 +730,25 @@ export function WaiterDashboard({
   const myOrders = useMemo(() => {
     const assigned = waiter.assignedTables ?? [];
     const tableOrders = orders.filter((o) => !isOnline(o));
+
     if (assigned.length === 0) {
-      return tableOrders.filter((o) => isAssignedToCurrentWaiter(o));
-    }
-    return tableOrders.filter(
-      (o) => {
+      // No explicit table assignments — show orders assigned to this waiter
+      // AND orders that have no waiter assigned at all (e.g. supervisor-placed orders).
+      return tableOrders.filter((o) => {
         if (isAssignedToCurrentWaiter(o)) return true;
-        const tNum = o.tableNumber ?? (o as any).table_number;
-        return tNum != null && assigned.includes(tNum);
-      }
-    );
+        const w = String(
+          o.assignedWaiterId ?? (o as any).assigned_waiter_id ?? (o as any).assigned_to ?? ''
+        ).trim();
+        return !w; // include unassigned orders so supervisor orders are visible
+      });
+    }
+
+    // Has specific table assignments — show own orders + all orders for those tables
+    return tableOrders.filter((o) => {
+      if (isAssignedToCurrentWaiter(o)) return true;
+      const tNum = o.tableNumber ?? (o as any).table_number;
+      return tNum != null && assigned.includes(tNum);
+    });
   }, [orders, waiter.assignedTables, isAssignedToCurrentWaiter]);
 
   // ── Derive waiter-call notifications from new pending orders (polling-safe) ──
@@ -1607,9 +1619,14 @@ export function WaiterDashboard({
                   <button
                     key={tNum}
                     onClick={() => {
-                      setSelectedTableNumber(tNum);
-                      setShowTablePicker(false);
-                      setShowOrderEntry(true);
+                      if (status === 'occupied' || status === 'urgent') {
+                        setShowTablePicker(false);
+                        setConfirmOccupied(tNum);
+                      } else {
+                        setSelectedTableNumber(tNum);
+                        setShowTablePicker(false);
+                        setShowOrderEntry(true);
+                      }
                     }}
                     className={`relative flex flex-col items-center justify-center rounded-xl border-2 py-3 font-bold text-sm transition-all ${cls}`}
                   >
@@ -1706,6 +1723,39 @@ export function WaiterDashboard({
           onConfirm={handlePaymentConfirmed}
           onCancel={() => setPaymentCaptureOrder(null)}
         />
+      )}
+
+      {/* Occupied-table pre-check — shown before order entry (mirrors supervisor flow) */}
+      {confirmOccupied !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="w-full max-w-sm rounded-2xl border border-slate-700 bg-slate-900 shadow-2xl p-6">
+            <h3 className="text-base font-bold text-white mb-2">
+              Table {confirmOccupied} has active orders
+            </h3>
+            <p className="text-sm text-slate-400 mb-6">
+              You can add new items — you'll be asked whether to merge into the existing tab
+              or start a separate order when you check out.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirmOccupied(null)}
+                className="flex-1 py-2.5 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm font-semibold transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  setSelectedTableNumber(confirmOccupied);
+                  setShowOrderEntry(true);
+                  setConfirmOccupied(null);
+                }}
+                className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-sm font-semibold transition-colors"
+              >
+                Add Items
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {mergeCandidate && (

@@ -142,14 +142,19 @@ export function PaymentApprovalPanel({ restaurantId, staffId, staffName }: Payme
 
   useEffect(() => {
     loadPendingOrders();
-    if (!restaurantId) return;
+    // Poll every 10 seconds as a reliable fallback when Realtime is unavailable
+    const poll = setInterval(loadPendingOrders, 10_000);
+    if (!restaurantId) return () => clearInterval(poll);
     const channel = supabase
       .channel(`payment-approval-${restaurantId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `restaurant_id=eq.${restaurantId}` }, () => {
         loadPendingOrders();
       })
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      clearInterval(poll);
+      supabase.removeChannel(channel);
+    };
   }, [restaurantId, loadPendingOrders]);
 
   // ── Cancel ─────────────────────────────────────────────────────────────────
