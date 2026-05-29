@@ -330,6 +330,9 @@ export function useOrders(): UseOrdersReturn {
 
       let savedOrder: Order = localOrder;
       try {
+        // Explicitly pass the creator's staffId so createOrder always assigns them,
+        // regardless of whether staffRole in localStorage is stale.
+        const hookStaffId = localStorage.getItem('staffId');
         const createdOrder = await apiCreateOrder({
           tableNumber,
           customerName: (customer as any)?.customerName || customer?.name || 'Walk-in',
@@ -343,6 +346,7 @@ export function useOrders(): UseOrdersReturn {
           requiresKitchen,
           deliveryProvider: delivery?.provider,
           deliveryAddress: delivery?.address,
+          assignedWaiterId: hookStaffId || undefined, // belt-and-suspenders assignment
           loyaltyRewardId,
           promotionCode,
           idempotencyKey,

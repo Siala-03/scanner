@@ -281,14 +281,20 @@ export async function createOrder(order: CreateOrderInput): Promise<Order> {
 
   // Resolve which waiter should be assigned to this order:
   // 1. If explicitly provided in input, use that.
-  // 2. If the person creating the order is a waiter, assign to them.
+  // 2. If the creator is a waiter, assign to them.
   // 3. Otherwise, look up the waiter assigned to the table.
+  // 4. Fallback: always record the staffId as responsible so the order stays visible.
   let assignedWaiterId: string | null = (order as any).assignedWaiterId ?? null;
   if (!assignedWaiterId) {
     if (staffId && staffRole === 'waiter') {
       assignedWaiterId = staffId;
     } else if (order.tableNumber != null) {
       assignedWaiterId = await lookupAssignedWaiter(restaurantId, order.tableNumber);
+    }
+    // Final fallback: record the creator so the order is never orphaned.
+    // Waiter portals use created_by as a secondary ownership check.
+    if (!assignedWaiterId && staffId && staffRole === 'waiter') {
+      assignedWaiterId = staffId;
     }
   }
 

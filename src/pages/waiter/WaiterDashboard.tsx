@@ -719,10 +719,14 @@ export function WaiterDashboard({
 
   const isAssignedToCurrentWaiter = useCallback((order: Order) => {
     const waiterIdStr = String(waiter.id).trim();
+    if (!waiterIdStr) return false;
     return (
       String(order.assignedWaiterId ?? '').trim() === waiterIdStr ||
       String((order as any).assigned_waiter_id ?? '').trim() === waiterIdStr ||
-      String((order as any).assigned_to ?? '').trim() === waiterIdStr
+      String((order as any).assigned_to ?? '').trim() === waiterIdStr ||
+      // Ownership by creation — catches orders where assignment was never saved
+      String((order as any).createdBy ?? '').trim() === waiterIdStr ||
+      String((order as any).created_by ?? '').trim() === waiterIdStr
     );
   }, [waiter.id]);
 
