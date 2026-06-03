@@ -106,6 +106,71 @@ Deno.serve(async (req) => {
     });
   }
 
+  // ── Update staff credentials ─────────────────────────────────────────────
+  if (req.method === 'PATCH') {
+    let body: any;
+    try { body = await req.json(); } catch {
+      return new Response(JSON.stringify({ error: 'Invalid JSON' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const { staffId: targetStaffId, username, password } = body;
+
+    if (!targetStaffId) {
+      return new Response(JSON.stringify({ error: 'staffId is required' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Non-superadmin may only update staff in their own restaurant
+    if (caller.role !== 'superadmin') {
+      const { data: target } = await db
+        .from('staff')
+        .select('restaurant_id')
+        .eq('id', targetStaffId)
+        .single();
+
+      if (!target || target.restaurant_id !== caller.restaurant_id) {
+        return new Response(JSON.stringify({ error: 'Forbidden' }), {
+          status: 403,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
+    const updates: Record<string, string> = {};
+    if (username) updates.username = username;
+    if (password) updates.password_hash = password;
+
+    if (Object.keys(updates).length === 0) {
+      return new Response(JSON.stringify({ error: 'Nothing to update' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const { error: updateError } = await db
+      .from('staff_credentials')
+      .update(updates)
+      .eq('staff_id', targetStaffId);
+
+    if (updateError) {
+      return new Response(JSON.stringify({
+        error: updateError.message.includes('duplicate') ? 'Username already taken' : updateError.message,
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    return new Response(JSON.stringify({ success: true }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
   // ── Delete staff ─────────────────────────────────────────────────────────
   if (req.method === 'DELETE') {
     const url = new URL(req.url);

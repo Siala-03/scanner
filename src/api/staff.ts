@@ -156,6 +156,13 @@ export async function deleteStaff(id: string): Promise<{ success: boolean }> {
   return { success: true };
 }
 
+export async function updateStaffCredentials(staffId: string, username: string, password: string): Promise<void> {
+  await callEdgeFn('admin-staff', {
+    method: 'PATCH',
+    body: { staffId, username, password },
+  });
+}
+
 export async function createStaff(input: {
   name: string;
   email: string;

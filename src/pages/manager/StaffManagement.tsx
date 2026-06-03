@@ -12,7 +12,7 @@ import { addStaffCredential, staffCredentials } from '../../data/staffData';
 import { useStaff } from '../../hooks/useStaff';
 import { useTables } from '../../hooks/useTables';
 import { signUpStaff } from '../../api/auth';
-import { updateStaffAssignments, updateStaffStatus, updateStaffRole, deleteStaff } from '../../api/staff';
+import { updateStaffAssignments, updateStaffStatus, updateStaffRole, deleteStaff, updateStaffCredentials } from '../../api/staff';
 import { useKPIs } from '../../hooks/useKPIs';
 import { createKPI, updateKPI, deleteKPI, assignKPI, unassignKPI } from '../../api/kpis';
 import { fetchOrdersByDateRange } from '../../api/orders';
@@ -188,28 +188,20 @@ export function StaffManagement({ onShowPerformance }: StaffManagementProps) {
     }
     setIsCredentialModalOpen(true);
   };
-  const handleSaveCredentials = () => {
-    if (
-    selectedStaffForCreds &&
-    newUsername &&
-    newPassword)
-    {
-      const newCred: StaffCredentials = {
-        staffId: selectedStaffForCreds.id,
-        username: newUsername,
-        password: newPassword
-      };
-      // In a real app, this would be an API call
-      // For demo, we just update the local array
-      const existingIndex = staffCredentials.findIndex(
-        (c) => c.staffId === selectedStaffForCreds.id
-      );
-      if (existingIndex >= 0) {
-        staffCredentials[existingIndex] = newCred;
-      } else {
-        addStaffCredential(newCred);
-      }
+  const [isSavingCreds, setIsSavingCreds] = useState(false);
+  const [credSaveError, setCredSaveError] = useState<string | null>(null);
+
+  const handleSaveCredentials = async () => {
+    if (!selectedStaffForCreds || !newUsername || !newPassword) return;
+    setIsSavingCreds(true);
+    setCredSaveError(null);
+    try {
+      await updateStaffCredentials(selectedStaffForCreds.id, newUsername, newPassword);
       setIsCredentialModalOpen(false);
+    } catch (err: any) {
+      setCredSaveError(err?.message || 'Failed to update credentials. Please try again.');
+    } finally {
+      setIsSavingCreds(false);
     }
   };
 
@@ -742,11 +734,17 @@ export function StaffManagement({ onShowPerformance }: StaffManagementProps) {
               placeholder="Enter new password" />
 
 
+            {credSaveError && (
+              <div className="rounded-md bg-red-500/15 border border-red-500 text-red-600 px-3 py-2 text-sm">
+                {credSaveError}
+              </div>
+            )}
+
             <div className="flex gap-3 pt-4">
               <Button
                 variant="secondary"
                 fullWidth
-                onClick={() => setIsCredentialModalOpen(false)}>
+                onClick={() => { setIsCredentialModalOpen(false); setCredSaveError(null); }}>
 
                 Cancel
               </Button>
@@ -754,9 +752,9 @@ export function StaffManagement({ onShowPerformance }: StaffManagementProps) {
                 variant="primary"
                 fullWidth
                 onClick={handleSaveCredentials}
-                disabled={!newUsername || !newPassword}>
+                disabled={!newUsername || !newPassword || isSavingCreds}>
 
-                Save Credentials
+                {isSavingCreds ? 'Saving…' : 'Save Credentials'}
               </Button>
             </div>
           </div>
