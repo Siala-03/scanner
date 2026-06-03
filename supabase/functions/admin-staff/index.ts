@@ -106,6 +106,51 @@ Deno.serve(async (req) => {
     });
   }
 
+  // ── Fetch staff credentials (username only) ──────────────────────────────
+  if (req.method === 'GET') {
+    const url = new URL(req.url);
+    const targetStaffId = url.searchParams.get('staff_id');
+
+    if (!targetStaffId) {
+      return new Response(JSON.stringify({ error: 'staff_id query param is required' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (caller.role !== 'superadmin') {
+      const { data: target } = await db
+        .from('staff')
+        .select('restaurant_id')
+        .eq('id', targetStaffId)
+        .single();
+
+      if (!target || target.restaurant_id !== caller.restaurant_id) {
+        return new Response(JSON.stringify({ error: 'Forbidden' }), {
+          status: 403,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
+    const { data: creds, error: fetchErr } = await db
+      .from('staff_credentials')
+      .select('username')
+      .eq('staff_id', targetStaffId)
+      .single();
+
+    if (fetchErr || !creds) {
+      return new Response(JSON.stringify({ error: 'Credentials not found' }), {
+        status: 404,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    return new Response(JSON.stringify({ username: creds.username }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
   // ── Update staff credentials ─────────────────────────────────────────────
   if (req.method === 'PATCH') {
     let body: any;

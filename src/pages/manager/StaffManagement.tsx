@@ -12,7 +12,7 @@ import { addStaffCredential, staffCredentials } from '../../data/staffData';
 import { useStaff } from '../../hooks/useStaff';
 import { useTables } from '../../hooks/useTables';
 import { signUpStaff } from '../../api/auth';
-import { updateStaffAssignments, updateStaffStatus, updateStaffRole, deleteStaff, updateStaffCredentials } from '../../api/staff';
+import { updateStaffAssignments, updateStaffStatus, updateStaffRole, deleteStaff, updateStaffCredentials, fetchStaffCredentialsUsername } from '../../api/staff';
 import { useKPIs } from '../../hooks/useKPIs';
 import { createKPI, updateKPI, deleteKPI, assignKPI, unassignKPI } from '../../api/kpis';
 import { fetchOrdersByDateRange } from '../../api/orders';
@@ -174,19 +174,18 @@ export function StaffManagement({ onShowPerformance }: StaffManagementProps) {
     const matchesRole = selectedRole === 'all' || s.role === selectedRole;
     return matchesSearch && matchesRole;
   });
-  const handleManageCredentials = (staffMember: Staff) => {
+  const handleManageCredentials = async (staffMember: Staff) => {
     setSelectedStaffForCreds(staffMember);
-    const existingCreds = staffCredentials.find(
-      (c) => c.staffId === staffMember.id
-    );
-    if (existingCreds) {
-      setNewUsername(existingCreds.username);
-      setNewPassword(existingCreds.password);
-    } else {
-      setNewUsername(staffMember.phone.replace(/\s+/g, ''));
-      setNewPassword('');
-    }
+    setNewUsername('');
+    setNewPassword('');
+    setCredSaveError(null);
     setIsCredentialModalOpen(true);
+    try {
+      const username = await fetchStaffCredentialsUsername(staffMember.id);
+      setNewUsername(username);
+    } catch {
+      // leave blank if not found
+    }
   };
   const [isSavingCreds, setIsSavingCreds] = useState(false);
   const [credSaveError, setCredSaveError] = useState<string | null>(null);

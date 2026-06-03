@@ -156,6 +156,14 @@ export async function deleteStaff(id: string): Promise<{ success: boolean }> {
   return { success: true };
 }
 
+export async function fetchStaffCredentialsUsername(staffId: string): Promise<string> {
+  const data = await callEdgeFn('admin-staff', {
+    method: 'GET',
+    params: { staff_id: staffId },
+  });
+  return data.username as string;
+}
+
 export async function updateStaffCredentials(staffId: string, username: string, password: string): Promise<void> {
   await callEdgeFn('admin-staff', {
     method: 'PATCH',
