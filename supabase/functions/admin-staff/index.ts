@@ -163,48 +163,76 @@ Deno.serve(async (req) => {
 
     const { staffId: targetStaffId, username, password } = body;
 
-    if (!targetStaffId) {
-      return new Response(JSON.stringify({ error: 'staffId is required' }), {
+    if (!targetStaffId || (!username && !password)) {
+      return new Response(JSON.stringify({ error: 'staffId and at least one of username/password are required' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // Non-superadmin may only update staff in their own restaurant
-    if (caller.role !== 'superadmin') {
-      const { data: target } = await db
-        .from('staff')
-        .select('restaurant_id')
-        .eq('id', targetStaffId)
-        .single();
+    // Always fetch target staff to get restaurant_id (needed for auth check and upsert)
+    const { data: targetStaff } = await db
+      .from('staff')
+      .select('restaurant_id')
+      .eq('id', targetStaffId)
+      .single();
 
-      if (!target || target.restaurant_id !== caller.restaurant_id) {
-        return new Response(JSON.stringify({ error: 'Forbidden' }), {
-          status: 403,
+    if (!targetStaff) {
+      return new Response(JSON.stringify({ error: 'Staff not found' }), {
+        status: 404,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (caller.role !== 'superadmin' && targetStaff.restaurant_id !== caller.restaurant_id) {
+      return new Response(JSON.stringify({ error: 'Forbidden' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Check if a credentials row already exists
+    const { data: existingCreds } = await db
+      .from('staff_credentials')
+      .select('staff_id')
+      .eq('staff_id', targetStaffId)
+      .maybeSingle();
+
+    let upsertError: any;
+
+    if (existingCreds) {
+      // Row exists — update only the fields that were provided
+      const updates: Record<string, string> = {};
+      if (username) updates.username = username.trim();
+      if (password) updates.password_hash = password;
+
+      const { error } = await db
+        .from('staff_credentials')
+        .update(updates)
+        .eq('staff_id', targetStaffId);
+      upsertError = error;
+    } else {
+      // No credentials row — insert one (requires both username and password)
+      if (!username || !password) {
+        return new Response(JSON.stringify({ error: 'Username and password are required when setting credentials for the first time' }), {
+          status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
+      const { error } = await db
+        .from('staff_credentials')
+        .insert({
+          staff_id: targetStaffId,
+          username: username.trim(),
+          password_hash: password,
+          restaurant_id: targetStaff.restaurant_id,
+        });
+      upsertError = error;
     }
 
-    const updates: Record<string, string> = {};
-    if (username) updates.username = username;
-    if (password) updates.password_hash = password;
-
-    if (Object.keys(updates).length === 0) {
-      return new Response(JSON.stringify({ error: 'Nothing to update' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    const { error: updateError } = await db
-      .from('staff_credentials')
-      .update(updates)
-      .eq('staff_id', targetStaffId);
-
-    if (updateError) {
+    if (upsertError) {
       return new Response(JSON.stringify({
-        error: updateError.message.includes('duplicate') ? 'Username already taken' : updateError.message,
+        error: upsertError.message.includes('duplicate') ? 'Username already taken by another staff member' : upsertError.message,
       }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

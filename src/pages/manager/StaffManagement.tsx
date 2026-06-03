@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   PlusIcon,
@@ -7,14 +7,14 @@ import {
   KeyIcon,
   ChevronDownIcon } from
 'lucide-react';
-import { Staff, StaffRole, StaffCredentials } from '../../types';
-import { addStaffCredential, staffCredentials } from '../../data/staffData';
+import { Staff, StaffRole } from '../../types';
+import { addStaffCredential } from '../../data/staffData';
 import { useStaff } from '../../hooks/useStaff';
 import { useTables } from '../../hooks/useTables';
 import { signUpStaff } from '../../api/auth';
 import { updateStaffAssignments, updateStaffStatus, updateStaffRole, deleteStaff, updateStaffCredentials, fetchStaffCredentialsUsername } from '../../api/staff';
 import { useKPIs } from '../../hooks/useKPIs';
-import { createKPI, updateKPI, deleteKPI, assignKPI, unassignKPI } from '../../api/kpis';
+import { createKPI, updateKPI, deleteKPI } from '../../api/kpis';
 import { fetchOrdersByDateRange } from '../../api/orders';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -191,11 +191,13 @@ export function StaffManagement({ onShowPerformance }: StaffManagementProps) {
   const [credSaveError, setCredSaveError] = useState<string | null>(null);
 
   const handleSaveCredentials = async () => {
-    if (!selectedStaffForCreds || !newUsername || !newPassword) return;
+    const trimmedUsername = newUsername.trim();
+    const trimmedPassword = newPassword.trim();
+    if (!selectedStaffForCreds || !trimmedUsername || !trimmedPassword) return;
     setIsSavingCreds(true);
     setCredSaveError(null);
     try {
-      await updateStaffCredentials(selectedStaffForCreds.id, newUsername, newPassword);
+      await updateStaffCredentials(selectedStaffForCreds.id, trimmedUsername, trimmedPassword);
       setIsCredentialModalOpen(false);
     } catch (err: any) {
       setCredSaveError(err?.message || 'Failed to update credentials. Please try again.');
