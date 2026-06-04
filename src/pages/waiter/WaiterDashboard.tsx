@@ -676,19 +676,38 @@ export function WaiterDashboard({
   // Track order IDs we've already seen so we can detect truly new ones
   const knownOrderIdsRef = useRef<Set<string>>(new Set());
 
-  // Occupied-table pre-check (mirrors StaffOrderPage behaviour)
-  const [confirmOccupied, setConfirmOccupied] = useState<number | null>(null);
+  // Occupied-table pre-check: stores the active order so the dialog can show its items
+  const [confirmOccupied, setConfirmOccupied] = useState<{ tableNumber: number; activeOrder: Order } | null>(null);
+  // Context passed into WaiterOrderEntry when adding to an existing order
+  const [existingOrderForEntry, setExistingOrderForEntry] = useState<{ id: string; items: OrderItem[] } | null>(null);
+  // null = ask user, true = auto-merge, false = auto-no-merge (set before opening order entry)
+  const autoMergeRef = useRef<boolean | null>(null);
 
-  // Open-tab merge modal state
+  // Open-tab merge modal state (fallback for unexpected merges)
   const [mergeCandidate, setMergeCandidate] = useState<Order | null>(null);
   const mergeResolveRef = useRef<((result: boolean) => void) | null>(null);
 
   const confirmMerge: ConfirmMergeFn = useCallback((candidate: Order) => {
+    if (autoMergeRef.current !== null) {
+      const decision = autoMergeRef.current;
+      autoMergeRef.current = null;
+      return Promise.resolve(decision);
+    }
     return new Promise<boolean>((resolve) => {
       setMergeCandidate(candidate);
       mergeResolveRef.current = resolve;
     });
   }, []);
+
+  const findActiveOrderForTable = useCallback((tNum: number): Order | null => {
+    return orders.find((o) => {
+      const ps = o.paymentStatus ?? (o as any).payment_status;
+      const tN = o.tableNumber ?? (o as any).table_number;
+      return tN === tNum &&
+        ['pending', 'verified', 'preparing', 'ready'].includes(o.status) &&
+        ps !== 'confirmed';
+    }) ?? null;
+  }, [orders]);
 
   const { kpis } = useStaffKPIs();
   const { tables: allTables } = useTables();
@@ -1624,9 +1643,17 @@ export function WaiterDashboard({
                     key={tNum}
                     onClick={() => {
                       if (status === 'occupied' || status === 'urgent') {
+                        const activeOrder = findActiveOrderForTable(tNum);
                         setShowTablePicker(false);
-                        setConfirmOccupied(tNum);
+                        if (activeOrder) {
+                          setConfirmOccupied({ tableNumber: tNum, activeOrder });
+                        } else {
+                          setSelectedTableNumber(tNum);
+                          setShowOrderEntry(true);
+                        }
                       } else {
+                        setExistingOrderForEntry(null);
+                        autoMergeRef.current = null;
                         setSelectedTableNumber(tNum);
                         setShowTablePicker(false);
                         setShowOrderEntry(true);
@@ -1651,9 +1678,17 @@ export function WaiterDashboard({
       {showQRScanner && (
         <QRScanner
           onScan={(tableNumber) => {
-            setShowQRScanner(false);
-            setSelectedTableNumber(tableNumber);
-            setShowOrderEntry(true);
+            const activeOrder = findActiveOrderForTable(tableNumber);
+            if (activeOrder) {
+              setShowQRScanner(false);
+              setConfirmOccupied({ tableNumber, activeOrder });
+            } else {
+              setExistingOrderForEntry(null);
+              autoMergeRef.current = null;
+              setShowQRScanner(false);
+              setSelectedTableNumber(tableNumber);
+              setShowOrderEntry(true);
+            }
           }}
           onClose={() => setShowQRScanner(false)}
           onError={(err) => { console.error('QR Scanner Error:', err); alert(err); }}
@@ -1664,7 +1699,8 @@ export function WaiterDashboard({
         <WaiterOrderEntry
           tableNumber={selectedTableNumber}
           isOpen={showOrderEntry}
-          onClose={() => { setShowOrderEntry(false); setSelectedTableNumber(null); }}
+          existingOrder={existingOrderForEntry}
+          onClose={() => { setShowOrderEntry(false); setSelectedTableNumber(null); setExistingOrderForEntry(null); autoMergeRef.current = null; }}
           onSubmitOrder={async (items, notes) => {
             if (!onCreateOrder) { alert('Order creation not available.'); return; }
             // 0 = Bar/Walk-up (no table number) — pass as undefined via a special value
@@ -1729,33 +1765,71 @@ export function WaiterDashboard({
         />
       )}
 
-      {/* Occupied-table pre-check — shown before order entry (mirrors supervisor flow) */}
+      {/* Occupied-table dialog — shows existing order and asks how to proceed */}
       {confirmOccupied !== null && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="w-full max-w-sm rounded-2xl border border-slate-700 bg-slate-900 shadow-2xl p-6">
-            <h3 className="text-base font-bold text-white mb-2">
-              Table {confirmOccupied} has active orders
-            </h3>
-            <p className="text-sm text-slate-400 mb-6">
-              You can add new items — you'll be asked whether to merge into the existing tab
-              or start a separate order when you check out.
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setConfirmOccupied(null)}
-                className="flex-1 py-2.5 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm font-semibold transition-colors"
-              >
-                Cancel
-              </button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="w-full max-w-sm rounded-2xl border border-slate-600 bg-slate-900 shadow-2xl overflow-hidden">
+            {/* Header */}
+            <div className="px-5 pt-5 pb-4 border-b border-slate-700">
+              <div className="flex items-center gap-2 mb-0.5">
+                <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                <p className="text-xs font-semibold text-amber-400 uppercase tracking-wide">Active Order</p>
+              </div>
+              <h3 className="text-lg font-bold text-white">Table {confirmOccupied.tableNumber}</h3>
+            </div>
+
+            {/* Existing items */}
+            <div className="px-5 py-3 max-h-52 overflow-y-auto">
+              <p className="text-xs font-medium text-slate-500 mb-2">Items currently on this table:</p>
+              <div className="space-y-1.5">
+                {confirmOccupied.activeOrder.items.map((item, i) => (
+                  <div key={i} className="flex items-center justify-between gap-3 text-sm">
+                    <span className="text-slate-200 flex-1 truncate">{item.menuItemName || 'Item'}</span>
+                    <span className="text-slate-500 shrink-0">×{item.quantity}</span>
+                    <span className="text-slate-400 shrink-0 font-medium">{formatPrice((item.unitPrice || 0) * item.quantity)}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-3 pt-2 border-t border-slate-700/60 flex justify-between text-sm font-semibold">
+                <span className="text-slate-400">Order total</span>
+                <span className="text-white">{formatPrice(confirmOccupied.activeOrder.total)}</span>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="px-5 pb-5 pt-3 space-y-2">
               <button
                 onClick={() => {
-                  setSelectedTableNumber(confirmOccupied);
+                  autoMergeRef.current = true;
+                  setExistingOrderForEntry({
+                    id: confirmOccupied.activeOrder.id,
+                    items: confirmOccupied.activeOrder.items,
+                  });
+                  setSelectedTableNumber(confirmOccupied.tableNumber);
                   setShowOrderEntry(true);
                   setConfirmOccupied(null);
                 }}
-                className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-sm font-semibold transition-colors"
+                className="w-full py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-sm font-bold transition-colors"
               >
-                Add Items
+                Add to this order
+              </button>
+              <button
+                onClick={() => {
+                  autoMergeRef.current = false;
+                  setExistingOrderForEntry(null);
+                  setSelectedTableNumber(confirmOccupied.tableNumber);
+                  setShowOrderEntry(true);
+                  setConfirmOccupied(null);
+                }}
+                className="w-full py-2.5 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm font-semibold transition-colors"
+              >
+                Start a separate order
+              </button>
+              <button
+                onClick={() => setConfirmOccupied(null)}
+                className="w-full py-2 text-slate-500 hover:text-slate-300 text-sm transition-colors"
+              >
+                Cancel
               </button>
             </div>
           </div>

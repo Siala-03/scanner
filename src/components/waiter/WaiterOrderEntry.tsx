@@ -48,21 +48,14 @@ export function WaiterOrderEntry({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showCart, setShowCart] = useState(false);
 
-  // Load existing order items into cart if editing
+  // Reset state when order entry opens fresh
   useEffect(() => {
-    if (existingOrder && isOpen && cart.length === 0) {
-      const existingCart = existingOrder.items.map((item, index) => ({
-        ...item,
-        tempId: `existing-${index}`,
-        notes: item.specialInstructions || '',
-        modifiers: []
-      })) as LocalCartItem[];
-      setCart(existingCart);
+    if (isOpen) {
+      setCart([]);
+      setOrderNotes('');
+      setShowCart(false);
+      setActiveCategory('all');
     }
-  }, [existingOrder, isOpen, cart.length]);
-
-  useEffect(() => {
-    if (isOpen) setShowCart(false);
   }, [isOpen]);
 
   // Get unique categories from menu
@@ -309,10 +302,12 @@ export function WaiterOrderEntry({
               </button>
               <div>
                 <h2 className="text-lg font-bold text-slate-100 sm:text-xl">
-                  Take Order - Table {tableNumber}
+                  {existingOrder ? `Add to Table ${tableNumber}` : `Take Order - Table ${tableNumber}`}
                 </h2>
                 <p className="text-xs sm:text-sm text-slate-400">
-                  {cartItemCount} item{cartItemCount !== 1 ? 's' : ''} • {formatPrice(cartTotal)}
+                  {existingOrder
+                    ? `${existingOrder.items.length} already on table · ${cartItemCount} new`
+                    : `${cartItemCount} item${cartItemCount !== 1 ? 's' : ''} • ${formatPrice(cartTotal)}`}
                 </p>
               </div>
             </div>
@@ -324,7 +319,7 @@ export function WaiterOrderEntry({
                 className="items-center gap-2 bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700"
               >
                 <ShoppingCartIcon className="w-4 h-4" />
-                Cart ({cartItemCount})
+                {existingOrder ? `New (${cartItemCount})` : `Cart (${cartItemCount})`}
               </Button>
             </div>
           </div>
@@ -438,7 +433,9 @@ export function WaiterOrderEntry({
             <div className="border-b border-slate-800 p-2.5 flex items-center justify-between gap-3">
               <h3 className="font-semibold text-slate-100 flex items-center gap-2">
                 <ShoppingCartIcon className="w-5 h-5" />
-                <Badge variant="count" size="sm">{cartItemCount}</Badge>
+                {existingOrder
+                  ? <span className="text-sm text-amber-300 font-medium">Adding to order</span>
+                  : <Badge variant="count" size="sm">{cartItemCount}</Badge>}
               </h3>
               <button
                 onClick={() => setShowCart(false)}
@@ -447,15 +444,45 @@ export function WaiterOrderEntry({
                 <XIcon className="w-4 h-4" />
               </button>
             </div>
+
+            {/* Read-only existing order context */}
+            {existingOrder && existingOrder.items.length > 0 && (
+              <div className="border-b border-slate-700 bg-slate-950/60 p-2.5 shrink-0">
+                <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Already on table</p>
+                <div className="space-y-1">
+                  {existingOrder.items.map((item, i) => (
+                    <div key={i} className="flex items-center justify-between gap-2 text-xs">
+                      <span className="text-slate-400 flex-1 truncate">
+                        {item.menuItemName || 'Item'} <span className="text-slate-600">×{item.quantity}</span>
+                      </span>
+                      <span className="text-slate-500 shrink-0">{formatPrice((item.unitPrice || 0) * item.quantity)}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-2 pt-1.5 border-t border-slate-700/50 flex justify-between text-xs">
+                  <span className="text-slate-600">Existing total</span>
+                  <span className="text-slate-400 font-medium">
+                    {formatPrice(existingOrder.items.reduce((s, i) => s + (i.unitPrice || 0) * i.quantity, 0))}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* New items */}
             {cart.length === 0 ? (
               <div className="flex-1 flex flex-col items-center justify-center text-slate-500 gap-2 p-4">
                 <ShoppingCartIcon className="w-10 h-10 text-slate-700" />
-                <p className="text-sm">Your cart is empty</p>
+                <p className="text-sm text-center">
+                  {existingOrder ? 'Select items to add to this order' : 'Your cart is empty'}
+                </p>
               </div>
             ) : (
               <>
+                {existingOrder && (
+                  <p className="px-2.5 pt-2.5 pb-0 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">New items</p>
+                )}
                 {renderCartItems()}
-                {renderCartFooter('Submit Order')}
+                {renderCartFooter(existingOrder ? 'Add Items to Order' : 'Submit Order')}
               </>
             )}
           </div>
