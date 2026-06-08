@@ -36,7 +36,10 @@ export function LoginPage({ onLogin, onBack, embedded = false }: LoginPageProps)
       try {
         const supabaseUrl = (import.meta as any).env?.VITE_SUPABASE_URL ?? '';
         const supabaseKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY ?? '';
-        await fetch(`${supabaseUrl}/rest/v1/`, {
+        // Append a timestamp so the service worker's NetworkFirst cache can
+        // never match this URL — we always need a real network round-trip for
+        // the probe, not a cached response that would falsely report "online".
+        await fetch(`${supabaseUrl}/rest/v1/?_probe=${Date.now()}`, {
           headers: { apikey: supabaseKey },
           cache: 'no-store',
           signal: AbortSignal.timeout(5000),

@@ -6,8 +6,9 @@ import { ExpirationPlugin } from 'workbox-expiration';
 
 declare const self: ServiceWorkerGlobalScope;
 
-// Injected by VitePWA at build time
-precacheAndRoute(self.__WB_MANIFEST);
+// Injected by VitePWA at build time — captured once so injectManifest sees exactly one reference.
+const WB_MANIFEST = self.__WB_MANIFEST;
+precacheAndRoute(WB_MANIFEST);
 
 self.skipWaiting();
 
@@ -23,7 +24,7 @@ self.addEventListener('activate', (e) => {
 import { NavigationRoute } from 'workbox-routing';
 import { createHandlerBoundToURL } from 'workbox-precaching';
 
-const hasPrecache = (self.__WB_MANIFEST as unknown[]).length > 0;
+const hasPrecache = (WB_MANIFEST as unknown[]).length > 0;
 const navHandler = hasPrecache
   ? createHandlerBoundToURL('/index.html')
   : new NetworkFirst({ cacheName: 'navigation' });
@@ -37,7 +38,10 @@ registerRoute(
   new NetworkOnly()
 );
 
-// Supabase REST / Edge Functions: NetworkFirst with 24h fallback cache
+// Supabase REST / Edge Functions: NetworkFirst with 24h fallback cache.
+// GET only — POST/PATCH/DELETE bypass the SW so they reach the real network
+// and throw a real TypeError when offline (rather than a WorkboxError that
+// the app's catch blocks can't distinguish from a server error).
 registerRoute(
   ({ url }) =>
     url.hostname.includes('supabase.co') &&
@@ -47,7 +51,8 @@ registerRoute(
     plugins: [
       new ExpirationPlugin({ maxEntries: 100, maxAgeSeconds: 24 * 60 * 60 }),
     ],
-  })
+  }),
+  'GET'
 );
 
 // Static assets: CacheFirst (7 days)
