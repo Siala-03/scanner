@@ -87,9 +87,13 @@ export function saveOfflineProfile(staff: Staff, restaurantName: string): void {
  * Re-hashing on each login means password changes are picked up immediately.
  */
 export async function savePasswordHash(staffId: string, password: string): Promise<void> {
+  if (!loadProfiles()[staffId]) return;
+  // Hash first (async), then reload profiles so we merge into the current state.
+  // If we captured the snapshot before awaiting, saveUsername's synchronous write
+  // (which runs between the snapshot and this resume) would be silently overwritten.
+  const passwordHash = await sha256(password + ':' + staffId);
   const profiles = loadProfiles();
   if (!profiles[staffId]) return;
-  const passwordHash = await sha256(password + ':' + staffId);
   profiles[staffId] = { ...profiles[staffId], passwordHash, failedAttempts: 0, lockedUntil: null };
   saveProfiles(profiles);
 }
