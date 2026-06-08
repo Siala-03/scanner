@@ -3,11 +3,31 @@ import { supabase } from '../lib/supabase';
 import { Order, OrderStatus, CartItem, Customer } from '../types';
 import { getEffectivePrice } from '../utils/pricing';
 import {
-  createOrder as apiCreateOrder,
   fetchOrders as apiFetchOrders,
   findMergeableOpenOrder,
 } from '../api/orders';
 import { recordTableSessionActivity } from '../utils/tableSessions';
+import * as queue from '../lib/orderQueue';
+
+// ─── Auth token helpers ───────────────────────────────────────────────────────
+
+async function getAuthToken(): Promise<string | null> {
+  try {
+    const { data } = await supabase.auth.getSession();
+    return data.session?.access_token ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function getRefreshToken(): Promise<string | null> {
+  try {
+    const { data } = await supabase.auth.getSession();
+    return data.session?.refresh_token ?? null;
+  } catch {
+    return null;
+  }
+}
 
 const normalizeOrderPayload = (rawOrder: any): Order | undefined => {
   if (!rawOrder) return undefined;
@@ -144,7 +164,7 @@ export function useOrders(): UseOrdersReturn {
   const [orders, setOrders] = useState<Order[]>([]);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
-  const [restaurantId, setRestaurantId] = useState<string | undefined>(
+  const [restaurantId] = useState<string | undefined>(
     () => localStorage.getItem('restaurantId') || undefined
   );
 
@@ -163,9 +183,12 @@ export function useOrders(): UseOrdersReturn {
       const normalized = (fetched ?? []).map((o: any) => normalizeOrderPayload(o)).filter(Boolean) as Order[];
       // Merge: keep in-flight temp orders (id starts with "temp-") that aren't in the DB yet
       setOrders((prev) => {
-        const tempOrders = prev.filter((o) => o.id.startsWith('temp-'));
+        // Preserve local-only orders (temp- = in-flight, offline- = queued) not yet in the DB
+        const localOrders = prev.filter(
+          (o) => o.id.startsWith('temp-') || o.id.startsWith('offline-')
+        );
         const fetchedIds = new Set(normalized.map((o) => o.id));
-        const stillPending = tempOrders.filter((t) => !fetchedIds.has(t.id));
+        const stillPending = localOrders.filter((t) => !fetchedIds.has(t.id));
         return [...stillPending, ...normalized];
       });
     } catch (e: any) {
@@ -263,6 +286,126 @@ export function useOrders(): UseOrdersReturn {
     };
   };
 
+  // ─── Queue callbacks (stable refs so event listeners don't stale-close) ────
+
+  const replaceLocalOrder = useCallback((localOrderId: string, confirmed: Order) => {
+    setOrders((prev) => {
+      const without = prev.filter((o) => o.id !== localOrderId);
+      const alreadyReal = without.some((o) => o.id === confirmed.id);
+      if (alreadyReal) return without.map((o) => (o.id === confirmed.id ? confirmed : o));
+      return [confirmed, ...without];
+    });
+    window.dispatchEvent(new Event('ordersUpdated'));
+  }, []);
+
+  const onQueueConfirmed = useCallback(
+    (localOrderId: string, confirmed: Order) => replaceLocalOrder(localOrderId, confirmed),
+    [replaceLocalOrder]
+  );
+
+  const onQueueFailed = useCallback((_localOrderId: string, reason: string) => {
+    console.warn('[Queue] Order hit max retries:', reason);
+    // Keep the offline order visible — it will show a "failed" badge via useOfflineStatus
+    window.dispatchEvent(new CustomEvent('orderSyncFailed', { detail: { reason } }));
+  }, []);
+
+  // ─── Flush helper (lazily imports offlineSync to avoid circular deps) ────────
+
+  const flushQueue = useCallback(async () => {
+    const { flushPendingOrders, flushPendingStatusUpdates } = await import('../utils/offlineSync');
+    await Promise.all([
+      flushPendingOrders(onQueueConfirmed, onQueueFailed),
+      flushPendingStatusUpdates(),
+    ]);
+  }, [onQueueConfirmed, onQueueFailed]);
+
+  // ─── Restore queued orders from IndexedDB on mount ───────────────────────────
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const restore = async () => {
+      try {
+        const pending = await queue.getPending();
+        if (cancelled || pending.length === 0) return;
+
+        const now = new Date();
+        const restoredOrders: Order[] = pending.map((entry) => {
+          const p = entry.payload as any;
+          const localItems = (p.items || []).map((item: any, idx: number) => ({
+            id: `local-${idx}`,
+            menuItemId: item.menuItemId,
+            menuItemName: item.menuItemName,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            totalPrice: item.unitPrice * item.quantity,
+            specialInstructions: item.notes,
+            status: 'pending',
+          }));
+          const total = localItems.reduce((s: number, i: any) => s + i.totalPrice, 0);
+          return {
+            id: entry.localOrderId,
+            orderNumber: entry.receiptContext.localOrderNumber,
+            tableNumber: p.tableNumber,
+            customerName: p.customerName,
+            restaurantId: p.restaurantId,
+            // Preserve assignment so the waiter sees the order in their incoming list
+            assignedWaiterId: p.assignedWaiterId ?? undefined,
+            items: localItems,
+            status: 'pending',
+            subtotal: total,
+            tax: 0,
+            total,
+            notes: p.notes,
+            requiresKitchen: p.requiresKitchen,
+            createdAt: now,
+            updatedAt: now,
+          } as Order;
+        });
+
+        setOrders((prev) => {
+          const existingIds = new Set(prev.map((o) => o.id));
+          const newOnes = restoredOrders.filter((o) => !existingIds.has(o.id));
+          return newOnes.length ? [...newOnes, ...prev] : prev;
+        });
+
+        // Attempt to flush immediately (we may have just come online)
+        await flushQueue();
+      } catch (e) {
+        console.warn('[Queue] Restore failed:', e);
+      }
+    };
+
+    restore();
+    return () => { cancelled = true; };
+  }, [flushQueue]);
+
+  // ─── Flush on reconnect + tab focus ──────────────────────────────────────────
+
+  useEffect(() => {
+    const onOnline = () => { void flushQueue(); };
+    const onVisible = () => { if (!document.hidden) void flushQueue(); };
+    window.addEventListener('online', onOnline);
+    document.addEventListener('visibilitychange', onVisible);
+
+    // Service worker notifies us when it synced orders while tab was backgrounded
+    const onSwMessage = (e: MessageEvent) => {
+      if (e.data?.type === 'ORDERS_REFRESHED' || e.data?.type === 'ORDER_SYNCED') {
+        void loadOrders();
+        void flushQueue();
+      }
+    };
+    navigator.serviceWorker?.addEventListener('message', onSwMessage);
+
+    return () => {
+      window.removeEventListener('online', onOnline);
+      document.removeEventListener('visibilitychange', onVisible);
+      navigator.serviceWorker?.removeEventListener('message', onSwMessage);
+    };
+  }, [flushQueue, loadOrders]);
+
+  // ─── addOrder ────────────────────────────────────────────────────────────────
+
   const addOrder = useCallback(
     async (
       tableNumber: number,
@@ -284,29 +427,43 @@ export function useOrders(): UseOrdersReturn {
       let allowMergeToOpenTab = false;
 
       if (Number.isInteger(tableNumber) && tableNumber > 0 && tableNumber !== 999) {
-        const mergeCandidate = await findMergeableOpenOrder(tableNumber, currentRestaurantId);
-        if (mergeCandidate) {
+        try {
+          const mergeCandidate = await findMergeableOpenOrder(tableNumber, currentRestaurantId);
+          if (mergeCandidate) {
+            if (confirmMerge) {
+              allowMergeToOpenTab = await confirmMerge(mergeCandidate);
+            } else {
+              const candidateNumber = String(
+                (mergeCandidate as any).orderNumber || (mergeCandidate as any).order_number || mergeCandidate.id
+              ).trim().slice(0, 7).toUpperCase();
+              allowMergeToOpenTab = window.confirm(
+                `Table ${tableNumber} has an open tab (#${candidateNumber}). Click OK to merge new items into that tab, or Cancel to create a separate order.`
+              );
+            }
+          }
+        } catch {
+          // Offline — network call failed, but the user may have explicitly chosen
+          // "Add to this order" via the confirmOccupied dialog (autoMergeRef = true).
+          // Probe confirmMerge with null so it returns the stored decision without
+          // showing a modal. If no decision was stored it returns false (new order).
           if (confirmMerge) {
-            allowMergeToOpenTab = await confirmMerge(mergeCandidate);
-          } else {
-            const candidateNumber = String(
-              (mergeCandidate as any).orderNumber || (mergeCandidate as any).order_number || mergeCandidate.id
-            ).trim().slice(0, 7).toUpperCase();
-            allowMergeToOpenTab = window.confirm(
-              `Table ${tableNumber} has an open tab (#${candidateNumber}). Click OK to merge new items into that tab, or Cancel to create a separate order.`
-            );
+            allowMergeToOpenTab = await confirmMerge(null as any);
           }
         }
       }
 
       const subtotal = localItems.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
       const total = subtotal;
+      // Key generated once here — never regenerated on retry
       const idempotencyKey = crypto.randomUUID();
-      const localOrderId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+      const localOrderId = `offline-${idempotencyKey}`;
       const now = new Date();
+      // Read staffId now so both localOrder and the queue payload share it
+      const hookStaffId = localStorage.getItem('staffId');
+
       const localOrder: Order = {
         id: localOrderId,
-        orderNumber: `TEMP-${Date.now().toString().slice(-6)}`,
+        orderNumber: 'QUEUED',
         tableNumber,
         customerName: customer?.name,
         customerId: customer?.id,
@@ -321,19 +478,23 @@ export function useOrders(): UseOrdersReturn {
         requiresKitchen,
         deliveryProvider: delivery?.provider,
         deliveryAddress: delivery?.address,
+        // These two fields make isAssignedToCurrentWaiter() return true,
+        // so the order appears in the waiter's incoming list while queued.
+        assignedWaiterId: hookStaffId ?? undefined,
         createdAt: now,
         updatedAt: now,
       } as Order;
 
+      // 1. Show optimistic order immediately
       setOrders((prev) => [localOrder, ...prev]);
       void recordTableSessionActivity(tableNumber);
 
-      let savedOrder: Order = localOrder;
-      try {
-        // Explicitly pass the creator's staffId so createOrder always assigns them,
-        // regardless of whether staffRole in localStorage is stale.
-        const hookStaffId = localStorage.getItem('staffId');
-        const createdOrder = await apiCreateOrder({
+      // 2. Persist to IndexedDB — survives page refresh, network drop, browser close
+      const receiptCtx = queue.buildReceiptContext();
+      await queue.enqueue({
+        idempotencyKey,
+        localOrderId,
+        payload: {
           tableNumber,
           customerName: (customer as any)?.customerName || customer?.name || 'Walk-in',
           customerId: customer?.id,
@@ -346,43 +507,78 @@ export function useOrders(): UseOrdersReturn {
           requiresKitchen,
           deliveryProvider: delivery?.provider,
           deliveryAddress: delivery?.address,
-          assignedWaiterId: hookStaffId || undefined, // belt-and-suspenders assignment
+          assignedWaiterId: hookStaffId || undefined,
           loyaltyRewardId,
           promotionCode,
           idempotencyKey,
           allowMergeToOpenTab,
-        } as any);
+        },
+        receiptContext: receiptCtx,
+        status: 'pending',
+        supabaseUrl: import.meta.env.VITE_SUPABASE_URL as string,
+        supabaseAnonKey: import.meta.env.VITE_SUPABASE_ANON_KEY as string,
+        authToken: await getAuthToken(),
+        refreshToken: await getRefreshToken(),
+      });
 
-        savedOrder = normalizeOrderPayload(createdOrder) ?? localOrder;
-        // Upsert: replace temp order OR merge with real order if poll already added it
-        setOrders((prev) => {
-          const withoutTemp = prev.filter((o) => o.id !== localOrderId);
-          const alreadyHasReal = withoutTemp.some((o) => o.id === savedOrder.id);
-          if (alreadyHasReal) {
-            return withoutTemp.map((o) => (o.id === savedOrder.id ? savedOrder : o));
-          }
-          return [savedOrder, ...withoutTemp];
-        });
-        window.dispatchEvent(new Event('ordersUpdated'));
-      } catch (e: any) {
-        console.error('[Order] Failed to save order to Supabase:', e?.message ?? e);
-        // Remove the optimistic temp order so the customer sees the real failure
-        setOrders((prev) => prev.filter((o) => o.id !== localOrderId));
-        throw e; // rethrow so CartPage can display the error and keep the cart intact
-      }
+      // 3. Attempt immediate send (non-blocking — queue handles failure)
+      void flushQueue();
 
-      return savedOrder;
+      return localOrder;
     },
-    [restaurantId]
+    [restaurantId, flushQueue]
   );
 
   const updateOrderStatus = useCallback(
-    async (orderId: string, status: OrderStatus, opts?: { assignedWaiterId?: string }) => {
-      try {
-        const ordersApi = await import('../api/orders');
-        await (ordersApi as any).updateOrderStatus(orderId, { status: status as any, assignedTo: opts?.assignedWaiterId });
-      } catch (e) {
-        console.warn('Failed to update order status:', e);
+    async (orderId: string, status: OrderStatus, opts?: {
+      assignedWaiterId?: string;
+      cancellationReason?: string;
+      cancelledBy?: string;
+    }) => {
+      // ── Offline order: update queue entry, don't hit the network ──────────
+      if (orderId.startsWith('offline-')) {
+        const idempotencyKey = orderId.slice('offline-'.length);
+
+        if (status === 'cancelled') {
+          // Order cancelled before it ever synced — mark done so it never creates
+          // on the server, and remove it from local state entirely.
+          await queue.markDone(idempotencyKey, 'cancelled-before-sync');
+          setOrders((prev) => prev.filter((o) => o.id !== orderId));
+          return;
+        }
+
+        // Record the furthest status reached so the flush can apply it after creation
+        void queue.updateTargetStatus(idempotencyKey, status);
+        // Fall through to update local state below (no network call needed)
+      } else {
+        try {
+          const ordersApi = await import('../api/orders');
+          await (ordersApi as any).updateOrderStatus(orderId, {
+            status: status as any,
+            assignedTo: opts?.assignedWaiterId,
+            cancellationReason: opts?.cancellationReason,
+            cancelledBy: opts?.cancelledBy,
+          });
+        } catch (e: any) {
+          const msg = e?.message ?? '';
+          const isNetworkError =
+            e?.name === 'TypeError' ||
+            msg.includes('Failed to fetch') ||
+            msg.includes('NetworkError') ||
+            msg.includes('Unable to connect') ||
+            !navigator.onLine;
+
+          if (isNetworkError) {
+            // Queue the status change — will be applied when network returns
+            void queue.queueStatusUpdate(orderId, status as string, {
+              assignedWaiterId: opts?.assignedWaiterId,
+              cancellationReason: opts?.cancellationReason,
+              cancelledBy: opts?.cancelledBy,
+            });
+          } else {
+            console.warn('Failed to update order status:', e);
+          }
+        }
       }
 
       // Always update local state

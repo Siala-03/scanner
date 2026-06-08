@@ -95,4 +95,6 @@ export interface CreateOrderInput {
 export interface UpdateOrderStatusInput {
   status: OrderStatus;
   assignedTo?: string;
+  cancellationReason?: string;  // required when status = 'cancelled'
+  cancelledBy?: string;         // staff name who rejected
 }

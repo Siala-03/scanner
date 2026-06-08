@@ -3,8 +3,9 @@ import { motion } from 'framer-motion';
 import { LockIcon, UserIcon, ArrowLeftIcon, EyeIcon, EyeOffIcon, WifiIcon, WifiOffIcon } from 'lucide-react';
 import { Staff } from '../../types';
 import { loginStaff } from '../../api/auth';
-import { supabase } from '../../lib/supabase';
 import { Button } from '../../components/ui/Button';
+import { OfflinePinScreen } from '../../components/auth/OfflinePinScreen';
+import { savePasswordHash, saveUsername, hasAnyCachedProfile } from '../../utils/offlineAuth';
 
 interface LoginPageProps {
   onLogin: (user: Staff) => void;
@@ -17,46 +18,109 @@ export function LoginPage({ onLogin, onBack, embedded = false }: LoginPageProps)
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [serverStatus, setServerStatus] = useState<'checking' | 'online' | 'offline'>('checking');
+  // Start as 'offline' immediately if the browser has no network interface at all,
+  // otherwise 'checking' until the real connectivity probe resolves.
+  const [serverStatus, setServerStatus] = useState<'checking' | 'online' | 'offline'>(
+    () => (navigator.onLine ? 'checking' : 'offline')
+  );
+  const [forceOnlineLogin, setForceOnlineLogin] = useState(false);
 
   const isMultiAccountConflict =
     error.toLowerCase().includes('multiple accounts found') ||
     error.toLowerCase().includes('provide restaurantid');
 
-  // Check Supabase connectivity on mount
+  // Connectivity probe — uses cache:'no-store' to bypass the service worker cache
+  // so it reflects actual internet access, not a cached response.
   useEffect(() => {
     const checkServerStatus = async () => {
       try {
-        const { error } = await supabase.from('restaurants').select('id').limit(1);
-        setServerStatus(error ? 'offline' : 'online');
+        const supabaseUrl = (import.meta as any).env?.VITE_SUPABASE_URL ?? '';
+        const supabaseKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY ?? '';
+        await fetch(`${supabaseUrl}/rest/v1/`, {
+          headers: { apikey: supabaseKey },
+          cache: 'no-store',
+          signal: AbortSignal.timeout(5000),
+        });
+        // Any HTTP response (even 4xx) means the server is reachable = online.
+        // Only a thrown error (network failure, timeout) means truly offline.
+        setServerStatus('online');
       } catch {
         setServerStatus('offline');
       }
     };
 
     checkServerStatus();
-    const interval = setInterval(checkServerStatus, 30000);
-    return () => clearInterval(interval);
+    const interval = setInterval(checkServerStatus, 15000);
+
+    const onOnline  = () => checkServerStatus();
+    const onOffline = () => setServerStatus('offline');
+    window.addEventListener('online',  onOnline);
+    window.addEventListener('offline', onOffline);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('online',  onOnline);
+      window.removeEventListener('offline', onOffline);
+    };
   }, []);
+
+  // Show offline login when server is confirmed unreachable, the user hasn't
+  // explicitly requested an online-login attempt, and at least one profile with a
+  // cached password exists. Without the last guard, a fresh device with no network
+  // would immediately show OfflinePinScreen with no way to proceed.
+  const showOfflineLogin = !forceOnlineLogin && serverStatus === 'offline' && hasAnyCachedProfile();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setIsLoading(true);
 
-    console.log('Login attempt:', { username });
-
     try {
       const user = await loginStaff(username, password);
+      // onLogin first so saveOfflineProfile (called inside onLogin in App.tsx)
+      // creates the profile entry before savePasswordHash looks for it.
       onLogin(user);
+      void savePasswordHash(user.id, password);
+      saveUsername(user.id, username);
     } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : 'Login failed. Please try again.';
-      setError(errorMessage);
+      // TypeError from fetch = network failure — treat as offline immediately
+      // rather than waiting for the 5-second probe to time out.
+      if (err instanceof TypeError) {
+        setServerStatus('offline');
+        if (!hasAnyCachedProfile()) {
+          setError('No internet connection. Sign in online at least once to enable offline access.');
+        }
+        // If cached profiles exist, showOfflineLogin becomes true on re-render.
+      } else {
+        const errorMessage = err instanceof Error ? err.message : 'Login failed. Please try again.';
+        setError(errorMessage);
+      }
     } finally {
       setIsLoading(false);
     }
   };
+
+  // Offline login screen — shown whenever the server is unreachable.
+  if (showOfflineLogin) {
+    const offlineContent = (
+      <OfflinePinScreen
+        onSuccess={onLogin}
+        onUseOnlineLogin={() => setForceOnlineLogin(true)}
+      />
+    );
+    if (embedded) return offlineContent;
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+        <button
+          onClick={onBack}
+          className="absolute top-4 left-4 md:top-6 md:left-6 z-50 p-2 rounded-full bg-slate-800 text-slate-400 hover:text-amber-400 transition-colors"
+          aria-label="Back">
+          <ArrowLeftIcon className="w-5 h-5" />
+        </button>
+        {offlineContent}
+      </div>
+    );
+  }
 
   const form = (
     <motion.div

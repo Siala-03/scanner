@@ -12,6 +12,8 @@ const PRESET_REASONS = [
 
 interface VoidReasonModalProps {
   orderLabel: string;           // e.g. "Order #ABC1234 — Table 5"
+  title?: string;               // defaults to "Void Order"
+  confirmLabel?: string;        // defaults to "Void Order"
   onConfirm: (reason: string) => void;
   onCancel: () => void;
   isSubmitting?: boolean;
@@ -19,6 +21,8 @@ interface VoidReasonModalProps {
 
 export function VoidReasonModal({
   orderLabel,
+  title = 'Void Order',
+  confirmLabel = 'Void Order',
   onConfirm,
   onCancel,
   isSubmitting = false,
@@ -49,7 +53,7 @@ export function VoidReasonModal({
               <AlertTriangleIcon className="w-4 h-4 text-red-400" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-white">Void Order</h2>
+              <h2 className="text-base font-bold text-white">{title}</h2>
               <p className="text-xs text-slate-400 mt-0.5">{orderLabel}</p>
             </div>
           </div>
@@ -110,7 +114,7 @@ export function VoidReasonModal({
             disabled={!canSubmit}
             className="px-4 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-500 disabled:opacity-40 disabled:cursor-not-allowed rounded-xl transition-colors"
           >
-            {isSubmitting ? 'Voiding…' : 'Void Order'}
+            {isSubmitting ? 'Submitting…' : confirmLabel}
           </button>
         </div>
       </div>

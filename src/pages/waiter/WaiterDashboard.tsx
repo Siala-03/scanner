@@ -39,6 +39,7 @@ import { supabase } from '../../lib/supabase';
 import { markTableSessionPendingCloseFromReceipt } from '../../utils/tableSessions';
 import { OnlineOrdersForWaiter } from '../../components/waiter/OnlineOrdersSection';
 import { useTables } from '../../hooks/useTables';
+import { OfflineBanner } from '../../components/ui/OfflineBanner';
 
 // ─── Kitchen detection ────────────────────────────────────────────────────────
 // Blacklist: these categories are bar/beverage only — everything else goes to kitchen.
@@ -88,7 +89,7 @@ interface WaiterDashboardProps {
   onUpdateOrderStatus: (
     orderId: string,
     status: 'verified' | 'preparing' | 'ready' | 'served' | 'cancelled',
-    opts?: { assignedWaiterId?: string }
+    opts?: { assignedWaiterId?: string; cancellationReason?: string; cancelledBy?: string }
   ) => void;
   onCreateOrder?: (tableNumber: number, items: CartItem[], notes?: string) => Promise<void>;
   waiterCalls?: { tableNumber: number; timestamp: Date }[];
@@ -224,6 +225,13 @@ function ComparisonBars({
   );
 }
 
+const REJECT_REASONS = [
+  'Customer changed mind',
+  'Item out of stock',
+  'Wrong order / entry error',
+  'Duplicate order',
+] as const;
+
 // ─── Inline Order Verification Card ──────────────────────────────────────────
 function IncomingOrderCard({
   order,
@@ -232,14 +240,17 @@ function IncomingOrderCard({
 }: {
   order: Order;
   onApprove: (order: Order) => void;
-  onReject: (orderId: string) => void;
+  onReject: (orderId: string, reason: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [rejectMode, setRejectMode] = useState<'idle' | 'choosing' | 'typing'>('idle');
+  const [customReason, setCustomReason] = useState('');
   const isQROrder = !order.assignedWaiterId;
   const supervisorAssigned = hasSupervisorSourceTag(order);
   const kitchenItems = order.items.filter(itemNeedsKitchen);
   const barItems = order.items.filter((i) => !itemNeedsKitchen(i));
   const hasKitchenItems = kitchenItems.length > 0;
+  const isQueued = order.id.startsWith('offline-');
 
   return (
     <motion.div
@@ -281,6 +292,12 @@ function IncomingOrderCard({
               {supervisorAssigned && (
                 <span className="inline-flex items-center gap-1 rounded-full border border-cyan-500/30 bg-cyan-500/10 px-2 py-0.5 text-xs font-medium text-cyan-300">
                   Assigned by supervisor
+                </span>
+              )}
+              {isQueued && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-300 animate-pulse">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0" />
+                  Queued offline
                 </span>
               )}
             </div>
@@ -391,25 +408,86 @@ function IncomingOrderCard({
               </div>
 
               {/* Actions */}
-              <div className="flex flex-col gap-3 pt-1 sm:flex-row">
-                <button
-                  onClick={() => onReject(order.id)}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-red-500/30 bg-red-500/10 text-red-300 hover:bg-red-500/20 transition-colors font-medium text-sm"
-                >
-                  <XCircleIcon className="w-4 h-4" />
-                  Reject
-                </button>
-                <button
-                  onClick={() => onApprove(order)}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500 text-slate-950 hover:bg-amber-400 transition-colors font-semibold text-sm"
-                >
-                  {hasKitchenItems ? (
-                    <><UtensilsIcon className="w-4 h-4" />Verify & Send to Kitchen</>
-                  ) : (
-                    <><CheckCircleIcon className="w-4 h-4" />Verify & Mark Ready</>
-                  )}
-                </button>
-              </div>
+              {rejectMode === 'choosing' ? (
+                <div className="space-y-2 pt-1">
+                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Why are you rejecting?</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {REJECT_REASONS.map((reason) => (
+                      <button
+                        key={reason}
+                        onClick={() => { onReject(order.id, reason); setRejectMode('idle'); }}
+                        className="flex items-center justify-center px-3 py-2.5 rounded-xl border border-red-500/25 bg-red-500/10 text-red-300 hover:bg-red-500/20 transition-colors text-sm font-medium text-center leading-tight"
+                      >
+                        {reason}
+                      </button>
+                    ))}
+                    <button
+                      onClick={() => setRejectMode('typing')}
+                      className="flex items-center justify-center px-3 py-2.5 rounded-xl border border-slate-600 bg-slate-700/50 text-slate-300 hover:bg-slate-700 transition-colors text-sm font-medium col-span-2"
+                    >
+                      Other…
+                    </button>
+                  </div>
+                  <button
+                    onClick={() => setRejectMode('idle')}
+                    className="w-full py-2 text-slate-500 hover:text-slate-300 text-sm transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : rejectMode === 'typing' ? (
+                <div className="space-y-2 pt-1">
+                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Specify reason</p>
+                  <textarea
+                    value={customReason}
+                    onChange={(e) => setCustomReason(e.target.value)}
+                    placeholder="Describe why you're rejecting this order…"
+                    rows={2}
+                    autoFocus
+                    className="w-full bg-slate-900 border border-slate-600 text-white text-sm rounded-xl px-3 py-2 resize-none focus:outline-none focus:border-red-500 placeholder-slate-500"
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setRejectMode('choosing')}
+                      className="flex-1 py-2 rounded-xl bg-slate-700 text-slate-300 text-sm font-medium hover:bg-slate-600 transition-colors"
+                    >
+                      Back
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (!customReason.trim()) return;
+                        onReject(order.id, customReason.trim());
+                        setRejectMode('idle');
+                        setCustomReason('');
+                      }}
+                      disabled={!customReason.trim()}
+                      className="flex-1 py-2 rounded-xl bg-red-600 text-white text-sm font-semibold hover:bg-red-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >
+                      Reject Order
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-3 pt-1 sm:flex-row">
+                  <button
+                    onClick={() => setRejectMode('choosing')}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-red-500/30 bg-red-500/10 text-red-300 hover:bg-red-500/20 transition-colors font-medium text-sm"
+                  >
+                    <XCircleIcon className="w-4 h-4" />
+                    Reject
+                  </button>
+                  <button
+                    onClick={() => onApprove(order)}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500 text-slate-950 hover:bg-amber-400 transition-colors font-semibold text-sm"
+                  >
+                    {hasKitchenItems ? (
+                      <><UtensilsIcon className="w-4 h-4" />Verify & Send to Kitchen</>
+                    ) : (
+                      <><CheckCircleIcon className="w-4 h-4" />Verify & Mark Ready</>
+                    )}
+                  </button>
+                </div>
+              )}
             </div>
           </motion.div>
         )}
@@ -688,10 +766,16 @@ export function WaiterDashboard({
   const mergeResolveRef = useRef<((result: boolean) => void) | null>(null);
 
   const confirmMerge: ConfirmMergeFn = useCallback((candidate: Order) => {
+    // Always check autoMergeRef first — covers both online and offline cases.
     if (autoMergeRef.current !== null) {
       const decision = autoMergeRef.current;
       autoMergeRef.current = null;
       return Promise.resolve(decision);
+    }
+    // Offline probe: candidate is null (no network, no real merge candidate found).
+    // No pre-stored decision means this is a plain new order — don't merge.
+    if (!candidate) {
+      return Promise.resolve(false);
     }
     return new Promise<boolean>((resolve) => {
       setMergeCandidate(candidate);
@@ -1071,8 +1155,12 @@ export function WaiterDashboard({
     onUpdateOrderStatus(order.id, nextStatus, { assignedWaiterId: waiter.id });
   };
 
-  const handleReject = (orderId: string) => {
-    onUpdateOrderStatus(orderId, 'cancelled', { assignedWaiterId: waiter.id });
+  const handleReject = (orderId: string, reason: string) => {
+    onUpdateOrderStatus(orderId, 'cancelled', {
+      assignedWaiterId: waiter.id,
+      cancellationReason: reason,
+      cancelledBy: waiterName,
+    });
   };
 
   const handleMarkReady = (orderId: string) => {
@@ -1145,6 +1233,9 @@ export function WaiterDashboard({
 
   return (
     <div className="dark min-h-screen bg-slate-900 text-slate-100 pb-24 sm:pb-8">
+      {/* ── Offline / sync banner ── */}
+      <OfflineBanner />
+
       {/* ── Header ── */}
       <div className="sticky top-0 z-50 border-b border-slate-700 bg-slate-800/95 px-4 py-4 backdrop-blur">
         <div className="mx-auto flex max-w-6xl flex-col gap-4">

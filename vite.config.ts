@@ -7,8 +7,18 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.ts',
       registerType: 'autoUpdate',
       includeAssets: ['logo.PNG'],
+      devOptions: {
+        // Register the service worker in dev so offline caching can be tested.
+        // Note: precache is empty in dev — true offline-refresh only works in
+        // a production build (npm run build && npm run preview).
+        enabled: true,
+        type: 'module',
+      },
       manifest: {
         name: 'Restaurant Scanner',
         short_name: 'Scanner',
@@ -36,25 +46,10 @@ export default defineConfig({
         lang: 'en',
         dir: 'ltr'
       },
-      workbox: {
-        skipWaiting: true,
-        clientsClaim: true,
+      injectManifest: {
         // Keep build stable when app bundle temporarily exceeds Workbox 2 MiB default.
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
-        runtimeCaching: [
-          {
-            urlPattern: /^https:\/\/api\./,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'api-cache',
-              expiration: {
-                maxEntries: 100,
-                maxAgeSeconds: 24 * 60 * 60, // 24 hours
-              },
-            },
-          },
-        ],
       },
     }),
   ],

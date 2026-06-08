@@ -1,13 +1,17 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   CheckCircleIcon, ClockIcon, BanknoteIcon, CreditCardIcon,
   SmartphoneIcon, RefreshCwIcon, UserIcon, PlusIcon, XIcon,
+  WifiOffIcon,
 } from 'lucide-react';
 import { fetchOrders, confirmPayment, fetchOrderCancellationRequests, requestOrderCancellation } from '../../api/orders';
 import { VoidReasonModal } from '../shared/VoidReasonModal';
 import { fiscalizeOrder } from '../../api/ebm';
 import { formatPrice } from '../../utils/currency';
 import { supabase } from '../../lib/supabase';
+import { enqueuePayment } from '../../lib/orderQueue';
+import { flushPendingPayments } from '../../utils/offlineSync';
+import { OfflineBanner } from '../ui/OfflineBanner';
 
 interface Order {
   id: string;
@@ -93,6 +97,8 @@ interface PaymentApprovalPanelProps {
   staffName?: string;
 }
 
+const CACHE_KEY = 'supervisor_pending_orders_cache';
+
 export function PaymentApprovalPanel({ restaurantId, staffId, staffName }: PaymentApprovalPanelProps) {
   const [orders,       setOrders]       = useState<Order[]>([]);
   const [staffMap,     setStaffMap]     = useState<Record<string, string>>({});
@@ -103,8 +109,12 @@ export function PaymentApprovalPanel({ restaurantId, staffId, staffName }: Payme
   const [voidTarget,   setVoidTarget]   = useState<Order | null>(null);
   const [splitsMap,    setSplitsMap]    = useState<Record<string, SplitEntry[]>>({});
   const [justConfirmed, setJustConfirmed] = useState<Set<string>>(new Set());
+  const [justQueued,   setJustQueued]   = useState<Set<string>>(new Set());
+  const [isOnline,     setIsOnline]     = useState(() => navigator.onLine);
+  const ordersRef = useRef<Order[]>([]); // keeps last-known list for offline fallback
 
   const loadPendingOrders = useCallback(async () => {
+    if (!restaurantId) return;
     try {
       const [all, cancellationRequests] = await Promise.all([
         fetchOrders('all', restaurantId),
@@ -116,10 +126,24 @@ export function PaymentApprovalPanel({ restaurantId, staffId, staffName }: Payme
         const unpaid = ps == null || ps === '' || ps === 'unpaid' || ps === 'pending' || ps === 'paid';
         return unpaid && st !== 'cancelled' && st !== 'completed';
       });
+      // Cache to localStorage so the panel can show stale data when offline
+      try { localStorage.setItem(CACHE_KEY, JSON.stringify(pending)); } catch { /* ignore */ }
+      ordersRef.current = pending;
       setOrders(pending);
       setPendingCancelRequests(new Set(cancellationRequests.map((r) => r.order_id)));
     } catch (err) {
       console.error('Failed to load pending orders:', err);
+      // Offline or network error — restore from localStorage cache
+      if (ordersRef.current.length === 0) {
+        try {
+          const cached = localStorage.getItem(CACHE_KEY);
+          if (cached) {
+            const parsed = JSON.parse(cached) as Order[];
+            ordersRef.current = parsed;
+            setOrders(parsed);
+          }
+        } catch { /* ignore */ }
+      }
     } finally {
       setLoading(false);
     }
@@ -142,18 +166,46 @@ export function PaymentApprovalPanel({ restaurantId, staffId, staffName }: Payme
 
   useEffect(() => {
     loadPendingOrders();
-    // Poll every 10 seconds as a reliable fallback when Realtime is unavailable
     const poll = setInterval(loadPendingOrders, 10_000);
-    if (!restaurantId) return () => clearInterval(poll);
+
+    const onOnline = () => {
+      setIsOnline(true);
+      loadPendingOrders();
+      // Flush any payments that were queued while offline
+      void flushPendingPayments(
+        (orderId) => {
+          // Remove from list once confirmed on server
+          setOrders((prev) => prev.filter((o) => o.id !== orderId));
+          ordersRef.current = ordersRef.current.filter((o) => o.id !== orderId);
+        },
+        (_orderId, reason) => console.error('[PaymentQueue] Sync failed:', reason)
+      );
+    };
+    const onOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', onOnline);
+    window.addEventListener('offline', onOffline);
+
+    if (!restaurantId) {
+      return () => {
+        clearInterval(poll);
+        window.removeEventListener('online', onOnline);
+        window.removeEventListener('offline', onOffline);
+      };
+    }
+
     const channel = supabase
       .channel(`payment-approval-${restaurantId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `restaurant_id=eq.${restaurantId}` }, () => {
         loadPendingOrders();
       })
       .subscribe();
+
     return () => {
       clearInterval(poll);
       supabase.removeChannel(channel);
+      window.removeEventListener('online', onOnline);
+      window.removeEventListener('offline', onOffline);
     };
   }, [restaurantId, loadPendingOrders]);
 
@@ -218,9 +270,7 @@ export function PaymentApprovalPanel({ restaurantId, staffId, staffName }: Payme
   const handleConfirm = async (order: Order) => {
     const splits = getSplits(splitsMap, order.id);
     const resolved = resolveAmounts(splits, order.total);
-    // Primary method = the one with the largest effective amount
     const primary = resolved.reduce((a, b) => a.effectiveAmount >= b.effectiveAmount ? a : b);
-
     const note = buildNote(splits, order.total);
     const paymentBreakdown = resolved
       .filter((s) => s.effectiveAmount > 0)
@@ -229,16 +279,45 @@ export function PaymentApprovalPanel({ restaurantId, staffId, staffName }: Payme
         amount: s.effectiveAmount,
         ...(s.momoRef ? { reference: s.momoRef } : {}),
       }));
+    const paymentData = {
+      paymentType:     primary.code,
+      paymentBreakdown,
+      confirmedBy:     staffId,
+      confirmedByName: staffName,
+      restaurantId,
+      note,
+    };
+
+    // ── Offline path ──────────────────────────────────────────────────────
+    if (!isOnline) {
+      try {
+        const sessionRes = await supabase.auth.getSession().catch(() => ({ data: { session: null } }));
+        await enqueuePayment({
+          idempotencyKey: `payment-${order.id}`,
+          orderId: order.id,
+          paymentData: paymentData as Record<string, unknown>,
+          status: 'pending',
+          supabaseUrl: import.meta.env.VITE_SUPABASE_URL as string,
+          supabaseAnonKey: import.meta.env.VITE_SUPABASE_ANON_KEY as string,
+          authToken: sessionRes.data.session?.access_token ?? null,
+          refreshToken: sessionRes.data.session?.refresh_token ?? null,
+        });
+      } catch (err) {
+        console.error('[PaymentQueue] Failed to enqueue:', err);
+      }
+      setJustQueued((prev) => new Set(prev).add(order.id));
+      setTimeout(() => {
+        setOrders((prev) => prev.filter((o) => o.id !== order.id));
+        ordersRef.current = ordersRef.current.filter((o) => o.id !== order.id);
+        setJustQueued((prev) => { const s = new Set(prev); s.delete(order.id); return s; });
+      }, 1800);
+      return;
+    }
+
+    // ── Online path ───────────────────────────────────────────────────────
     setConfirming(order.id);
     try {
-      await confirmPayment(order.id, {
-        paymentType:     primary.code,
-        paymentBreakdown,
-        confirmedBy:     staffId,
-        confirmedByName: staffName,
-        restaurantId,
-        note,
-      });
+      await confirmPayment(order.id, paymentData);
 
       if (restaurantId) {
         fiscalizeOrder(order.id, { restaurantId, paymentType: primary.code })
@@ -248,6 +327,7 @@ export function PaymentApprovalPanel({ restaurantId, staffId, staffName }: Payme
       setJustConfirmed((prev) => new Set(prev).add(order.id));
       setTimeout(() => {
         setOrders((prev) => prev.filter((o) => o.id !== order.id));
+        ordersRef.current = ordersRef.current.filter((o) => o.id !== order.id);
         setJustConfirmed((prev) => { const s = new Set(prev); s.delete(order.id); return s; });
       }, 1200);
     } catch (err) {
@@ -289,6 +369,19 @@ export function PaymentApprovalPanel({ restaurantId, staffId, staffName }: Payme
 
   return (
     <div className="space-y-4">
+      <OfflineBanner />
+
+      {/* Offline notice specific to payments */}
+      {!isOnline && (
+        <div className="flex items-center gap-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+          <WifiOffIcon className="w-4 h-4 shrink-0 text-amber-400" />
+          <span>
+            You're offline. Payments confirmed now will be <strong>queued</strong> and synced
+            automatically when the connection is restored.
+          </span>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -317,6 +410,7 @@ export function PaymentApprovalPanel({ restaurantId, staffId, staffName }: Payme
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {orders.map((order) => {
             const confirmed = justConfirmed.has(order.id);
+            const queued    = justQueued.has(order.id);
             const busy      = confirming === order.id;
             const waiterName = getWaiterName(order);
             const splits    = getSplits(splitsMap, order.id);
@@ -335,6 +429,8 @@ export function PaymentApprovalPanel({ restaurantId, staffId, staffName }: Payme
                 className={`rounded-xl border p-4 transition-all duration-300 ${
                   confirmed
                     ? 'border-emerald-500/40 bg-emerald-900/20'
+                    : queued
+                    ? 'border-amber-500/40 bg-amber-900/10'
                     : 'border-slate-700 bg-slate-800/60'
                 }`}
               >
@@ -483,6 +579,14 @@ export function PaymentApprovalPanel({ restaurantId, staffId, staffName }: Payme
                     </div>
                     {staffName && <p className="text-xs text-slate-500">by {staffName}</p>}
                   </div>
+                ) : queued ? (
+                  <div className="flex flex-col items-center gap-0.5 py-2">
+                    <div className="flex items-center gap-1.5 text-amber-400 text-sm">
+                      <WifiOffIcon className="w-4 h-4" />
+                      Queued — will sync when online
+                    </div>
+                    <p className="text-xs text-slate-500">Payment recorded offline</p>
+                  </div>
                 ) : (
                   <>
                     <button
@@ -517,7 +621,7 @@ export function PaymentApprovalPanel({ restaurantId, staffId, staffName }: Payme
 
                 <div className="flex items-center gap-1 mt-2 text-xs text-slate-500">
                   <ClockIcon className="w-3 h-3" />
-                  {new Date(order.createdAt ?? order.created_at ?? '').toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  {new Date(order.createdAt ?? order.created_at ?? '').toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                 </div>
               </div>
             );

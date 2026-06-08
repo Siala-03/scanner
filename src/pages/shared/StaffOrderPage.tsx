@@ -19,10 +19,9 @@ import { OpenTabModal } from '../../components/shared/OpenTabModal';
 import { supabase } from '../../lib/supabase';
 import { fetchKitchenOrders } from '../../api/orders';
 import { formatPrice } from '../../utils/currency';
-import { buildReceiptHtml, orderToReceiptData, printReceipt, downloadReceiptHtml } from '../../utils/receipt';
+import { buildReceiptHtml, orderToReceiptData, printReceipt } from '../../utils/receipt';
 import type { ReceiptData } from '../../utils/receipt';
 import { printOrderReceipt as printThermal } from '../../utils/sunmiPrinter';
-import { sendReceiptViaWhatsApp, sendReceiptViaSMS, copyReceiptToClipboard } from '../../api/receipt';
 import { Modal } from '../../components/ui/Modal';
 import { MenuItem, Order } from '../../types';
 
@@ -347,32 +346,6 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
     } finally {
       setIsPrintingReceipt(false);
     }
-  };
-
-  const handleShareWhatsApp = () => {
-    const data = buildCurrentReceiptData();
-    if (!data) return;
-    const phone = (lastPlacedOrder as any)?.customerPhone ?? (lastPlacedOrder as any)?.customer_phone ?? '';
-    sendReceiptViaWhatsApp({ phoneNumber: phone, receipt: data });
-  };
-
-  const handleShareSms = () => {
-    const data = buildCurrentReceiptData();
-    if (!data) return;
-    const phone = (lastPlacedOrder as any)?.customerPhone ?? (lastPlacedOrder as any)?.customer_phone ?? '';
-    sendReceiptViaSMS({ phoneNumber: phone, receipt: data });
-  };
-
-  const handleCopyReceipt = async () => {
-    const data = buildCurrentReceiptData();
-    if (!data) return;
-    await copyReceiptToClipboard(data);
-  };
-
-  const handleDownloadHtml = () => {
-    const data = buildCurrentReceiptData();
-    if (!data) return;
-    downloadReceiptHtml(data);
   };
 
   const confirmPrintLastReceipt = () => {
@@ -880,10 +853,6 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
             onSelectedStaffIdChange={setSelectedStaffId}
             onSubmit={handleSubmit}
             onPrintReceipt={handlePrintLastReceipt}
-            onShareWhatsApp={handleShareWhatsApp}
-            onShareSms={handleShareSms}
-            onCopyReceipt={handleCopyReceipt}
-            onDownloadHtml={handleDownloadHtml}
             onDone={handleDoneAfterSuccess}
           />
         </div>
@@ -997,10 +966,6 @@ function CartPanel({
   onSelectedStaffIdChange,
   onSubmit,
   onPrintReceipt,
-  onShareWhatsApp,
-  onShareSms,
-  onCopyReceipt,
-  onDownloadHtml,
   onDone,
 }: {
   cart: CartEntry[];
@@ -1022,10 +987,6 @@ function CartPanel({
   onSelectedStaffIdChange: (v: string) => void;
   onSubmit: () => void;
   onPrintReceipt: () => void;
-  onShareWhatsApp?: () => void;
-  onShareSms?: () => void;
-  onCopyReceipt?: () => void;
-  onDownloadHtml?: () => void;
   onDone: () => void;
 }) {
   if (successTable) {
@@ -1045,28 +1006,6 @@ function CartPanel({
                 <PrinterIcon className="inline w-4 h-4 mr-1.5" />
                 {isPrintingReceipt ? 'Printing...' : 'Print Receipt'}
               </button>
-              <div className="flex gap-2">
-                {onShareWhatsApp && (
-                  <button onClick={onShareWhatsApp} title="Send via WhatsApp" className="flex-1 rounded-lg border border-slate-600 bg-slate-800 py-2 text-xs text-green-400 hover:bg-slate-700 transition-colors">
-                    WhatsApp
-                  </button>
-                )}
-                {onShareSms && (
-                  <button onClick={onShareSms} title="Send via SMS" className="flex-1 rounded-lg border border-slate-600 bg-slate-800 py-2 text-xs text-sky-400 hover:bg-slate-700 transition-colors">
-                    SMS
-                  </button>
-                )}
-                {onCopyReceipt && (
-                  <button onClick={onCopyReceipt} title="Copy to clipboard" className="flex-1 rounded-lg border border-slate-600 bg-slate-800 py-2 text-xs text-slate-300 hover:bg-slate-700 transition-colors">
-                    Copy
-                  </button>
-                )}
-                {onDownloadHtml && (
-                  <button onClick={onDownloadHtml} title="Download as HTML (open in browser → Save as PDF)" className="flex-1 rounded-lg border border-slate-600 bg-slate-800 py-2 text-xs text-slate-300 hover:bg-slate-700 transition-colors">
-                    Download
-                  </button>
-                )}
-              </div>
             </>
           )}
           <button

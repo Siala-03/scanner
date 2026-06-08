@@ -97,6 +97,10 @@ CREATE TABLE IF NOT EXISTS orders (
   payment_status text DEFAULT 'unpaid' CHECK (payment_status IN ('unpaid', 'partial', 'paid')),
   amount_paid integer DEFAULT 0,
   change_amount integer DEFAULT 0,
+  idempotency_key text,
+  cancellation_note text,
+  cancelled_by_name text,
+  cancelled_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   completed_at timestamptz,
@@ -105,6 +109,10 @@ CREATE TABLE IF NOT EXISTS orders (
 CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status, restaurant_id);
 CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders(created_at DESC, restaurant_id);
 CREATE INDEX IF NOT EXISTS idx_orders_table ON orders(table_number, restaurant_id);
+-- Partial unique index: prevents duplicate orders from retries/background sync
+CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_idempotency_key
+  ON orders (idempotency_key)
+  WHERE idempotency_key IS NOT NULL;
 
 -- 6. INVENTORY
 CREATE TABLE IF NOT EXISTS inventory_records (

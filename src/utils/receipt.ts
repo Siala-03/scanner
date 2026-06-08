@@ -557,6 +557,211 @@ export function buildReceiptHtml(receipt: ReceiptData): string {
 }
 
 // ============================================
+// KITCHEN TICKET GENERATION
+// ============================================
+
+export interface KitchenTicketData {
+  restaurantName: string;
+  restaurantLogo?: string;
+  orderNumber: string | number;
+  tableNumber?: number | string;
+  status: string;
+  createdAt: string | Date;
+  items: Array<{ quantity: number; name: string; notes?: string }>;
+  notes?: string;
+  loyaltyDiscount?: number;
+  loyaltyFreeItemName?: string;
+}
+
+/**
+ * Generate an 80mm kitchen order ticket (KOT) using the same CSS base
+ * as buildReceiptHtml so all printed documents look consistent.
+ */
+export function buildKitchenTicketHtml(ticket: KitchenTicketData): string {
+  const {
+    restaurantName,
+    restaurantLogo,
+    orderNumber,
+    tableNumber,
+    status,
+    createdAt,
+    items,
+    notes,
+    loyaltyDiscount,
+    loyaltyFreeItemName,
+  } = ticket;
+
+  const now = new Date();
+  const placedAt = new Date(createdAt);
+  const waitMinutes = Math.floor((now.getTime() - placedAt.getTime()) / 60000);
+  const urgencyLabel = waitMinutes > 15 ? 'URGENT' : waitMinutes > 8 ? 'SOON' : 'ON TIME';
+  const urgencyColor = waitMinutes > 15 ? '#b91c1c' : waitMinutes > 8 ? '#92400e' : '#065f46';
+  const urgencyBg    = waitMinutes > 15 ? '#fee2e2' : waitMinutes > 8 ? '#fef3c7' : '#d1fae5';
+
+  const printedAt = now.toLocaleString('en-US', {
+    year: 'numeric', month: 'short', day: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  });
+  const placedAtStr = placedAt.toLocaleString('en-US', {
+    hour: '2-digit', minute: '2-digit',
+  });
+
+  const itemsHtml = items.map(item => `
+    <tr>
+      <td class="qty">${item.quantity}&times;</td>
+      <td class="name">${item.name}${item.notes ? `<div class="note">&#8627; ${item.notes}</div>` : ''}</td>
+    </tr>`).join('');
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Kitchen Ticket #${orderNumber}</title>
+  <style>
+    @page { size: 80mm auto; margin: 0; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif; font-size: 10pt; color: #000; line-height: 1.45; }
+
+    @media screen {
+      body { background: #c8c8c8; display: flex; flex-direction: column; align-items: center; padding: 20px 12px 40px; }
+      .paper { background: #fff; width: 80mm; padding: 6mm 5mm 10mm; box-shadow: 0 3px 16px rgba(0,0,0,.22); }
+    }
+    @media print {
+      html, body { background: #fff; display: block; }
+      .paper { padding: 3mm 4mm 14mm; }
+      .no-print { display: none !important; }
+      * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    }
+
+    .hdr { text-align: center; padding-bottom: 8px; }
+    .logo { max-height: 60px; max-width: 150px; object-fit: contain; display: block; margin: 0 auto 6px; }
+    .brand { font-size: 15pt; font-weight: 900; letter-spacing: 2px; text-transform: uppercase; }
+    .rbadge { display: inline-block; margin-top: 7px; padding: 2px 10px; border: 1.5px solid #000; font-size: 8pt; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; }
+
+    .solid  { border: none; border-top: 2px solid #000; margin: 8px 0; }
+    .dashed { border: none; border-top: 1px dashed #666; margin: 6px 0; }
+
+    .order-block { text-align: center; padding: 4px 0; }
+    .order-num { font-size: 24pt; font-weight: 900; line-height: 1.1; }
+    .table-num { font-size: 14pt; font-weight: 700; margin-top: 2px; }
+    .status-badge { display: inline-block; margin-top: 5px; padding: 2px 12px; border: 1.5px solid #000; font-size: 9pt; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; }
+
+    .meta { width: 100%; border-collapse: collapse; font-size: 9pt; }
+    .meta td { padding: 2px 0; vertical-align: top; }
+    .meta td:first-child { color: #333; width: 42%; }
+    .meta td:last-child  { font-weight: 700; text-align: right; }
+
+    .urgency-row { display: flex; justify-content: space-between; align-items: center; font-size: 9pt; margin: 4px 0; }
+    .urgency-badge { padding: 2px 10px; border-radius: 3px; font-weight: 700; font-size: 8pt; letter-spacing: 1px; }
+
+    .items { width: 100%; border-collapse: collapse; font-size: 11pt; }
+    .items td { padding: 5px 0; vertical-align: top; border-bottom: 1px dotted #bbb; }
+    .items .qty  { width: 28px; color: #333; font-size: 10pt; font-weight: 700; }
+    .items .name { font-weight: 700; }
+    .note { font-size: 8pt; color: #555; font-style: italic; margin-top: 1px; font-weight: 400; }
+
+    .special-box { border: 2px solid #000; padding: 6px 8px; margin: 8px 0; font-size: 9pt; font-weight: 700; line-height: 1.5; }
+    .special-box .lbl { font-size: 7pt; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 2px; }
+
+    .loyalty-box { border: 1.5px dashed #b8952a; border-radius: 3px; padding: 5px 7px; font-size: 9pt; background: #fffbf0; color: #92400e; }
+
+    .footer { text-align: center; font-size: 9pt; color: #333; line-height: 1.7; }
+    .powered { font-size: 8pt; color: #777; margin-top: 4px; letter-spacing: 1px; }
+
+    .print-btn { margin-top: 16px; padding: 8px 28px; background: #111; color: #fff; border: none; border-radius: 3px; font-family: inherit; font-size: 12px; cursor: pointer; }
+    .print-btn:hover { background: #333; }
+  </style>
+</head>
+<body>
+
+<div class="paper">
+
+  <div class="hdr">
+    ${restaurantLogo ? `<img src="${restaurantLogo}" alt="${restaurantName}" class="logo">` : ''}
+    <div class="brand">${restaurantName}</div>
+    <div class="rbadge">Kitchen Ticket</div>
+  </div>
+
+  <hr class="solid">
+
+  <div class="order-block">
+    <div class="order-num">Order #${orderNumber}</div>
+    ${tableNumber != null ? `<div class="table-num">TABLE ${tableNumber}</div>` : ''}
+    <div class="status-badge">${status.toUpperCase()}</div>
+  </div>
+
+  <hr class="dashed">
+
+  <table class="meta">
+    <tr><td>Placed</td><td>${placedAtStr}</td></tr>
+    <tr>
+      <td>Wait</td>
+      <td>
+        <span>${waitMinutes} min</span>
+        &nbsp;<span class="urgency-badge" style="background:${urgencyBg};color:${urgencyColor}">${urgencyLabel}</span>
+      </td>
+    </tr>
+  </table>
+
+  <hr class="dashed">
+
+  ${notes ? `
+  <div class="special-box">
+    <div class="lbl">&#9888; Special Request</div>
+    ${notes}
+  </div>` : ''}
+
+  <table class="items">
+    <tbody>${itemsHtml}</tbody>
+  </table>
+
+  ${(loyaltyDiscount && loyaltyDiscount > 0) || loyaltyFreeItemName ? `
+  <hr class="dashed">
+  <div class="loyalty-box">
+    ${loyaltyDiscount && loyaltyDiscount > 0 ? `<div>&#127873; Loyalty Discount Applied</div>` : ''}
+    ${loyaltyFreeItemName ? `<div>&#127873; Free Item: ${loyaltyFreeItemName}</div>` : ''}
+  </div>` : ''}
+
+  <hr class="solid">
+
+  <div class="footer">
+    <div>Printed: ${printedAt}</div>
+    <div class="powered">Powered by SERVV</div>
+  </div>
+
+</div>
+
+<button class="print-btn no-print" onclick="window.print()">Print Ticket</button>
+
+<script>
+  if (window.opener || window.name === 'kitchen_print') {
+    setTimeout(function() {
+      window.print();
+      window.addEventListener('afterprint', function() {
+        setTimeout(function() { window.close(); }, 300);
+      });
+    }, 500);
+  }
+<\/script>
+
+</body>
+</html>`;
+}
+
+/**
+ * Open a kitchen ticket in a named 80mm-wide window.
+ */
+export function printKitchenTicket(html: string): void {
+  const printWindow = window.open('', 'kitchen_print', 'width=302,height=700,toolbar=0,scrollbars=1,status=0');
+  if (!printWindow) {
+    throw new Error('Unable to open print window. Please allow pop-ups.');
+  }
+  printWindow.document.open();
+  printWindow.document.write(html);
+  printWindow.document.close();
+}
+
+// ============================================
 // PRINT FUNCTION
 // ============================================
 

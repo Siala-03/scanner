@@ -86,12 +86,13 @@ export function useTables() {
       if (mutationCountRef.current !== mutationAtStart) return;
 
       // Merge backend + localStorage so optimistically-added tables are never lost.
-      // Only mutations (addTable/removeTable) may write localStorage.
       const localTables = getStoredTables(restaurantId);
       if (backendTables && backendTables.length > 0) {
         const backendNumbers = backendTables.map(t => t.tableNumber || t.table_number);
         const merged = [...new Set([...backendNumbers, ...localTables])].sort((a, b) => a - b);
         setTables(merged);
+        // Persist the merged list so it's available when offline.
+        setStoredTables(restaurantId, merged);
       } else {
         // Backend has no tables — trust localStorage
         setTables(localTables);

@@ -303,6 +303,17 @@ export async function createOrder(order: CreateOrderInput): Promise<Order> {
   // Generate idempotency key once per submission to prevent duplicate orders
   const idempotencyKey = (order as any).idempotencyKey || crypto.randomUUID();
 
+  // Fast path: if this key already landed in the DB (retry or race), return immediately.
+  // This avoids hitting the unique constraint and saves a round-trip on the fallback path.
+  if (idempotencyKey) {
+    const { data: existing } = await db
+      .from('orders')
+      .select('*')
+      .eq('idempotency_key', idempotencyKey)
+      .maybeSingle();
+    if (existing) return existing as unknown as Order;
+  }
+
   const shouldAttemptTabMerge =
     Number.isInteger(order.tableNumber) &&
     Number(order.tableNumber) > 0 &&
@@ -505,9 +516,10 @@ export async function updateOrderStatus(
   id: string,
   statusUpdate: UpdateOrderStatusInput
 ): Promise<Order> {
+  const now = new Date().toISOString();
   const fullUpdates: Record<string, unknown> = {
     status: statusUpdate.status,
-    updated_at: new Date().toISOString(),
+    updated_at: now,
   };
 
   if (statusUpdate.assignedTo !== undefined) {
@@ -516,7 +528,17 @@ export async function updateOrderStatus(
   }
 
   if (statusUpdate.status === 'served' || (statusUpdate.status as string) === 'completed') {
-    fullUpdates.completed_at = new Date().toISOString();
+    fullUpdates.completed_at = now;
+  }
+
+  if (statusUpdate.status === 'cancelled') {
+    fullUpdates.cancelled_at = now;
+    if (statusUpdate.cancellationReason) {
+      fullUpdates.cancellation_note = statusUpdate.cancellationReason;
+    }
+    if (statusUpdate.cancelledBy) {
+      fullUpdates.cancelled_by_name = statusUpdate.cancelledBy;
+    }
   }
 
   let result = await db.from('orders').update(fullUpdates).eq('id', id).select().single();

@@ -1,4 +1,5 @@
 import { useCallback, useState, useEffect, useRef } from 'react';
+import { saveOfflineProfile } from './utils/offlineAuth';
 import { motion } from 'framer-motion';
 import { ArrowLeftIcon, QrCodeIcon, LogOutIcon, ChevronDownIcon } from 'lucide-react';
 import { CartItem, OrderStatus, Customer } from './types';
@@ -1201,7 +1202,7 @@ export function App() {
               onLogin={(user) => {
                 justLoggedIn.current = true;
                 if (user.role === 'manager' || user.role === 'supervisor') {
-                  setOutletType('restaurant'); // clear stale value before API resolves
+                  setOutletType('restaurant');
                   setOutletTypeResolved(false);
                 }
                 setAuthUser(user);
@@ -1217,6 +1218,9 @@ export function App() {
                   setCurrentRestaurantId(loginRestaurantId);
                   window.dispatchEvent(new Event('restaurantIdChanged'));
                 }
+
+                // Cache profile for offline password auth (password hash saved in LoginPage)
+                saveOfflineProfile(user, restaurantName || 'Restaurant');
               }}
               onBack={() => {}} />
         </motion.div>
@@ -1253,6 +1257,7 @@ export function App() {
           </div>
         </motion.div>
       </div>
+
     </div>);
 
 }
