@@ -27,6 +27,7 @@ import {
 import { formatPrice } from '../../utils/currency';
 import { Order, Staff, CartItem, OrderItem, Reservation } from '../../types';
 import { getReservations, updateReservation } from '../../api/reservations';
+import { requestOrderCancellation } from '../../api/orders';
 import { QRScanner } from '../../components/waiter/QRScanner';
 import { WaiterOrderEntry } from '../../components/waiter/WaiterOrderEntry';
 import { loadReviews } from '../../utils/reviewsStorage';
@@ -237,14 +238,30 @@ function IncomingOrderCard({
   order,
   onApprove,
   onReject,
+  pendingCancel = false,
 }: {
   order: Order;
   onApprove: (order: Order) => void;
-  onReject: (orderId: string, reason: string) => void;
+  onReject: (orderId: string, reason: string) => Promise<void>;
+  pendingCancel?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [rejectMode, setRejectMode] = useState<'idle' | 'choosing' | 'typing'>('idle');
   const [customReason, setCustomReason] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const submitRejection = async (reason: string) => {
+    setSubmitting(true);
+    try {
+      await onReject(order.id, reason);
+    } catch (_e) {
+      // error handled in parent
+    } finally {
+      setSubmitting(false);
+      setRejectMode('idle');
+      setCustomReason('');
+    }
+  };
   const isQROrder = !order.assignedWaiterId;
   const supervisorAssigned = hasSupervisorSourceTag(order);
   const kitchenItems = order.items.filter(itemNeedsKitchen);
@@ -410,27 +427,30 @@ function IncomingOrderCard({
               {/* Actions */}
               {rejectMode === 'choosing' ? (
                 <div className="space-y-2 pt-1">
-                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Why are you rejecting?</p>
+                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Why are you cancelling?</p>
                   <div className="grid grid-cols-2 gap-2">
                     {REJECT_REASONS.map((reason) => (
                       <button
                         key={reason}
-                        onClick={() => { onReject(order.id, reason); setRejectMode('idle'); }}
-                        className="flex items-center justify-center px-3 py-2.5 rounded-xl border border-red-500/25 bg-red-500/10 text-red-300 hover:bg-red-500/20 transition-colors text-sm font-medium text-center leading-tight"
+                        onClick={() => submitRejection(reason)}
+                        disabled={submitting}
+                        className="flex items-center justify-center px-3 py-2.5 rounded-xl border border-red-500/25 bg-red-500/10 text-red-300 hover:bg-red-500/20 transition-colors text-sm font-medium text-center leading-tight disabled:opacity-40 disabled:cursor-not-allowed"
                       >
                         {reason}
                       </button>
                     ))}
                     <button
                       onClick={() => setRejectMode('typing')}
-                      className="flex items-center justify-center px-3 py-2.5 rounded-xl border border-slate-600 bg-slate-700/50 text-slate-300 hover:bg-slate-700 transition-colors text-sm font-medium col-span-2"
+                      disabled={submitting}
+                      className="flex items-center justify-center px-3 py-2.5 rounded-xl border border-slate-600 bg-slate-700/50 text-slate-300 hover:bg-slate-700 transition-colors text-sm font-medium col-span-2 disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       Other…
                     </button>
                   </div>
                   <button
                     onClick={() => setRejectMode('idle')}
-                    className="w-full py-2 text-slate-500 hover:text-slate-300 text-sm transition-colors"
+                    disabled={submitting}
+                    className="w-full py-2 text-slate-500 hover:text-slate-300 text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     Cancel
                   </button>
@@ -441,31 +461,33 @@ function IncomingOrderCard({
                   <textarea
                     value={customReason}
                     onChange={(e) => setCustomReason(e.target.value)}
-                    placeholder="Describe why you're rejecting this order…"
+                    placeholder="Describe why you're cancelling this order…"
                     rows={2}
                     autoFocus
-                    className="w-full bg-slate-900 border border-slate-600 text-white text-sm rounded-xl px-3 py-2 resize-none focus:outline-none focus:border-red-500 placeholder-slate-500"
+                    disabled={submitting}
+                    className="w-full bg-slate-900 border border-slate-600 text-white text-sm rounded-xl px-3 py-2 resize-none focus:outline-none focus:border-red-500 placeholder-slate-500 disabled:opacity-40"
                   />
                   <div className="flex gap-2">
                     <button
                       onClick={() => setRejectMode('choosing')}
-                      className="flex-1 py-2 rounded-xl bg-slate-700 text-slate-300 text-sm font-medium hover:bg-slate-600 transition-colors"
+                      disabled={submitting}
+                      className="flex-1 py-2 rounded-xl bg-slate-700 text-slate-300 text-sm font-medium hover:bg-slate-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       Back
                     </button>
                     <button
-                      onClick={() => {
-                        if (!customReason.trim()) return;
-                        onReject(order.id, customReason.trim());
-                        setRejectMode('idle');
-                        setCustomReason('');
-                      }}
-                      disabled={!customReason.trim()}
+                      onClick={() => { if (!customReason.trim()) return; submitRejection(customReason.trim()); }}
+                      disabled={!customReason.trim() || submitting}
                       className="flex-1 py-2 rounded-xl bg-red-600 text-white text-sm font-semibold hover:bg-red-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                     >
-                      Reject Order
+                      {submitting ? 'Sending…' : 'Request Cancellation'}
                     </button>
                   </div>
+                </div>
+              ) : pendingCancel ? (
+                <div className="flex items-center gap-2.5 px-4 py-3 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-300 text-sm font-medium">
+                  <ClockIcon className="w-4 h-4 flex-shrink-0" />
+                  <span>Cancellation request sent — awaiting manager approval</span>
                 </div>
               ) : (
                 <div className="flex flex-col gap-3 pt-1 sm:flex-row">
@@ -474,7 +496,7 @@ function IncomingOrderCard({
                     className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-red-500/30 bg-red-500/10 text-red-300 hover:bg-red-500/20 transition-colors font-medium text-sm"
                   >
                     <XCircleIcon className="w-4 h-4" />
-                    Reject
+                    Request Cancel
                   </button>
                   <button
                     onClick={() => onApprove(order)}
@@ -763,6 +785,7 @@ export function WaiterDashboard({
 
   // Open-tab merge modal state (fallback for unexpected merges)
   const [mergeCandidate, setMergeCandidate] = useState<Order | null>(null);
+  const [pendingCancelRequests, setPendingCancelRequests] = useState<Set<string>>(new Set());
   const mergeResolveRef = useRef<((result: boolean) => void) | null>(null);
 
   const confirmMerge: ConfirmMergeFn = useCallback((candidate: Order) => {
@@ -1155,12 +1178,13 @@ export function WaiterDashboard({
     onUpdateOrderStatus(order.id, nextStatus, { assignedWaiterId: waiter.id });
   };
 
-  const handleReject = (orderId: string, reason: string) => {
-    onUpdateOrderStatus(orderId, 'cancelled', {
-      assignedWaiterId: waiter.id,
-      cancellationReason: reason,
-      cancelledBy: waiterName,
+  const handleReject = async (orderId: string, reason: string): Promise<void> => {
+    await requestOrderCancellation(orderId, {
+      reason,
+      requestedBy: String(waiter.id),
+      requestedByName: waiterName,
     });
+    setPendingCancelRequests((prev) => new Set(prev).add(orderId));
   };
 
   const handleMarkReady = (orderId: string) => {
@@ -1482,7 +1506,7 @@ export function WaiterDashboard({
                   ) : (
                     <AnimatePresence>
                       {incomingOrders.map((order) => (
-                        <IncomingOrderCard key={order.id} order={order} onApprove={handleApprove} onReject={handleReject} />
+                        <IncomingOrderCard key={order.id} order={order} onApprove={handleApprove} onReject={handleReject} pendingCancel={pendingCancelRequests.has(order.id)} />
                       ))}
                     </AnimatePresence>
                   )}
