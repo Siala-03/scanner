@@ -82,7 +82,7 @@ const MANAGER_NAV_GROUPS: Array<{
     items: [
       { id: 'analytics', label: 'Analytics' },
       { id: 'expenses', label: 'Expenses' },
-      { id: 'payment-cancellations', label: 'Payment Cancellations' },
+      { id: 'payment-cancellations', label: 'Cancellation Requests' },
       { id: 'credit', label: 'Credit' },
     ],
   },
