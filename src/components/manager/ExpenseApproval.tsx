@@ -320,7 +320,7 @@ export default function ManagerExpenseApproval() {
               </td>
               <td className="px-3 md:px-6 py-4 text-sm md:text-base text-slate-100">
                 <span className="inline-block px-2 py-1 bg-amber-900/40 text-amber-200 rounded text-xs border border-amber-700">
-                  {expense.createdByName || expense.createdByRole || expense.createdBy?.split('@')[0] || 'Staff'}
+                  {expense.createdByName || (expense.createdBy?.startsWith('staff-') ? 'Staff' : expense.createdBy) || 'Staff'}
                 </span>
               </td>
               <td className="px-3 md:px-6 py-4 space-x-2">
@@ -629,7 +629,7 @@ export default function ManagerExpenseApproval() {
                 <div>
                   <p className="text-sm text-slate-400">Created By</p>
                   <p className="font-medium text-slate-100">
-                    {selectedExpense.createdByName || selectedExpense.createdByRole || selectedExpense.createdBy?.split('@')[0] || 'Staff'}
+                    {selectedExpense.createdByName || (selectedExpense.createdBy?.startsWith('staff-') ? 'Staff' : selectedExpense.createdBy) || 'Staff'}
                   </p>
                 </div>
               </div>

@@ -766,7 +766,8 @@ export async function getPendingApprovals(): Promise<Expense[]> {
     .order('created_at', { ascending: false });
 
   if (error) { console.error('getPendingApprovals error:', error); return []; }
-  return (data || []).map(normalizeExpense);
+  const enrichedRows = await withCreatorNames(data || [], restaurantId);
+  return enrichedRows.map(normalizeExpense);
 }
 
 // Backward-compatible API used by ExpenseApproval component
