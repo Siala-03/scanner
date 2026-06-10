@@ -16,8 +16,9 @@ export interface ExpenseCategory {
 }
 
 // ── Payment Methods ─────────────────────────────────────────────────────────
-export type PaymentMethod = 
+export type PaymentMethod =
   | 'cash'
+  | 'mobile_money'
   | 'credit_card'
   | 'debit_card'
   | 'bank_transfer'

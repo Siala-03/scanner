@@ -578,6 +578,7 @@ export default function ManagerExpenseApproval() {
                     className="w-full border border-slate-600 bg-slate-700 text-slate-200 rounded-lg px-3 py-2 md:py-3 text-sm md:text-base focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500"
                   >
                     <option value="cash">Cash</option>
+                    <option value="mobile_money">MoMo</option>
                     <option value="credit_card">Credit Card</option>
                     <option value="debit_card">Debit Card</option>
                     <option value="bank_transfer">Bank Transfer</option>
