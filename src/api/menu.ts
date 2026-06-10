@@ -2,6 +2,9 @@ import { supabase, callEdgeFn, type MenuItem } from '../lib/supabase';
 
 let menuSkuColumnSupported: boolean | null = null;
 
+const missingColPattern = /Could not find the '([^']+)' column of 'menu_items'/i;
+const pgMissingColPattern = /column\s+"?([a-zA-Z0-9_]+)"?\s+of\s+relation\s+"?menu_items"?\s+does\s+not\s+exist/i;
+
 function isMissingColumnError(error: any, column: string): boolean {
   const msg = String(error?.message || '').toLowerCase();
   const col = column.toLowerCase();
@@ -172,11 +175,24 @@ export async function createMenuItem(item: Partial<MenuItem> & { sku?: string })
   };
 
   let payload = buildPayload(canUseSku);
+
+  // Retry loop: strip any columns that don't exist in this deployment's schema.
+  // Handles emoji, is_popular, prep_time, requires_kitchen, image_url, etc.
   let res = await supabase.from('menu_items').insert(payload).select().single();
 
-  if (res.error && isMissingColumnError(res.error, 'sku')) {
-    menuSkuColumnSupported = false;
-    payload = buildPayload(false);
+  for (let attempt = 0; attempt < 10 && res.error; attempt++) {
+    const msg = String(res.error?.message || '');
+    const col = msg.match(missingColPattern)?.[1] ?? msg.match(pgMissingColPattern)?.[1];
+
+    if (col === 'sku') {
+      menuSkuColumnSupported = false;
+      payload = buildPayload(false);
+    } else if (col && col in payload) {
+      delete payload[col];
+    } else {
+      break; // unknown error — stop retrying
+    }
+
     res = await supabase.from('menu_items').insert(payload).select().single();
   }
 
@@ -215,12 +231,20 @@ export async function updateMenuItem(id: string, updates: Partial<MenuItem> & { 
     .select()
     .single();
 
-  if (res.error && isMissingColumnError(res.error, 'sku') && 'sku' in payload) {
-    menuSkuColumnSupported = false;
-    const { sku: _omitSku, ...withoutSku } = payload;
+  for (let attempt = 0; attempt < 10 && res.error; attempt++) {
+    const msg = String(res.error?.message || '');
+    const col = msg.match(missingColPattern)?.[1] ?? msg.match(pgMissingColPattern)?.[1];
+
+    if (col === 'sku') menuSkuColumnSupported = false;
+    if (col && col in payload) {
+      delete payload[col];
+    } else {
+      break;
+    }
+
     res = await supabase
       .from('menu_items')
-      .update(withoutSku)
+      .update(payload)
       .eq('id', id)
       .eq('restaurant_id', restaurantId)
       .select()

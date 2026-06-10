@@ -560,50 +560,58 @@ export async function submitExpenseForApproval(expenseId: string): Promise<Expen
 
 export async function approveExpense(expenseId: string, notes?: string): Promise<Expense> {
   const staffId = getStaffId();
-  const updatePayload: Record<string, unknown> = {
+  let payload: Record<string, unknown> = {
     status: 'approved',
     approved_by: staffId,
     approved_at: new Date().toISOString(),
   };
-  if (notes) updatePayload.notes = notes;
-  const { data, error } = await supabase
-    .from('expenses')
-    .update(updatePayload)
-    .eq('id', expenseId)
-    .select()
-    .single();
+  if (notes) payload.notes = notes;
 
-  if (error) { console.error('approveExpense error:', error); throw error; }
-  return normalizeExpense(data);
+  const missingColPattern = /Could not find the '([^']+)' column of 'expenses'/i;
+
+  let result = await supabase.from('expenses').update(payload).eq('id', expenseId).select().single();
+
+  for (let attempt = 0; attempt < 10 && result.error; attempt++) {
+    const col = String(result.error?.message || '').match(missingColPattern)?.[1];
+    if (col && col in payload) {
+      const { [col]: _dropped, ...rest } = payload;
+      payload = rest;
+    } else {
+      break;
+    }
+    result = await supabase.from('expenses').update(payload).eq('id', expenseId).select().single();
+  }
+
+  if (result.error) { console.error('approveExpense error:', result.error); throw result.error; }
+  return normalizeExpense(result.data);
 }
 
 export async function rejectExpense(expenseId: string, rejectionReason: string): Promise<Expense> {
   const staffId = getStaffId();
-  const basePayload: Record<string, any> = {
+  let payload: Record<string, unknown> = {
     status: 'rejected',
     rejection_reason: rejectionReason,
     approved_by: staffId,
     approved_at: new Date().toISOString(),
   };
 
-  let result = await supabase
-    .from('expenses')
-    .update(basePayload)
-    .eq('id', expenseId)
-    .select()
-    .single();
+  const missingColPattern = /Could not find the '([^']+)' column of 'expenses'/i;
 
-  // If rejection_reason column doesn't exist, fall back to storing reason in notes
-  if (result.error?.code === 'PGRST204' && result.error.message?.includes('rejection_reason')) {
-    const fallbackPayload = { ...basePayload };
-    delete fallbackPayload.rejection_reason;
-    if (rejectionReason) fallbackPayload.notes = `Rejected: ${rejectionReason}`;
-    result = await supabase
-      .from('expenses')
-      .update(fallbackPayload)
-      .eq('id', expenseId)
-      .select()
-      .single();
+  let result = await supabase.from('expenses').update(payload).eq('id', expenseId).select().single();
+
+  for (let attempt = 0; attempt < 10 && result.error; attempt++) {
+    const col = String(result.error?.message || '').match(missingColPattern)?.[1];
+    if (col === 'rejection_reason') {
+      // Column absent — store reason in notes instead
+      const { rejection_reason: _dropped, ...rest } = payload;
+      payload = rejectionReason ? { ...rest, notes: `Rejected: ${rejectionReason}` } : rest;
+    } else if (col && col in payload) {
+      const { [col]: _dropped, ...rest } = payload;
+      payload = rest;
+    } else {
+      break;
+    }
+    result = await supabase.from('expenses').update(payload).eq('id', expenseId).select().single();
   }
 
   if (result.error) { console.error('rejectExpense error:', result.error); throw result.error; }
