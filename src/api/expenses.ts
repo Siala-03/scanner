@@ -579,20 +579,35 @@ export async function approveExpense(expenseId: string, notes?: string): Promise
 
 export async function rejectExpense(expenseId: string, rejectionReason: string): Promise<Expense> {
   const staffId = getStaffId();
-  const { data, error } = await supabase
+  const basePayload: Record<string, any> = {
+    status: 'rejected',
+    rejection_reason: rejectionReason,
+    approved_by: staffId,
+    approved_at: new Date().toISOString(),
+  };
+
+  let result = await supabase
     .from('expenses')
-    .update({
-      status: 'rejected',
-      rejection_reason: rejectionReason,
-      approved_by: staffId,
-      approved_at: new Date().toISOString(),
-    })
+    .update(basePayload)
     .eq('id', expenseId)
     .select()
     .single();
 
-  if (error) { console.error('rejectExpense error:', error); throw error; }
-  return normalizeExpense(data);
+  // If rejection_reason column doesn't exist, fall back to storing reason in notes
+  if (result.error?.code === 'PGRST204' && result.error.message?.includes('rejection_reason')) {
+    const fallbackPayload = { ...basePayload };
+    delete fallbackPayload.rejection_reason;
+    if (rejectionReason) fallbackPayload.notes = `Rejected: ${rejectionReason}`;
+    result = await supabase
+      .from('expenses')
+      .update(fallbackPayload)
+      .eq('id', expenseId)
+      .select()
+      .single();
+  }
+
+  if (result.error) { console.error('rejectExpense error:', result.error); throw result.error; }
+  return normalizeExpense(result.data);
 }
 
 export async function recallExpense(expenseId: string, reason?: string): Promise<Expense> {

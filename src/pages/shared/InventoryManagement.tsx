@@ -487,8 +487,11 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
         unitCost: newInventoryItemUnitCost,
         unitMeasurement: newInventoryItemUnitMeasurement,
         location: newInventoryItemLocation,
-        ...(addItemMode === 'standalone' && newInventoryItemCategory.trim()
-          ? { category: newInventoryItemCategory.trim() }
+        ...(addItemMode === 'standalone'
+          ? {
+              description: newInventoryItemName.trim(),
+              ...(newInventoryItemCategory.trim() ? { category: newInventoryItemCategory.trim() } : {}),
+            }
           : {}),
       });
 
@@ -1605,6 +1608,9 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                       const targetMenuItemId = row.rec?.menuItemId || row.item.id;
                       const linkedMenuItem = menuItemMap[targetMenuItemId];
                       const rowInventoryRec = inventoryMap[targetMenuItemId] || row.rec;
+                      // isLinked: an inventory record exists AND it's linked to a menu item.
+                      // Without row.rec, there's no inventory record to delink/relink.
+                      const isLinked = !!(linkedMenuItem && row.rec);
                       const maxStock = Math.max(row.rec?.reorderQty ?? row.stock * 2, row.stock, 1);
                       const purchaseDate = row.rec?.purchaseDate ? new Date(row.rec.purchaseDate) : null;
                       const ageDays = purchaseDate && !Number.isNaN(purchaseDate.getTime())
@@ -1907,11 +1913,11 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                                   </button>
                                   <button
                                     onClick={async () => {
-                                      if (linkedMenuItem) {
-                                        const linkedName = linkedMenuItem.name;
+                                      if (isLinked) {
+                                        const linkedName = linkedMenuItem!.name;
                                         if (!window.confirm(`Unlink this inventory record from "${linkedName}"?\nStock tracking will pause until re-linked.`)) return;
                                         try {
-                                          await apiDelinkInventoryRecord(row.rec?.id ?? row.item.id);
+                                          await apiDelinkInventoryRecord(row.rec!.id);
                                           await refresh();
                                           alert(`"${linkedName}" unlinked. Stock tracking paused until re-linked.`);
                                         } catch (err) {
@@ -1919,11 +1925,12 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                                         }
                                         return;
                                       }
-                                      const recId = row.rec?.id ?? row.item.id;
+                                      if (!row.rec) return; // no inventory record — can't link
+                                      const recId = row.rec.id;
                                       // row.item.id is the original standalone menuItemId (product code) for unlinked items
-                                      const originalCode = !linkedMenuItem ? row.item.id : '';
-                                      const name = (row.rec?.description || row.item.name || '').trim();
-                                      const price = row.rec?.price ?? row.rec?.unitCost ?? 0;
+                                      const originalCode = row.item.id;
+                                      const name = (row.rec.description || row.item.name || '').trim();
+                                      const price = row.rec.price ?? row.rec.unitCost ?? 0;
                                       const category = row.item.category !== 'Other' ? row.item.category : (isMinimartScope ? 'General' : 'Food');
                                       // If data is complete, auto-link without modal
                                       if (name && price > 0) {
@@ -1960,19 +1967,26 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                                       setAddToMenuCategory(category);
                                       setShowAddToMenuModal(true);
                                     }}
-                                    disabled={autoLinking === (row.rec?.id ?? row.item.id)}
+                                    disabled={autoLinking === (row.rec?.id ?? row.item.id) || (!isLinked && !row.rec)}
                                     className={`h-7 w-7 inline-flex items-center justify-center rounded-md border transition ${
                                       autoLinking === (row.rec?.id ?? row.item.id)
                                         ? 'text-slate-400 bg-slate-500/20 border-slate-500/30 cursor-not-allowed'
-                                        : linkedMenuItem
-                                          ? 'text-orange-200 bg-orange-500/20 border-orange-500/50 hover:bg-orange-500/35'
-                                          : 'text-blue-100 bg-blue-500/22 border-blue-500/55 hover:bg-blue-500/35'
+                                        : !isLinked && !row.rec
+                                          ? 'text-slate-600 bg-slate-700/20 border-slate-600/30 cursor-not-allowed'
+                                          : isLinked
+                                            ? 'text-orange-200 bg-orange-500/20 border-orange-500/50 hover:bg-orange-500/35'
+                                            : 'text-blue-100 bg-blue-500/22 border-blue-500/55 hover:bg-blue-500/35'
                                     }`}
-                                    title={autoLinking === (row.rec?.id ?? row.item.id) ? 'Linking…' : linkedMenuItem ? `Unlink from ${isMinimartScope ? 'Product' : 'Menu Item'}` : `Add to ${isMinimartScope ? 'Products' : 'Menu'}`}
+                                    title={
+                                      autoLinking === (row.rec?.id ?? row.item.id) ? 'Linking…'
+                                      : !isLinked && !row.rec ? 'Use "Add Item" to start tracking this item'
+                                      : isLinked ? `Unlink from ${isMinimartScope ? 'Product' : 'Menu Item'}`
+                                      : `Add to ${isMinimartScope ? 'Products' : 'Menu'}`
+                                    }
                                   >
                                     {autoLinking === (row.rec?.id ?? row.item.id)
                                       ? <RefreshCcwIcon className="w-4 h-4 animate-spin" />
-                                      : linkedMenuItem
+                                      : isLinked
                                         ? <XCircleIcon className="w-4 h-4" />
                                         : <LinkIcon className="w-4 h-4" />}
                                   </button>
