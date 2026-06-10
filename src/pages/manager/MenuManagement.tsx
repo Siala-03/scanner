@@ -125,7 +125,7 @@ export function MenuManagement() {
         reorderPoint: Math.max(1, Math.floor(trackThreshold * 1.5)),
         reorderQty: Math.max(1, trackThreshold * 4),
       });
-      await loadInvMap();
+      await Promise.all([loadInvMap(), refresh()]);
       setTrackingItem(null);
     } catch (err) {
       alert('Failed to save: ' + (err instanceof Error ? err.message : String(err)));

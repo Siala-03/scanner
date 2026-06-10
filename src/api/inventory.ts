@@ -412,6 +412,13 @@ export async function updateInventoryRecord(
       overrideSupplierId: record.supplierId ?? record.supplier_id,
       overrideUnitCost: record.unitCost ?? record.unit_cost,
     });
+    if (updateFields.stock !== undefined) {
+      await autoSyncMenuAvailability(
+        menuItemId, restaurantId,
+        Number(updateFields.stock),
+        previous?.stock != null ? Number(previous.stock) : null,
+      ).catch(() => {});
+    }
     return normalized;
   }
 
@@ -487,6 +494,8 @@ export async function updateInventoryRecord(
     overrideSupplierId: record.supplierId ?? record.supplier_id,
     overrideUnitCost: record.unitCost ?? record.unit_cost,
   });
+  // For a brand-new inventory record, previousStock is null — hide item if starting stock is 0
+  await autoSyncMenuAvailability(menuItemId, restaurantId, stock, null).catch(() => {});
   return normalizeInventoryRecord(data);
 }
 
@@ -712,6 +721,28 @@ export async function deleteInventoryRecord(menuItemId: string): Promise<void> {
  * Called after a successful order creation.
  * Failures are logged but do NOT throw — order creation takes priority over inventory sync.
  */
+/** Auto-hide or auto-show a menu item based on stock crossing zero. Fire-and-forget — failures are suppressed so they never block the caller. */
+async function autoSyncMenuAvailability(
+  menuItemId: string,
+  restaurantId: string,
+  newStock: number,
+  previousStock: number | null,
+): Promise<void> {
+  if (newStock === 0 && previousStock !== 0) {
+    await supabase
+      .from('menu_items')
+      .update({ is_available: false, updated_at: new Date().toISOString() })
+      .eq('id', menuItemId)
+      .eq('restaurant_id', restaurantId);
+  } else if (newStock > 0 && previousStock === 0) {
+    await supabase
+      .from('menu_items')
+      .update({ is_available: true, updated_at: new Date().toISOString() })
+      .eq('id', menuItemId)
+      .eq('restaurant_id', restaurantId);
+  }
+}
+
 export async function decrementInventoryForOrder(
   items: Array<{ menuItemId: string; quantity: number }>,
   options?: { reference?: string; performedBy?: string }
@@ -762,6 +793,8 @@ export async function decrementInventoryForOrder(
       if (movementErr) {
         console.warn(`[decrementInventoryForOrder] Failed to log movement for ${menuItemId}:`, movementErr.message);
       }
+
+      await autoSyncMenuAvailability(menuItemId, restaurantId, newStock, rec.stock ?? 0).catch(() => {});
     })
   );
 }
@@ -822,6 +855,8 @@ export async function restoreInventoryForOrder(
       if (movementErr) {
         console.warn(`[restoreInventoryForOrder] Failed to log movement for ${menuItemId}:`, movementErr.message);
       }
+
+      await autoSyncMenuAvailability(menuItemId, restaurantId, newStock, rec.stock ?? 0).catch(() => {});
     })
   );
 }
