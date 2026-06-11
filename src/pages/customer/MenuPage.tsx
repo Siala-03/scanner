@@ -104,10 +104,10 @@ export function MenuPage({ onAddToCart }: MenuPageProps) {
   );
 
   const filteredItems = useMemo(() => {
-    let items =
-    activeCategory === 'all' ?
-    menuItems :
-    menuItems.filter((item) => normalizeCategory(item.category) === normalizeCategory(activeCategory));
+    let items = menuItems.filter((item) => item.isAvailable);
+    if (activeCategory !== 'all') {
+      items = items.filter((item) => normalizeCategory(item.category) === normalizeCategory(activeCategory));
+    }
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       items = items.filter(

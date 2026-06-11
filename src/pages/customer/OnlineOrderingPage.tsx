@@ -264,13 +264,13 @@ export function OnlineOrderingPage({ qrCodeToken, restaurantName }: OnlineOrderi
             <div className="text-center py-12">
               <p className="text-slate-500 dark:text-slate-400">Loading menu...</p>
             </div>
-          ) : menuItems.length === 0 ? (
+          ) : menuItems.filter((i) => i.isAvailable).length === 0 ? (
             <div className="text-center py-12">
               <p className="text-slate-500 dark:text-slate-400">Menu not available</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {menuItems.map((item) => (
+              {menuItems.filter((i) => i.isAvailable).map((item) => (
                 <MenuItemCard
                   key={item.id}
                   item={item}
