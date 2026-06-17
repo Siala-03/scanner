@@ -69,6 +69,13 @@ export function AnalyticsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const { menuItems } = useMenu();
+  const [itemPageSize, setItemPageSize] = useState(10);
+  const [itemPage, setItemPage] = useState(0);
+  const [itemPaymentFilter, setItemPaymentFilter] = useState<string>('all');
+  const [sectionPageSize, setSectionPageSize] = useState(10);
+  const [sectionPage, setSectionPage] = useState(0);
+  useEffect(() => { setItemPage(0); }, [filterMode, customStart, customEnd, itemPaymentFilter]);
+  useEffect(() => { setSectionPage(0); }, [filterMode, customStart, customEnd]);
   const menuById = useMemo(
     () => Object.fromEntries(menuItems.map((item) => [item.id, item])),
     [menuItems],
@@ -310,9 +317,51 @@ export function AnalyticsPage() {
 
   // ─── Top menu items ─────────────────────────────────────────────────────────
 
-  const topItems = useMemo(() => {
-    const stats = new Map<string, { name: string; revenue: number; qty: number }>();
-    filteredOrders.forEach((o) => {
+  const parseBreakdown = (raw: any): any[] | null => {
+    if (Array.isArray(raw) && raw.length > 0) return raw;
+    if (typeof raw === 'string') {
+      try { const p = JSON.parse(raw); if (Array.isArray(p) && p.length > 0) return p; } catch {}
+    }
+    return null;
+  };
+
+  const resolvePaymentMethod = (o: any): string => {
+    const breakdown = parseBreakdown(o.payment_breakdown ?? o.paymentBreakdown);
+    if (breakdown) {
+      const raw = breakdown[0]?.method;
+      if (!raw) return 'Other';
+      const key = String(raw).toLowerCase().trim();
+      return { cash: 'Cash', '01': 'Cash', card: 'Card', '02': 'Card', credit_card: 'Card', debit_card: 'Card',
+        cheque: 'Cheque', check: 'Cheque', '03': 'Cheque', 'mobile money': 'Mobile Money', momo: 'Mobile Money', '04': 'Mobile Money',
+        'bank transfer': 'Bank Transfer', bank_transfer: 'Bank Transfer' }[key]
+        ?? raw.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase());
+    }
+    const raw = o.payment_type ?? o.paymentType;
+    if (!raw) return 'Other';
+    const key = String(raw).toLowerCase().trim();
+    return { cash: 'Cash', '01': 'Cash', card: 'Card', '02': 'Card', credit_card: 'Card', debit_card: 'Card',
+      cheque: 'Cheque', check: 'Cheque', '03': 'Cheque', 'mobile money': 'Mobile Money', momo: 'Mobile Money', '04': 'Mobile Money',
+      'bank transfer': 'Bank Transfer', bank_transfer: 'Bank Transfer' }[key]
+      ?? String(raw).replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase());
+  };
+
+  const availablePaymentMethods = useMemo(() => {
+    const methods = new Set<string>();
+    filteredOrders.forEach((o) => { methods.add(resolvePaymentMethod(o)); });
+    return Array.from(methods).sort();
+  }, [filteredOrders]);
+
+  const itemFilteredOrders = useMemo(
+    () => itemPaymentFilter === 'all'
+      ? filteredOrders
+      : filteredOrders.filter((o) => resolvePaymentMethod(o) === itemPaymentFilter),
+    [filteredOrders, itemPaymentFilter],
+  );
+
+  const allItemStats = useMemo(() => {
+    const stats = new Map<string, { name: string; revenue: number; qty: number; orders: number }>();
+    itemFilteredOrders.forEach((o) => {
+      const seenKeys = new Set<string>();
       normalizeItems(o.items).forEach((item: any) => {
         const mid = item.menuItemId ?? item.menu_item_id ?? '';
         const key = mid || (item.menuItemName ?? item.menu_item_name ?? 'unknown');
@@ -320,13 +369,16 @@ export function AnalyticsPage() {
         const qty = Number(item.quantity ?? 1) || 1;
         const up = Number(item.unitPrice ?? item.unit_price ?? menuById[mid]?.price ?? 0);
         const rev = Number(item.totalPrice ?? item.total_price ?? up * qty) || 0;
-        const s = stats.get(key) ?? { name, revenue: 0, qty: 0 };
+        const s = stats.get(key) ?? { name, revenue: 0, qty: 0, orders: 0 };
         s.revenue += rev; s.qty += qty;
+        if (!seenKeys.has(key)) { s.orders += 1; seenKeys.add(key); }
         stats.set(key, s);
       });
     });
-    return Array.from(stats.values()).sort((a, b) => b.revenue - a.revenue).slice(0, 5);
-  }, [filteredOrders, menuById]);
+    return Array.from(stats.values()).sort((a, b) => b.revenue - a.revenue);
+  }, [itemFilteredOrders, menuById]);
+
+  const topItems = useMemo(() => allItemStats.slice(0, 5), [allItemStats]);
 
   // ─── Sales funnel ──────────────────────────────────────────────────────────
 
@@ -368,10 +420,10 @@ export function AnalyticsPage() {
 
     filteredOrders.forEach((o) => {
       if (!isConfirmed(o)) return;
-      const breakdown = o.payment_breakdown ?? o.paymentBreakdown;
+      const breakdown = parseBreakdown(o.payment_breakdown ?? o.paymentBreakdown);
       const orderTotal = Number(o.total) || 0;
 
-      if (Array.isArray(breakdown) && breakdown.length > 0) {
+      if (breakdown) {
         // Accurate split: each entry has exact method amount
         breakdown.forEach((entry: any) => {
           const label = resolveMethodLabel(entry.method);
@@ -764,6 +816,129 @@ export function AnalyticsPage() {
           </Card>
         </div>
 
+        {/* ── Item Revenue Breakdown ──────────────────────────────────── */}
+        <Card className="bg-slate-800 mb-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
+            <div>
+              <h3 className="text-base font-semibold text-gray-100">Item Revenue Breakdown</h3>
+              <p className="text-xs text-slate-400 mt-0.5">
+                {allItemStats.length} items · {itemFilteredOrders.length} orders · {periodLabel}
+                {itemPaymentFilter !== 'all' && <span className="text-emerald-400"> · {itemPaymentFilter}</span>}
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <select
+                value={itemPaymentFilter}
+                onChange={(e) => { setItemPaymentFilter(e.target.value); setItemPage(0); }}
+                className="bg-slate-700 text-slate-200 text-xs rounded-lg px-2 py-1.5 border border-slate-600 focus:outline-none focus:border-emerald-500"
+              >
+                <option value="all">All Payments</option>
+                {availablePaymentMethods.map((m) => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
+              <span className="text-xs text-slate-400">Show</span>
+              <select
+                value={itemPageSize}
+                onChange={(e) => { setItemPageSize(Number(e.target.value)); setItemPage(0); }}
+                className="bg-slate-700 text-slate-200 text-xs rounded-lg px-2 py-1.5 border border-slate-600 focus:outline-none focus:border-emerald-500"
+              >
+                {[10, 25, 50, 100].map((n) => (
+                  <option key={n} value={n}>{n}</option>
+                ))}
+              </select>
+              <span className="text-xs text-slate-400">per page</span>
+            </div>
+          </div>
+
+          {allItemStats.length === 0 ? (
+            <p className="text-sm text-slate-500 py-4">No item data for this period.</p>
+          ) : (
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-700">
+                      <th className="text-left text-slate-400 py-2 pr-4 font-medium w-8">#</th>
+                      <th className="text-left text-slate-400 py-2 pr-4 font-medium">Item</th>
+                      <th className="text-right text-slate-400 py-2 px-2 font-medium">Qty Sold</th>
+                      <th className="text-right text-slate-400 py-2 px-2 font-medium">Orders</th>
+                      <th className="text-right text-slate-400 py-2 pl-4 font-medium">Revenue</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {allItemStats.slice(itemPage * itemPageSize, (itemPage + 1) * itemPageSize).map((item, i) => (
+                      <tr key={item.name} className="border-b border-slate-700/40 hover:bg-slate-700/20">
+                        <td className="py-2 pr-4 text-slate-500 text-xs">{itemPage * itemPageSize + i + 1}</td>
+                        <td className="py-2 pr-4 text-slate-200 font-medium">{item.name}</td>
+                        <td className="py-2 px-2 text-right text-slate-300">{item.qty}</td>
+                        <td className="py-2 px-2 text-right text-slate-300">{item.orders}</td>
+                        <td className="py-2 pl-4 text-right font-semibold text-amber-300">{formatPrice(item.revenue)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="border-t-2 border-slate-600">
+                      <td colSpan={2} className="py-3 pr-4 font-bold text-gray-100">Total</td>
+                      <td className="py-3 px-2 text-right font-bold text-gray-100">
+                        {allItemStats.reduce((s, it) => s + it.qty, 0)}
+                      </td>
+                      <td className="py-3 px-2 text-right font-bold text-gray-100">
+                        {filteredOrders.length}
+                      </td>
+                      <td className="py-3 pl-4 text-right font-bold text-emerald-400">
+                        {formatPrice(allItemStats.reduce((s, it) => s + it.revenue, 0))}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+
+              {/* Pagination controls */}
+              {allItemStats.length > itemPageSize && (
+                <div className="flex items-center justify-between mt-4 pt-3 border-t border-slate-700/50">
+                  <p className="text-xs text-slate-400">
+                    Showing {itemPage * itemPageSize + 1}–{Math.min((itemPage + 1) * itemPageSize, allItemStats.length)} of {allItemStats.length} items
+                  </p>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => setItemPage(0)}
+                      disabled={itemPage === 0}
+                      className="px-2 py-1 text-xs rounded bg-slate-700 text-slate-300 hover:bg-slate-600 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      First
+                    </button>
+                    <button
+                      onClick={() => setItemPage((p) => Math.max(0, p - 1))}
+                      disabled={itemPage === 0}
+                      className="px-2 py-1 text-xs rounded bg-slate-700 text-slate-300 hover:bg-slate-600 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      Prev
+                    </button>
+                    <span className="text-xs text-slate-400 px-2">
+                      {itemPage + 1} / {Math.ceil(allItemStats.length / itemPageSize)}
+                    </span>
+                    <button
+                      onClick={() => setItemPage((p) => Math.min(Math.ceil(allItemStats.length / itemPageSize) - 1, p + 1))}
+                      disabled={(itemPage + 1) * itemPageSize >= allItemStats.length}
+                      className="px-2 py-1 text-xs rounded bg-slate-700 text-slate-300 hover:bg-slate-600 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      Next
+                    </button>
+                    <button
+                      onClick={() => setItemPage(Math.ceil(allItemStats.length / itemPageSize) - 1)}
+                      disabled={(itemPage + 1) * itemPageSize >= allItemStats.length}
+                      className="px-2 py-1 text-xs rounded bg-slate-700 text-slate-300 hover:bg-slate-600 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      Last
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </Card>
+
         {/* ── Payment method breakdown ─────────────────────────────────── */}
         <Card className="bg-slate-800 mb-4">
           <div className="flex items-center justify-between mb-4">
@@ -940,6 +1115,20 @@ export function AnalyticsPage() {
               </div>
 
               {/* Daily table */}
+              <div className="flex items-center justify-end gap-2 mb-3">
+                <span className="text-xs text-slate-400">Show</span>
+                <select
+                  value={sectionPageSize}
+                  onChange={(e) => { setSectionPageSize(Number(e.target.value)); setSectionPage(0); }}
+                  className="bg-slate-700 text-slate-200 text-xs rounded-lg px-2 py-1.5 border border-slate-600 focus:outline-none focus:border-emerald-500"
+                >
+                  {[10, 25, 50, 100].map((n) => (
+                    <option key={n} value={n}>{n}</option>
+                  ))}
+                </select>
+                <span className="text-xs text-slate-400">per page</span>
+              </div>
+
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
@@ -952,7 +1141,7 @@ export function AnalyticsPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {sectionRevenueByDay.map((day) => (
+                    {sectionRevenueByDay.slice(sectionPage * sectionPageSize, (sectionPage + 1) * sectionPageSize).map((day) => (
                       <tr key={day.date} className="border-b border-slate-700/40 hover:bg-slate-700/20">
                         <td className="py-2 pr-4 text-slate-300 whitespace-nowrap">{day.label}</td>
                         {activeSections.map((s) => {
@@ -985,6 +1174,47 @@ export function AnalyticsPage() {
                   </tfoot>
                 </table>
               </div>
+
+              {sectionRevenueByDay.length > sectionPageSize && (
+                <div className="flex items-center justify-between mt-4 pt-3 border-t border-slate-700/50">
+                  <p className="text-xs text-slate-400">
+                    Showing {sectionPage * sectionPageSize + 1}–{Math.min((sectionPage + 1) * sectionPageSize, sectionRevenueByDay.length)} of {sectionRevenueByDay.length} days
+                  </p>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => setSectionPage(0)}
+                      disabled={sectionPage === 0}
+                      className="px-2 py-1 text-xs rounded bg-slate-700 text-slate-300 hover:bg-slate-600 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      First
+                    </button>
+                    <button
+                      onClick={() => setSectionPage((p) => Math.max(0, p - 1))}
+                      disabled={sectionPage === 0}
+                      className="px-2 py-1 text-xs rounded bg-slate-700 text-slate-300 hover:bg-slate-600 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      Prev
+                    </button>
+                    <span className="text-xs text-slate-400 px-2">
+                      {sectionPage + 1} / {Math.ceil(sectionRevenueByDay.length / sectionPageSize)}
+                    </span>
+                    <button
+                      onClick={() => setSectionPage((p) => Math.min(Math.ceil(sectionRevenueByDay.length / sectionPageSize) - 1, p + 1))}
+                      disabled={(sectionPage + 1) * sectionPageSize >= sectionRevenueByDay.length}
+                      className="px-2 py-1 text-xs rounded bg-slate-700 text-slate-300 hover:bg-slate-600 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      Next
+                    </button>
+                    <button
+                      onClick={() => setSectionPage(Math.ceil(sectionRevenueByDay.length / sectionPageSize) - 1)}
+                      disabled={(sectionPage + 1) * sectionPageSize >= sectionRevenueByDay.length}
+                      className="px-2 py-1 text-xs rounded bg-slate-700 text-slate-300 hover:bg-slate-600 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      Last
+                    </button>
+                  </div>
+                </div>
+              )}
             </>
           )}
         </Card>
