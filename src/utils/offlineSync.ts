@@ -19,19 +19,30 @@ export type OnPaymentConfirmed = (orderId: string) => void;
 export type OnPaymentFailed = (orderId: string, reason: string) => void;
 
 let _flushing = false;
+let _flushStartedAt = 0;
 let _flushingPayments = false;
+let _flushPaymentsStartedAt = 0;
 let _flushingStatus = false;
+let _flushStatusStartedAt = 0;
+const FLUSH_LOCK_TIMEOUT = 30_000;
+
+function acquireLock(active: boolean, startedAt: number): boolean {
+  if (!active) return true;
+  return Date.now() - startedAt >= FLUSH_LOCK_TIMEOUT;
+}
 
 /**
  * Flush all ready pending entries sequentially.
  * Skips if a flush is already running (prevents concurrent sends).
+ * Lock auto-expires after 30s to prevent permanent stalls.
  */
 export async function flushPendingOrders(
   onConfirmed: OnConfirmed,
   onFailed: OnFailed
 ): Promise<void> {
-  if (_flushing) return;
+  if (!acquireLock(_flushing, _flushStartedAt)) return;
   _flushing = true;
+  _flushStartedAt = Date.now();
 
   try {
     const pending = await queue.getPending();
@@ -112,6 +123,13 @@ async function flushEntry(
       }
     }
 
+    // IP restriction — will never succeed on retry, fail immediately
+    if (message.includes('restaurant network')) {
+      await queue.markDone(entry.idempotencyKey, 'blocked-by-ip-restriction');
+      onFailed(entry.localOrderId, message);
+      return;
+    }
+
     // Network error — leave as pending for retry
     const isNetworkError =
       err?.name === 'TypeError' ||
@@ -162,8 +180,9 @@ export async function flushPendingPayments(
   onConfirmed: OnPaymentConfirmed,
   onFailed: OnPaymentFailed
 ): Promise<void> {
-  if (_flushingPayments) return;
+  if (!acquireLock(_flushingPayments, _flushPaymentsStartedAt)) return;
   _flushingPayments = true;
+  _flushPaymentsStartedAt = Date.now();
 
   try {
     const pending = await queue.getPendingPayments();
@@ -223,8 +242,9 @@ async function flushPaymentEntry(
  * that were made while offline against already-existing server orders.
  */
 export async function flushPendingStatusUpdates(): Promise<void> {
-  if (_flushingStatus) return;
+  if (!acquireLock(_flushingStatus, _flushStatusStartedAt)) return;
   _flushingStatus = true;
+  _flushStatusStartedAt = Date.now();
 
   try {
     const pending = await queue.getPendingStatusUpdates();

@@ -300,19 +300,7 @@ export async function createOrder(order: CreateOrderInput): Promise<Order> {
 
   const isOnlineOrder = order.tableNumber === 999;
 
-  // Generate idempotency key once per submission to prevent duplicate orders
   const idempotencyKey = (order as any).idempotencyKey || crypto.randomUUID();
-
-  // Fast path: if this key already landed in the DB (retry or race), return immediately.
-  // This avoids hitting the unique constraint and saves a round-trip on the fallback path.
-  if (idempotencyKey) {
-    const { data: existing } = await db
-      .from('orders')
-      .select('*')
-      .eq('idempotency_key', idempotencyKey)
-      .maybeSingle();
-    if (existing) return existing as unknown as Order;
-  }
 
   const shouldAttemptTabMerge =
     Number.isInteger(order.tableNumber) &&

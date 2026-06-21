@@ -73,7 +73,10 @@ registerRoute(
 // ─── Background Sync ──────────────────────────────────────────────────────────
 
 const DB_NAME = 'servv_order_queue';
+const DB_VERSION = 3;
 const STORE = 'orders';
+const PAYMENT_STORE = 'payment_confirmations';
+const STATUS_STORE = 'status_updates';
 
 self.addEventListener('sync', (e) => {
   if ((e as any).tag === 'sync-pending-orders') {
@@ -83,16 +86,31 @@ self.addEventListener('sync', (e) => {
 
 async function openQueueDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, 1);
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
-    // If the DB doesn't exist yet (tab was never opened), skip gracefully
-    req.onupgradeneeded = () => {
+    req.onupgradeneeded = (e) => {
       const db = req.result;
-      if (!db.objectStoreNames.contains(STORE)) {
+      const oldVersion = e.oldVersion;
+
+      if (oldVersion < 1) {
         const store = db.createObjectStore(STORE, { keyPath: 'idempotencyKey' });
         store.createIndex('byStatus', 'status', { unique: false });
         store.createIndex('byLocalOrderId', 'localOrderId', { unique: true });
+      }
+
+      if (oldVersion < 2) {
+        if (!db.objectStoreNames.contains(PAYMENT_STORE)) {
+          const pStore = db.createObjectStore(PAYMENT_STORE, { keyPath: 'idempotencyKey' });
+          pStore.createIndex('byStatus', 'status', { unique: false });
+        }
+      }
+
+      if (oldVersion < 3) {
+        if (!db.objectStoreNames.contains(STATUS_STORE)) {
+          const sStore = db.createObjectStore(STATUS_STORE, { keyPath: 'idempotencyKey' });
+          sStore.createIndex('byQueueStatus', 'queueStatus', { unique: false });
+        }
       }
     };
   });
