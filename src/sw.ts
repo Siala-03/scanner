@@ -13,7 +13,14 @@ precacheAndRoute(WB_MANIFEST);
 self.skipWaiting();
 
 self.addEventListener('activate', (e) => {
-  e.waitUntil(self.clients.claim());
+  e.waitUntil(
+    Promise.all([
+      self.clients.claim(),
+      // Purge the old Supabase API cache — it stored stale/error responses
+      // that caused order submissions to fail on flaky connections.
+      caches.delete('supabase-api'),
+    ])
+  );
 });
 
 // ─── App shell: serve from cache when offline ────────────────────────────────

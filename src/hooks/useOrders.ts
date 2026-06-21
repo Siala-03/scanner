@@ -566,6 +566,9 @@ export function useOrders(): UseOrdersReturn {
             msg.includes('Failed to fetch') ||
             msg.includes('NetworkError') ||
             msg.includes('Unable to connect') ||
+            msg.includes('WorkboxError') ||
+            msg.includes('no-response') ||
+            msg.includes('timeout') ||
             !navigator.onLine;
 
           if (isNetworkError) {

@@ -136,6 +136,15 @@ async function flushEntry(
       message.includes('Failed to fetch') ||
       message.includes('NetworkError') ||
       message.includes('Unable to connect') ||
+      message.includes('WorkboxError') ||
+      message.includes('no-response') ||
+      message.includes('bad-network') ||
+      message.includes('timeout') ||
+      message.includes('ERR_') ||
+      message.includes('ECONNREFUSED') ||
+      message.includes('502') ||
+      message.includes('503') ||
+      message.includes('504') ||
       (typeof navigator !== 'undefined' && !navigator.onLine);
 
     if (isNetworkError) {
@@ -218,6 +227,9 @@ async function flushPaymentEntry(
       message.includes('Failed to fetch') ||
       message.includes('NetworkError') ||
       message.includes('Unable to connect') ||
+      message.includes('WorkboxError') ||
+      message.includes('no-response') ||
+      message.includes('timeout') ||
       (typeof navigator !== 'undefined' && !navigator.onLine);
 
     if (isNetworkError) {
@@ -277,6 +289,9 @@ async function flushStatusEntry(entry: StatusUpdateEntry): Promise<void> {
       message.includes('Failed to fetch') ||
       message.includes('NetworkError') ||
       message.includes('Unable to connect') ||
+      message.includes('WorkboxError') ||
+      message.includes('no-response') ||
+      message.includes('timeout') ||
       (typeof navigator !== 'undefined' && !navigator.onLine);
 
     // Network error — keep pending for next retry
