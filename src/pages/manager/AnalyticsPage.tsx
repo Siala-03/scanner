@@ -326,23 +326,23 @@ export function AnalyticsPage() {
   };
 
   const resolvePaymentMethod = (o: any): string => {
+    const methodMap: Record<string, string> = {
+      cash: 'Cash', '01': 'Cash',
+      card: 'Card', '02': 'Card', credit_card: 'Card', debit_card: 'Card',
+      cheque: 'Cheque', check: 'Cheque', '03': 'Cheque',
+      'mobile money': 'MoMo', momo: 'MoMo', '04': 'MoMo',
+      other: 'Other', '99': 'Other',
+      'bank transfer': 'Bank Transfer', bank_transfer: 'Bank Transfer',
+    };
     const breakdown = parseBreakdown(o.payment_breakdown ?? o.paymentBreakdown);
     if (breakdown) {
       const raw = breakdown[0]?.method;
       if (!raw) return 'Other';
-      const key = String(raw).toLowerCase().trim();
-      return { cash: 'Cash', '01': 'Cash', card: 'Card', '02': 'Card', credit_card: 'Card', debit_card: 'Card',
-        cheque: 'Cheque', check: 'Cheque', '03': 'Cheque', 'mobile money': 'Mobile Money', momo: 'Mobile Money', '04': 'Mobile Money',
-        'bank transfer': 'Bank Transfer', bank_transfer: 'Bank Transfer' }[key]
-        ?? raw.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase());
+      return methodMap[String(raw).toLowerCase().trim()] ?? raw.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase());
     }
     const raw = o.payment_type ?? o.paymentType;
     if (!raw) return 'Other';
-    const key = String(raw).toLowerCase().trim();
-    return { cash: 'Cash', '01': 'Cash', card: 'Card', '02': 'Card', credit_card: 'Card', debit_card: 'Card',
-      cheque: 'Cheque', check: 'Cheque', '03': 'Cheque', 'mobile money': 'Mobile Money', momo: 'Mobile Money', '04': 'Mobile Money',
-      'bank transfer': 'Bank Transfer', bank_transfer: 'Bank Transfer' }[key]
-      ?? String(raw).replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase());
+    return methodMap[String(raw).toLowerCase().trim()] ?? String(raw).replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase());
   };
 
   const availablePaymentMethods = useMemo(() => {
@@ -396,14 +396,16 @@ export function AnalyticsPage() {
     '01': 'Cash',    cash: 'Cash',
     '02': 'Card',    card: 'Card',    credit_card: 'Card',    debit_card: 'Card',
     '03': 'Cheque',  cheque: 'Cheque', check: 'Cheque',
-    '04': 'Mobile Money', 'mobile money': 'Mobile Money', momo: 'Mobile Money',
+    '04': 'MoMo',    'mobile money': 'MoMo', momo: 'MoMo',
+    '99': 'Other',   other: 'Other',
     'bank transfer': 'Bank Transfer', bank_transfer: 'Bank Transfer',
   };
 
   const PAYMENT_METHOD_COLORS: Record<string, string> = {
     'Cash':          '#10b981',
     'Card':          '#3b82f6',
-    'Mobile Money':  '#f59e0b',
+    'MoMo':          '#f59e0b',
+    'Other':         '#6b7280',
     'Cheque':        '#8b5cf6',
     'Bank Transfer': '#06b6d4',
   };

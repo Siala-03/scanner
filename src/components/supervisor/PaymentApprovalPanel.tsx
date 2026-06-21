@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   CheckCircleIcon, ClockIcon, BanknoteIcon, CreditCardIcon,
   SmartphoneIcon, RefreshCwIcon, UserIcon, PlusIcon, XIcon,
-  WifiOffIcon,
+  WifiOffIcon, CircleEllipsisIcon,
 } from 'lucide-react';
 import { fetchOrders, confirmPayment, fetchOrderCancellationRequests, requestOrderCancellation } from '../../api/orders';
 import { VoidReasonModal } from '../shared/VoidReasonModal';
@@ -36,6 +36,7 @@ const PAYMENT_METHODS = [
   { code: '01', label: 'Cash',  icon: BanknoteIcon  },
   { code: '02', label: 'Card',  icon: CreditCardIcon },
   { code: '04', label: 'MoMo',  icon: SmartphoneIcon },
+  { code: '99', label: 'Other', icon: CircleEllipsisIcon },
 ];
 
 interface SplitEntry {

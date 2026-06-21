@@ -1,15 +1,15 @@
 import { useState } from 'react';
 import {
-  BanknoteIcon, SmartphoneIcon, CreditCardIcon, BuildingIcon,
+  BanknoteIcon, SmartphoneIcon, CreditCardIcon, CircleEllipsisIcon,
   XIcon, CheckCircleIcon,
 } from 'lucide-react';
 import type { PaymentEntry } from '../../utils/receipt';
 
 const METHODS = [
-  { id: 'Cash',          label: 'Cash',          icon: BanknoteIcon,   hasRef: false },
-  { id: 'Mobile Money',  label: 'MOMO',          icon: SmartphoneIcon, hasRef: true  },
-  { id: 'Card',          label: 'Card',          icon: CreditCardIcon, hasRef: true  },
-  { id: 'Bank Transfer', label: 'Bank Transfer', icon: BuildingIcon,   hasRef: true  },
+  { id: 'Cash',          label: 'Cash',          icon: BanknoteIcon,        hasRef: false },
+  { id: 'Mobile Money',  label: 'MoMo',          icon: SmartphoneIcon,      hasRef: true  },
+  { id: 'Card',          label: 'Card',          icon: CreditCardIcon,      hasRef: true  },
+  { id: 'Other',         label: 'Other',         icon: CircleEllipsisIcon,  hasRef: false },
 ];
 
 interface EntryDraft {
