@@ -38,21 +38,14 @@ registerRoute(
   new NetworkOnly()
 );
 
-// Supabase REST / Edge Functions: NetworkFirst with 24h fallback cache.
-// GET only — POST/PATCH/DELETE bypass the SW so they reach the real network
-// and throw a real TypeError when offline (rather than a WorkboxError that
-// the app's catch blocks can't distinguish from a server error).
+// Supabase REST / Edge Functions: always hit the network.
+// Caching API responses causes stale auth tokens, cached error responses (400s),
+// and stale data. Offline mode uses IndexedDB queuing instead.
 registerRoute(
   ({ url }) =>
     url.hostname.includes('supabase.co') &&
     (url.pathname.includes('/rest/') || url.pathname.includes('/functions/')),
-  new NetworkFirst({
-    cacheName: 'supabase-api',
-    plugins: [
-      new ExpirationPlugin({ maxEntries: 100, maxAgeSeconds: 24 * 60 * 60 }),
-    ],
-  }),
-  'GET'
+  new NetworkOnly()
 );
 
 // Static assets: CacheFirst (7 days)
