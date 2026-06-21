@@ -594,81 +594,48 @@ export async function confirmPayment(
 ): Promise<Order> {
   const now = new Date().toISOString();
 
-  // Full update — newest schema
-  let result = await db
-    .from('orders')
-    .update({
-      payment_status: 'confirmed',
-      status: 'served',
-      payment_confirmed_by: opts.confirmedBy || null,
-      payment_confirmed_by_name: opts.confirmedByName || null,
-      payment_confirmed_at: now,
-      payment_type: opts.paymentType || null,
-      payment_breakdown: opts.paymentBreakdown || null,
-      payment_note: opts.note || null,
-      completed_at: now,
-      updated_at: now,
-    })
-    .eq('id', orderId)
-    .select()
-    .single();
+  const paymentFields: Record<string, unknown> = {
+    payment_type: opts.paymentType || null,
+    payment_breakdown: opts.paymentBreakdown || null,
+    payment_note: opts.note || null,
+  };
 
-  // Fallback 1: keep cashier ownership even if newer metadata columns are missing
-  if (result.error) {
+  const confirmedByFields: Record<string, unknown> = {
+    payment_confirmed_by: opts.confirmedBy || null,
+    payment_confirmed_by_name: opts.confirmedByName || null,
+    payment_confirmed_at: now,
+  };
+
+  const baseFields: Record<string, unknown> = {
+    payment_status: 'confirmed',
+    status: 'served',
+    completed_at: now,
+    updated_at: now,
+  };
+
+  // Try progressively smaller payloads, but always keep payment method fields
+  // as long as possible so analytics can track Cash/Card/MoMo.
+  const attempts = [
+    { ...baseFields, ...confirmedByFields, ...paymentFields },
+    { ...baseFields, ...paymentFields, payment_confirmed_by: opts.confirmedBy || null },
+    { ...baseFields, ...paymentFields },
+    { ...baseFields, ...confirmedByFields },
+    { ...baseFields },
+    { status: 'served', completed_at: now, updated_at: now },
+  ];
+
+  let result: any;
+  for (const payload of attempts) {
     result = await db
       .from('orders')
-      .update({
-        payment_status: 'confirmed',
-        status: 'served',
-        payment_confirmed_by: opts.confirmedBy || null,
-        payment_confirmed_by_name: opts.confirmedByName || null,
-        completed_at: now,
-        updated_at: now,
-      })
+      .update(payload)
       .eq('id', orderId)
       .select()
       .single();
+    if (!result.error) return result.data as Order;
   }
 
-  // Fallback 2: payment_confirmed_by_name missing, still keep payment_confirmed_by
-  if (result.error) {
-    result = await db
-      .from('orders')
-      .update({
-        payment_status: 'confirmed',
-        status: 'served',
-        payment_confirmed_by: opts.confirmedBy || null,
-        completed_at: now,
-        updated_at: now,
-      })
-      .eq('id', orderId)
-      .select()
-      .single();
-  }
-
-  // Fallback 3: ownership columns unavailable in very old schemas
-  if (result.error) {
-    result = await db
-      .from('orders')
-      .update({ payment_status: 'confirmed', status: 'served', completed_at: now, updated_at: now })
-      .eq('id', orderId)
-      .select()
-      .single();
-  }
-
-  // Fallback 4: payment_status missing or check mismatch — mark served only
-  if (result.error?.code === 'PGRST204' || result.error?.code === '23514') {
-    console.warn('[confirmPayment] payment_status unavailable, marking updated_at only:', result.error.message);
-    result = await db
-      .from('orders')
-      .update({ status: 'served', completed_at: now, updated_at: now })
-      .eq('id', orderId)
-      .select()
-      .single();
-  }
-
-  if (result.error) throw result.error;
-  return result.data as Order;
+  throw result?.error || new Error('Failed to confirm payment');
 }
 
 export async function updateOrderItemStatus(

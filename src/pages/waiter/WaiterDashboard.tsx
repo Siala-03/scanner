@@ -1224,10 +1224,10 @@ export function WaiterDashboard({
         confirmedBy: String(waiter.id),
         confirmedByName: waiterName,
       });
-      onUpdateOrderStatus(order.id, 'served', { assignedWaiterId: waiter.id });
     } catch (err) {
       console.error('Failed to persist payment data:', err);
     }
+    onUpdateOrderStatus(order.id, 'served', { assignedWaiterId: waiter.id });
 
     try {
       const combinedNotes = [cleanSourceTag(order.notes), receiptNote?.trim() || '']
