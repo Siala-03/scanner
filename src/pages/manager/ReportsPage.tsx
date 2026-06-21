@@ -227,6 +227,7 @@ export function ReportsPage({ restaurantName = '' }: { restaurantName?: string }
           fetchExpenses({
             startDate: periodWindow.start.toISOString().split('T')[0],
             endDate: periodWindow.end.toISOString().split('T')[0],
+            approvalStatus: 'approved',
           }),
           fetchExpenseCategories(),
           fetchWaiters(),

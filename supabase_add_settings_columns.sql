@@ -64,3 +64,58 @@ ALTER TABLE orders
 CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_idempotency_key
   ON orders (idempotency_key)
   WHERE idempotency_key IS NOT NULL;
+
+-- =============================================
+-- EXPENSES TABLE — ensure all required columns exist
+-- =============================================
+
+CREATE TABLE IF NOT EXISTS expenses (
+  id text PRIMARY KEY,
+  restaurant_id text NOT NULL,
+  category_id text,
+  vendor_name text,
+  description text,
+  amount numeric DEFAULT 0,
+  expense_date date,
+  payment_method text,
+  payment_status text DEFAULT 'pending',
+  reference_number text,
+  notes text,
+  is_recurring boolean DEFAULT false,
+  recurring_frequency text,
+  tax_amount numeric DEFAULT 0,
+  tax_rate numeric DEFAULT 0,
+  is_tax_deductible boolean DEFAULT false,
+  status text DEFAULT 'pending',
+  rejection_reason text,
+  approved_by text,
+  approved_at timestamptz,
+  created_by text,
+  submitted_by text,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
+
+-- Add columns that may be missing on older schemas
+ALTER TABLE expenses ADD COLUMN IF NOT EXISTS status text DEFAULT 'pending';
+ALTER TABLE expenses ADD COLUMN IF NOT EXISTS rejection_reason text;
+ALTER TABLE expenses ADD COLUMN IF NOT EXISTS approved_by text;
+ALTER TABLE expenses ADD COLUMN IF NOT EXISTS approved_at timestamptz;
+ALTER TABLE expenses ADD COLUMN IF NOT EXISTS created_by text;
+ALTER TABLE expenses ADD COLUMN IF NOT EXISTS submitted_by text;
+
+-- =============================================
+-- EXPENSE CATEGORIES TABLE
+-- =============================================
+
+CREATE TABLE IF NOT EXISTS expense_categories (
+  id text PRIMARY KEY,
+  restaurant_id text,
+  name text NOT NULL,
+  description text,
+  color text DEFAULT '#6b7280',
+  icon text DEFAULT 'receipt',
+  is_active boolean DEFAULT true,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);

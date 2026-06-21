@@ -798,30 +798,29 @@ export async function getApprovalSummary(): Promise<any> {
 
 // Backward-compatible API used by ExpenseApproval component
 export async function getExpenseApprovalSummary(): Promise<any> {
-  const summary = await getApprovalSummary();
-  const normalized = summary || {};
+  const restaurantId = getRestaurantId();
+  if (!restaurantId) return [];
+
+  const { data, error } = await supabase
+    .from('expenses')
+    .select('status, amount')
+    .eq('restaurant_id', restaurantId);
+
+  if (error) { console.error('getExpenseApprovalSummary error:', error); }
+
+  const expenses = data || [];
+  const byStatus = (s: string) => expenses.filter(e => e.status === s);
+  const sumAmount = (rows: any[]) => rows.reduce((s, e) => s + (Number(e.amount) || 0), 0);
+
+  const pending = byStatus('pending');
+  const approved = byStatus('approved');
+  const rejected = byStatus('rejected');
 
   return [
-    {
-      approval_status: 'pending',
-      count: normalized.pending || 0,
-      total_amount: 0,
-    },
-    {
-      approval_status: 'approved',
-      count: normalized.approved || 0,
-      total_amount: 0,
-    },
-    {
-      approval_status: 'rejected',
-      count: normalized.rejected || 0,
-      total_amount: 0,
-    },
-    {
-      approval_status: 'total',
-      count: normalized.total || 0,
-      total_amount: 0,
-    },
+    { approval_status: 'pending',  count: pending.length,  total_amount: sumAmount(pending) },
+    { approval_status: 'approved', count: approved.length, total_amount: sumAmount(approved) },
+    { approval_status: 'rejected', count: rejected.length, total_amount: sumAmount(rejected) },
+    { approval_status: 'total',    count: expenses.length, total_amount: sumAmount(expenses) },
   ];
 }
 
