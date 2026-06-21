@@ -47,10 +47,11 @@ import type { RestaurantReceiptSettings } from './api/restaurants';
 import { MinimartApp } from './pages/minimart/MinimartApp';
 import { RestaurantSettings } from './pages/manager/RestaurantSettings';
 import { EbmSettings } from './pages/manager/EbmSettings';
+import { ReportsPage } from './pages/manager/ReportsPage';
 import { StaffOrderPage } from './pages/shared/StaffOrderPage';
 
 type UserRole = 'customer' | 'waiter' | 'cashier' | 'supervisor' | 'manager' | 'kitchen' | 'superadmin' | 'supplier' | null;
-type ManagerPage = 'dashboard' | 'menu' | 'staff' | 'analytics' | 'performance' | 'qrcodes' | 'inventory' | 'history' | 'expenses' | 'payment-cancellations' | 'credit' | 'loyalty' | 'promotions' | 'reservations' | 'scheduling' | 'reviews' | 'settings' | 'ebm';
+type ManagerPage = 'dashboard' | 'menu' | 'staff' | 'analytics' | 'performance' | 'qrcodes' | 'inventory' | 'history' | 'expenses' | 'payment-cancellations' | 'credit' | 'loyalty' | 'promotions' | 'reservations' | 'scheduling' | 'reviews' | 'settings' | 'ebm' | 'reports';
 type SupervisorPage = 'dashboard' | 'revenue' | 'staff' | 'qrcodes' | 'inventory' | 'history' | 'expenses' | 'online-orders' | 'payments' | 'attendance' | 'take-order';
 
 const MANAGER_NAV_GROUPS: Array<{
@@ -81,6 +82,7 @@ const MANAGER_NAV_GROUPS: Array<{
     label: 'Finance',
     items: [
       { id: 'analytics', label: 'Analytics' },
+      { id: 'reports', label: 'Reports' },
       { id: 'expenses', label: 'Expenses' },
       { id: 'payment-cancellations', label: 'Cancellation Requests' },
       { id: 'credit', label: 'Credit' },
@@ -1063,6 +1065,7 @@ export function App() {
             {managerPage === 'menu' && <MenuManagement />}
             {managerPage === 'staff' && <StaffManagement onShowPerformance={() => setManagerPage('performance')} />}
             {managerPage === 'analytics' && <AnalyticsPage />}
+            {managerPage === 'reports' && <ReportsPage />}
             {managerPage === 'performance' && <StaffPerformance onBack={() => setManagerPage('staff')} />}
             {managerPage === 'inventory' && <InventoryManagement role="manager" />}
             {managerPage === 'qrcodes' && (

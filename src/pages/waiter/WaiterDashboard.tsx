@@ -27,7 +27,7 @@ import {
 import { formatPrice } from '../../utils/currency';
 import { Order, Staff, CartItem, OrderItem, Reservation } from '../../types';
 import { getReservations, updateReservation } from '../../api/reservations';
-import { requestOrderCancellation } from '../../api/orders';
+import { requestOrderCancellation, confirmPayment } from '../../api/orders';
 import { QRScanner } from '../../components/waiter/QRScanner';
 import { WaiterOrderEntry } from '../../components/waiter/WaiterOrderEntry';
 import { loadReviews } from '../../utils/reviewsStorage';
@@ -1193,7 +1193,12 @@ export function WaiterDashboard({
   };
 
   const handleMarkServed = (orderId: string) => {
-    onUpdateOrderStatus(orderId, 'served', { assignedWaiterId: waiter.id });
+    const order = orders.find(o => o.id === orderId);
+    if (order) {
+      setPaymentCaptureOrder(order);
+    } else {
+      onUpdateOrderStatus(orderId, 'served', { assignedWaiterId: waiter.id });
+    }
   };
 
   const handlePrintReceipt = (order: Order) => {
@@ -1204,6 +1209,26 @@ export function WaiterDashboard({
     const order = paymentCaptureOrder;
     if (!order) return;
     setPaymentCaptureOrder(null);
+
+    // Persist payment data to the database
+    try {
+      const paymentBreakdown = payments.map(p => ({
+        method: p.method,
+        amount: p.amount,
+        ...(p.reference ? { reference: p.reference } : {}),
+      }));
+      const primaryMethod = payments.reduce((a, b) => a.amount >= b.amount ? a : b);
+      await confirmPayment(order.id, {
+        paymentType: primaryMethod.method,
+        paymentBreakdown,
+        confirmedBy: String(waiter.id),
+        confirmedByName: waiterName,
+      });
+      onUpdateOrderStatus(order.id, 'served', { assignedWaiterId: waiter.id });
+    } catch (err) {
+      console.error('Failed to persist payment data:', err);
+    }
+
     try {
       const combinedNotes = [cleanSourceTag(order.notes), receiptNote?.trim() || '']
         .filter(Boolean)
