@@ -164,31 +164,57 @@ export async function saveReceiptSettings(
   if (typeof receiptSettings.city === 'string') corePayload.city = receiptSettings.city;
   if (typeof receiptSettings.country === 'string') corePayload.country = receiptSettings.country;
 
-  const attempts: Record<string, unknown>[] = [
-    { ...corePayload, settings: merged, ...(typeof receiptSettings.logo === 'string' ? { logo_url: receiptSettings.logo } : {}) },
-    { ...corePayload, settings: merged },
-    { ...corePayload, ...(typeof receiptSettings.logo === 'string' ? { logo_url: receiptSettings.logo } : {}) },
-    { ...corePayload },
-    {
-      ...(restaurantName ? { name: restaurantName } : {}),
-      ...(typeof receiptSettings.address === 'string' ? { address: receiptSettings.address } : {}),
-      ...(typeof receiptSettings.phone === 'string' ? { phone: receiptSettings.phone } : {}),
-      ...(typeof receiptSettings.email === 'string' ? { email: receiptSettings.email } : {}),
-    },
-  ].filter((payload) => Object.keys(payload).length > 0);
-
+  // Save settings JSONB independently so momoCode/currency are never lost
+  // when a combined payload fails due to column issues.
+  let settingsSaved = false;
   let lastError: any = null;
-  for (const payload of attempts) {
+
+  // Try settings JSONB first (contains momoCode, currency, etc.)
+  const settingsAttempts = [
+    { settings: merged, ...(typeof receiptSettings.logo === 'string' ? { logo_url: receiptSettings.logo } : {}) },
+    { settings: merged },
+  ];
+  for (const payload of settingsAttempts) {
     const { error } = await supabase
       .from('restaurants')
       .update(payload)
       .eq('id', restaurantId);
-
-    if (!error) return;
+    if (!error) { settingsSaved = true; break; }
     lastError = error;
   }
 
-  // Last-resort: update fields one-by-one for very old schemas where mixed payloads fail.
+  // If combined JSONB failed (e.g. large logo), try without logo in JSONB
+  if (!settingsSaved) {
+    const receiptWithoutLogo = { ...receiptSettings, logo: undefined };
+    const mergedWithoutLogo = { ...existingSettings, receipt: receiptWithoutLogo };
+    const { error } = await supabase
+      .from('restaurants')
+      .update({ settings: mergedWithoutLogo })
+      .eq('id', restaurantId);
+    if (!error) settingsSaved = true;
+    else lastError = error;
+  }
+
+  // Save core columns (name, address, phone, etc.) separately
+  if (Object.keys(corePayload).length > 0) {
+    const logoPayload = typeof receiptSettings.logo === 'string' ? { logo_url: receiptSettings.logo } : {};
+    const coreAttempts = [
+      { ...corePayload, ...logoPayload },
+      { ...corePayload },
+    ];
+    for (const payload of coreAttempts) {
+      const { error } = await supabase
+        .from('restaurants')
+        .update(payload)
+        .eq('id', restaurantId);
+      if (!error) break;
+      lastError = error;
+    }
+  }
+
+  if (settingsSaved) return;
+
+  // Last-resort: update fields one-by-one
   const singleFieldAttempts: Record<string, unknown>[] = [
     ...(restaurantName ? [{ name: restaurantName }] : []),
     ...(typeof receiptSettings.address === 'string' ? [{ address: receiptSettings.address }] : []),
@@ -215,7 +241,6 @@ export async function saveReceiptSettings(
     return value !== undefined && value !== null;
   });
 
-  // Allow no-op saves only when absolutely nothing was requested.
   if (Object.keys(corePayload).length === 0 && !hasReceiptValues) return;
 
   throw lastError || new Error('Failed to persist restaurant receipt settings');
