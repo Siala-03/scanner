@@ -444,6 +444,7 @@ export function buildReceiptHtml(receipt: ReceiptData): string {
     <div class="addr">
       ${[restaurantAddress, restaurantCity, restaurantCountry].filter(Boolean).join(', ')}<br>
       ${restaurantPhone}${restaurantEmail ? `<br>${restaurantEmail}` : ''}
+      ${restaurantMomoCode ? `<br><strong style="font-size:10pt;letter-spacing:0.5px">MoMo: ${restaurantMomoCode}</strong>` : ''}
     </div>
     <div class="rbadge">Official Receipt</div>
   </div>
@@ -531,13 +532,6 @@ export function buildReceiptHtml(receipt: ReceiptData): string {
   </div>
   ${qrImageUrl ? `<div style="text-align:center;margin-top:8px"><img src="${qrImageUrl}" alt="RRA QR" style="width:130px;height:130px;object-fit:contain" /></div>` : ''}
   ` : ''}
-
-  ${restaurantMomoCode ? `
-  <hr class="dashed">
-  <div style="text-align:center;padding:6px 0">
-    <div style="font-size:8pt;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#333;margin-bottom:4px">Pay via Mobile Money</div>
-    <div style="font-size:12pt;font-weight:900;letter-spacing:1px;color:#000">${restaurantMomoCode}</div>
-  </div>` : ''}
 
   <hr class="solid">
 

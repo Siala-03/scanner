@@ -133,7 +133,7 @@ export async function fetchReceiptSettings(restaurantId: string): Promise<Restau
     phone: receiptFromSettings?.phone || (data as any)?.phone || undefined,
     email: receiptFromSettings?.email || (data as any)?.email || undefined,
     currency: receiptFromSettings?.currency || undefined,
-    momoCode: receiptFromSettings?.momoCode || undefined,
+    momoCode: receiptFromSettings?.momoCode || (data as any)?.momo_code || undefined,
   };
 }
 
@@ -156,6 +156,7 @@ export async function saveReceiptSettings(
   const existingSettings = ((current as any)?.settings as Record<string, unknown> | undefined) || {};
   const merged = { ...existingSettings, receipt: receiptSettings };
 
+  // Known-good core columns (these exist in all schemas)
   const corePayload: Record<string, unknown> = {};
   if (restaurantName) corePayload.name = restaurantName;
   if (typeof receiptSettings.address === 'string') corePayload.address = receiptSettings.address;
@@ -164,77 +165,58 @@ export async function saveReceiptSettings(
   if (typeof receiptSettings.city === 'string') corePayload.city = receiptSettings.city;
   if (typeof receiptSettings.country === 'string') corePayload.country = receiptSettings.country;
 
-  // Save settings JSONB independently so momoCode/currency are never lost
-  // when a combined payload fails due to column issues.
-  let settingsSaved = false;
+  let anySaved = false;
   let lastError: any = null;
 
-  // Try settings JSONB first (contains momoCode, currency, etc.)
-  const settingsAttempts = [
-    { settings: merged, ...(typeof receiptSettings.logo === 'string' ? { logo_url: receiptSettings.logo } : {}) },
-    { settings: merged },
-  ];
-  for (const payload of settingsAttempts) {
-    const { error } = await supabase
-      .from('restaurants')
-      .update(payload)
-      .eq('id', restaurantId);
-    if (!error) { settingsSaved = true; break; }
-    lastError = error;
-  }
-
-  // If combined JSONB failed (e.g. large logo), try without logo in JSONB
-  if (!settingsSaved) {
-    const receiptWithoutLogo = { ...receiptSettings, logo: undefined };
-    const mergedWithoutLogo = { ...existingSettings, receipt: receiptWithoutLogo };
-    const { error } = await supabase
-      .from('restaurants')
-      .update({ settings: mergedWithoutLogo })
-      .eq('id', restaurantId);
-    if (!error) settingsSaved = true;
-    else lastError = error;
-  }
-
-  // Save core columns (name, address, phone, etc.) separately
+  // 1. Save core columns first (known to work)
   if (Object.keys(corePayload).length > 0) {
     const logoPayload = typeof receiptSettings.logo === 'string' ? { logo_url: receiptSettings.logo } : {};
-    const coreAttempts = [
-      { ...corePayload, ...logoPayload },
-      { ...corePayload },
-    ];
-    for (const payload of coreAttempts) {
-      const { error } = await supabase
-        .from('restaurants')
-        .update(payload)
-        .eq('id', restaurantId);
-      if (!error) break;
+    for (const payload of [{ ...corePayload, ...logoPayload }, corePayload]) {
+      const { error } = await supabase.from('restaurants').update(payload).eq('id', restaurantId);
+      if (!error) { anySaved = true; break; }
       lastError = error;
     }
   }
 
-  if (settingsSaved) return;
+  // 2. Try momo_code as its own column (may or may not exist)
+  if (typeof receiptSettings.momoCode === 'string') {
+    const { error } = await supabase.from('restaurants').update({ momo_code: receiptSettings.momoCode }).eq('id', restaurantId);
+    if (!error) anySaved = true;
+  }
 
-  // Last-resort: update fields one-by-one
-  const singleFieldAttempts: Record<string, unknown>[] = [
+  // 3. Try settings JSONB (may or may not exist — stores momoCode, currency, etc.)
+  for (const payload of [{ settings: merged }, { settings: { receipt: receiptSettings } }]) {
+    const { error } = await supabase.from('restaurants').update(payload).eq('id', restaurantId);
+    if (!error) { anySaved = true; break; }
+    lastError = error;
+  }
+
+  // 4. Try logo_url separately if not yet saved
+  if (typeof receiptSettings.logo === 'string') {
+    await supabase.from('restaurants').update({ logo_url: receiptSettings.logo }).eq('id', restaurantId).then(({ error }) => {
+      if (!error) anySaved = true;
+    });
+  }
+
+  if (anySaved) return;
+
+  // 5. Last-resort: each field individually
+  const singleFields: Record<string, unknown>[] = [
     ...(restaurantName ? [{ name: restaurantName }] : []),
     ...(typeof receiptSettings.address === 'string' ? [{ address: receiptSettings.address }] : []),
     ...(typeof receiptSettings.phone === 'string' ? [{ phone: receiptSettings.phone }] : []),
     ...(typeof receiptSettings.email === 'string' ? [{ email: receiptSettings.email }] : []),
-    ...(typeof receiptSettings.logo === 'string' ? [{ logo_url: receiptSettings.logo }] : []),
     ...(typeof receiptSettings.city === 'string' ? [{ city: receiptSettings.city }] : []),
     ...(typeof receiptSettings.country === 'string' ? [{ country: receiptSettings.country }] : []),
-    { settings: merged },
   ];
 
-  for (const payload of singleFieldAttempts) {
-    const { error } = await supabase
-      .from('restaurants')
-      .update(payload)
-      .eq('id', restaurantId);
-
-    if (!error) return;
-    lastError = error;
+  for (const payload of singleFields) {
+    const { error } = await supabase.from('restaurants').update(payload).eq('id', restaurantId);
+    if (!error) { anySaved = true; }
+    else lastError = error;
   }
+
+  if (anySaved) return;
 
   const hasReceiptValues = Object.values(receiptSettings).some((value) => {
     if (typeof value === 'string') return value.trim().length > 0;
@@ -249,7 +231,7 @@ export async function saveReceiptSettings(
 export async function fetchIpRestriction(restaurantId: string): Promise<IpRestrictionSettings> {
   const { data } = await supabase
     .from('restaurants')
-    .select('settings')
+    .select('*')
     .eq('id', restaurantId)
     .maybeSingle();
 
@@ -266,7 +248,7 @@ export async function saveIpRestriction(
 ): Promise<void> {
   const { data: current } = await supabase
     .from('restaurants')
-    .select('settings')
+    .select('*')
     .eq('id', restaurantId)
     .maybeSingle();
 
