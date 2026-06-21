@@ -88,7 +88,8 @@ function parseOrderDate(order: any): Date | null {
 }
 
 function isConfirmed(order: any) {
-  return order.payment_status === 'confirmed' || order.paymentStatus === 'confirmed';
+  return order.payment_status === 'confirmed' || order.paymentStatus === 'confirmed'
+    || order.status === 'served';
 }
 
 function normalizeItems(raw: any): any[] {
