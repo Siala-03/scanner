@@ -23,6 +23,15 @@ type FilterMode = 'today' | 'week' | 'month' | 'custom';
 
 const PIE_COLORS = ['#f59e0b', '#3b82f6', '#10b981', '#8b5cf6', '#ef4444', '#06b6d4', '#ec4899', '#f97316'];
 
+const DEFAULT_SECTIONS = [
+  { name: 'Kitchen', color: '#f59e0b', categories: ['food','kitchen','main-course','main course','mains','main','appetizer','appetizers','starter','starters','dessert','desserts','breakfast','lunch','dinner','grill','grills','pizza','pasta','seafood','fast food','snacks'] },
+  { name: 'Buffet',  color: '#10b981', categories: ['buffet','buffet items'] },
+  { name: 'Bar',     color: '#3b82f6', categories: ['bar','drinks','beverages','cocktails','alcoholic-drinks','alcoholic drinks','beers','beer','wine','wines','spirits','soft-drinks','soft drinks','juices','juice','coffee','tea'] },
+  { name: 'Pool',    color: '#06b6d4', categories: ['pool','pool-bar','pool bar'] },
+];
+
+const SECTION_AUTO_COLORS = ['#f59e0b','#10b981','#3b82f6','#8b5cf6','#ef4444','#06b6d4','#ec4899','#f97316','#84cc16','#64748b'];
+
 const PAYMENT_METHOD_LABELS: Record<string, string> = {
   '01': 'Cash', cash: 'Cash',
   '02': 'Card', card: 'Card', credit_card: 'Card', debit_card: 'Card',
@@ -165,7 +174,7 @@ function downloadPdf(reportRef: HTMLDivElement, title: string) {
 
 // ─── Component ──────────────────────────────────────────────────────────────
 
-export function ReportsPage() {
+export function ReportsPage({ restaurantName = '' }: { restaurantName?: string }) {
   const [filterMode, setFilterMode] = useState<FilterMode>('week');
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
@@ -416,6 +425,56 @@ export function ReportsPage() {
     return Array.from(map.values()).sort((a, b) => b.total - a.total);
   }, [expenses, expenseCategories]);
 
+  // ─── 9. Location / Section Distribution ────────────────────────────────────
+
+  const categoryToSection = useMemo(() => {
+    const map = new Map<string, string>();
+    DEFAULT_SECTIONS.forEach((g) => g.categories.forEach((c) => map.set(c, g.name)));
+    return map;
+  }, []);
+
+  const resolveSection = (item: any): string => {
+    const mid = item.menuItemId ?? item.menu_item_id;
+    const cat = String(menuById[mid]?.category ?? item.category ?? item.menuItem?.category ?? '').toLowerCase().trim();
+    if (!cat) return 'Other';
+    return categoryToSection.get(cat) ?? cat.replace(/-/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase());
+  };
+
+  const locationRevenue = useMemo(() => {
+    const map = new Map<string, { name: string; revenue: number; orders: number; color: string }>();
+    const orderSections = new Map<string, Set<string>>();
+
+    filteredOrders.forEach((o) => {
+      if (!isConfirmed(o)) return;
+      normalizeItems(o.items).forEach((item: any) => {
+        const section = resolveSection(item);
+        const rev = Number(item.totalPrice ?? item.total_price ?? ((item.unitPrice ?? item.unit_price ?? 0) * (item.quantity ?? 1))) || 0;
+        const existing = map.get(section) ?? { name: section, revenue: 0, orders: 0, color: '' };
+        existing.revenue += rev;
+        if (!orderSections.has(o.id)) orderSections.set(o.id, new Set());
+        orderSections.get(o.id)!.add(section);
+        map.set(section, existing);
+      });
+    });
+
+    orderSections.forEach((sections) => {
+      sections.forEach((s) => {
+        const existing = map.get(s);
+        if (existing) existing.orders++;
+      });
+    });
+
+    const configColors = new Map(DEFAULT_SECTIONS.map(s => [s.name, s.color]));
+    let autoIdx = 0;
+    const result = Array.from(map.values())
+      .map(s => ({ ...s, color: configColors.get(s.name) ?? SECTION_AUTO_COLORS[autoIdx++ % SECTION_AUTO_COLORS.length] }))
+      .sort((a, b) => b.revenue - a.revenue);
+
+    return result;
+  }, [filteredOrders, categoryToSection, menuById]);
+
+  const locationTotal = locationRevenue.reduce((s, l) => s + l.revenue, 0);
+
   // ─── Downloads ────────────────────────────────────────────────────────────
 
   const fileDate = new Date().toISOString().split('T')[0];
@@ -449,6 +508,10 @@ export function ReportsPage() {
     rows.push(['Waiter', 'Orders Served', 'Revenue', 'Avg Order Value']);
     staffPerformance.forEach(s => rows.push([s.name, String(s.ordersServed), String(Math.round(s.revenue)), String(Math.round(s.avgOrderValue))]));
 
+    sep('LOCATION / SECTION DISTRIBUTION');
+    rows.push(['Location', 'Revenue', 'Orders', 'Percentage']);
+    locationRevenue.forEach(l => rows.push([l.name, String(Math.round(l.revenue)), String(l.orders), locationTotal > 0 ? `${Math.round((l.revenue / locationTotal) * 100)}%` : '0%']));
+
     sep('PAYMENT METHOD DISTRIBUTION');
     rows.push(['Payment Method', 'Amount', 'Orders', 'Percentage']);
     paymentBreakdown.forEach(p => rows.push([p.label, String(Math.round(p.total)), String(p.orders), paymentTotal > 0 ? `${Math.round((p.total / paymentTotal) * 100)}%` : '0%']));
@@ -470,7 +533,7 @@ export function ReportsPage() {
   };
 
   const dlPdf = () => {
-    if (pdfRef.current) downloadPdf(pdfRef.current, `Report — ${periodLabel(filterMode, periodWindow)}`);
+    if (pdfRef.current) downloadPdf(pdfRef.current, `${restaurantName || 'Business'} Report — ${periodLabel(filterMode, periodWindow)}`);
     setShowDlMenu(false);
   };
 
@@ -668,6 +731,47 @@ export function ReportsPage() {
         )}
       </Section>
 
+      {/* ── Location / Section Distribution ── */}
+      <Section title="Revenue by Location">
+        {locationRevenue.length === 0 ? <Empty /> : (
+          <div className="grid md:grid-cols-2 gap-5">
+            <div className="w-full h-52">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={locationRevenue} dataKey="revenue" nameKey="name" cx="50%" cy="50%" innerRadius={35} outerRadius={70} paddingAngle={2} strokeWidth={0}>
+                    {locationRevenue.map((l, i) => <Cell key={i} fill={l.color || PIE_COLORS[i % PIE_COLORS.length]} />)}
+                  </Pie>
+                  <Tooltip {...TOOLTIP_STYLE} formatter={(value: number) => formatPrice(value)} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="overflow-y-auto max-h-52">
+              <table className="w-full text-xs">
+                <thead><tr className="text-slate-500 uppercase tracking-wider text-[10px] border-b border-slate-700">
+                  <th className="text-left py-2 font-semibold">Location</th>
+                  <th className="text-right py-2 font-semibold">Revenue</th>
+                  <th className="text-right py-2 font-semibold">Orders</th>
+                  <th className="text-right py-2 font-semibold">%</th>
+                </tr></thead>
+                <tbody>
+                  {locationRevenue.map((l) => (
+                    <tr key={l.name} className="border-b border-slate-700/30 hover:bg-slate-700/20 transition-colors">
+                      <td className="py-2 text-slate-200 flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: l.color }} />
+                        {l.name}
+                      </td>
+                      <td className="py-2 text-right text-white font-semibold">{formatPrice(l.revenue)}</td>
+                      <td className="py-2 text-right text-slate-400">{l.orders}</td>
+                      <td className="py-2 text-right text-slate-400">{locationTotal > 0 ? Math.round((l.revenue / locationTotal) * 100) : 0}%</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </Section>
+
       {/* ── 6 & 7: Payment + Order Status ── */}
       <div className="grid md:grid-cols-2 gap-4">
         <Section title="Payment Methods">
@@ -747,7 +851,7 @@ export function ReportsPage() {
       {/* ── Hidden PDF-printable version ── */}
       <div className="hidden">
         <div ref={pdfRef}>
-          <h1>Business Report</h1>
+          <h1>{restaurantName || 'Business'} Report</h1>
           <div className="meta">{pLabel} &mdash; Generated {new Date().toLocaleString()}</div>
 
           <div className="kpi-row">
@@ -770,6 +874,11 @@ export function ReportsPage() {
           <h2>Staff Performance</h2>
           <table><thead><tr><th>Waiter</th><th>Orders</th><th>Revenue</th><th>Avg</th></tr></thead><tbody>
             {staffPerformance.map(s => <tr key={s.name}><td>{s.name}</td><td>{s.ordersServed}</td><td>{formatPrice(s.revenue)}</td><td>{formatPrice(s.avgOrderValue)}</td></tr>)}
+          </tbody></table>
+
+          <h2>Revenue by Location</h2>
+          <table><thead><tr><th>Location</th><th>Revenue</th><th>Orders</th><th>%</th></tr></thead><tbody>
+            {locationRevenue.map(l => <tr key={l.name}><td>{l.name}</td><td>{formatPrice(l.revenue)}</td><td>{l.orders}</td><td>{locationTotal > 0 ? Math.round((l.revenue / locationTotal) * 100) : 0}%</td></tr>)}
           </tbody></table>
 
           <h2>Payment Methods</h2>

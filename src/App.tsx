@@ -1065,7 +1065,7 @@ export function App() {
             {managerPage === 'menu' && <MenuManagement />}
             {managerPage === 'staff' && <StaffManagement onShowPerformance={() => setManagerPage('performance')} />}
             {managerPage === 'analytics' && <AnalyticsPage />}
-            {managerPage === 'reports' && <ReportsPage />}
+            {managerPage === 'reports' && <ReportsPage restaurantName={restaurantName} />}
             {managerPage === 'performance' && <StaffPerformance onBack={() => setManagerPage('staff')} />}
             {managerPage === 'inventory' && <InventoryManagement role="manager" />}
             {managerPage === 'qrcodes' && (
