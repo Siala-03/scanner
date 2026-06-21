@@ -1193,12 +1193,7 @@ export function WaiterDashboard({
   };
 
   const handleMarkServed = (orderId: string) => {
-    const order = orders.find(o => o.id === orderId);
-    if (order) {
-      setPaymentCaptureOrder(order);
-    } else {
-      onUpdateOrderStatus(orderId, 'served', { assignedWaiterId: waiter.id });
-    }
+    onUpdateOrderStatus(orderId, 'served', { assignedWaiterId: waiter.id });
   };
 
   const handlePrintReceipt = (order: Order) => {
