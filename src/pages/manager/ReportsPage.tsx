@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, PieChart, Pie, Cell,
@@ -6,7 +6,7 @@ import {
 import {
   CalendarIcon, DownloadIcon, TrendingUpIcon, TrendingDownIcon,
   ShoppingCartIcon, DollarSignIcon, UsersIcon, CreditCardIcon,
-  XCircleIcon, ReceiptIcon,
+  XCircleIcon, ReceiptIcon, FileTextIcon, ChevronDownIcon,
 } from 'lucide-react';
 import { fetchOrdersByDateRange } from '../../api/orders';
 import { fetchExpenses, fetchExpenseCategories } from '../../api/expenses';
@@ -111,29 +111,55 @@ function pctDelta(current: number, prior: number): { pct: number; up: boolean } 
 }
 
 function periodLabel(mode: FilterMode, window: { start: Date; end: Date }): string {
-  const fmt = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  if (mode === 'today') return 'Today';
+  const fmt = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  if (mode === 'today') return `Today — ${fmt(window.start)}`;
   if (mode === 'week') return `${fmt(window.start)} – ${fmt(window.end)}`;
   if (mode === 'month') return window.start.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   return `${fmt(window.start)} – ${fmt(window.end)}`;
 }
 
-// ─── Section download helper ────────────────────────────────────────────────
+// ─── PDF generator ──────────────────────────────────────────────────────────
 
-function SectionHeader({ title, onDownload }: { title: string; onDownload?: () => void }) {
-  return (
-    <div className="flex items-center justify-between mb-4">
-      <h3 className="text-sm font-semibold text-slate-200 uppercase tracking-wider">{title}</h3>
-      {onDownload && (
-        <button
-          onClick={onDownload}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-700/60 transition-colors"
-        >
-          <DownloadIcon className="w-3.5 h-3.5" /> CSV
-        </button>
-      )}
-    </div>
-  );
+function downloadPdf(reportRef: HTMLDivElement, title: string) {
+  const printWindow = window.open('', '_blank');
+  if (!printWindow) { alert('Please allow pop-ups to download PDF.'); return; }
+
+  printWindow.document.write(`<!DOCTYPE html><html><head><title>${title}</title><style>
+    @page { size: A4; margin: 12mm; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, Helvetica, sans-serif; font-size: 10pt; color: #1e293b; line-height: 1.5; background: #fff; padding: 16px; }
+    h1 { font-size: 16pt; margin-bottom: 4px; }
+    h2 { font-size: 11pt; color: #334155; margin: 16px 0 6px; padding-bottom: 4px; border-bottom: 2px solid #e2e8f0; text-transform: uppercase; letter-spacing: 1px; }
+    .meta { font-size: 9pt; color: #64748b; margin-bottom: 12px; }
+    .kpi-row { display: flex; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+    .kpi { flex: 1; min-width: 120px; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; text-align: center; }
+    .kpi .label { font-size: 8pt; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; }
+    .kpi .value { font-size: 14pt; font-weight: 800; color: #0f172a; margin-top: 2px; }
+    .kpi .delta { font-size: 8pt; margin-top: 2px; }
+    .delta-up { color: #059669; }
+    .delta-down { color: #dc2626; }
+    table { width: 100%; border-collapse: collapse; margin-top: 6px; font-size: 9pt; }
+    th { text-align: left; padding: 5px 6px; border-bottom: 2px solid #cbd5e1; font-weight: 700; color: #334155; text-transform: uppercase; font-size: 8pt; letter-spacing: 0.5px; }
+    td { padding: 5px 6px; border-bottom: 1px solid #f1f5f9; }
+    th:last-child, td:last-child { text-align: right; }
+    tr:last-child td { border-bottom: none; }
+    .total-row td { font-weight: 700; border-top: 2px solid #cbd5e1; }
+    .bar-row { margin: 4px 0; }
+    .bar-label { display: flex; justify-content: space-between; font-size: 9pt; margin-bottom: 2px; }
+    .bar-track { height: 8px; background: #f1f5f9; border-radius: 4px; overflow: hidden; }
+    .bar-fill { height: 100%; border-radius: 4px; }
+    .status-grid { display: flex; gap: 12px; margin: 8px 0; flex-wrap: wrap; }
+    .status-card { flex: 1; min-width: 80px; text-align: center; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px; }
+    .status-card .val { font-size: 16pt; font-weight: 800; }
+    .status-card .lbl { font-size: 8pt; color: #64748b; }
+    .cancel-rate { display: inline-block; background: #fef2f2; color: #dc2626; padding: 4px 12px; border-radius: 6px; font-weight: 700; font-size: 10pt; margin-top: 6px; }
+    @media print { body { padding: 0; } }
+  </style></head><body>`);
+
+  printWindow.document.write(reportRef.innerHTML);
+  printWindow.document.write('</body></html>');
+  printWindow.document.close();
+  setTimeout(() => { printWindow.print(); }, 400);
 }
 
 // ─── Component ──────────────────────────────────────────────────────────────
@@ -148,7 +174,10 @@ export function ReportsPage() {
   const [expenseCategories, setExpenseCategories] = useState<ExpenseCategory[]>([]);
   const [waiters, setWaiters] = useState<Staff[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [showDlMenu, setShowDlMenu] = useState(false);
   const { menuItems } = useMenu();
+  const pdfRef = useRef<HTMLDivElement>(null);
+  const dlMenuRef = useRef<HTMLDivElement>(null);
 
   const menuById = useMemo(
     () => Object.fromEntries(menuItems.map((item) => [item.id, item])),
@@ -164,6 +193,15 @@ export function ReportsPage() {
     () => getPriorPeriodWindow(filterMode, periodWindow),
     [filterMode, periodWindow],
   );
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (dlMenuRef.current && !dlMenuRef.current.contains(e.target as Node)) setShowDlMenu(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
   // ─── Fetch ──────────────────────────────────────────────────────────────────
 
@@ -202,18 +240,12 @@ export function ReportsPage() {
   // ─── Filtered orders ──────────────────────────────────────────────────────
 
   const filteredOrders = useMemo(
-    () => orders.filter((o) => {
-      const d = parseOrderDate(o);
-      return d ? d >= periodWindow.start && d <= periodWindow.end : false;
-    }),
+    () => orders.filter((o) => { const d = parseOrderDate(o); return d ? d >= periodWindow.start && d <= periodWindow.end : false; }),
     [orders, periodWindow],
   );
 
   const filteredPriorOrders = useMemo(
-    () => priorOrders.filter((o) => {
-      const d = parseOrderDate(o);
-      return d ? d >= priorWindow.start && d <= priorWindow.end : false;
-    }),
+    () => priorOrders.filter((o) => { const d = parseOrderDate(o); return d ? d >= priorWindow.start && d <= priorWindow.end : false; }),
     [priorOrders, priorWindow],
   );
 
@@ -221,25 +253,14 @@ export function ReportsPage() {
 
   const metrics = useMemo(() => {
     let revenue = 0, orderCount = 0;
-    filteredOrders.forEach((o) => {
-      orderCount++;
-      if (isConfirmed(o)) revenue += o.total ?? 0;
-    });
+    filteredOrders.forEach((o) => { orderCount++; if (isConfirmed(o)) revenue += o.total ?? 0; });
     const totalExpenses = expenses.reduce((s, e) => s + (e.amount ?? 0), 0);
-    return {
-      revenue, orders: orderCount,
-      avgOrderValue: orderCount > 0 ? revenue / orderCount : 0,
-      expenses: totalExpenses,
-      netProfit: revenue - totalExpenses,
-    };
+    return { revenue, orders: orderCount, avgOrderValue: orderCount > 0 ? revenue / orderCount : 0, expenses: totalExpenses };
   }, [filteredOrders, expenses]);
 
   const priorMetrics = useMemo(() => {
     let revenue = 0, orderCount = 0;
-    filteredPriorOrders.forEach((o) => {
-      orderCount++;
-      if (isConfirmed(o)) revenue += o.total ?? 0;
-    });
+    filteredPriorOrders.forEach((o) => { orderCount++; if (isConfirmed(o)) revenue += o.total ?? 0; });
     return { revenue, orders: orderCount, avgOrderValue: orderCount > 0 ? revenue / orderCount : 0 };
   }, [filteredPriorOrders]);
 
@@ -250,29 +271,17 @@ export function ReportsPage() {
       return Array.from({ length: 18 }, (_, i) => {
         const hour = i + 6;
         let revenue = 0, cnt = 0;
-        filteredOrders.forEach((o) => {
-          const d = parseOrderDate(o);
-          if (!d || d.getHours() !== hour) return;
-          cnt++;
-          if (isConfirmed(o)) revenue += o.total ?? 0;
-        });
+        filteredOrders.forEach((o) => { const d = parseOrderDate(o); if (!d || d.getHours() !== hour) return; cnt++; if (isConfirmed(o)) revenue += o.total ?? 0; });
         return { label: `${hour}:00`, revenue, orders: cnt };
       });
     }
     if (filterMode === 'week') {
       return Array.from({ length: 7 }, (_, i) => {
-        const day = new Date(periodWindow.start);
-        day.setDate(day.getDate() + i);
+        const day = new Date(periodWindow.start); day.setDate(day.getDate() + i);
         const s = new Date(day); s.setHours(0, 0, 0, 0);
         const e = new Date(day); e.setHours(23, 59, 59, 999);
-        const bucket = filteredOrders.filter((o) => {
-          const d = parseOrderDate(o); return d ? d >= s && d <= e : false;
-        });
-        return {
-          label: day.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
-          revenue: bucket.filter(isConfirmed).reduce((sum, o) => sum + (o.total ?? 0), 0),
-          orders: bucket.length,
-        };
+        const bucket = filteredOrders.filter((o) => { const d = parseOrderDate(o); return d ? d >= s && d <= e : false; });
+        return { label: day.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric' }), revenue: bucket.filter(isConfirmed).reduce((sum, o) => sum + (o.total ?? 0), 0), orders: bucket.length };
       });
     }
     const rangeDays = Math.ceil((periodWindow.end.getTime() - periodWindow.start.getTime()) / 86_400_000);
@@ -283,17 +292,8 @@ export function ReportsPage() {
       const s = new Date(cursor);
       const e = new Date(cursor); e.setDate(e.getDate() + step - 1); e.setHours(23, 59, 59, 999);
       if (e > periodWindow.end) e.setTime(periodWindow.end.getTime());
-      const bucket = filteredOrders.filter((o) => {
-        const d = parseOrderDate(o); return d ? d >= s && d <= e : false;
-      });
-      const label = step > 1
-        ? `${s.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}–${e.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
-        : s.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-      rows.push({
-        label,
-        revenue: bucket.filter(isConfirmed).reduce((sum, o) => sum + (o.total ?? 0), 0),
-        orders: bucket.length,
-      });
+      const bucket = filteredOrders.filter((o) => { const d = parseOrderDate(o); return d ? d >= s && d <= e : false; });
+      rows.push({ label: s.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), revenue: bucket.filter(isConfirmed).reduce((sum, o) => sum + (o.total ?? 0), 0), orders: bucket.length });
       cursor.setDate(cursor.getDate() + step);
     }
     return rows;
@@ -311,15 +311,11 @@ export function ReportsPage() {
         const cat = menuById[mid]?.category ?? item.category ?? item.menuItem?.category ?? 'other';
         const rev = Number(item.totalPrice ?? item.total_price ?? ((item.unitPrice ?? item.unit_price ?? 0) * (item.quantity ?? 1))) || 0;
         const existing = map.get(cat) ?? { category: cat, revenue: 0, qty: 0 };
-        existing.revenue += rev;
-        existing.qty += Number(item.quantity ?? 1);
-        map.set(cat, existing);
-        total += rev;
+        existing.revenue += rev; existing.qty += Number(item.quantity ?? 1);
+        map.set(cat, existing); total += rev;
       });
     });
-    return Array.from(map.values())
-      .map((r) => ({ ...r, percentage: total > 0 ? Math.round((r.revenue / total) * 100) : 0 }))
-      .sort((a, b) => b.revenue - a.revenue);
+    return Array.from(map.values()).map((r) => ({ ...r, percentage: total > 0 ? Math.round((r.revenue / total) * 100) : 0 })).sort((a, b) => b.revenue - a.revenue);
   }, [filteredOrders, menuById]);
 
   // ─── 4. Top Selling Items ─────────────────────────────────────────────────
@@ -350,10 +346,7 @@ export function ReportsPage() {
   const staffPerformance = useMemo(() => {
     const waiterIds = new Set(waiters.map(w => w.id));
     const tableToWaiter = new Map<number, string>();
-    waiters.forEach(w => {
-      (w.assignedTables || []).forEach((t: number) => tableToWaiter.set(t, w.id));
-    });
-
+    waiters.forEach(w => { (w.assignedTables || []).forEach((t: number) => tableToWaiter.set(t, w.id)); });
     const map = new Map<string, { name: string; ordersServed: number; revenue: number }>();
     filteredOrders.forEach((order) => {
       if (order.status !== 'served') return;
@@ -364,18 +357,12 @@ export function ReportsPage() {
         (o.created_by && waiterIds.has(o.created_by) ? o.created_by : null) ??
         (order.tableNumber != null ? tableToWaiter.get(order.tableNumber) ?? null : null);
       if (!waiterId) return;
-
       const waiter = waiters.find(w => w.id === waiterId);
-      const name = waiter?.name || 'Unknown';
-      const cur = map.get(waiterId) ?? { name, ordersServed: 0, revenue: 0 };
-      cur.ordersServed++;
-      cur.revenue += order.total ?? 0;
+      const cur = map.get(waiterId) ?? { name: waiter?.name || 'Unknown', ordersServed: 0, revenue: 0 };
+      cur.ordersServed++; cur.revenue += order.total ?? 0;
       map.set(waiterId, cur);
     });
-
-    return Array.from(map.values())
-      .map(s => ({ ...s, avgOrderValue: s.ordersServed > 0 ? s.revenue / s.ordersServed : 0 }))
-      .sort((a, b) => b.revenue - a.revenue);
+    return Array.from(map.values()).map(s => ({ ...s, avgOrderValue: s.ordersServed > 0 ? s.revenue / s.ordersServed : 0 })).sort((a, b) => b.revenue - a.revenue);
   }, [filteredOrders, waiters]);
 
   // ─── 6. Payment Method Distribution ───────────────────────────────────────
@@ -385,22 +372,17 @@ export function ReportsPage() {
     filteredOrders.forEach((o) => {
       if (!isConfirmed(o)) return;
       const breakdown = parseBreakdown(o.payment_breakdown ?? o.paymentBreakdown);
-      const orderTotal = Number(o.total) || 0;
-
       if (breakdown) {
         breakdown.forEach((entry: any) => {
           const label = resolveMethodLabel(entry.method);
-          const amount = Number(entry.amount) || 0;
           const existing = map.get(label) ?? { label, total: 0, orders: 0, color: PAYMENT_METHOD_COLORS[label] ?? '#6b7280' };
-          existing.total += amount;
-          existing.orders++;
+          existing.total += Number(entry.amount) || 0; existing.orders++;
           map.set(label, existing);
         });
       } else {
         const label = resolveMethodLabel(o.payment_type ?? o.paymentType ?? null);
         const existing = map.get(label) ?? { label, total: 0, orders: 0, color: PAYMENT_METHOD_COLORS[label] ?? '#6b7280' };
-        existing.total += orderTotal;
-        existing.orders++;
+        existing.total += Number(o.total) || 0; existing.orders++;
         map.set(label, existing);
       }
     });
@@ -413,19 +395,10 @@ export function ReportsPage() {
 
   const orderStatus = useMemo(() => {
     const counts: Record<string, number> = {};
-    filteredOrders.forEach((o) => {
-      const status = o.status ?? 'pending';
-      counts[status] = (counts[status] ?? 0) + 1;
-    });
+    filteredOrders.forEach((o) => { counts[o.status ?? 'pending'] = (counts[o.status ?? 'pending'] ?? 0) + 1; });
     const total = filteredOrders.length;
     const cancelled = counts['cancelled'] ?? 0;
-    return {
-      total,
-      served: counts['served'] ?? 0,
-      pending: (counts['pending'] ?? 0) + (counts['verified'] ?? 0) + (counts['preparing'] ?? 0) + (counts['ready'] ?? 0),
-      cancelled,
-      cancellationRate: total > 0 ? Math.round((cancelled / total) * 100) : 0,
-    };
+    return { total, served: counts['served'] ?? 0, pending: (counts['pending'] ?? 0) + (counts['verified'] ?? 0) + (counts['preparing'] ?? 0) + (counts['ready'] ?? 0), cancelled, cancellationRate: total > 0 ? Math.round((cancelled / total) * 100) : 0 };
   }, [filteredOrders]);
 
   // ─── 8. Expenses Summary ──────────────────────────────────────────────────
@@ -436,51 +409,19 @@ export function ReportsPage() {
     expenses.forEach((e) => {
       const catName = catMap.get(e.categoryId) ?? 'Uncategorized';
       const existing = map.get(catName) ?? { category: catName, total: 0, count: 0 };
-      existing.total += e.amount ?? 0;
-      existing.count++;
+      existing.total += e.amount ?? 0; existing.count++;
       map.set(catName, existing);
     });
     return Array.from(map.values()).sort((a, b) => b.total - a.total);
   }, [expenses, expenseCategories]);
 
-  // ─── Download helpers ─────────────────────────────────────────────────────
+  // ─── Downloads ────────────────────────────────────────────────────────────
 
-  const dlTrend = () => downloadCsv(`report_trend_${filterMode}.csv`, [
-    ['Period', 'Revenue', 'Orders'],
-    ...periodRevenue.map(d => [d.label, String(d.revenue), String(d.orders)]),
-  ]);
-  const dlCategory = () => downloadCsv(`report_categories_${filterMode}.csv`, [
-    ['Category', 'Revenue', 'Qty Sold', 'Percentage'],
-    ...categoryRevenue.map(c => [c.category, String(c.revenue), String(c.qty), `${c.percentage}%`]),
-  ]);
-  const dlTopItems = () => downloadCsv(`report_top_items_${filterMode}.csv`, [
-    ['Rank', 'Item', 'Qty Sold', 'Revenue'],
-    ...topItems.map((t, i) => [String(i + 1), t.name, String(t.qty), String(t.revenue)]),
-  ]);
-  const dlStaff = () => downloadCsv(`report_staff_${filterMode}.csv`, [
-    ['Waiter', 'Orders Served', 'Revenue', 'Avg Order Value'],
-    ...staffPerformance.map(s => [s.name, String(s.ordersServed), String(Math.round(s.revenue)), String(Math.round(s.avgOrderValue))]),
-  ]);
-  const dlPayment = () => downloadCsv(`report_payment_${filterMode}.csv`, [
-    ['Payment Method', 'Amount', 'Orders', 'Percentage'],
-    ...paymentBreakdown.map(p => [p.label, String(Math.round(p.total)), String(p.orders), paymentTotal > 0 ? `${Math.round((p.total / paymentTotal) * 100)}%` : '0%']),
-  ]);
-  const dlStatus = () => downloadCsv(`report_order_status_${filterMode}.csv`, [
-    ['Status', 'Count', 'Percentage'],
-    ['Served', String(orderStatus.served), `${orderStatus.total > 0 ? Math.round((orderStatus.served / orderStatus.total) * 100) : 0}%`],
-    ['Pending', String(orderStatus.pending), `${orderStatus.total > 0 ? Math.round((orderStatus.pending / orderStatus.total) * 100) : 0}%`],
-    ['Cancelled', String(orderStatus.cancelled), `${orderStatus.cancellationRate}%`],
-  ]);
-  const dlExpenses = () => downloadCsv(`report_expenses_${filterMode}.csv`, [
-    ['Category', 'Total', 'Count'],
-    ...expenseSummary.map(e => [e.category, String(Math.round(e.total)), String(e.count)]),
-    ['TOTAL', String(Math.round(metrics.expenses)), String(expenses.length)],
-  ]);
+  const fileDate = new Date().toISOString().split('T')[0];
 
-  const dlFullReport = () => {
+  const dlCsv = () => {
     const rows: string[][] = [];
     const sep = (title: string) => { rows.push([]); rows.push([`── ${title} ──`]); };
-
     rows.push(['Report Period', periodLabel(filterMode, periodWindow)]);
     rows.push(['Generated', new Date().toLocaleString()]);
 
@@ -490,7 +431,6 @@ export function ReportsPage() {
     rows.push(['Total Orders', String(metrics.orders)]);
     rows.push(['Avg Order Value', String(Math.round(metrics.avgOrderValue))]);
     rows.push(['Total Expenses', String(Math.round(metrics.expenses))]);
-    rows.push(['Net Profit', String(Math.round(metrics.netProfit))]);
 
     sep('REVENUE & ORDERS TREND');
     rows.push(['Period', 'Revenue', 'Orders']);
@@ -524,7 +464,13 @@ export function ReportsPage() {
     expenseSummary.forEach(e => rows.push([e.category, String(Math.round(e.total)), String(e.count)]));
     rows.push(['TOTAL', String(Math.round(metrics.expenses)), String(expenses.length)]);
 
-    downloadCsv(`full_report_${filterMode}_${new Date().toISOString().split('T')[0]}.csv`, rows);
+    downloadCsv(`report_${filterMode}_${fileDate}.csv`, rows);
+    setShowDlMenu(false);
+  };
+
+  const dlPdf = () => {
+    if (pdfRef.current) downloadPdf(pdfRef.current, `Report — ${periodLabel(filterMode, periodWindow)}`);
+    setShowDlMenu(false);
   };
 
   // ─── Render ───────────────────────────────────────────────────────────────
@@ -540,6 +486,7 @@ export function ReportsPage() {
   const revDelta = pctDelta(metrics.revenue, priorMetrics.revenue);
   const ordDelta = pctDelta(metrics.orders, priorMetrics.orders);
   const avgDelta = pctDelta(metrics.avgOrderValue, priorMetrics.avgOrderValue);
+  const pLabel = periodLabel(filterMode, periodWindow);
 
   return (
     <div className="max-w-7xl mx-auto space-y-6 py-2">
@@ -548,65 +495,66 @@ export function ReportsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-white">Reports</h1>
-          <p className="text-sm text-slate-400 mt-0.5">{periodLabel(filterMode, periodWindow)}</p>
+          <p className="text-sm text-slate-400 mt-0.5">{pLabel}</p>
         </div>
-        <button
-          onClick={dlFullReport}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-900 font-semibold text-sm transition"
-        >
-          <DownloadIcon className="w-4 h-4" />
-          Download Full Report
-        </button>
+        <div className="relative" ref={dlMenuRef}>
+          <button
+            onClick={() => setShowDlMenu(v => !v)}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-900 font-semibold text-sm transition shadow-lg shadow-amber-500/20"
+          >
+            <DownloadIcon className="w-4 h-4" />
+            Download Report
+            <ChevronDownIcon className="w-4 h-4" />
+          </button>
+          {showDlMenu && (
+            <div className="absolute right-0 mt-2 w-48 bg-slate-800 border border-slate-700 rounded-xl shadow-xl overflow-hidden z-50">
+              <button onClick={dlPdf} className="flex items-center gap-3 w-full px-4 py-3 text-sm text-slate-200 hover:bg-slate-700/60 transition">
+                <FileTextIcon className="w-4 h-4 text-red-400" /> Download as PDF
+              </button>
+              <button onClick={dlCsv} className="flex items-center gap-3 w-full px-4 py-3 text-sm text-slate-200 hover:bg-slate-700/60 transition border-t border-slate-700">
+                <FileTextIcon className="w-4 h-4 text-emerald-400" /> Download as CSV
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ── Filter Bar ── */}
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="bg-slate-800/40 rounded-xl border border-slate-700/50 p-3 flex flex-wrap items-center gap-2">
         {(['today', 'week', 'month', 'custom'] as FilterMode[]).map((m) => (
           <button
             key={m}
             onClick={() => setFilterMode(m)}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
               filterMode === m
-                ? 'bg-amber-500 text-slate-900'
-                : 'bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-700'
+                ? 'bg-amber-500 text-slate-900 shadow-md shadow-amber-500/20'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
             }`}
           >
             {m === 'today' ? 'Today' : m === 'week' ? 'This Week' : m === 'month' ? 'This Month' : 'Custom'}
           </button>
         ))}
         {filterMode === 'custom' && (
-          <div className="flex items-center gap-2 ml-2">
-            <CalendarIcon className="w-4 h-4 text-slate-400" />
-            <input
-              type="date"
-              value={customStart}
-              onChange={(e) => setCustomStart(e.target.value)}
-              className="px-2 py-1.5 rounded-lg bg-slate-800 border border-slate-600 text-sm text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
-            />
-            <span className="text-slate-500">to</span>
-            <input
-              type="date"
-              value={customEnd}
-              onChange={(e) => setCustomEnd(e.target.value)}
-              className="px-2 py-1.5 rounded-lg bg-slate-800 border border-slate-600 text-sm text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
-            />
+          <div className="flex items-center gap-2 ml-1">
+            <CalendarIcon className="w-4 h-4 text-slate-500" />
+            <input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} className="px-2.5 py-2 rounded-lg bg-slate-800 border border-slate-600 text-sm text-white focus:outline-none focus:ring-2 focus:ring-amber-500" />
+            <span className="text-slate-600 text-xs">to</span>
+            <input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} className="px-2.5 py-2 rounded-lg bg-slate-800 border border-slate-600 text-sm text-white focus:outline-none focus:ring-2 focus:ring-amber-500" />
           </div>
         )}
       </div>
 
       {/* ── 1. Executive Summary ── */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <KPICard icon={<DollarSignIcon className="w-5 h-5" />} label="Revenue" value={formatPrice(metrics.revenue)} delta={revDelta} />
-        <KPICard icon={<ShoppingCartIcon className="w-5 h-5" />} label="Orders" value={String(metrics.orders)} delta={ordDelta} />
-        <KPICard icon={<TrendingUpIcon className="w-5 h-5" />} label="Avg Order" value={formatPrice(metrics.avgOrderValue)} delta={avgDelta} />
-        <KPICard icon={<ReceiptIcon className="w-5 h-5" />} label="Expenses" value={formatPrice(metrics.expenses)} />
-        <KPICard icon={<DollarSignIcon className="w-5 h-5" />} label="Net Profit" value={formatPrice(metrics.netProfit)} tone={metrics.netProfit >= 0 ? 'green' : 'red'} />
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <KPICard icon={<DollarSignIcon className="w-5 h-5" />} label="Revenue" value={formatPrice(metrics.revenue)} delta={revDelta} accent="emerald" />
+        <KPICard icon={<ShoppingCartIcon className="w-5 h-5" />} label="Orders" value={String(metrics.orders)} delta={ordDelta} accent="blue" />
+        <KPICard icon={<TrendingUpIcon className="w-5 h-5" />} label="Avg Order" value={formatPrice(metrics.avgOrderValue)} delta={avgDelta} accent="amber" />
+        <KPICard icon={<ReceiptIcon className="w-5 h-5" />} label="Expenses" value={formatPrice(metrics.expenses)} accent="red" />
       </div>
 
       {/* ── 2. Revenue & Orders Trend ── */}
-      <div className="bg-slate-800/60 rounded-xl border border-slate-700 p-5">
-        <SectionHeader title="Revenue & Orders Trend" onDownload={dlTrend} />
-        <div className="h-64">
+      <Section title="Revenue & Orders Trend">
+        <div className="h-72">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={periodRevenue} margin={{ top: 5, right: 10, bottom: 5, left: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
@@ -614,116 +562,102 @@ export function ReportsPage() {
               <YAxis yAxisId="rev" stroke="#64748b" fontSize={10} tick={{ fill: '#64748b' }} tickFormatter={(v) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v} />
               <YAxis yAxisId="ord" orientation="right" stroke="#64748b" fontSize={10} tick={{ fill: '#64748b' }} />
               <Tooltip {...TOOLTIP_STYLE} formatter={(value: number, name: string) => [name === 'Revenue' ? formatPrice(value) : value, name]} />
-              <Bar yAxisId="rev" dataKey="revenue" fill="#10b981" name="Revenue" radius={[3, 3, 0, 0]} />
-              <Bar yAxisId="ord" dataKey="orders" fill="#38bdf8" name="Orders" radius={[3, 3, 0, 0]} />
+              <Bar yAxisId="rev" dataKey="revenue" fill="#10b981" name="Revenue" radius={[4, 4, 0, 0]} />
+              <Bar yAxisId="ord" dataKey="orders" fill="#38bdf8" name="Orders" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
-      </div>
+      </Section>
 
-      {/* ── 3 & 4: Category + Top Items side by side ── */}
+      {/* ── 3 & 4: Category + Top Items ── */}
       <div className="grid md:grid-cols-2 gap-4">
-        {/* Category Revenue */}
-        <div className="bg-slate-800/60 rounded-xl border border-slate-700 p-5">
-          <SectionHeader title="Revenue by Category" onDownload={dlCategory} />
-          {categoryRevenue.length === 0 ? (
-            <p className="text-sm text-slate-500 text-center py-8">No category data for this period.</p>
-          ) : (
-            <div className="flex gap-4">
-              <div className="w-36 h-36 shrink-0">
+        <Section title="Revenue by Category">
+          {categoryRevenue.length === 0 ? <Empty /> : (
+            <div className="flex gap-5 items-start">
+              <div className="w-40 h-40 shrink-0">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
-                    <Pie data={categoryRevenue} dataKey="revenue" nameKey="category" cx="50%" cy="50%" innerRadius={30} outerRadius={55} paddingAngle={2}>
+                    <Pie data={categoryRevenue} dataKey="revenue" nameKey="category" cx="50%" cy="50%" innerRadius={32} outerRadius={60} paddingAngle={2} strokeWidth={0}>
                       {categoryRevenue.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
                     </Pie>
                     <Tooltip {...TOOLTIP_STYLE} formatter={(value: number) => formatPrice(value)} />
                   </PieChart>
                 </ResponsiveContainer>
               </div>
-              <div className="flex-1 space-y-1.5 overflow-y-auto max-h-44">
+              <div className="flex-1 space-y-2 overflow-y-auto max-h-44 pr-1">
                 {categoryRevenue.map((c, i) => (
                   <div key={c.category} className="flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
                       <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
-                      <span className="text-slate-300 capitalize">{c.category.replace(/-/g, ' ')}</span>
+                      <span className="text-slate-300 capitalize truncate">{c.category.replace(/-/g, ' ')}</span>
                     </div>
-                    <span className="text-slate-400 font-medium">{formatPrice(c.revenue)} ({c.percentage}%)</span>
+                    <span className="text-slate-400 font-semibold whitespace-nowrap ml-2">{formatPrice(c.revenue)} <span className="text-slate-500 font-normal">({c.percentage}%)</span></span>
                   </div>
                 ))}
               </div>
             </div>
           )}
-        </div>
+        </Section>
 
-        {/* Top Selling Items */}
-        <div className="bg-slate-800/60 rounded-xl border border-slate-700 p-5">
-          <SectionHeader title="Top Selling Items" onDownload={dlTopItems} />
-          {topItems.length === 0 ? (
-            <p className="text-sm text-slate-500 text-center py-8">No item data for this period.</p>
-          ) : (
-            <div className="overflow-y-auto max-h-52">
+        <Section title="Top Selling Items">
+          {topItems.length === 0 ? <Empty /> : (
+            <div className="overflow-y-auto max-h-56">
               <table className="w-full text-xs">
-                <thead>
-                  <tr className="text-slate-500 uppercase tracking-wide border-b border-slate-700">
-                    <th className="text-left py-1.5 font-semibold">#</th>
-                    <th className="text-left py-1.5 font-semibold">Item</th>
-                    <th className="text-right py-1.5 font-semibold">Qty</th>
-                    <th className="text-right py-1.5 font-semibold">Revenue</th>
-                  </tr>
-                </thead>
+                <thead><tr className="text-slate-500 uppercase tracking-wider text-[10px] border-b border-slate-700">
+                  <th className="text-left py-2 font-semibold w-6">#</th>
+                  <th className="text-left py-2 font-semibold">Item</th>
+                  <th className="text-right py-2 font-semibold">Qty</th>
+                  <th className="text-right py-2 font-semibold">Revenue</th>
+                </tr></thead>
                 <tbody>
                   {topItems.map((t, i) => (
-                    <tr key={t.name} className="border-b border-slate-700/50">
-                      <td className="py-1.5 text-slate-500">{i + 1}</td>
-                      <td className="py-1.5 text-slate-200">{t.name}</td>
-                      <td className="py-1.5 text-right text-slate-400">{t.qty}</td>
-                      <td className="py-1.5 text-right text-slate-200 font-medium">{formatPrice(t.revenue)}</td>
+                    <tr key={t.name} className="border-b border-slate-700/30 hover:bg-slate-700/20 transition-colors">
+                      <td className="py-2 text-slate-600 font-bold">{i + 1}</td>
+                      <td className="py-2 text-slate-200">{t.name}</td>
+                      <td className="py-2 text-right text-slate-400">{t.qty}</td>
+                      <td className="py-2 text-right text-white font-semibold">{formatPrice(t.revenue)}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
           )}
-        </div>
+        </Section>
       </div>
 
       {/* ── 5. Staff Performance ── */}
-      <div className="bg-slate-800/60 rounded-xl border border-slate-700 p-5">
-        <SectionHeader title="Staff Performance" onDownload={dlStaff} />
-        {staffPerformance.length === 0 ? (
-          <p className="text-sm text-slate-500 text-center py-8">No staff data for this period.</p>
-        ) : (
-          <div className="grid md:grid-cols-2 gap-4">
-            <div className="h-52">
+      <Section title="Staff Performance">
+        {staffPerformance.length === 0 ? <Empty /> : (
+          <div className="grid md:grid-cols-2 gap-5">
+            <div className="h-56">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={staffPerformance} layout="vertical" margin={{ top: 5, right: 10, bottom: 5, left: 60 }}>
+                <BarChart data={staffPerformance} layout="vertical" margin={{ top: 5, right: 10, bottom: 5, left: 70 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
                   <XAxis type="number" stroke="#64748b" fontSize={10} tick={{ fill: '#64748b' }} tickFormatter={(v) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v} />
-                  <YAxis type="category" dataKey="name" stroke="#64748b" fontSize={10} tick={{ fill: '#94a3b8' }} width={55} />
+                  <YAxis type="category" dataKey="name" stroke="#64748b" fontSize={11} tick={{ fill: '#cbd5e1' }} width={65} />
                   <Tooltip {...TOOLTIP_STYLE} formatter={(value: number, name: string) => [name === 'Revenue' ? formatPrice(value) : value, name]} />
-                  <Bar dataKey="revenue" fill="#f59e0b" name="Revenue" radius={[0, 3, 3, 0]} />
+                  <Bar dataKey="revenue" fill="#f59e0b" name="Revenue" radius={[0, 4, 4, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
-            <div className="overflow-y-auto max-h-52">
+            <div className="overflow-y-auto max-h-56">
               <table className="w-full text-xs">
-                <thead>
-                  <tr className="text-slate-500 uppercase tracking-wide border-b border-slate-700">
-                    <th className="text-left py-1.5 font-semibold">Waiter</th>
-                    <th className="text-right py-1.5 font-semibold">Orders</th>
-                    <th className="text-right py-1.5 font-semibold">Revenue</th>
-                    <th className="text-right py-1.5 font-semibold">Avg</th>
-                  </tr>
-                </thead>
+                <thead><tr className="text-slate-500 uppercase tracking-wider text-[10px] border-b border-slate-700">
+                  <th className="text-left py-2 font-semibold">Waiter</th>
+                  <th className="text-right py-2 font-semibold">Orders</th>
+                  <th className="text-right py-2 font-semibold">Revenue</th>
+                  <th className="text-right py-2 font-semibold">Avg</th>
+                </tr></thead>
                 <tbody>
-                  {staffPerformance.map((s) => (
-                    <tr key={s.name} className="border-b border-slate-700/50">
-                      <td className="py-1.5 text-slate-200 flex items-center gap-1.5">
-                        <UsersIcon className="w-3 h-3 text-slate-500" />{s.name}
+                  {staffPerformance.map((s, i) => (
+                    <tr key={s.name} className="border-b border-slate-700/30 hover:bg-slate-700/20 transition-colors">
+                      <td className="py-2 text-slate-200 flex items-center gap-2">
+                        {i === 0 && <span className="text-amber-400 text-[10px]">&#9733;</span>}
+                        <UsersIcon className="w-3 h-3 text-slate-500 shrink-0" />{s.name}
                       </td>
-                      <td className="py-1.5 text-right text-slate-400">{s.ordersServed}</td>
-                      <td className="py-1.5 text-right text-slate-200 font-medium">{formatPrice(s.revenue)}</td>
-                      <td className="py-1.5 text-right text-slate-400">{formatPrice(s.avgOrderValue)}</td>
+                      <td className="py-2 text-right text-slate-400">{s.ordersServed}</td>
+                      <td className="py-2 text-right text-white font-semibold">{formatPrice(s.revenue)}</td>
+                      <td className="py-2 text-right text-slate-400">{formatPrice(s.avgOrderValue)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -731,112 +665,133 @@ export function ReportsPage() {
             </div>
           </div>
         )}
-      </div>
+      </Section>
 
-      {/* ── 6 & 7: Payment + Order Status side by side ── */}
+      {/* ── 6 & 7: Payment + Order Status ── */}
       <div className="grid md:grid-cols-2 gap-4">
-        {/* Payment Method Distribution */}
-        <div className="bg-slate-800/60 rounded-xl border border-slate-700 p-5">
-          <SectionHeader title="Payment Methods" onDownload={dlPayment} />
-          {paymentBreakdown.length === 0 ? (
-            <p className="text-sm text-slate-500 text-center py-8">No payment data for this period.</p>
-          ) : (
-            <div className="space-y-3">
+        <Section title="Payment Methods">
+          {paymentBreakdown.length === 0 ? <Empty /> : (
+            <div className="space-y-4">
               {paymentBreakdown.map((p) => {
                 const pct = paymentTotal > 0 ? (p.total / paymentTotal) * 100 : 0;
                 return (
                   <div key={p.label}>
-                    <div className="flex items-center justify-between text-xs mb-1">
+                    <div className="flex items-center justify-between text-xs mb-1.5">
                       <div className="flex items-center gap-2">
-                        <CreditCardIcon className="w-3.5 h-3.5 text-slate-400" />
+                        <CreditCardIcon className="w-3.5 h-3.5" style={{ color: p.color }} />
                         <span className="text-slate-200 font-medium">{p.label}</span>
-                        <span className="text-slate-500">({p.orders} orders)</span>
+                        <span className="text-slate-600 text-[10px]">{p.orders} orders</span>
                       </div>
-                      <span className="text-slate-300 font-semibold">{formatPrice(p.total)}</span>
+                      <span className="text-white font-bold">{formatPrice(p.total)}</span>
                     </div>
-                    <div className="w-full bg-slate-700 rounded-full h-2">
-                      <div className="h-2 rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: p.color }} />
+                    <div className="w-full bg-slate-700/50 rounded-full h-2.5">
+                      <div className="h-2.5 rounded-full transition-all duration-500" style={{ width: `${Math.max(pct, 2)}%`, backgroundColor: p.color }} />
                     </div>
-                    <div className="text-right text-[10px] text-slate-500 mt-0.5">{Math.round(pct)}%</div>
+                    <div className="text-right text-[10px] text-slate-500 mt-0.5 font-medium">{Math.round(pct)}%</div>
                   </div>
                 );
               })}
             </div>
           )}
-        </div>
+        </Section>
 
-        {/* Order Status & Cancellations */}
-        <div className="bg-slate-800/60 rounded-xl border border-slate-700 p-5">
-          <SectionHeader title="Order Status & Cancellations" onDownload={dlStatus} />
+        <Section title="Order Status & Cancellations">
           <div className="grid grid-cols-2 gap-3 mb-4">
-            <StatusCard label="Total Orders" value={orderStatus.total} color="text-white" />
-            <StatusCard label="Served" value={orderStatus.served} color="text-emerald-400" />
-            <StatusCard label="Pending" value={orderStatus.pending} color="text-amber-400" />
-            <StatusCard label="Cancelled" value={orderStatus.cancelled} color="text-red-400" />
+            <StatusCard label="Total Orders" value={orderStatus.total} color="text-white" bg="bg-slate-700/30" />
+            <StatusCard label="Served" value={orderStatus.served} color="text-emerald-400" bg="bg-emerald-500/10" />
+            <StatusCard label="Pending" value={orderStatus.pending} color="text-amber-400" bg="bg-amber-500/10" />
+            <StatusCard label="Cancelled" value={orderStatus.cancelled} color="text-red-400" bg="bg-red-500/10" />
           </div>
-          <div className="flex items-center gap-3 bg-slate-900/60 rounded-xl p-3">
-            <XCircleIcon className="w-5 h-5 text-red-400 shrink-0" />
-            <div>
-              <p className="text-xs text-slate-400">Cancellation Rate</p>
-              <p className={`text-lg font-bold ${orderStatus.cancellationRate > 10 ? 'text-red-400' : orderStatus.cancellationRate > 5 ? 'text-amber-400' : 'text-emerald-400'}`}>
+          <div className="flex items-center gap-3 bg-slate-900/60 rounded-xl p-4 border border-slate-700/50">
+            <XCircleIcon className="w-6 h-6 text-red-400 shrink-0" />
+            <div className="flex-1">
+              <p className="text-xs text-slate-400 font-medium">Cancellation Rate</p>
+              <p className={`text-2xl font-bold ${orderStatus.cancellationRate > 10 ? 'text-red-400' : orderStatus.cancellationRate > 5 ? 'text-amber-400' : 'text-emerald-400'}`}>
                 {orderStatus.cancellationRate}%
               </p>
             </div>
           </div>
-        </div>
+        </Section>
       </div>
 
       {/* ── 8. Expenses Summary ── */}
-      <div className="bg-slate-800/60 rounded-xl border border-slate-700 p-5">
-        <SectionHeader title="Expenses Summary" onDownload={dlExpenses} />
-        {expenseSummary.length === 0 ? (
-          <p className="text-sm text-slate-500 text-center py-8">No expenses recorded for this period.</p>
-        ) : (
-          <div className="grid md:grid-cols-2 gap-4">
-            <div className="overflow-y-auto max-h-48">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="text-slate-500 uppercase tracking-wide border-b border-slate-700">
-                    <th className="text-left py-1.5 font-semibold">Category</th>
-                    <th className="text-right py-1.5 font-semibold">Amount</th>
-                    <th className="text-right py-1.5 font-semibold">Count</th>
+      <Section title="Expenses Summary">
+        {expenseSummary.length === 0 ? <Empty msg="No expenses recorded for this period." /> : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead><tr className="text-slate-500 uppercase tracking-wider text-[10px] border-b border-slate-700">
+                <th className="text-left py-2 font-semibold">Category</th>
+                <th className="text-right py-2 font-semibold">Amount</th>
+                <th className="text-right py-2 font-semibold">Count</th>
+              </tr></thead>
+              <tbody>
+                {expenseSummary.map((e) => (
+                  <tr key={e.category} className="border-b border-slate-700/30 hover:bg-slate-700/20 transition-colors">
+                    <td className="py-2 text-slate-200">{e.category}</td>
+                    <td className="py-2 text-right text-white font-semibold">{formatPrice(e.total)}</td>
+                    <td className="py-2 text-right text-slate-400">{e.count}</td>
                   </tr>
-                </thead>
-                <tbody>
-                  {expenseSummary.map((e) => (
-                    <tr key={e.category} className="border-b border-slate-700/50">
-                      <td className="py-1.5 text-slate-200">{e.category}</td>
-                      <td className="py-1.5 text-right text-slate-200 font-medium">{formatPrice(e.total)}</td>
-                      <td className="py-1.5 text-right text-slate-400">{e.count}</td>
-                    </tr>
-                  ))}
-                  <tr className="border-t-2 border-slate-600">
-                    <td className="py-2 text-slate-200 font-bold">Total</td>
-                    <td className="py-2 text-right text-white font-bold">{formatPrice(metrics.expenses)}</td>
-                    <td className="py-2 text-right text-slate-300 font-bold">{expenses.length}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            <div className="flex flex-col items-center justify-center gap-3 bg-slate-900/60 rounded-xl p-4">
-              <div className="text-center">
-                <p className="text-xs text-slate-400 uppercase tracking-wider">Revenue</p>
-                <p className="text-lg font-bold text-emerald-400">{formatPrice(metrics.revenue)}</p>
-              </div>
-              <div className="text-slate-600 text-lg">−</div>
-              <div className="text-center">
-                <p className="text-xs text-slate-400 uppercase tracking-wider">Expenses</p>
-                <p className="text-lg font-bold text-red-400">{formatPrice(metrics.expenses)}</p>
-              </div>
-              <div className="w-full border-t border-slate-700 pt-2 text-center">
-                <p className="text-xs text-slate-400 uppercase tracking-wider">Net Profit</p>
-                <p className={`text-xl font-bold ${metrics.netProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                  {formatPrice(metrics.netProfit)}
-                </p>
-              </div>
-            </div>
+                ))}
+                <tr className="border-t-2 border-slate-600">
+                  <td className="py-2.5 text-white font-bold">Total Expenses</td>
+                  <td className="py-2.5 text-right text-amber-400 font-bold text-sm">{formatPrice(metrics.expenses)}</td>
+                  <td className="py-2.5 text-right text-slate-300 font-bold">{expenses.length}</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         )}
+      </Section>
+
+      {/* ── Hidden PDF-printable version ── */}
+      <div className="hidden">
+        <div ref={pdfRef}>
+          <h1>Business Report</h1>
+          <div className="meta">{pLabel} &mdash; Generated {new Date().toLocaleString()}</div>
+
+          <div className="kpi-row">
+            <div className="kpi"><div className="label">Revenue</div><div className="value">{formatPrice(metrics.revenue)}</div><div className={`delta ${revDelta.up ? 'delta-up' : 'delta-down'}`}>{revDelta.up ? '+' : '-'}{revDelta.pct}% vs prior</div></div>
+            <div className="kpi"><div className="label">Orders</div><div className="value">{metrics.orders}</div><div className={`delta ${ordDelta.up ? 'delta-up' : 'delta-down'}`}>{ordDelta.up ? '+' : '-'}{ordDelta.pct}% vs prior</div></div>
+            <div className="kpi"><div className="label">Avg Order</div><div className="value">{formatPrice(metrics.avgOrderValue)}</div><div className={`delta ${avgDelta.up ? 'delta-up' : 'delta-down'}`}>{avgDelta.up ? '+' : '-'}{avgDelta.pct}% vs prior</div></div>
+            <div className="kpi"><div className="label">Expenses</div><div className="value">{formatPrice(metrics.expenses)}</div></div>
+          </div>
+
+          <h2>Revenue by Category</h2>
+          <table><thead><tr><th>Category</th><th>Revenue</th><th>Qty</th><th style={{textAlign:'right'}}>%</th></tr></thead><tbody>
+            {categoryRevenue.map(c => <tr key={c.category}><td style={{textTransform:'capitalize'}}>{c.category.replace(/-/g,' ')}</td><td>{formatPrice(c.revenue)}</td><td>{c.qty}</td><td style={{textAlign:'right'}}>{c.percentage}%</td></tr>)}
+          </tbody></table>
+
+          <h2>Top Selling Items</h2>
+          <table><thead><tr><th>#</th><th>Item</th><th>Qty</th><th>Revenue</th></tr></thead><tbody>
+            {topItems.map((t,i) => <tr key={t.name}><td>{i+1}</td><td>{t.name}</td><td>{t.qty}</td><td>{formatPrice(t.revenue)}</td></tr>)}
+          </tbody></table>
+
+          <h2>Staff Performance</h2>
+          <table><thead><tr><th>Waiter</th><th>Orders</th><th>Revenue</th><th>Avg</th></tr></thead><tbody>
+            {staffPerformance.map(s => <tr key={s.name}><td>{s.name}</td><td>{s.ordersServed}</td><td>{formatPrice(s.revenue)}</td><td>{formatPrice(s.avgOrderValue)}</td></tr>)}
+          </tbody></table>
+
+          <h2>Payment Methods</h2>
+          {paymentBreakdown.map(p => {
+            const pct = paymentTotal > 0 ? Math.round((p.total / paymentTotal) * 100) : 0;
+            return <div key={p.label} className="bar-row"><div className="bar-label"><span>{p.label} ({p.orders} orders)</span><span>{formatPrice(p.total)} — {pct}%</span></div><div className="bar-track"><div className="bar-fill" style={{width:`${Math.max(pct,2)}%`,backgroundColor:p.color}}/></div></div>;
+          })}
+
+          <h2>Order Status</h2>
+          <div className="status-grid">
+            <div className="status-card"><div className="val">{orderStatus.total}</div><div className="lbl">Total</div></div>
+            <div className="status-card"><div className="val" style={{color:'#059669'}}>{orderStatus.served}</div><div className="lbl">Served</div></div>
+            <div className="status-card"><div className="val" style={{color:'#d97706'}}>{orderStatus.pending}</div><div className="lbl">Pending</div></div>
+            <div className="status-card"><div className="val" style={{color:'#dc2626'}}>{orderStatus.cancelled}</div><div className="lbl">Cancelled</div></div>
+          </div>
+          <div>Cancellation Rate: <span className="cancel-rate">{orderStatus.cancellationRate}%</span></div>
+
+          <h2>Expenses</h2>
+          <table><thead><tr><th>Category</th><th>Amount</th><th>Count</th></tr></thead><tbody>
+            {expenseSummary.map(e => <tr key={e.category}><td>{e.category}</td><td>{formatPrice(e.total)}</td><td>{e.count}</td></tr>)}
+            <tr className="total-row"><td>Total</td><td>{formatPrice(metrics.expenses)}</td><td>{expenses.length}</td></tr>
+          </tbody></table>
+        </div>
       </div>
 
     </div>
@@ -845,25 +800,35 @@ export function ReportsPage() {
 
 // ─── Sub-components ─────────────────────────────────────────────────────────
 
-function KPICard({ icon, label, value, delta, tone }: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-  delta?: { pct: number; up: boolean };
-  tone?: 'green' | 'red';
-}) {
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="bg-slate-800/60 rounded-xl border border-slate-700 p-4">
-      <div className="flex items-center gap-2 text-slate-400 mb-1">
+    <div className="bg-slate-800/60 rounded-xl border border-slate-700/50 p-5">
+      <h3 className="text-sm font-semibold text-slate-200 uppercase tracking-wider mb-4">{title}</h3>
+      {children}
+    </div>
+  );
+}
+
+function Empty({ msg }: { msg?: string }) {
+  return <p className="text-sm text-slate-500 text-center py-10">{msg || 'No data for this period.'}</p>;
+}
+
+function KPICard({ icon, label, value, delta, accent }: {
+  icon: React.ReactNode; label: string; value: string;
+  delta?: { pct: number; up: boolean }; accent?: string;
+}) {
+  const borderColor = accent === 'emerald' ? 'border-emerald-500/30' : accent === 'blue' ? 'border-blue-500/30' : accent === 'amber' ? 'border-amber-500/30' : accent === 'red' ? 'border-red-500/30' : 'border-slate-700';
+  const iconColor = accent === 'emerald' ? 'text-emerald-400' : accent === 'blue' ? 'text-blue-400' : accent === 'amber' ? 'text-amber-400' : accent === 'red' ? 'text-red-400' : 'text-slate-400';
+  return (
+    <div className={`bg-slate-800/60 rounded-xl border ${borderColor} p-4 hover:bg-slate-800/80 transition-colors`}>
+      <div className={`flex items-center gap-2 ${iconColor} mb-2`}>
         {icon}
-        <span className="text-xs font-medium uppercase tracking-wider">{label}</span>
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">{label}</span>
       </div>
-      <p className={`text-lg font-bold ${tone === 'green' ? 'text-emerald-400' : tone === 'red' ? 'text-red-400' : 'text-white'}`}>
-        {value}
-      </p>
+      <p className="text-xl font-bold text-white">{value}</p>
       {delta && (
-        <div className={`flex items-center gap-1 mt-1 text-xs font-medium ${delta.up ? 'text-emerald-400' : 'text-red-400'}`}>
-          {delta.up ? <TrendingUpIcon className="w-3 h-3" /> : <TrendingDownIcon className="w-3 h-3" />}
+        <div className={`flex items-center gap-1 mt-1.5 text-xs font-semibold ${delta.up ? 'text-emerald-400' : 'text-red-400'}`}>
+          {delta.up ? <TrendingUpIcon className="w-3.5 h-3.5" /> : <TrendingDownIcon className="w-3.5 h-3.5" />}
           <span>{delta.pct}% vs prior period</span>
         </div>
       )}
@@ -871,11 +836,11 @@ function KPICard({ icon, label, value, delta, tone }: {
   );
 }
 
-function StatusCard({ label, value, color }: { label: string; value: number; color: string }) {
+function StatusCard({ label, value, color, bg }: { label: string; value: number; color: string; bg: string }) {
   return (
-    <div className="bg-slate-900/60 rounded-xl p-3 text-center">
-      <p className="text-xs text-slate-400">{label}</p>
-      <p className={`text-xl font-bold ${color}`}>{value}</p>
+    <div className={`${bg} rounded-xl p-3.5 text-center border border-slate-700/30`}>
+      <p className={`text-2xl font-bold ${color}`}>{value}</p>
+      <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider mt-0.5">{label}</p>
     </div>
   );
 }
