@@ -45,6 +45,7 @@ interface StaffOrderPageProps {
     country?: string;
     phone?: string;
     email?: string;
+    momoCode?: string;
   };
   staffName?: string;
   sharedTerminalMode?: boolean;
@@ -327,6 +328,7 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
       restaurantLogo: restaurantInfo?.logo,
       restaurantCity: restaurantInfo?.city,
       restaurantCountry: restaurantInfo?.country,
+      restaurantMomoCode: restaurantInfo?.momoCode,
       taxRate: 0,
       serverName: selectedStaffName || resolveStaffName(),
       orderType: lastPlacedOrder.tableNumber == null ? 'takeout' : 'dine-in',
@@ -364,6 +366,7 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
           restaurantLogo: restaurantInfo?.logo,
           restaurantCity: restaurantInfo?.city,
           restaurantCountry: restaurantInfo?.country,
+          restaurantMomoCode: restaurantInfo?.momoCode,
           taxRate: 0,
           serverName: selectedStaffName || resolveStaffName(),
           orderType: lastPlacedOrder.tableNumber == null ? 'takeout' : 'dine-in',

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { BuildingIcon, PhoneIcon, MailIcon, MapPinIcon, GlobeIcon, ImageIcon, SaveIcon, UploadIcon, XIcon, CoinsIcon, ShieldCheckIcon, WifiIcon, RefreshCwIcon } from 'lucide-react';
+import { BuildingIcon, PhoneIcon, MailIcon, MapPinIcon, GlobeIcon, ImageIcon, SaveIcon, UploadIcon, XIcon, CoinsIcon, ShieldCheckIcon, WifiIcon, RefreshCwIcon, SmartphoneIcon } from 'lucide-react';
 import { fetchReceiptSettings, saveReceiptSettings, fetchIpRestriction, saveIpRestriction } from '../../api/restaurants';
 import type { RestaurantReceiptSettings } from '../../api/restaurants';
 import { setCurrency, CURRENCY_OPTIONS, getCurrency, CurrencyCode } from '../../utils/currency';
@@ -279,6 +279,17 @@ export function RestaurantSettings({ restaurantId, restaurantName, onNameChange,
         {field('Email Address', 'email', 'e.g. info@company.rw', <MailIcon className="w-4 h-4" />, 'email')}
       </div>
 
+      {/* ── Mobile Money (MoMo) ── */}
+      <div className="bg-slate-800/60 rounded-xl border border-slate-700 p-6 space-y-4">
+        <h2 className="text-sm font-semibold text-slate-200 uppercase tracking-wider flex items-center gap-2">
+          <SmartphoneIcon className="w-4 h-4 text-amber-400" /> Mobile Money (MoMo)
+        </h2>
+        {field('MoMo Code', 'momoCode', 'e.g. *182*8*1*012345#', <SmartphoneIcon className="w-4 h-4" />)}
+        <p className="text-xs text-slate-500">
+          This code will appear on customer receipts so they can pay via Mobile Money.
+        </p>
+      </div>
+
       {/* ── Currency ── */}
       <div className="bg-slate-800/60 rounded-xl border border-slate-700 p-6 space-y-4">
         <h2 className="text-sm font-semibold text-slate-200 uppercase tracking-wider flex items-center gap-2">
@@ -303,8 +314,8 @@ export function RestaurantSettings({ restaurantId, restaurantName, onNameChange,
 
       {/* ── Receipt Preview hint ── */}
       <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 text-sm text-amber-300">
-        <strong className="text-amber-200">Receipt preview:</strong> The logo, name, address, city, country, phone and
-        email will all appear at the top of every customer receipt printed from the waiter or kitchen portal.
+        <strong className="text-amber-200">Receipt preview:</strong> The logo, name, address, city, country, phone,
+        email and MoMo code will all appear on every customer receipt printed from the waiter or kitchen portal.
       </div>
 
       {/* ── IP Restriction ── */}

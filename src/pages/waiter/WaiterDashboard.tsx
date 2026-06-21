@@ -80,6 +80,7 @@ interface RestaurantInfo {
   country?: string;
   phone?: string;
   email?: string;
+  momoCode?: string;
 }
 
 interface WaiterDashboardProps {
@@ -1215,6 +1216,7 @@ export function WaiterDashboard({
         restaurantLogo: restaurantInfo?.logo,
         restaurantCity: restaurantInfo?.city,
         restaurantCountry: restaurantInfo?.country,
+        restaurantMomoCode: restaurantInfo?.momoCode,
         taxRate: 0,
         serverName: waiterName,
         orderType: order.deliveryAddress ? 'delivery' : 'dine-in',
@@ -1861,6 +1863,7 @@ export function WaiterDashboard({
             restaurantLogo: restaurantInfo?.logo,
             restaurantCity: restaurantInfo?.city,
             restaurantCountry: restaurantInfo?.country,
+            restaurantMomoCode: restaurantInfo?.momoCode,
             taxRate: 0,
             serverName: waiterName,
             orderType: selectedOrderForShare.deliveryAddress ? 'delivery' : 'dine-in',

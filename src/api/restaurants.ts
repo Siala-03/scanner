@@ -27,6 +27,7 @@ export interface RestaurantReceiptSettings {
   phone?: string;
   email?: string;
   currency?: string; // e.g. 'RWF' | 'KShs' | 'UGX'
+  momoCode?: string;
 }
 
 export async function fetchRestaurants(): Promise<Restaurant[]> {
@@ -132,6 +133,7 @@ export async function fetchReceiptSettings(restaurantId: string): Promise<Restau
     phone: receiptFromSettings?.phone || (data as any)?.phone || undefined,
     email: receiptFromSettings?.email || (data as any)?.email || undefined,
     currency: receiptFromSettings?.currency || undefined,
+    momoCode: receiptFromSettings?.momoCode || undefined,
   };
 }
 

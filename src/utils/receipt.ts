@@ -112,6 +112,7 @@ export interface ReceiptData {
   restaurantLogo?: string;   // base64 data URL or https URL
   restaurantCity?: string;
   restaurantCountry?: string;
+  restaurantMomoCode?: string;
   taxId?: string;
 
   // Order Info
@@ -179,6 +180,7 @@ export interface BuildReceiptOptions {
   restaurantLogo?: string;
   restaurantCity?: string;
   restaurantCountry?: string;
+  restaurantMomoCode?: string;
   taxRate: number;
   serverName: string;
   orderType?: 'dine-in' | 'takeout' | 'delivery';
@@ -239,6 +241,7 @@ export function orderToReceiptData(
     restaurantLogo: options.restaurantLogo,
     restaurantCity: options.restaurantCity,
     restaurantCountry: options.restaurantCountry,
+    restaurantMomoCode: options.restaurantMomoCode,
 
     orderNumber,
     receiptId,
@@ -308,6 +311,7 @@ export function buildReceiptHtml(receipt: ReceiptData): string {
     restaurantLogo,
     restaurantCity,
     restaurantCountry,
+    restaurantMomoCode,
     orderNumber,
     receiptId,
     orderType,
@@ -527,6 +531,13 @@ export function buildReceiptHtml(receipt: ReceiptData): string {
   </div>
   ${qrImageUrl ? `<div style="text-align:center;margin-top:8px"><img src="${qrImageUrl}" alt="RRA QR" style="width:130px;height:130px;object-fit:contain" /></div>` : ''}
   ` : ''}
+
+  ${restaurantMomoCode ? `
+  <hr class="dashed">
+  <div style="text-align:center;padding:6px 0">
+    <div style="font-size:8pt;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#333;margin-bottom:4px">Pay via Mobile Money</div>
+    <div style="font-size:12pt;font-weight:900;letter-spacing:1px;color:#000">${restaurantMomoCode}</div>
+  </div>` : ''}
 
   <hr class="solid">
 
