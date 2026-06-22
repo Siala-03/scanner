@@ -201,7 +201,7 @@ export async function findMergeableOpenOrder(
 
   const target = data.find((row: any) => {
     const paymentStatus = String(row?.payment_status ?? row?.paymentStatus ?? 'unpaid').toLowerCase();
-    return paymentStatus !== 'confirmed';
+    return paymentStatus !== 'confirmed' && paymentStatus !== 'paid';
   });
 
   return (target ?? null) as Order | null;
@@ -376,15 +376,12 @@ export async function createOrder(order: CreateOrderInput): Promise<Order> {
     }
   }
 
-  // Full payload — includes optional columns that may or may not exist in the schema
-  const fullPayload = {
+  const payload: Record<string, unknown> = {
     id: orderId,
     order_number: orderNumber,
     table_number: order.tableNumber,
     customer_name: order.customerName || null,
     customer_phone: (order as any).customerPhone || null,
-    customer_email: (order as any).customerEmail || null,
-    customer_address: (order as any).customerAddress || null,
     customer_id: order.customerId || null,
     status: 'pending',
     idempotency_key: idempotencyKey,
@@ -393,111 +390,63 @@ export async function createOrder(order: CreateOrderInput): Promise<Order> {
     tax: 0,
     total,
     notes: order.notes || null,
-    requires_kitchen: order.requiresKitchen ?? false,
     created_by: staffId,
-    assigned_waiter_id: assignedWaiterId,
     payment_status: 'unpaid',
     restaurant_id: restaurantId,
-    is_online_order: isOnlineOrder,
   };
 
-  let result = await db.from('orders').insert(fullPayload).select().single();
+  // Optional columns — only include if the schema supports them.
+  // Each is wrapped in its own insert attempt via the fallback loop below.
+  const optionalColumns: Record<string, unknown> = {
+    requires_kitchen: order.requiresKitchen ?? false,
+    assigned_waiter_id: assignedWaiterId,
+    is_online_order: isOnlineOrder,
+    customer_email: (order as any).customerEmail || null,
+    customer_address: (order as any).customerAddress || null,
+  };
 
-  // If the insert hit a unique-constraint violation (23505) on idempotency_key or id,
-  // the order was already created — return it instead of throwing.
-  if (result.error?.code === '23505') {
-    const { data: existing } = await db
-      .from('orders')
-      .select('*')
-      .or(`idempotency_key.eq.${idempotencyKey},id.eq.${orderId}`)
-      .limit(1)
-      .single();
-    if (existing) return existing as Order;
-  }
+  // Try with all optional columns, then drop them one-by-one on failure
+  const optionalKeys = Object.keys(optionalColumns);
 
-  // Fallback 1: remove assigned_waiter_id (may not exist in schema)
-  if (result.error) {
-    console.warn('[createOrder] Full insert failed, retrying without assigned_waiter_id:', result.error.message);
-    const payload2 = {
-      id: orderId,
-      order_number: orderNumber,
-      table_number: order.tableNumber,
-      customer_name: order.customerName || null,
-      customer_phone: (order as any).customerPhone || null,
-      customer_id: order.customerId || null,
-      status: 'pending',
-      idempotency_key: idempotencyKey,
-      items,
-      subtotal: total,
-      tax: 0,
-      total,
-      notes: order.notes || null,
-      requires_kitchen: order.requiresKitchen ?? true,
-      created_by: staffId,
-      payment_status: 'unpaid',
-      restaurant_id: restaurantId,
-      is_online_order: isOnlineOrder,
-    };
-    result = await db.from('orders').insert(payload2).select().single();
+  for (let drop = 0; drop <= optionalKeys.length; drop++) {
+    const attempt = { ...payload };
+    for (let i = drop; i < optionalKeys.length; i++) {
+      // skip — don't add columns we've already dropped
+    }
+    // Add optional columns that haven't been dropped yet
+    for (let i = drop; i < optionalKeys.length; i++) {
+      attempt[optionalKeys[i]] = optionalColumns[optionalKeys[i]];
+    }
+
+    const result = await db.from('orders').insert(attempt).select().single();
+
     if (result.error?.code === '23505') {
-      const { data: existing } = await db.from('orders').select('*').or(`idempotency_key.eq.${idempotencyKey},id.eq.${orderId}`).limit(1).single();
+      const { data: existing } = await db
+        .from('orders')
+        .select('*')
+        .or(`idempotency_key.eq.${idempotencyKey},id.eq.${orderId}`)
+        .limit(1)
+        .single();
       if (existing) return existing as Order;
+    }
+
+    if (!result.error) {
+      // Success — decrement inventory (best-effort)
+      decrementInventoryForOrder(
+        order.items.map(item => ({ menuItemId: item.menuItemId, quantity: item.quantity })),
+        { reference: orderNumber, performedBy: staffId || undefined }
+      ).catch(err => console.warn('[createOrder] Inventory decrement failed:', err));
+      return result.data as Order;
+    }
+
+    if (drop < optionalKeys.length) {
+      console.warn(`[createOrder] Insert failed (dropping "${optionalKeys[drop]}"):`, result.error.message);
+    } else {
+      throw result.error;
     }
   }
 
-  // Fallback 2: also remove requires_kitchen (may not exist in schema)
-  if (result.error) {
-    console.warn('[createOrder] Retrying without requires_kitchen:', result.error.message);
-    const payload3 = {
-      id: orderId,
-      order_number: orderNumber,
-      table_number: order.tableNumber,
-      customer_name: order.customerName || null,
-      customer_id: order.customerId || null,
-      status: 'pending',
-      idempotency_key: idempotencyKey,
-      items,
-      total,
-      notes: order.notes || null,
-      created_by: staffId,
-      restaurant_id: restaurantId,
-    };
-    result = await db.from('orders').insert(payload3).select().single();
-    if (result.error?.code === '23505') {
-      const { data: existing } = await db.from('orders').select('*').or(`idempotency_key.eq.${idempotencyKey},id.eq.${orderId}`).limit(1).single();
-      if (existing) return existing as Order;
-    }
-  }
-
-  // Fallback 3: absolute bare minimum
-  if (result.error) {
-    console.warn('[createOrder] Retrying with core-only columns:', result.error.message);
-    const corePayload = {
-      id: orderId,
-      table_number: order.tableNumber,
-      status: 'pending',
-      idempotency_key: idempotencyKey,
-      items,
-      total,
-      created_by: staffId,
-      restaurant_id: restaurantId,
-    };
-    result = await db.from('orders').insert(corePayload).select().single();
-    if (result.error?.code === '23505') {
-      const { data: existing } = await db.from('orders').select('*').or(`idempotency_key.eq.${idempotencyKey},id.eq.${orderId}`).limit(1).single();
-      if (existing) return existing as Order;
-    }
-  }
-
-  if (result.error) throw result.error;
-
-  // Decrement inventory stock for each ordered item (best-effort, does not block order creation)
-  decrementInventoryForOrder(
-    order.items.map(item => ({ menuItemId: item.menuItemId, quantity: item.quantity })),
-    { reference: orderNumber, performedBy: staffId || undefined }
-  ).catch(err => console.warn('[createOrder] Inventory decrement failed:', err));
-
-  return result.data as Order;
+  throw new Error('Order creation failed after all attempts');
 }
 
 export async function updateOrderStatus(
@@ -607,7 +556,7 @@ export async function confirmPayment(
   };
 
   const baseFields: Record<string, unknown> = {
-    payment_status: 'confirmed',
+    payment_status: 'paid',
     status: 'served',
     completed_at: now,
     updated_at: now,
