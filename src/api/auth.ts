@@ -62,7 +62,6 @@ export async function loginStaff(
   localStorage.removeItem('token');
   localStorage.removeItem('authUser');
   localStorage.removeItem('restaurantId');
-  await supabase.auth.signOut().catch(() => {});
 
   const raw = await callEdgeFn('staff-login', {
     method: 'POST',
@@ -78,7 +77,10 @@ export async function loginStaff(
 
   if (raw.token) {
     localStorage.setItem('token', raw.token);
-    await supabase.auth.setSession({ access_token: raw.token, refresh_token: '' });
+    // Do NOT call supabase.auth.setSession() — this app uses custom staff auth,
+    // not Supabase Auth. RLS policies grant full access to the anon role.
+    // Setting a session with no refresh token causes every request to 401
+    // once the JWT expires (~1 hour), breaking all order operations.
   }
 
   return staff;
@@ -171,7 +173,6 @@ export function logoutStaff(): void {
   localStorage.removeItem('token');
   localStorage.removeItem('staffRole');
   localStorage.removeItem('restaurantId');
-  supabase.auth.signOut().catch(() => {});
 }
 
 export async function changePassword(

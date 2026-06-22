@@ -9,25 +9,8 @@ import {
 import { recordTableSessionActivity } from '../utils/tableSessions';
 import * as queue from '../lib/orderQueue';
 
-// ─── Auth token helpers ───────────────────────────────────────────────────────
-
-async function getAuthToken(): Promise<string | null> {
-  try {
-    const { data } = await supabase.auth.getSession();
-    return data.session?.access_token ?? null;
-  } catch {
-    return null;
-  }
-}
-
-async function getRefreshToken(): Promise<string | null> {
-  try {
-    const { data } = await supabase.auth.getSession();
-    return data.session?.refresh_token ?? null;
-  } catch {
-    return null;
-  }
-}
+// Auth is anon-key-only (custom staff auth, not Supabase Auth).
+// The SW uses the anon key directly for background sync.
 
 const normalizeOrderPayload = (rawOrder: any): Order | undefined => {
   if (!rawOrder) return undefined;
@@ -517,8 +500,8 @@ export function useOrders(): UseOrdersReturn {
         status: 'pending',
         supabaseUrl: import.meta.env.VITE_SUPABASE_URL as string,
         supabaseAnonKey: import.meta.env.VITE_SUPABASE_ANON_KEY as string,
-        authToken: await getAuthToken(),
-        refreshToken: await getRefreshToken(),
+        authToken: null,
+        refreshToken: null,
       });
 
       // 3. Attempt immediate send (non-blocking — queue handles failure)
