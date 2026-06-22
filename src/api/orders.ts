@@ -153,14 +153,15 @@ export async function fetchOrderById(id: string): Promise<Order> {
 /** Look up which staff member is assigned to a given table for a restaurant. */
 async function lookupAssignedWaiter(restaurantId: string, tableNumber: number): Promise<string | null> {
   try {
-    const { data } = await db
+    const query = db
       .from('staff')
       .select('id, assigned_tables')
       .eq('restaurant_id', restaurantId)
       .not('assigned_tables', 'is', null);
 
+    const { data } = await withTimeout(query, 5000, { data: null } as any);
+
     if (!data) return null;
-    // assigned_tables is stored as a JSON array of numbers
     for (const row of data) {
       const tables: number[] = Array.isArray(row.assigned_tables) ? row.assigned_tables : [];
       if (tables.includes(tableNumber)) return row.id;
@@ -172,6 +173,13 @@ async function lookupAssignedWaiter(restaurantId: string, tableNumber: number): 
 }
 
 const MERGEABLE_ORDER_STATUSES = ['pending', 'verified', 'preparing', 'ready', 'served'];
+
+function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms)),
+  ]);
+}
 
 export async function findMergeableOpenOrder(
   tableNumber: number,
@@ -185,7 +193,7 @@ export async function findMergeableOpenOrder(
 
   const cutoff = new Date(Date.now() - maxAgeMinutes * 60_000).toISOString();
 
-  const { data, error } = await db
+  const query = db
     .from('orders')
     .select('*')
     .eq('restaurant_id', restaurant)
@@ -194,6 +202,8 @@ export async function findMergeableOpenOrder(
     .gte('created_at', cutoff)
     .order('updated_at', { ascending: false })
     .limit(6);
+
+  const { data, error } = await withTimeout(query, 8000, { data: null, error: null } as any);
 
   if (error || !Array.isArray(data) || data.length === 0) {
     return null;
@@ -359,7 +369,7 @@ export async function createOrder(order: CreateOrderInput): Promise<Order> {
           mergeQuery = mergeQuery.eq('updated_at', (mergeTarget as any).updated_at);
         }
 
-        const mergeResult = await mergeQuery.select().maybeSingle();
+        const mergeResult = await withTimeout(mergeQuery.select().maybeSingle(), 10000, { data: null, error: { message: 'Merge timed out' } } as any);
         if (!mergeResult.error && mergeResult.data) {
           decrementInventoryForOrder(
             order.items.map(item => ({ menuItemId: item.menuItemId, quantity: item.quantity })),
@@ -418,15 +428,21 @@ export async function createOrder(order: CreateOrderInput): Promise<Order> {
       attempt[optionalKeys[i]] = optionalColumns[optionalKeys[i]];
     }
 
-    const result = await db.from('orders').insert(attempt).select().single();
+    const result = await withTimeout(
+      db.from('orders').insert(attempt).select().single(),
+      15000,
+      { data: null, error: { message: 'Request timed out', code: 'TIMEOUT' } } as any
+    );
 
     if (result.error?.code === '23505') {
-      const { data: existing } = await db
-        .from('orders')
-        .select('*')
-        .or(`idempotency_key.eq.${idempotencyKey},id.eq.${orderId}`)
-        .limit(1)
-        .single();
+      const { data: existing } = await withTimeout(
+        db.from('orders').select('*')
+          .or(`idempotency_key.eq.${idempotencyKey},id.eq.${orderId}`)
+          .limit(1)
+          .single(),
+        8000,
+        { data: null } as any
+      );
       if (existing) return existing as Order;
     }
 
