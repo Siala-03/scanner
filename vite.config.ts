@@ -11,40 +11,44 @@ export default defineConfig({
       srcDir: 'src',
       filename: 'sw.ts',
       registerType: 'autoUpdate',
-      includeAssets: ['logo.PNG'],
+      includeAssets: ['assets/logo_servv_black.PNG', 'assets/favicon_black.png'],
       devOptions: {
-        // Register the service worker in dev so offline caching can be tested.
-        // Note: precache is empty in dev — true offline-refresh only works in
-        // a production build (npm run build && npm run preview).
         enabled: true,
         type: 'module',
       },
       manifest: {
-        name: 'Restaurant Scanner',
-        short_name: 'Scanner',
-        description: 'Restaurant management system with offline support',
-        theme_color: '#1f2937',
-        background_color: '#111827',
+        name: 'Servv IQ',
+        short_name: 'Servv',
+        description: 'The Operating System for Hospitality',
+        theme_color: '#111111',
+        background_color: '#111111',
         display: 'standalone',
+        orientation: 'any',
         start_url: '/',
         scope: '/',
         icons: [
           {
-            src: 'logo.PNG',
+            src: 'assets/logo_servv_black.PNG',
             sizes: '192x192',
             type: 'image/png',
-            purpose: 'any maskable'
+            purpose: 'any',
           },
           {
-            src: 'logo.PNG',
+            src: 'assets/logo_servv_black.PNG',
             sizes: '512x512',
             type: 'image/png',
-            purpose: 'any maskable'
-          }
+            purpose: 'any',
+          },
+          {
+            src: 'assets/logo_servv_black.PNG',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'maskable',
+          },
         ],
         categories: ['business', 'productivity'],
         lang: 'en',
-        dir: 'ltr'
+        dir: 'ltr',
       },
       injectManifest: {
         // Keep build stable when app bundle temporarily exceeds Workbox 2 MiB default.
