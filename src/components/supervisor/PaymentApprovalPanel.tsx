@@ -320,10 +320,11 @@ export function PaymentApprovalPanel({ restaurantId, staffId, staffName }: Payme
     try {
       await confirmPayment(order.id, paymentData);
 
-      if (restaurantId) {
-        fiscalizeOrder(order.id, { restaurantId, paymentType: primary.code })
-          .catch((err) => console.warn('[EBM] Fiscalization skipped:', err));
-      }
+      // EBM fiscalization disabled — CORS issues with backend routing
+      // if (restaurantId) {
+      //   fiscalizeOrder(order.id, { restaurantId, paymentType: primary.code })
+      //     .catch((err) => console.warn('[EBM] Fiscalization skipped:', err));
+      // }
 
       setJustConfirmed((prev) => new Set(prev).add(order.id));
       setTimeout(() => {

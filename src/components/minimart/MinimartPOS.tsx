@@ -552,10 +552,11 @@ export function MinimartPOS({ restaurantName, cashier, restaurantId, onLogout }:
         restaurantId: activeRestaurantId,
       });
 
-      if (activeRestaurantId) {
-        fiscalizeOrder(order.id, { restaurantId: activeRestaurantId, paymentType: methodCode })
-          .catch((err) => console.warn('[EBM] Fiscalization failed:', err));
-      }
+      // EBM fiscalization disabled — CORS issues with backend routing
+      // if (activeRestaurantId) {
+      //   fiscalizeOrder(order.id, { restaurantId: activeRestaurantId, paymentType: methodCode })
+      //     .catch((err) => console.warn('[EBM] Fiscalization failed:', err));
+      // }
 
       // Deduct inventory stock (non-blocking, best-effort)
       checkoutCart.forEach((line) => {
