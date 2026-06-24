@@ -582,26 +582,29 @@ export async function confirmPayment(
     updated_at: now,
   };
 
-  // Try progressively smaller payloads, but always keep payment method fields
-  // as long as possible so analytics can track Cash/Card/MoMo.
+  const coreFields: Record<string, unknown> = {
+    status: 'served',
+    updated_at: now,
+  };
+
   const attempts = [
     { ...baseFields, ...confirmedByFields, ...paymentFields },
-    { ...baseFields, ...paymentFields, payment_confirmed_by: opts.confirmedBy || null },
     { ...baseFields, ...paymentFields },
     { ...baseFields, ...confirmedByFields },
     { ...baseFields },
-    { status: 'served', completed_at: now, updated_at: now },
+    { ...coreFields, payment_status: 'paid' },
+    coreFields,
   ];
 
   let result: any;
   for (const payload of attempts) {
-    result = await db
-      .from('orders')
-      .update(payload)
-      .eq('id', orderId)
-      .select()
-      .single();
+    result = await withTimeout(
+      db.from('orders').update(payload).eq('id', orderId).select().single(),
+      10000,
+      { data: null, error: { message: 'Request timed out', code: 'TIMEOUT' } } as any
+    );
     if (!result.error) return result.data as Order;
+    console.warn('[confirmPayment] Attempt failed, trying smaller payload:', result.error.message);
   }
 
   throw result?.error || new Error('Failed to confirm payment');

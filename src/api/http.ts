@@ -20,10 +20,13 @@ export async function apiRequest<T>(
 ): Promise<T> {
   let url = path;
   if (!path.startsWith('http')) {
-    // Prepend API_BASE for all relative paths (with or without leading /)
-    // This ensures production API calls go to the backend server
-    const prefix = API_BASE.endsWith('/') ? API_BASE.slice(0, -1) : API_BASE;
-    url = path.startsWith('/') ? `${prefix}${path}` : `${prefix}/${path}`;
+    if (path.startsWith('/api/')) {
+      // Express backend routes: keep as same-origin path (reverse proxy handles routing)
+      url = path;
+    } else {
+      const prefix = API_BASE.endsWith('/') ? API_BASE.slice(0, -1) : API_BASE;
+      url = path.startsWith('/') ? `${prefix}${path}` : `${prefix}/${path}`;
+    }
   }
 
   const headers = new Headers(init.headers);
