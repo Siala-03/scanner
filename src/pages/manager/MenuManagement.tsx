@@ -104,6 +104,12 @@ export function MenuManagement() {
 
   useEffect(() => { loadInvMap(); }, [loadInvMap]);
 
+  useEffect(() => {
+    const onVisible = () => { if (!document.hidden) loadInvMap(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [loadInvMap]);
+
   const handleOpenTrack = (item: MenuItem) => {
     const existing = invMap[item.id];
     setTrackStock(existing?.stock ?? 0);
