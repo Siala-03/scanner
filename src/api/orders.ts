@@ -576,7 +576,7 @@ export async function confirmPayment(
   };
 
   const baseFields: Record<string, unknown> = {
-    payment_status: 'paid',
+    payment_status: 'confirmed',
     status: 'served',
     completed_at: now,
     updated_at: now,
@@ -592,7 +592,7 @@ export async function confirmPayment(
     { ...baseFields, ...paymentFields },
     { ...baseFields, ...confirmedByFields },
     { ...baseFields },
-    { ...coreFields, payment_status: 'paid' },
+    { ...coreFields, payment_status: 'confirmed' },
     coreFields,
   ];
 
