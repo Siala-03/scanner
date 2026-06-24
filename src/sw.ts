@@ -8,7 +8,11 @@ declare const self: ServiceWorkerGlobalScope;
 
 // Injected by VitePWA at build time — captured once so injectManifest sees exactly one reference.
 const WB_MANIFEST = self.__WB_MANIFEST;
-precacheAndRoute(WB_MANIFEST);
+try {
+  precacheAndRoute(WB_MANIFEST);
+} catch (e) {
+  console.warn('[SW] precacheAndRoute failed, runtime routes still active:', e);
+}
 
 self.skipWaiting();
 

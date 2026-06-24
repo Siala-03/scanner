@@ -40,7 +40,10 @@ export function LoginPage({ onLogin, onBack, embedded = false }: LoginPageProps)
         // never match this URL — we always need a real network round-trip for
         // the probe, not a cached response that would falsely report "online".
         await fetch(`${supabaseUrl}/rest/v1/?_probe=${Date.now()}`, {
-          headers: { apikey: supabaseKey },
+          headers: {
+            apikey: supabaseKey,
+            Authorization: `Bearer ${supabaseKey}`,
+          },
           cache: 'no-store',
           signal: AbortSignal.timeout(5000),
         });

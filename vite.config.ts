@@ -11,7 +11,7 @@ export default defineConfig({
       srcDir: 'src',
       filename: 'sw.ts',
       registerType: 'autoUpdate',
-      includeAssets: ['assets/logo_servv_black.PNG', 'assets/favicon_black.png'],
+      includeAssets: [],
       devOptions: {
         enabled: true,
         type: 'module',

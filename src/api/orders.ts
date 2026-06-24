@@ -250,7 +250,11 @@ export async function createOrder(order: CreateOrderInput): Promise<Order> {
     try {
       let ipSettings = getCachedIpRestrictionSettings(restaurantId);
       if (!ipSettings) {
-        ipSettings = await fetchIpRestriction(restaurantId);
+        ipSettings = await withTimeout(
+          fetchIpRestriction(restaurantId),
+          5000,
+          { enabled: false, allowedIps: [] }
+        );
         cacheIpRestrictionSettings(restaurantId, ipSettings);
       }
       if (ipSettings.enabled && ipSettings.allowedIps.length > 0) {
