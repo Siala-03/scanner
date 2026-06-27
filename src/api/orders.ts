@@ -108,6 +108,22 @@ export async function fetchOrders(status?: string, restaurantId?: string): Promi
   return (data ?? []) as Order[];
 }
 
+export async function fetchUnpaidOrders(restaurantId?: string): Promise<Order[]> {
+  const restaurant = restaurantId || getRestaurantId();
+  if (!restaurant) return [];
+
+  const { data, error } = await db
+    .from('orders')
+    .select('*')
+    .eq('restaurant_id', restaurant)
+    .or('payment_status.eq.unpaid,payment_status.is.null,payment_status.eq.')
+    .neq('status', 'cancelled')
+    .order('created_at', { ascending: false });
+
+  if (error) return [];
+  return (data ?? []) as Order[];
+}
+
 export async function fetchOrdersByDateRange(startDate: string, endDate: string, restaurantId?: string): Promise<Order[]> {
   const restaurant = restaurantId || getRestaurantId();
   if (!restaurant) return [];
