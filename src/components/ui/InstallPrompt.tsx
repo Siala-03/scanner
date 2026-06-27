@@ -114,7 +114,9 @@ export function InstallPrompt() {
         )}
         {showMobileHint && !deferredPrompt && (
           <p className="mt-2 text-xs text-slate-500 text-center">
-            Use your browser menu to add this app to your home screen.
+            {isMobile()
+              ? 'Use your browser menu to add this app to your home screen.'
+              : 'Click the install icon in your address bar, or use your browser\'s menu to install this app.'}
           </p>
         )}
       </div>
