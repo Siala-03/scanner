@@ -88,6 +88,11 @@ async function flushEntry(
   try {
     let confirmedOrder = await apiCreateOrder(entry.payload as any) as Order;
 
+    if (!confirmedOrder?.id) {
+      await queue.markFailed(entry.idempotencyKey, 'Order created but no ID returned');
+      return;
+    }
+
     // If the waiter progressed the order through the workflow while offline
     // (e.g. verified → ready → served), apply that final status immediately
     // so the order doesn't reset back to "incoming / pending" on sync.

@@ -702,17 +702,14 @@ async function maybeAutoReorder(params: {
 
 export async function deleteInventoryRecord(menuItemId: string): Promise<void> {
   const restaurantId = getRestaurantId();
-  // Build query — only add restaurant_id filter when it's available (undefined breaks the eq filter)
-  let deleteQuery = supabase
+  if (!restaurantId) throw new Error('Cannot delete inventory: no restaurant context');
+
+  const { error } = await supabase
     .from('inventory_records')
     .delete()
-    .eq('menu_item_id', menuItemId);
+    .eq('menu_item_id', menuItemId)
+    .eq('restaurant_id', restaurantId);
 
-  if (restaurantId) {
-    deleteQuery = deleteQuery.eq('restaurant_id', restaurantId);
-  }
-
-  const { error } = await deleteQuery;
   if (error) throw error;
 }
 
@@ -744,7 +741,7 @@ async function autoSyncMenuAvailability(
 }
 
 export async function decrementInventoryForOrder(
-  items: Array<{ menuItemId: string; quantity: number }>,
+  items: Array<{ menuItemId: string; quantity: number; menuItemName?: string }>,
   options?: { reference?: string; performedBy?: string }
 ): Promise<void> {
   const restaurantId = getRestaurantId();
@@ -752,55 +749,66 @@ export async function decrementInventoryForOrder(
   const performedBy = options?.performedBy || getStaffId();
 
   await Promise.allSettled(
-    items.map(async ({ menuItemId, quantity }) => {
-      const { data: rec, error: fetchErr } = await supabase
-        .from('inventory_records')
-        .select('stock')
-        .eq('menu_item_id', menuItemId)
-        .eq('restaurant_id', restaurantId)
-        .maybeSingle();
+    items.map(async ({ menuItemId, quantity, menuItemName }) => {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const { data: rec, error: fetchErr } = await supabase
+          .from('inventory_records')
+          .select('stock')
+          .eq('menu_item_id', menuItemId)
+          .eq('restaurant_id', restaurantId)
+          .maybeSingle();
 
-      if (fetchErr || !rec) return; // No inventory record for this item — skip silently
+        if (fetchErr || !rec) return;
 
-      const newStock = Math.max(0, (rec.stock ?? 0) - quantity);
-      const { error: updateErr } = await supabase
-        .from('inventory_records')
-        .update({ stock: newStock, updated_at: new Date().toISOString() })
-        .eq('menu_item_id', menuItemId)
-        .eq('restaurant_id', restaurantId);
+        const oldStock = rec.stock ?? 0;
+        const newStock = Math.max(0, oldStock - quantity);
 
-      if (updateErr) {
-        console.warn(`[decrementInventoryForOrder] Failed to decrement stock for ${menuItemId}:`, updateErr.message);
+        const { data: updated, error: updateErr } = await supabase
+          .from('inventory_records')
+          .update({ stock: newStock, updated_at: new Date().toISOString() })
+          .eq('menu_item_id', menuItemId)
+          .eq('restaurant_id', restaurantId)
+          .eq('stock', oldStock)
+          .select('stock')
+          .maybeSingle();
+
+        if (updateErr) {
+          console.warn(`[decrementInventoryForOrder] Failed to decrement stock for ${menuItemId}:`, updateErr.message);
+          return;
+        }
+
+        if (!updated && attempt === 0) continue;
+        if (!updated) return;
+
+        const { error: movementErr } = await supabase
+          .from('stock_movements')
+          .insert({
+            id: `mov-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            menu_item_id: menuItemId,
+            menu_item_name: menuItemName || menuItemId,
+            type: 'sale',
+            qty: -Math.abs(quantity),
+            stock_before: oldStock,
+            balance_after: newStock,
+            performed_by: performedBy,
+            reference: options?.reference ?? null,
+            notes: options?.reference ? `Sale for ${options.reference}` : 'Sale inventory deduction',
+            restaurant_id: restaurantId,
+          });
+
+        if (movementErr) {
+          console.warn(`[decrementInventoryForOrder] Failed to log movement for ${menuItemId}:`, movementErr.message);
+        }
+
+        await autoSyncMenuAvailability(menuItemId, restaurantId, newStock, oldStock).catch(() => {});
         return;
       }
-
-      const { error: movementErr } = await supabase
-        .from('stock_movements')
-        .insert({
-          id: `mov-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          menu_item_id: menuItemId,
-          menu_item_name: menuItemId,
-          type: 'sale',
-          qty: -Math.abs(quantity),
-          stock_before: rec.stock ?? 0,
-          balance_after: newStock,
-          performed_by: performedBy,
-          reference: options?.reference ?? null,
-          notes: options?.reference ? `Sale for ${options.reference}` : 'Sale inventory deduction',
-          restaurant_id: restaurantId,
-        });
-
-      if (movementErr) {
-        console.warn(`[decrementInventoryForOrder] Failed to log movement for ${menuItemId}:`, movementErr.message);
-      }
-
-      await autoSyncMenuAvailability(menuItemId, restaurantId, newStock, rec.stock ?? 0).catch(() => {});
     })
   );
 }
 
 export async function restoreInventoryForOrder(
-  items: Array<{ menuItemId: string; quantity: number }>,
+  items: Array<{ menuItemId: string; quantity: number; menuItemName?: string }>,
   options?: { reference?: string; reason?: string; performedBy?: string }
 ): Promise<void> {
   const restaurantId = getRestaurantId();
@@ -808,55 +816,66 @@ export async function restoreInventoryForOrder(
   const performedBy = options?.performedBy || getStaffId();
 
   await Promise.allSettled(
-    items.map(async ({ menuItemId, quantity }) => {
+    items.map(async ({ menuItemId, quantity, menuItemName }) => {
       if (!menuItemId || !quantity) return;
 
-      const { data: rec, error: fetchErr } = await supabase
-        .from('inventory_records')
-        .select('stock')
-        .eq('menu_item_id', menuItemId)
-        .eq('restaurant_id', restaurantId)
-        .maybeSingle();
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const { data: rec, error: fetchErr } = await supabase
+          .from('inventory_records')
+          .select('stock')
+          .eq('menu_item_id', menuItemId)
+          .eq('restaurant_id', restaurantId)
+          .maybeSingle();
 
-      if (fetchErr || !rec) return; // No inventory record — nothing to restore
+        if (fetchErr || !rec) return;
 
-      const newStock = (rec.stock ?? 0) + quantity;
-      const { error: updateErr } = await supabase
-        .from('inventory_records')
-        .update({ stock: newStock, updated_at: new Date().toISOString() })
-        .eq('menu_item_id', menuItemId)
-        .eq('restaurant_id', restaurantId);
+        const oldStock = rec.stock ?? 0;
+        const newStock = oldStock + quantity;
 
-      if (updateErr) {
-        console.warn(`[restoreInventoryForOrder] Failed to restore stock for ${menuItemId}:`, updateErr.message);
+        const { data: updated, error: updateErr } = await supabase
+          .from('inventory_records')
+          .update({ stock: newStock, updated_at: new Date().toISOString() })
+          .eq('menu_item_id', menuItemId)
+          .eq('restaurant_id', restaurantId)
+          .eq('stock', oldStock)
+          .select('stock')
+          .maybeSingle();
+
+        if (updateErr) {
+          console.warn(`[restoreInventoryForOrder] Failed to restore stock for ${menuItemId}:`, updateErr.message);
+          return;
+        }
+
+        if (!updated && attempt === 0) continue;
+        if (!updated) return;
+
+        const { error: movementErr } = await supabase
+          .from('stock_movements')
+          .insert({
+            id: `mov-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            menu_item_id: menuItemId,
+            menu_item_name: menuItemName || menuItemId,
+            type: 'return',
+            qty: Math.abs(quantity),
+            stock_before: oldStock,
+            balance_after: newStock,
+            performed_by: performedBy,
+            reference: options?.reference ?? null,
+            notes: options?.reason
+              ? `Cancellation: ${options.reason}`
+              : options?.reference
+              ? `Order cancelled: ${options.reference}`
+              : 'Order cancelled — stock restored',
+            restaurant_id: restaurantId,
+          });
+
+        if (movementErr) {
+          console.warn(`[restoreInventoryForOrder] Failed to log movement for ${menuItemId}:`, movementErr.message);
+        }
+
+        await autoSyncMenuAvailability(menuItemId, restaurantId, newStock, oldStock).catch(() => {});
         return;
       }
-
-      const { error: movementErr } = await supabase
-        .from('stock_movements')
-        .insert({
-          id: `mov-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          menu_item_id: menuItemId,
-          menu_item_name: menuItemId,
-          type: 'return',
-          qty: Math.abs(quantity),
-          stock_before: rec.stock ?? 0,
-          balance_after: newStock,
-          performed_by: performedBy,
-          reference: options?.reference ?? null,
-          notes: options?.reason
-            ? `Cancellation: ${options.reason}`
-            : options?.reference
-            ? `Order cancelled: ${options.reference}`
-            : 'Order cancelled — stock restored',
-          restaurant_id: restaurantId,
-        });
-
-      if (movementErr) {
-        console.warn(`[restoreInventoryForOrder] Failed to log movement for ${menuItemId}:`, movementErr.message);
-      }
-
-      await autoSyncMenuAvailability(menuItemId, restaurantId, newStock, rec.stock ?? 0).catch(() => {});
     })
   );
 }

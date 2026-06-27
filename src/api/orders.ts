@@ -389,17 +389,22 @@ export async function createOrder(order: CreateOrderInput): Promise<Order> {
           mergeQuery = mergeQuery.eq('updated_at', (mergeTarget as any).updated_at);
         }
 
-        const mergeResult = await withTimeout(mergeQuery.select().maybeSingle(), 10000, { data: null, error: { message: 'Merge timed out' } } as any);
+        const mergeResult = await withTimeout(mergeQuery.select().maybeSingle(), 5000, { data: null, error: { message: 'Merge timed out' } } as any);
         if (!mergeResult.error && mergeResult.data) {
           decrementInventoryForOrder(
-            order.items.map(item => ({ menuItemId: item.menuItemId, quantity: item.quantity })),
+            order.items.map(item => ({ menuItemId: item.menuItemId, quantity: item.quantity, menuItemName: item.menuItemName })),
             { reference: String((mergeResult.data as any).order_number || orderNumber), performedBy: staffId || undefined }
           ).catch(err => console.warn('[createOrder] Inventory decrement failed after merge:', err));
           return mergeResult.data as Order;
         }
 
-        // Optimistic lock miss (row changed) should fall back to creating a separate order safely.
+        // Optimistic lock miss (row changed) — fall through to create new order
         if (!mergeResult.error && !mergeResult.data) {
+          break;
+        }
+
+        // Timeout or server error — stop merge attempts, create new order instead
+        if (mergeResult.error) {
           break;
         }
       }
@@ -450,7 +455,7 @@ export async function createOrder(order: CreateOrderInput): Promise<Order> {
 
     const result = await withTimeout(
       db.from('orders').insert(attempt).select().single(),
-      15000,
+      8000,
       { data: null, error: { message: 'Request timed out', code: 'TIMEOUT' } } as any
     );
 
@@ -460,7 +465,7 @@ export async function createOrder(order: CreateOrderInput): Promise<Order> {
           .or(`idempotency_key.eq.${idempotencyKey},id.eq.${orderId}`)
           .limit(1)
           .single(),
-        8000,
+        5000,
         { data: null } as any
       );
       if (existing) return existing as Order;
@@ -469,10 +474,16 @@ export async function createOrder(order: CreateOrderInput): Promise<Order> {
     if (!result.error) {
       // Success — decrement inventory (best-effort)
       decrementInventoryForOrder(
-        order.items.map(item => ({ menuItemId: item.menuItemId, quantity: item.quantity })),
+        order.items.map(item => ({ menuItemId: item.menuItemId, quantity: item.quantity, menuItemName: item.menuItemName })),
         { reference: orderNumber, performedBy: staffId || undefined }
       ).catch(err => console.warn('[createOrder] Inventory decrement failed:', err));
       return result.data as Order;
+    }
+
+    // Auth/permission errors are not retryable — fail immediately
+    if (result.error?.code === '42501' || result.error?.code === 'PGRST301' ||
+        result.error?.message?.includes('row-level security')) {
+      throw result.error;
     }
 
     if (drop < optionalKeys.length) {
