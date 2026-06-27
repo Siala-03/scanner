@@ -124,8 +124,7 @@ export function PaymentApprovalPanel({ restaurantId, staffId, staffName }: Payme
       const pending = (all as any[]).filter((o) => {
         const ps = o.paymentStatus ?? o.payment_status;
         const st = o.status;
-        const unpaid = ps == null || ps === '' || ps === 'unpaid';
-        return unpaid && st !== 'cancelled' && st !== 'completed';
+        return ps !== 'confirmed' && ps !== 'paid' && st !== 'cancelled' && st !== 'completed';
       });
       // Cache to localStorage so the panel can show stale data when offline
       try { localStorage.setItem(CACHE_KEY, JSON.stringify(pending)); } catch { /* ignore */ }

@@ -122,17 +122,14 @@ export async function fetchUnpaidOrders(restaurantId?: string): Promise<Order[]>
   if (error) {
     console.warn('[fetchUnpaidOrders] Query failed, falling back to fetchOrders:', error.message);
     const all = await fetchOrders('all', restaurant);
-    return all.filter((o: any) => {
-      const ps = o.payment_status;
-      const st = o.status;
-      return (ps == null || ps === '' || ps === 'unpaid') && st !== 'cancelled';
-    });
+    return all.filter((o: any) =>
+      o.payment_status !== 'confirmed' && o.payment_status !== 'paid' && o.status !== 'cancelled'
+    );
   }
 
-  return ((data ?? []) as any[]).filter((o) => {
-    const ps = o.payment_status;
-    return ps == null || ps === '' || ps === 'unpaid';
-  }) as Order[];
+  return ((data ?? []) as any[]).filter((o) =>
+    o.payment_status !== 'confirmed' && o.payment_status !== 'paid'
+  ) as Order[];
 }
 
 export async function fetchOrdersByDateRange(startDate: string, endDate: string, restaurantId?: string): Promise<Order[]> {
