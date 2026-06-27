@@ -41,7 +41,7 @@ function wasDismissed(): boolean {
 export function InstallPrompt() {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(deferredPromptGlobal);
   const [showIosHint] = useState(() => isIos() && !isInStandaloneMode() && !wasDismissed());
-  const [showMobileHint] = useState(() => isMobile() && !isIos() && !isInStandaloneMode() && !wasDismissed());
+  const [showMobileHint] = useState(() => !isIos() && !isInStandaloneMode() && !wasDismissed());
   const [dismissed, setDismissed] = useState(() => wasDismissed());
 
   useEffect(() => {
