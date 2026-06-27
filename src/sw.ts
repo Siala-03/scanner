@@ -16,13 +16,20 @@ try {
 
 self.skipWaiting();
 
+const CURRENT_CACHES = new Set(['static-assets', 'navigation']);
+
 self.addEventListener('activate', (e) => {
   e.waitUntil(
     Promise.all([
       self.clients.claim(),
-      // Purge the old Supabase API cache — it stored stale/error responses
-      // that caused order submissions to fail on flaky connections.
       caches.delete('supabase-api'),
+      caches.keys().then((names) =>
+        Promise.all(
+          names
+            .filter((n) => !CURRENT_CACHES.has(n) && !n.startsWith('workbox-precache'))
+            .map((n) => caches.delete(n))
+        )
+      ),
     ])
   );
 });
@@ -59,7 +66,7 @@ registerRoute(
   new NetworkOnly()
 );
 
-// Static assets: CacheFirst (7 days)
+// Static assets: CacheFirst (24 hours)
 registerRoute(
   ({ request }) =>
     request.destination === 'style' ||
@@ -69,10 +76,20 @@ registerRoute(
   new CacheFirst({
     cacheName: 'static-assets',
     plugins: [
-      new ExpirationPlugin({ maxEntries: 60, maxAgeSeconds: 7 * 24 * 60 * 60 }),
+      new ExpirationPlugin({ maxEntries: 60, maxAgeSeconds: 24 * 60 * 60 }),
     ],
   })
 );
+
+// ─── Message handler — app can trigger sync explicitly ─────────────────────
+self.addEventListener('message', (e) => {
+  if (e.data?.type === 'SYNC_ORDERS') {
+    e.waitUntil(syncPendingOrders());
+  }
+  if (e.data?.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+});
 
 // ─── Background Sync ──────────────────────────────────────────────────────────
 

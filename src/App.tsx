@@ -49,6 +49,7 @@ import { RestaurantSettings } from './pages/manager/RestaurantSettings';
 import { EbmSettings } from './pages/manager/EbmSettings';
 import { ReportsPage } from './pages/manager/ReportsPage';
 import { StaffOrderPage } from './pages/shared/StaffOrderPage';
+import { InstallPrompt } from './components/ui/InstallPrompt';
 
 type UserRole = 'customer' | 'waiter' | 'cashier' | 'supervisor' | 'manager' | 'kitchen' | 'superadmin' | 'supplier' | null;
 type ManagerPage = 'dashboard' | 'menu' | 'staff' | 'analytics' | 'performance' | 'qrcodes' | 'inventory' | 'history' | 'expenses' | 'payment-cancellations' | 'credit' | 'loyalty' | 'promotions' | 'reservations' | 'scheduling' | 'reviews' | 'settings' | 'ebm' | 'reports';
@@ -1179,6 +1180,7 @@ export function App() {
   // Login page (default landing page)
   return (
     <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4 md:p-8">
+      <InstallPrompt />
       <div className="w-full max-w-md">
         {/* Header */}
         <motion.div

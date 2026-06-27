@@ -99,7 +99,11 @@ export function useOfflineStatus(): OfflineStatus {
   useEffect(() => {
     void refresh();
 
-    const onOnline = () => { setIsOnline(true); void refresh(); };
+    const onOnline = () => {
+      setIsOnline(true);
+      void refresh();
+      navigator.serviceWorker?.controller?.postMessage({ type: 'SYNC_ORDERS' });
+    };
     const onOffline = () => { setIsOnline(false); void refresh(); };
     const onQueueChanged = () => { void refresh(); };
     const onVisible = () => { if (!document.hidden) void refresh(); };
