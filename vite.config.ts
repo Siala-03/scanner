@@ -28,19 +28,19 @@ export default defineConfig({
         scope: '/',
         icons: [
           {
-            src: 'assets/logo_servv_black.PNG',
+            src: 'assets/favicon_black.png',
             sizes: '192x192',
             type: 'image/png',
             purpose: 'any',
           },
           {
-            src: 'assets/logo_servv_black.PNG',
+            src: 'assets/favicon_black.png',
             sizes: '512x512',
             type: 'image/png',
             purpose: 'any',
           },
           {
-            src: 'assets/logo_servv_black.PNG',
+            src: 'assets/favicon_black.png',
             sizes: '512x512',
             type: 'image/png',
             purpose: 'maskable',
