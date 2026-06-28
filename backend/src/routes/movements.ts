@@ -6,12 +6,17 @@ const router = Router();
 // GET all stock movements
 router.get('/', async (req: Request, res: Response) => {
   try {
-    const { menu_item_id, type, from_date, to_date, limit } = req.query;
+    const { menu_item_id, type, from_date, to_date, limit, restaurant_id } = req.query;
 
     let query = 'SELECT * FROM stock_movements';
     const conditions: string[] = [];
     const params: unknown[] = [];
     let paramIndex = 1;
+
+    if (restaurant_id) {
+      conditions.push(`restaurant_id = $${paramIndex++}`);
+      params.push(restaurant_id);
+    }
 
     if (menu_item_id) {
       conditions.push(`menu_item_id = $${paramIndex++}`);
@@ -74,17 +79,18 @@ router.post('/', async (req: Request, res: Response) => {
       total_value,
       reference,
       performed_by,
-      notes
+      notes,
+      restaurant_id
     } = req.body;
 
     const id = `mov_${Date.now().toString(36)}`;
-    
+
     const result = await pool.query(
-      `INSERT INTO stock_movements 
-        (id, menu_item_id, menu_item_name, type, qty, stock_before, balance_after, unit_cost, total_value, reference, performed_by, notes)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+      `INSERT INTO stock_movements
+        (id, menu_item_id, menu_item_name, type, qty, stock_before, balance_after, unit_cost, total_value, reference, performed_by, notes, restaurant_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
        RETURNING *`,
-      [id, menu_item_id, menu_item_name, type, qty, stock_before, balance_after, unit_cost, total_value, reference, performed_by, notes]
+      [id, menu_item_id, menu_item_name, type, qty, stock_before, balance_after, unit_cost, total_value, reference, performed_by, notes, restaurant_id || null]
     );
     
     res.status(201).json(result.rows[0]);

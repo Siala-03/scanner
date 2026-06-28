@@ -144,7 +144,7 @@ export async function createMenuItem(item: Partial<MenuItem> & { sku?: string })
       .select('*', { count: 'exact', head: true })
       .eq('restaurant_id', restaurantId);
     sku = generateSku(item.name, (count ?? 0) + 1);
-    // Ensure uniqueness — if collision, append a random suffix
+    // Ensure uniqueness — if collision, regenerate with UUID suffix
     const { data: existing, error: skuCheckError } = await supabase
       .from('menu_items')
       .select('sku')
@@ -152,10 +152,9 @@ export async function createMenuItem(item: Partial<MenuItem> & { sku?: string })
       .eq('sku', sku)
       .maybeSingle();
 
-    // Older schemas may not have the sku column yet.
     if (!skuCheckError) {
       if (existing) {
-        sku = generateSku(item.name, (count ?? 0) + 1 + Math.floor(Math.random() * 90 + 10));
+        sku = `${sku}-${crypto.randomUUID().slice(0, 4).toUpperCase()}`;
       }
     } else if (isMissingColumnError(skuCheckError, 'sku')) {
       sku = null;
@@ -205,6 +204,19 @@ export async function updateMenuItem(id: string, updates: Partial<MenuItem> & { 
   if (!restaurantId) throw new Error('No company selected');
   const canUseSku = await supportsMenuSkuColumn();
 
+  // Capture old price before update for audit trail
+  const hasNewPrice = updates.price !== undefined;
+  let oldPrice: number | null = null;
+  if (hasNewPrice) {
+    const { data: current } = await supabase
+      .from('menu_items')
+      .select('price')
+      .eq('id', id)
+      .eq('restaurant_id', restaurantId)
+      .maybeSingle();
+    oldPrice = current?.price ?? null;
+  }
+
   const payload: Record<string, any> = { updated_at: new Date().toISOString() };
   if (updates.name           !== undefined) payload.name            = updates.name;
   if (updates.description    !== undefined) payload.description     = updates.description;
@@ -252,6 +264,24 @@ export async function updateMenuItem(id: string, updates: Partial<MenuItem> & { 
   }
 
   if (res.error) throw res.error;
+
+  // Log price change for audit trail
+  if (hasNewPrice && oldPrice !== null && oldPrice !== updates.price) {
+    const staffId = typeof window !== 'undefined' ? localStorage.getItem('staffId') : null;
+    await supabase.from('stock_movements').insert({
+      id: `mov-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      menu_item_id: id,
+      menu_item_name: res.data?.name || id,
+      type: 'adjustment',
+      qty: 0,
+      stock_before: 0,
+      balance_after: 0,
+      performed_by: staffId || 'system',
+      notes: `PRICE_CHANGE|old=${oldPrice}|new=${updates.price}`,
+      restaurant_id: restaurantId,
+    }).then(null, (err: any) => console.warn('[updateMenuItem] Price audit log failed:', err));
+  }
+
   return res.data as MenuItem;
 }
 
@@ -277,13 +307,17 @@ export async function deleteMenuItem(id: string): Promise<void> {
 }
 
 export async function toggleMenuItemAvailability(id: string, isAvailable: boolean): Promise<MenuItem> {
-  const { data, error } = await supabase
+  const restaurantId = getRestaurantId();
+  let query = supabase
     .from('menu_items')
     .update({ is_available: isAvailable, updated_at: new Date().toISOString() })
-    .eq('id', id)
-    .select()
-    .single();
+    .eq('id', id);
 
+  if (restaurantId) {
+    query = query.eq('restaurant_id', restaurantId);
+  }
+
+  const { data, error } = await query.select().single();
   if (error) throw error;
   return data as MenuItem;
 }
@@ -292,23 +326,49 @@ export async function uploadMenu(items: Partial<MenuItem>[]): Promise<{ message:
   const restaurantId = await resolveRestaurantId();
   if (!restaurantId) throw new Error('No company selected');
   const canUseSku = await supportsMenuSkuColumn();
-  
+
   const itemsToInsert = items.map((item, index) => {
     const normalized = canUseSku ? item : ({ ...item, sku: undefined } as Partial<MenuItem>);
-    return toDbMenuItem(normalized as Partial<MenuItem> & Record<string, any>, restaurantId, `item-${Date.now()}-${index}`);
+    return toDbMenuItem(normalized as Partial<MenuItem> & Record<string, any>, restaurantId, item.id || `item-${Date.now()}-${index}`);
   });
 
-  const { error } = await supabase.from('menu_items').upsert(itemsToInsert, { onConflict: 'id' });
-  if (error) throw error;
-  return { message: 'Menu uploaded successfully', count: items.length };
+  // Process in batches of 50 to avoid partial failures on large imports
+  const BATCH_SIZE = 50;
+  let successCount = 0;
+  for (let i = 0; i < itemsToInsert.length; i += BATCH_SIZE) {
+    const batch = itemsToInsert.slice(i, i + BATCH_SIZE);
+    const { error } = await supabase.from('menu_items').upsert(batch, { onConflict: 'id' });
+    if (error) throw new Error(`Import failed at item ${i + 1}: ${error.message}. ${successCount} items saved successfully.`);
+    successCount += batch.length;
+  }
+
+  return { message: 'Menu uploaded successfully', count: successCount };
 }
 
 export async function clearMenu(): Promise<{ message: string }> {
   const restaurantId = await resolveRestaurantId();
   if (!restaurantId) throw new Error('No company selected');
-  
+
+  // Get menu item IDs before deletion so we can clean up inventory
+  const { data: menuItems } = await supabase
+    .from('menu_items')
+    .select('id')
+    .eq('restaurant_id', restaurantId);
+
   const { error } = await supabase.from('menu_items').delete().eq('restaurant_id', restaurantId);
   if (error) throw error;
+
+  // Clean up orphaned inventory records
+  if (menuItems && menuItems.length > 0) {
+    const ids = menuItems.map((m: any) => m.id);
+    await supabase
+      .from('inventory_records')
+      .delete()
+      .eq('restaurant_id', restaurantId)
+      .in('menu_item_id', ids)
+      .then(null, (err: any) => console.warn('[clearMenu] Inventory cleanup failed:', err));
+  }
+
   return { message: 'Menu cleared successfully' };
 }
 

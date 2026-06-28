@@ -63,11 +63,15 @@ export async function setInventoryStock(menuItemId: string, stock: number, perfo
   return record;
 }
 
-export async function adjustStock(menuItemId: string, adjustment: number, reason: string, performedBy: string) {
+export async function adjustStock(menuItemId: string, adjustment: number, reason: string, performedBy: string, restaurantId?: string) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const existing = await client.query('SELECT stock, low_stock_threshold FROM inventory_records WHERE menu_item_id = $1 FOR UPDATE', [menuItemId]);
+    const existingQuery = restaurantId
+      ? 'SELECT stock, low_stock_threshold FROM inventory_records WHERE menu_item_id = $1 AND restaurant_id = $2 FOR UPDATE'
+      : 'SELECT stock, low_stock_threshold FROM inventory_records WHERE menu_item_id = $1 FOR UPDATE';
+    const existingParams = restaurantId ? [menuItemId, restaurantId] : [menuItemId];
+    const existing = await client.query(existingQuery, existingParams);
     if (existing.rows.length === 0) {
       throw new Error('Inventory record not found');
     }
@@ -75,17 +79,20 @@ export async function adjustStock(menuItemId: string, adjustment: number, reason
     const threshold = existing.rows[0].low_stock_threshold ?? 0;
     const newStock = Math.max(0, stockBefore + adjustment);
 
-    const update = await client.query(
-      'UPDATE inventory_records SET stock = $1, updated_at = $2 WHERE menu_item_id = $3 RETURNING *',
-      [newStock, new Date().toISOString(), menuItemId]
-    );
+    const updateQuery = restaurantId
+      ? 'UPDATE inventory_records SET stock = $1, updated_at = $2 WHERE menu_item_id = $3 AND restaurant_id = $4 RETURNING *'
+      : 'UPDATE inventory_records SET stock = $1, updated_at = $2 WHERE menu_item_id = $3 RETURNING *';
+    const updateParams = restaurantId
+      ? [newStock, new Date().toISOString(), menuItemId, restaurantId]
+      : [newStock, new Date().toISOString(), menuItemId];
+    const update = await client.query(updateQuery, updateParams);
 
     const movementId = `mov_${Date.now().toString(36)}`;
     await client.query(
-      `INSERT INTO stock_movements 
-        (id, menu_item_id, menu_item_name, type, qty, stock_before, balance_after, performed_by, notes)
-       VALUES ($1, $2, $3, 'adjustment', $4, $5, $6, $7, $8)`,
-      [movementId, menuItemId, menuItemId, adjustment, stockBefore, newStock, performedBy, reason]
+      `INSERT INTO stock_movements
+        (id, menu_item_id, menu_item_name, type, qty, stock_before, balance_after, performed_by, notes, restaurant_id)
+       VALUES ($1, $2, $3, 'adjustment', $4, $5, $6, $7, $8, $9)`,
+      [movementId, menuItemId, menuItemId, adjustment, stockBefore, newStock, performedBy, reason, restaurantId || null]
     );
 
     await client.query('COMMIT');

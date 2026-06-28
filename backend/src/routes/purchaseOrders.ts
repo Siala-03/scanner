@@ -202,7 +202,8 @@ router.post('/', async (req: Request, res: Response) => {
 router.put('/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { status, items, expected_delivery, notes } = req.body;
+    const { status, items, expected_delivery, notes, restaurant_id, restaurantId } = req.body;
+    const rid = restaurant_id || restaurantId;
 
     const updates: string[] = [];
     const values: unknown[] = [];
@@ -232,8 +233,14 @@ router.put('/:id', async (req: Request, res: Response) => {
     values.push(new Date().toISOString());
     values.push(id);
 
+    let whereClause = `WHERE id = $${paramIndex}`;
+    if (rid) {
+      values.push(rid);
+      whereClause += ` AND restaurant_id = $${paramIndex + 1}`;
+    }
+
     const result = await pool.query(
-      `UPDATE purchase_orders SET ${updates.join(', ')} WHERE id = $${paramIndex} RETURNING *`,
+      `UPDATE purchase_orders SET ${updates.join(', ')} ${whereClause} RETURNING *`,
       values
     );
 
@@ -374,10 +381,10 @@ router.post('/:id/receive', async (req: Request, res: Response) => {
       // Record movement
       const movementId = `mov_${Date.now().toString(36)}`;
       await client.query(
-        `INSERT INTO stock_movements 
-          (id, menu_item_id, menu_item_name, type, qty, stock_before, balance_after, reference, performed_by)
-         VALUES ($1, $2, $3, 'purchase', $4, $5, $6, $7, $8)`,
-        [movementId, menu_item_id, menu_item_id, receivedQtyNumber, stockBefore, newStock, id, received_by]
+        `INSERT INTO stock_movements
+          (id, menu_item_id, menu_item_name, type, qty, stock_before, balance_after, reference, performed_by, restaurant_id)
+         VALUES ($1, $2, $3, 'purchase', $4, $5, $6, $7, $8, $9)`,
+        [movementId, menu_item_id, menu_item_id, receivedQtyNumber, stockBefore, newStock, id, received_by, po.restaurant_id || null]
       );
     }
 
@@ -438,7 +445,12 @@ router.post('/:id/receive', async (req: Request, res: Response) => {
 router.delete('/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    await pool.query('DELETE FROM purchase_orders WHERE id = $1', [id]);
+    const { restaurant_id } = req.query;
+    if (restaurant_id) {
+      await pool.query('DELETE FROM purchase_orders WHERE id = $1 AND restaurant_id = $2', [id, restaurant_id]);
+    } else {
+      await pool.query('DELETE FROM purchase_orders WHERE id = $1', [id]);
+    }
     res.status(204).send();
   } catch (error) {
     console.error('Error deleting purchase order:', error);

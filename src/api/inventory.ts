@@ -223,12 +223,17 @@ export async function fetchInventory(): Promise<InventoryRecord[]> {
 }
 
 export async function fetchInventoryById(menuItemId: string): Promise<InventoryRecord> {
-  const { data, error } = await supabase
+  const restaurantId = getRestaurantId();
+  let query = supabase
     .from('inventory_records')
     .select('*')
-    .eq('menu_item_id', menuItemId)
-    .single();
+    .eq('menu_item_id', menuItemId);
 
+  if (restaurantId) {
+    query = query.eq('restaurant_id', restaurantId);
+  }
+
+  const { data, error } = await query.single();
   if (error) throw error;
   return normalizeInventoryRecord(data);
 }
@@ -726,17 +731,19 @@ async function autoSyncMenuAvailability(
   previousStock: number | null,
 ): Promise<void> {
   if (newStock === 0 && previousStock !== 0) {
-    await supabase
+    const { error } = await supabase
       .from('menu_items')
       .update({ is_available: false, updated_at: new Date().toISOString() })
       .eq('id', menuItemId)
       .eq('restaurant_id', restaurantId);
+    if (error) console.warn(`[autoSyncMenuAvailability] Failed to hide out-of-stock item ${menuItemId}:`, error.message);
   } else if (newStock > 0 && previousStock === 0) {
-    await supabase
+    const { error } = await supabase
       .from('menu_items')
       .update({ is_available: true, updated_at: new Date().toISOString() })
       .eq('id', menuItemId)
       .eq('restaurant_id', restaurantId);
+    if (error) console.warn(`[autoSyncMenuAvailability] Failed to show restocked item ${menuItemId}:`, error.message);
   }
 }
 
@@ -903,44 +910,52 @@ export async function adjustStock(
   performedBy: string
 ): Promise<InventoryRecord> {
   const restaurantId = getRestaurantId();
+  if (!restaurantId) throw new Error('No company selected');
 
-  const { data: current } = await supabase
-    .from('inventory_records')
-    .select('stock')
-    .eq('menu_item_id', menuItemId)
-    .eq('restaurant_id', restaurantId)
-    .single();
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const { data: current } = await supabase
+      .from('inventory_records')
+      .select('stock')
+      .eq('menu_item_id', menuItemId)
+      .eq('restaurant_id', restaurantId)
+      .single();
 
-  const oldStock = current?.stock ?? 0;
-  const newStock = Math.max(0, oldStock + adjustment);
+    const oldStock = current?.stock ?? 0;
+    const newStock = Math.max(0, oldStock + adjustment);
 
-  const { data, error } = await supabase
-    .from('inventory_records')
-    .update({ stock: newStock, updated_at: new Date().toISOString() })
-    .eq('menu_item_id', menuItemId)
-    .eq('restaurant_id', restaurantId)
-    .select()
-    .single();
+    const { data, error } = await supabase
+      .from('inventory_records')
+      .update({ stock: newStock, updated_at: new Date().toISOString() })
+      .eq('menu_item_id', menuItemId)
+      .eq('restaurant_id', restaurantId)
+      .eq('stock', oldStock)
+      .select()
+      .single();
 
-  if (error) throw error;
+    if (error) throw error;
+    if (!data && attempt === 0) continue;
+    if (!data) throw new Error('Stock was modified by another operation, please retry');
 
-  const { error: movementError } = await supabase.from('stock_movements').insert({
-    id:            `mov-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-    menu_item_id:  menuItemId,
-    menu_item_name: menuItemId,
-    type:          adjustment > 0 ? 'purchase' : 'adjustment',
-    qty:           Math.abs(adjustment),
-    stock_before:  oldStock,
-    balance_after: newStock,
-    performed_by:  performedBy,
-    notes:         reason,
-    restaurant_id: restaurantId,
-  });
-  if (movementError) {
-    console.warn('Failed to record stock movement:', movementError);
+    const { error: movementError } = await supabase.from('stock_movements').insert({
+      id:             `mov-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      menu_item_id:   menuItemId,
+      menu_item_name: reason || menuItemId,
+      type:           adjustment > 0 ? 'purchase' : 'adjustment',
+      qty:            adjustment,
+      stock_before:   oldStock,
+      balance_after:  newStock,
+      performed_by:   performedBy,
+      notes:          reason,
+      restaurant_id:  restaurantId,
+    });
+    if (movementError) {
+      console.warn('Failed to record stock movement:', movementError);
+    }
+
+    return normalizeInventoryRecord(data);
   }
 
-  return normalizeInventoryRecord(data);
+  throw new Error('Stock adjustment failed after retries');
 }
 
 // ── Suppliers ─────────────────────────────────────────────────────────────────
@@ -1125,13 +1140,17 @@ export async function updatePurchaseOrder(id: string, po: Partial<PurchaseOrder>
   if (po.expectedDelivery  !== undefined) update.expected_delivery = po.expectedDelivery;
   if (po.notes             !== undefined) update.notes             = po.notes;
 
-  const { data, error } = await supabase
+  let query = supabase
     .from('purchase_orders')
     .update(update)
-    .eq('id', id)
-    .select()
-    .single();
+    .eq('id', id);
 
+  const restaurantId = getRestaurantId();
+  if (restaurantId) {
+    query = query.eq('restaurant_id', restaurantId);
+  }
+
+  const { data, error } = await query.select().single();
   if (error) throw error;
   return normalizePurchaseOrder(data);
 }
@@ -1361,24 +1380,10 @@ export async function recordWaste(waste: {
   notes?: string;
 }): Promise<WasteEntry> {
   const restaurantId = getRestaurantId();
+  if (!restaurantId) throw new Error('No company selected');
   const id = `waste-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-  const { data: inv } = await supabase
-    .from('inventory_records')
-    .select('stock')
-    .eq('menu_item_id', waste.menu_item_id)
-    .eq('restaurant_id', restaurantId)
-    .single();
-
-  const oldStock = inv?.stock ?? 0;
-  const newStock = Math.max(0, oldStock - waste.qty);
-
-  await supabase
-    .from('inventory_records')
-    .update({ stock: newStock, updated_at: new Date().toISOString() })
-    .eq('menu_item_id', waste.menu_item_id)
-    .eq('restaurant_id', restaurantId);
-
+  // 1. Insert waste entry first — if this fails, no stock is touched
   const { data, error } = await supabase
     .from('waste_entries')
     .insert({
@@ -1398,6 +1403,51 @@ export async function recordWaste(waste: {
     .single();
 
   if (error) throw error;
+
+  // 2. Decrement stock with optimistic lock
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const { data: inv } = await supabase
+      .from('inventory_records')
+      .select('stock')
+      .eq('menu_item_id', waste.menu_item_id)
+      .eq('restaurant_id', restaurantId)
+      .maybeSingle();
+
+    if (!inv) break;
+
+    const oldStock = inv.stock ?? 0;
+    const newStock = Math.max(0, oldStock - waste.qty);
+
+    const { data: updated } = await supabase
+      .from('inventory_records')
+      .update({ stock: newStock, updated_at: new Date().toISOString() })
+      .eq('menu_item_id', waste.menu_item_id)
+      .eq('restaurant_id', restaurantId)
+      .eq('stock', oldStock)
+      .select('stock')
+      .maybeSingle();
+
+    if (!updated && attempt === 0) continue;
+    if (!updated) break;
+
+    // 3. Record stock movement for audit trail
+    await supabase.from('stock_movements').insert({
+      id:             `mov-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      menu_item_id:   waste.menu_item_id,
+      menu_item_name: waste.menu_item_name,
+      type:           'waste',
+      qty:            -Math.abs(waste.qty),
+      stock_before:   oldStock,
+      balance_after:  newStock,
+      performed_by:   waste.recorded_by,
+      notes:          `Waste: ${waste.reason}`,
+      restaurant_id:  restaurantId,
+    });
+
+    await autoSyncMenuAvailability(waste.menu_item_id, restaurantId, newStock, oldStock).catch(() => {});
+    break;
+  }
+
   return normalizeWasteEntry(data);
 }
 

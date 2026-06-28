@@ -237,7 +237,7 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
   }, [menuItems]);
 
   const filteredItems = useMemo(() => {
-    let items = menuItems.filter((item) => item.isAvailable);
+    let items = [...menuItems];
     if (activeCategory !== 'all') items = items.filter((i) => i.category === activeCategory);
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
@@ -247,6 +247,7 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
           (i.description ?? '').toLowerCase().includes(q)
       );
     }
+    items.sort((a, b) => (a.isAvailable === b.isAvailable ? 0 : a.isAvailable ? -1 : 1));
     return items;
   }, [menuItems, activeCategory, searchQuery]);
 
@@ -789,20 +790,34 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
               {filteredItems.map((item) => {
                 const qty = getCartQty(item.id);
+                const outOfStock = !item.isAvailable;
                 return (
                   <div
                     key={item.id}
-                    className="flex items-center gap-3 rounded-xl border border-slate-700 bg-slate-800 p-3 hover:border-slate-600 transition-colors"
+                    className={`flex items-center gap-3 rounded-xl border p-3 transition-colors ${
+                      outOfStock
+                        ? 'border-slate-800 bg-slate-800/50 opacity-60'
+                        : 'border-slate-700 bg-slate-800 hover:border-slate-600'
+                    }`}
                   >
                     {item.emoji && (
                       <span className="text-2xl flex-shrink-0">{item.emoji}</span>
                     )}
                     <div className="flex-1 min-w-0">
-                      <p className="truncate text-sm font-semibold text-white">{item.name}</p>
-                      <p className="text-xs text-amber-400 font-medium">{formatPrice(item.price)}</p>
+                      <div className="flex items-center gap-1.5">
+                        <p className={`truncate text-sm font-semibold ${outOfStock ? 'text-slate-500' : 'text-white'}`}>{item.name}</p>
+                        {outOfStock && (
+                          <span className="flex-shrink-0 text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 border border-red-500/30">
+                            Out of Stock
+                          </span>
+                        )}
+                      </div>
+                      <p className={`text-xs font-medium ${outOfStock ? 'text-slate-500' : 'text-amber-400'}`}>{formatPrice(item.price)}</p>
                     </div>
                     <div className="flex items-center gap-1.5 flex-shrink-0">
-                      {qty > 0 ? (
+                      {outOfStock ? (
+                        <span className="text-xs text-slate-600 italic">Unavailable</span>
+                      ) : qty > 0 ? (
                         <>
                           <button
                             onClick={() => updateQty(item.id, -1)}

@@ -6,12 +6,17 @@ const router = Router();
 // GET all waste entries
 router.get('/', async (req: Request, res: Response) => {
   try {
-    const { menu_item_id, reason, from_date, to_date, limit = 100 } = req.query;
+    const { menu_item_id, reason, from_date, to_date, limit = 100, restaurant_id } = req.query;
 
     let query = 'SELECT * FROM waste_entries';
     const conditions: string[] = [];
     const params: unknown[] = [];
     let paramIndex = 1;
+
+    if (restaurant_id) {
+      conditions.push(`restaurant_id = $${paramIndex++}`);
+      params.push(restaurant_id);
+    }
 
     if (menu_item_id) {
       conditions.push(`menu_item_id = $${paramIndex++}`);
@@ -75,16 +80,21 @@ router.post('/', async (req: Request, res: Response) => {
       reason,
       reported_by,
       recorded_by,
-      notes
+      notes,
+      restaurant_id
     } = req.body;
+
+    if (!restaurant_id) {
+      return res.status(400).json({ error: 'restaurant_id is required' });
+    }
 
     const id = `waste_${Date.now().toString(36)}`;
     const total_cost = qty * unit_cost;
 
     // Get current stock
     const invResult = await client.query(
-      'SELECT stock FROM inventory_records WHERE menu_item_id = $1',
-      [menu_item_id]
+      'SELECT stock FROM inventory_records WHERE menu_item_id = $1 AND restaurant_id = $2',
+      [menu_item_id, restaurant_id]
     );
 
     const stockBefore = invResult.rows.length > 0 ? invResult.rows[0].stock : 0;
@@ -102,18 +112,18 @@ router.post('/', async (req: Request, res: Response) => {
     // Update inventory stock
     if (invResult.rows.length > 0) {
       await client.query(
-        'UPDATE inventory_records SET stock = $1, updated_at = $2 WHERE menu_item_id = $3',
-        [newStock, new Date().toISOString(), menu_item_id]
+        'UPDATE inventory_records SET stock = $1, updated_at = $2 WHERE menu_item_id = $3 AND restaurant_id = $4',
+        [newStock, new Date().toISOString(), menu_item_id, restaurant_id]
       );
     }
 
     // Record movement
     const movementId = `mov_${Date.now().toString(36)}`;
     await client.query(
-      `INSERT INTO stock_movements 
-        (id, menu_item_id, menu_item_name, type, qty, stock_before, balance_after, unit_cost, total_value, performed_by, notes)
-       VALUES ($1, $2, $3, 'waste', $4, $5, $6, $7, $8, $9, $10)`,
-      [movementId, menu_item_id, menu_item_name, -qty, stockBefore, newStock, unit_cost, -total_cost, recorded_by, notes]
+      `INSERT INTO stock_movements
+        (id, menu_item_id, menu_item_name, type, qty, stock_before, balance_after, unit_cost, total_value, performed_by, notes, restaurant_id)
+       VALUES ($1, $2, $3, 'waste', $4, $5, $6, $7, $8, $9, $10, $11)`,
+      [movementId, menu_item_id, menu_item_name, -qty, stockBefore, newStock, unit_cost, -total_cost, recorded_by, notes, restaurant_id]
     );
 
     await client.query('COMMIT');

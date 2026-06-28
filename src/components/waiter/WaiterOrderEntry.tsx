@@ -64,14 +64,14 @@ export function WaiterOrderEntry({
     return ['all', ...Array.from(cats)];
   }, [menuItems]);
 
-  // Filter menu items
+  // Filter menu items — show all items including out-of-stock (waiter needs to see them)
   const filteredItems = useMemo(() => {
-    let items = menuItems.filter(item => item.isAvailable);
-    
+    let items = [...menuItems];
+
     if (activeCategory !== 'all') {
       items = items.filter(item => item.category === activeCategory);
     }
-    
+
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       items = items.filter(
@@ -80,7 +80,10 @@ export function WaiterOrderEntry({
           item.description.toLowerCase().includes(query)
       );
     }
-    
+
+    // Sort: available items first, then out-of-stock at the bottom
+    items.sort((a, b) => (a.isAvailable === b.isAvailable ? 0 : a.isAvailable ? -1 : 1));
+
     return items;
   }, [menuItems, activeCategory, searchQuery]);
 
@@ -389,40 +392,59 @@ export function WaiterOrderEntry({
               </div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-2.5 sm:gap-3">
-                {filteredItems.map((item) => (
-                  <motion.button
-                    key={item.id}
-                    layout
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    whileHover={{ y: -2 }}
-                    className="relative flex flex-col items-start rounded-2xl border border-slate-700 bg-slate-900/90 p-3 text-left transition-colors hover:border-amber-500/50 hover:bg-slate-800"
-                    onClick={() => addToCart(item, 1)}
-                  >
-                    <span className="text-2xl sm:text-3xl mb-1">{item.emoji}</span>
-                    <div className="mb-1 flex flex-wrap items-center gap-1.5">
-                      <Badge variant="secondary" size="sm" className="bg-slate-700 text-slate-200">
-                        {item.category}
-                      </Badge>
-                    </div>
-                    <h3 className="font-semibold text-slate-100 text-sm sm:text-base line-clamp-2 leading-tight">
-                      {item.name}
-                    </h3>
-                    <p className="text-xs sm:text-sm text-slate-400 line-clamp-2 mt-1">
-                      {item.description}
-                    </p>
-                    <div className="mt-2 flex items-center justify-between w-full gap-2">
-                      <span className="text-amber-300 font-semibold text-sm sm:text-base">{formatPrice(item.price)}</span>
-                      {!!item.prepTime && (
-                        <span className="text-[11px] text-slate-400">{item.prepTime}m</span>
+                {filteredItems.map((item) => {
+                  const outOfStock = !item.isAvailable;
+                  return (
+                    <motion.button
+                      key={item.id}
+                      layout
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      whileHover={outOfStock ? {} : { y: -2 }}
+                      disabled={outOfStock}
+                      className={`relative flex flex-col items-start rounded-2xl border p-3 text-left transition-colors ${
+                        outOfStock
+                          ? 'border-slate-800 bg-slate-900/40 opacity-60 cursor-not-allowed'
+                          : 'border-slate-700 bg-slate-900/90 hover:border-amber-500/50 hover:bg-slate-800'
+                      }`}
+                      onClick={() => !outOfStock && addToCart(item, 1)}
+                    >
+                      <span className="text-2xl sm:text-3xl mb-1">{item.emoji}</span>
+                      <div className="mb-1 flex flex-wrap items-center gap-1.5">
+                        <Badge variant="secondary" size="sm" className="bg-slate-700 text-slate-200">
+                          {item.category}
+                        </Badge>
+                        {outOfStock && (
+                          <Badge variant="secondary" size="sm" className="bg-red-500/20 text-red-400 border border-red-500/30">
+                            Out of Stock
+                          </Badge>
+                        )}
+                      </div>
+                      <h3 className={`font-semibold text-sm sm:text-base line-clamp-2 leading-tight ${outOfStock ? 'text-slate-500' : 'text-slate-100'}`}>
+                        {item.name}
+                      </h3>
+                      <p className="text-xs sm:text-sm text-slate-400 line-clamp-2 mt-1">
+                        {item.description}
+                      </p>
+                      <div className="mt-2 flex items-center justify-between w-full gap-2">
+                        <span className={`font-semibold text-sm sm:text-base ${outOfStock ? 'text-slate-500' : 'text-amber-300'}`}>{formatPrice(item.price)}</span>
+                        {!!item.prepTime && (
+                          <span className="text-[11px] text-slate-400">{item.prepTime}m</span>
+                        )}
+                      </div>
+                      {outOfStock ? (
+                        <div className="absolute top-2 right-2 flex flex-shrink-0 items-center gap-1 rounded-xl border border-red-500/30 bg-red-500/10 px-2 py-1 text-red-400">
+                          <XIcon className="w-4 h-4" />
+                        </div>
+                      ) : (
+                        <div className="absolute top-2 right-2 flex flex-shrink-0 items-center gap-1 rounded-xl border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-amber-300">
+                          <PlusIcon className="w-4 h-4" />
+                          <span className="hidden sm:inline text-xs font-semibold">Add</span>
+                        </div>
                       )}
-                    </div>
-                    <div className="absolute top-2 right-2 flex flex-shrink-0 items-center gap-1 rounded-xl border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-amber-300">
-                      <PlusIcon className="w-4 h-4" />
-                      <span className="hidden sm:inline text-xs font-semibold">Add</span>
-                    </div>
-                  </motion.button>
-                ))}
+                    </motion.button>
+                  );
+                })}
               </div>
             )}
           </div>
