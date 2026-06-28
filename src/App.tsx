@@ -909,6 +909,8 @@ export function App() {
           <div className="p-4 md:p-6">
             <PaymentApprovalPanel
               restaurantId={authUser?.restaurantId || localStorage.getItem('restaurantId') || undefined}
+              restaurantName={restaurantName}
+              restaurantInfo={receiptSettings}
               staffId={authUser?.id}
               staffName={authUser?.name}
             />

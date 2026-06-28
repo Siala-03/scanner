@@ -525,12 +525,14 @@ function ActiveOrderRow({
   onMarkReady,
   onMarkServed,
   onPrintReceipt,
+  onPrintRoundReceipt,
   onShare,
 }: {
   order: Order;
   onMarkReady?: (id: string) => void;
   onMarkServed?: (id: string) => void;
   onPrintReceipt?: (order: Order) => void;
+  onPrintRoundReceipt?: (order: Order) => void;
   onShare?: (order: Order) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -615,13 +617,22 @@ function ActiveOrderRow({
                 Mark Served
               </button>
             )}
-            {onPrintReceipt && (
+            {onPrintRoundReceipt && (
               <button
-                onClick={() => onPrintReceipt(order)}
+                onClick={() => onPrintRoundReceipt(order)}
                 className="px-3 py-1.5 rounded-lg bg-slate-700 text-slate-300 hover:bg-slate-600 text-xs font-medium border border-slate-600 transition-colors flex items-center gap-1"
               >
                 <PrinterIcon className="w-3 h-3" />
-                Receipt
+                Round
+              </button>
+            )}
+            {onPrintReceipt && (
+              <button
+                onClick={() => onPrintReceipt(order)}
+                className="px-3 py-1.5 rounded-lg bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/30 text-xs font-medium border border-indigo-500/30 transition-colors flex items-center gap-1"
+              >
+                <PrinterIcon className="w-3 h-3" />
+                Pay & Receipt
               </button>
             )}
           </div>
@@ -674,13 +685,22 @@ function ActiveOrderRow({
                     Mark Served
                   </button>
                 )}
-                {onPrintReceipt && (
+                {onPrintRoundReceipt && (
                   <button
-                    onClick={() => onPrintReceipt(order)}
+                    onClick={() => onPrintRoundReceipt(order)}
                     className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-slate-700 text-slate-300 hover:bg-slate-600 text-sm transition-colors"
                   >
                     <PrinterIcon className="w-4 h-4" />
-                    Print Receipt
+                    Print Round Receipt
+                  </button>
+                )}
+                {onPrintReceipt && (
+                  <button
+                    onClick={() => onPrintReceipt(order)}
+                    className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/30 text-sm border border-indigo-500/30 transition-colors"
+                  >
+                    <PrinterIcon className="w-4 h-4" />
+                    Pay & Print Full Receipt
                   </button>
                 )}
               </div>
@@ -1200,6 +1220,36 @@ export function WaiterDashboard({
     setPaymentCaptureOrder(order);
   };
 
+  const handlePrintRoundReceipt = (order: Order) => {
+    const allItems = order.items || [];
+    const maxRound = allItems.reduce((max, i: any) => Math.max(max, i.round ?? 1), 1);
+    const latestRoundItems = allItems.filter((i: any) => (i.round ?? 1) === maxRound);
+    const roundTotal = latestRoundItems.reduce((sum, i) => sum + ((i.unitPrice ?? 0) * i.quantity), 0);
+
+    try {
+      const receiptData = orderToReceiptData(
+        { ...order, items: latestRoundItems, total: roundTotal, subtotal: roundTotal } as Order,
+        {
+          restaurantName: restaurantName || 'Company',
+          restaurantAddress: restaurantInfo?.address || '',
+          restaurantPhone: restaurantInfo?.phone || '',
+          restaurantEmail: restaurantInfo?.email || '',
+          restaurantLogo: restaurantInfo?.logo,
+          restaurantCity: restaurantInfo?.city,
+          restaurantCountry: restaurantInfo?.country,
+          restaurantMomoCode: restaurantInfo?.momoCode,
+          taxRate: 0,
+          serverName: waiterName,
+          orderType: 'dine-in',
+          notes: `Round ${maxRound} of ${allItems.length} total items`,
+        }
+      );
+      printReceipt(buildReceiptHtml(receiptData));
+    } catch {
+      alert('Could not open print window. Please allow pop-ups.');
+    }
+  };
+
   const handlePaymentConfirmed = async (payments: PaymentEntry[], change: number, receiptNote?: string) => {
     const order = paymentCaptureOrder;
     if (!order) return;
@@ -1556,7 +1606,7 @@ export function WaiterDashboard({
                   ) : (
                     <AnimatePresence>
                       {kitchenOrders.map((order) => (
-                        <ActiveOrderRow key={order.id} order={order} onMarkReady={handleMarkReady} onPrintReceipt={handlePrintReceipt} />
+                        <ActiveOrderRow key={order.id} order={order} onMarkReady={handleMarkReady} onPrintReceipt={handlePrintReceipt} onPrintRoundReceipt={handlePrintRoundReceipt} />
                       ))}
                     </AnimatePresence>
                   )}
@@ -1582,7 +1632,7 @@ export function WaiterDashboard({
                   ) : (
                     <AnimatePresence>
                       {readyOrders.map((order) => (
-                        <ActiveOrderRow key={order.id} order={order} onMarkServed={handleMarkServed} onPrintReceipt={handlePrintReceipt} />
+                        <ActiveOrderRow key={order.id} order={order} onMarkServed={handleMarkServed} onPrintReceipt={handlePrintReceipt} onPrintRoundReceipt={handlePrintRoundReceipt} />
                       ))}
                     </AnimatePresence>
                   )}
@@ -1602,7 +1652,7 @@ export function WaiterDashboard({
                   ) : (
                     <AnimatePresence>
                       {servedOrders.map((order) => (
-                        <ActiveOrderRow key={order.id} order={order} onPrintReceipt={handlePrintReceipt} onShare={handleShare} />
+                        <ActiveOrderRow key={order.id} order={order} onPrintReceipt={handlePrintReceipt} onPrintRoundReceipt={handlePrintRoundReceipt} onShare={handleShare} />
                       ))}
                     </AnimatePresence>
                   )}
@@ -1737,22 +1787,22 @@ export function WaiterDashboard({
       {/* Manual table picker */}
       {showTablePicker && (
         <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center bg-black/60 p-4">
-          <div className="w-full max-w-md rounded-2xl border border-slate-700 bg-slate-900 p-5 shadow-2xl">
+          <div className="w-full max-w-lg rounded-2xl border border-slate-700 bg-slate-900 p-5 shadow-2xl">
             <div className="mb-4 flex items-center justify-between">
               <div>
-                <h3 className="font-bold text-white">Select Table</h3>
-                <p className="text-xs text-slate-400 mt-0.5">Pick a table to place an order manually</p>
+                <h3 className="text-lg font-bold text-white">Select Table</h3>
+                <p className="text-xs text-slate-400 mt-0.5">Tap a table to place or add to an order</p>
               </div>
-              <button onClick={() => setShowTablePicker(false)}>
+              <button onClick={() => setShowTablePicker(false)} className="p-1.5 rounded-lg hover:bg-slate-800 transition-colors">
                 <XIcon className="w-5 h-5 text-slate-400" />
               </button>
             </div>
 
             {/* Legend */}
-            <div className="mb-3 flex gap-3 text-xs text-slate-400">
-              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" />Free</span>
-              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-400 inline-block" />Occupied</span>
-              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-400 inline-block" />Urgent</span>
+            <div className="mb-3 flex gap-4 text-xs text-slate-400">
+              <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-emerald-400 inline-block" />Free</span>
+              <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block" />Occupied</span>
+              <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-red-400 animate-pulse inline-block" />Urgent</span>
             </div>
 
             {/* Bar/Walk-up */}
@@ -1762,30 +1812,35 @@ export function WaiterDashboard({
                 setShowTablePicker(false);
                 setShowOrderEntry(true);
               }}
-              className="mb-3 w-full rounded-xl border-2 border-dashed border-amber-500/50 bg-amber-500/10 py-3 text-sm font-semibold text-amber-300 hover:bg-amber-500/20 transition-colors"
+              className="mb-4 w-full rounded-xl border-2 border-dashed border-amber-500/40 bg-amber-500/5 py-3.5 text-sm font-semibold text-amber-300 hover:bg-amber-500/15 hover:border-amber-500/60 transition-all"
             >
               Bar / Walk-up (no table)
             </button>
 
             {/* Table grid */}
-            <div className="grid grid-cols-5 gap-2 max-h-64 overflow-y-auto">
+            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2.5 max-h-[50vh] overflow-y-auto pr-1">
               {[...allTables].sort((a, b) => a - b).map((tNum) => {
                 const status = tableOccupancy[tNum];
-                const cls = status === 'urgent'
-                  ? 'border-red-500 bg-red-500/15 text-red-200'
+                const activeOrder = status ? findActiveOrderForTable(tNum) : null;
+                const itemCount = activeOrder?.items?.length ?? 0;
+                const orderTotal = activeOrder?.total ?? 0;
+
+                const borderCls = status === 'urgent'
+                  ? 'border-red-500/70 bg-red-500/10 hover:bg-red-500/20'
                   : status === 'occupied'
-                    ? 'border-amber-500 bg-amber-500/15 text-amber-200'
-                    : 'border-slate-600 bg-slate-800 text-slate-300 hover:border-emerald-500 hover:text-white';
-                const dot = status === 'urgent' ? 'bg-red-400' : status === 'occupied' ? 'bg-amber-400' : 'bg-emerald-400';
+                    ? 'border-amber-500/60 bg-amber-500/8 hover:bg-amber-500/15'
+                    : 'border-slate-700 bg-slate-800/80 hover:border-emerald-500/50 hover:bg-slate-800';
+                const dot = status === 'urgent' ? 'bg-red-400 animate-pulse' : status === 'occupied' ? 'bg-amber-400' : 'bg-emerald-400';
+                const numColor = status === 'urgent' ? 'text-red-200' : status === 'occupied' ? 'text-amber-200' : 'text-slate-200';
                 return (
                   <button
                     key={tNum}
                     onClick={() => {
                       if (status === 'occupied' || status === 'urgent') {
-                        const activeOrder = findActiveOrderForTable(tNum);
+                        const order = findActiveOrderForTable(tNum);
                         setShowTablePicker(false);
-                        if (activeOrder) {
-                          setConfirmOccupied({ tableNumber: tNum, activeOrder });
+                        if (order) {
+                          setConfirmOccupied({ tableNumber: tNum, activeOrder: order });
                         } else {
                           setSelectedTableNumber(tNum);
                           setShowOrderEntry(true);
@@ -1798,17 +1853,24 @@ export function WaiterDashboard({
                         setShowOrderEntry(true);
                       }
                     }}
-                    className={`relative flex flex-col items-center justify-center rounded-xl border-2 py-3 font-bold text-sm transition-all ${cls}`}
+                    className={`relative flex flex-col items-center justify-center rounded-xl border p-3 min-h-[4.5rem] transition-all ${borderCls}`}
                   >
-                    <span className={`absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full ${dot}`} />
-                    {tNum}
+                    <span className={`absolute top-2 right-2 w-2 h-2 rounded-full ${dot}`} />
+                    <span className={`text-lg font-bold ${numColor}`}>{tNum}</span>
+                    {status ? (
+                      <span className="text-[10px] text-slate-400 mt-0.5">
+                        {itemCount} item{itemCount !== 1 ? 's' : ''} · {formatPrice(orderTotal)}
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-slate-500 mt-0.5">Available</span>
+                    )}
                   </button>
                 );
               })}
             </div>
 
             {allTables.length === 0 && (
-              <p className="py-6 text-center text-sm text-slate-500">No tables configured</p>
+              <p className="py-8 text-center text-sm text-slate-500">No tables configured</p>
             )}
           </div>
         </div>

@@ -312,7 +312,8 @@ export async function createOrder(order: CreateOrderInput): Promise<Order> {
     notes: item.notes || null,
     category: (item as any).category || null,
     requires_kitchen: (item as any).requiresKitchen ?? null,
-    status: 'pending'
+    status: 'pending',
+    round: 1,
   }));
 
   const total = items.reduce((sum, item) => sum + item.total_price, 0);
@@ -358,9 +359,14 @@ export async function createOrder(order: CreateOrderInput): Promise<Order> {
       const mergedTotal = mergedSubtotal + existingTax;
       const mergedNotes = mergeNotes((mergeTarget as any).notes, order.notes);
 
+      // Assign next round number to new items
+      const maxRound = existingItems.reduce((max: number, i: any) => Math.max(max, i.round ?? 1), 1);
+      const nextRound = maxRound + 1;
+      const roundedItems = items.map(i => ({ ...i, round: nextRound }));
+
       const mergePayloads: Array<Record<string, unknown>> = [
         {
-          items: [...existingItems, ...items],
+          items: [...existingItems, ...roundedItems],
           subtotal: mergedSubtotal,
           total: mergedTotal,
           notes: mergedNotes,
@@ -371,7 +377,7 @@ export async function createOrder(order: CreateOrderInput): Promise<Order> {
           updated_at: new Date().toISOString(),
         },
         {
-          items: [...existingItems, ...items],
+          items: [...existingItems, ...roundedItems],
           subtotal: mergedSubtotal,
           total: mergedTotal,
           notes: mergedNotes,
@@ -380,7 +386,7 @@ export async function createOrder(order: CreateOrderInput): Promise<Order> {
           updated_at: new Date().toISOString(),
         },
         {
-          items: [...existingItems, ...items],
+          items: [...existingItems, ...roundedItems],
           total: mergedTotal,
           status: 'pending',
           updated_at: new Date().toISOString(),

@@ -12,6 +12,8 @@ import { supabase } from '../../lib/supabase';
 import { enqueuePayment } from '../../lib/orderQueue';
 import { flushPendingPayments } from '../../utils/offlineSync';
 import { OfflineBanner } from '../ui/OfflineBanner';
+import { orderToReceiptData, buildReceiptHtml, printReceipt } from '../../utils/receipt';
+import { PrinterIcon } from 'lucide-react';
 
 interface Order {
   id: string;
@@ -94,13 +96,15 @@ function buildNote(splits: SplitEntry[], orderTotal: number): string | undefined
 
 interface PaymentApprovalPanelProps {
   restaurantId?: string;
+  restaurantName?: string;
+  restaurantInfo?: { address?: string; phone?: string; email?: string; logo?: string; city?: string; country?: string; momoCode?: string };
   staffId?: string;
   staffName?: string;
 }
 
 const CACHE_KEY = 'supervisor_pending_orders_cache';
 
-export function PaymentApprovalPanel({ restaurantId, staffId, staffName }: PaymentApprovalPanelProps) {
+export function PaymentApprovalPanel({ restaurantId, restaurantName, restaurantInfo, staffId, staffName }: PaymentApprovalPanelProps) {
   const [orders,       setOrders]       = useState<Order[]>([]);
   const [staffMap,     setStaffMap]     = useState<Record<string, string>>({});
   const [loading,      setLoading]      = useState(true);
@@ -232,6 +236,28 @@ export function PaymentApprovalPanel({ restaurantId, staffId, staffName }: Payme
       alert('Failed to send cancellation request. Please try again.');
     } finally {
       setCancelling(null);
+    }
+  };
+
+  const handlePrintFullBill = (order: Order) => {
+    try {
+      const receiptData = orderToReceiptData(order as any, {
+        restaurantName: restaurantName || 'Company',
+        restaurantAddress: restaurantInfo?.address || '',
+        restaurantPhone: restaurantInfo?.phone || '',
+        restaurantEmail: restaurantInfo?.email || '',
+        restaurantLogo: restaurantInfo?.logo,
+        restaurantCity: restaurantInfo?.city,
+        restaurantCountry: restaurantInfo?.country,
+        restaurantMomoCode: restaurantInfo?.momoCode,
+        taxRate: 0,
+        serverName: staffName,
+        orderType: 'dine-in',
+        notes: `Full bill — ${(order.items || []).length} items`,
+      });
+      printReceipt(buildReceiptHtml(receiptData));
+    } catch {
+      alert('Could not open print window. Please allow pop-ups.');
     }
   };
 
@@ -590,6 +616,12 @@ export function PaymentApprovalPanel({ restaurantId, staffId, staffName }: Payme
                   </div>
                 ) : (
                   <>
+                    <button
+                      onClick={() => handlePrintFullBill(order)}
+                      className="w-full py-2 mb-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                    >
+                      <PrinterIcon className="w-3.5 h-3.5" /> Print Full Bill
+                    </button>
                     <button
                       onClick={() => handleConfirm(order)}
                       disabled={busy || cancelling === order.id || !canConfirm}
