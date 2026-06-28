@@ -4,7 +4,7 @@ import {
   SmartphoneIcon, RefreshCwIcon, UserIcon, PlusIcon, XIcon,
   WifiOffIcon, CircleEllipsisIcon,
 } from 'lucide-react';
-import { fetchUnpaidOrders, confirmPayment, fetchOrderCancellationRequests, requestOrderCancellation } from '../../api/orders';
+import { fetchOrders, confirmPayment, fetchOrderCancellationRequests, requestOrderCancellation } from '../../api/orders';
 import { VoidReasonModal } from '../shared/VoidReasonModal';
 import { fiscalizeOrder } from '../../api/ebm';
 import { formatPrice } from '../../utils/currency';
@@ -118,7 +118,7 @@ export function PaymentApprovalPanel({ restaurantId, staffId, staffName }: Payme
     if (!restaurantId) return;
     try {
       const [all, cancellationRequests] = await Promise.all([
-        fetchUnpaidOrders(restaurantId),
+        fetchOrders('all', restaurantId),
         fetchOrderCancellationRequests('pending', restaurantId),
       ]);
       const pending = (all as any[]).filter((o) => {

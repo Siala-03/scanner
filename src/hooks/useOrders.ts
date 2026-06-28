@@ -159,24 +159,40 @@ export function useOrders(): UseOrdersReturn {
     return () => window.removeEventListener('restaurantIdChanged', handleChange);
   }, []);
 
+  const statusChangeInFlight = useRef<Set<string>>(new Set());
+
   const loadOrders = useCallback(async (restId?: string) => {
     const id = restId || restaurantId;
     try {
       const fetched = await apiFetchOrders('all', id);
       const normalized = (fetched ?? []).map((o: any) => normalizeOrderPayload(o)).filter(Boolean) as Order[];
-      // Merge: keep in-flight temp orders (id starts with "temp-") that aren't in the DB yet
+      const fetchedIds = new Set(normalized.map((o) => o.id));
+
       setOrders((prev) => {
-        // Preserve local-only orders (temp- = in-flight, offline- = queued) not yet in the DB
+        // Preserve local-only orders not yet in the DB
         const localOrders = prev.filter(
           (o) => o.id.startsWith('temp-') || o.id.startsWith('offline-')
         );
-        const fetchedIds = new Set(normalized.map((o) => o.id));
-        const stillPending = localOrders.filter((t) => !fetchedIds.has(t.id));
-        return [...stillPending, ...normalized];
+        // Dedupe: drop offline orders whose idempotency key matches a server order
+        const stillPending = localOrders.filter((local) => {
+          if (!local.id.startsWith('offline-')) return !fetchedIds.has(local.id);
+          const key = local.id.slice('offline-'.length);
+          return !normalized.some((n: any) => n.idempotency_key === key || n.idempotencyKey === key);
+        });
+
+        // For orders with a status change in flight, keep the local version
+        const merged = normalized.map((serverOrder) => {
+          if (statusChangeInFlight.current.has(serverOrder.id)) {
+            const localVersion = prev.find((o) => o.id === serverOrder.id);
+            if (localVersion) return localVersion;
+          }
+          return serverOrder;
+        });
+
+        return [...stillPending, ...merged];
       });
     } catch (e: any) {
       console.error('[Orders] Poll failed:', e?.message ?? e);
-      // Do not clear orders on a failed poll — preserve existing state
     }
   }, [restaurantId]);
 
@@ -468,17 +484,13 @@ export function useOrders(): UseOrdersReturn {
         updatedAt: now,
       } as Order;
 
-      // 1. Show optimistic order immediately
-      setOrders((prev) => [localOrder, ...prev]);
-      void recordTableSessionActivity(tableNumber);
-
-      // 2. Persist to IndexedDB — survives page refresh, network drop, browser close
+      // 1. Persist to IndexedDB first — survives page refresh, network drop, browser close
       const receiptCtx = queue.buildReceiptContext();
       await queue.enqueue({
         idempotencyKey,
         localOrderId,
         payload: {
-          tableNumber,
+          tableNumber: tableNumber === 0 ? undefined : tableNumber,
           customerName: (customer as any)?.customerName || customer?.name || 'Walk-in',
           customerId: customer?.id,
           customerPhone: (customer as any)?.customerPhone || null,
@@ -503,6 +515,10 @@ export function useOrders(): UseOrdersReturn {
         authToken: null,
         refreshToken: null,
       });
+
+      // 2. Show optimistic order in UI (after queue write so it's never lost)
+      setOrders((prev) => [localOrder, ...prev]);
+      void recordTableSessionActivity(tableNumber);
 
       // 3. Attempt immediate send (non-blocking — queue handles failure)
       void flushQueue();
@@ -534,6 +550,7 @@ export function useOrders(): UseOrdersReturn {
         void queue.updateTargetStatus(idempotencyKey, status);
         // Fall through to update local state below (no network call needed)
       } else {
+        statusChangeInFlight.current.add(orderId);
         try {
           const ordersApi = await import('../api/orders');
           await (ordersApi as any).updateOrderStatus(orderId, {
@@ -555,7 +572,6 @@ export function useOrders(): UseOrdersReturn {
             !navigator.onLine;
 
           if (isNetworkError) {
-            // Queue the status change — will be applied when network returns
             void queue.queueStatusUpdate(orderId, status as string, {
               assignedWaiterId: opts?.assignedWaiterId,
               cancellationReason: opts?.cancellationReason,
@@ -567,7 +583,7 @@ export function useOrders(): UseOrdersReturn {
         }
       }
 
-      // Always update local state
+      // Update local state (only reached on success or queued offline)
       let affectedTableNumber: number | undefined;
       setOrders((prev) =>
         prev.map((order) => {
@@ -598,6 +614,11 @@ export function useOrders(): UseOrdersReturn {
 
       if (affectedTableNumber != null) {
         void recordTableSessionActivity(affectedTableNumber);
+      }
+
+      // Clear in-flight flag after next poll cycle has time to fetch the updated status
+      if (!orderId.startsWith('offline-')) {
+        setTimeout(() => statusChangeInFlight.current.delete(orderId), 5000);
       }
 
       window.dispatchEvent(new Event('ordersUpdated'));

@@ -399,10 +399,14 @@ export async function createOrder(order: CreateOrderInput): Promise<Order> {
 
         const mergeResult = await withTimeout(mergeQuery.select().maybeSingle(), 5000, { data: null, error: { message: 'Merge timed out' } } as any);
         if (!mergeResult.error && mergeResult.data) {
-          decrementInventoryForOrder(
-            order.items.map(item => ({ menuItemId: item.menuItemId, quantity: item.quantity, menuItemName: item.menuItemName })),
-            { reference: String((mergeResult.data as any).order_number || orderNumber), performedBy: staffId || undefined }
-          ).catch(err => console.warn('[createOrder] Inventory decrement failed after merge:', err));
+          try {
+            await decrementInventoryForOrder(
+              order.items.map(item => ({ menuItemId: item.menuItemId, quantity: item.quantity, menuItemName: item.menuItemName })),
+              { reference: String((mergeResult.data as any).order_number || orderNumber), performedBy: staffId || undefined }
+            );
+          } catch (err) {
+            console.warn('[createOrder] Inventory decrement failed after merge:', err);
+          }
           return mergeResult.data as Order;
         }
 
@@ -436,13 +440,13 @@ export async function createOrder(order: CreateOrderInput): Promise<Order> {
     created_by: staffId,
     payment_status: 'unpaid',
     restaurant_id: restaurantId,
+    assigned_waiter_id: assignedWaiterId,
   };
 
   // Optional columns — only include if the schema supports them.
   // Each is wrapped in its own insert attempt via the fallback loop below.
   const optionalColumns: Record<string, unknown> = {
     requires_kitchen: order.requiresKitchen ?? false,
-    assigned_waiter_id: assignedWaiterId,
     is_online_order: isOnlineOrder,
     customer_email: (order as any).customerEmail || null,
     customer_address: (order as any).customerAddress || null,
@@ -481,10 +485,14 @@ export async function createOrder(order: CreateOrderInput): Promise<Order> {
 
     if (!result.error) {
       // Success — decrement inventory (best-effort)
-      decrementInventoryForOrder(
-        order.items.map(item => ({ menuItemId: item.menuItemId, quantity: item.quantity, menuItemName: item.menuItemName })),
-        { reference: orderNumber, performedBy: staffId || undefined }
-      ).catch(err => console.warn('[createOrder] Inventory decrement failed:', err));
+      try {
+        await decrementInventoryForOrder(
+          order.items.map(item => ({ menuItemId: item.menuItemId, quantity: item.quantity, menuItemName: item.menuItemName })),
+          { reference: orderNumber, performedBy: staffId || undefined }
+        );
+      } catch (err) {
+        console.warn('[createOrder] Inventory decrement failed:', err);
+      }
       return result.data as Order;
     }
 
@@ -624,18 +632,15 @@ export async function confirmPayment(
 
   const attempts = [
     { ...baseFields, ...confirmedByFields, ...paymentFields },
-    { ...baseFields, ...paymentFields },
-    { ...baseFields, ...confirmedByFields },
     { ...baseFields },
     { ...coreFields, payment_status: 'confirmed' },
-    coreFields,
   ];
 
   let result: any;
   for (const payload of attempts) {
     result = await withTimeout(
       db.from('orders').update(payload).eq('id', orderId).select().single(),
-      10000,
+      8000,
       { data: null, error: { message: 'Request timed out', code: 'TIMEOUT' } } as any
     );
     if (!result.error) return result.data as Order;
@@ -717,10 +722,14 @@ export async function cancelOrder(id: string, reason?: string): Promise<void> {
       .filter((i) => i.menuItemId && i.quantity > 0);
 
     if (restoreList.length > 0) {
-      restoreInventoryForOrder(restoreList, {
-        reference: order.order_number ?? id,
-        reason: reason ?? 'Order cancelled',
-      }).catch((err) => console.warn('[cancelOrder] Inventory restore failed:', err));
+      try {
+        await restoreInventoryForOrder(restoreList, {
+          reference: order.order_number ?? id,
+          reason: reason ?? 'Order cancelled',
+        });
+      } catch (err) {
+        console.warn('[cancelOrder] Inventory restore failed:', err);
+      }
     }
   }
 }

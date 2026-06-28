@@ -8,6 +8,13 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     persistSession: false,
     autoRefreshToken: false,
   },
+  global: {
+    fetch: (url, options = {}) => {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000);
+      return fetch(url, { ...options, signal: controller.signal }).finally(() => clearTimeout(timeout));
+    },
+  },
 });
 
 // Clean up stale Supabase Auth sessions from before this fix.

@@ -1205,14 +1205,14 @@ export function WaiterDashboard({
     if (!order) return;
     setPaymentCaptureOrder(null);
 
-    // Persist payment data to the database
+    const paymentBreakdown = payments.map(p => ({
+      method: p.method,
+      amount: p.amount,
+      ...(p.reference ? { reference: p.reference } : {}),
+    }));
+    const primaryMethod = payments.reduce((a, b) => a.amount >= b.amount ? a : b);
+
     try {
-      const paymentBreakdown = payments.map(p => ({
-        method: p.method,
-        amount: p.amount,
-        ...(p.reference ? { reference: p.reference } : {}),
-      }));
-      const primaryMethod = payments.reduce((a, b) => a.amount >= b.amount ? a : b);
       await confirmPayment(order.id, {
         paymentType: primaryMethod.method,
         paymentBreakdown,
@@ -1220,7 +1220,9 @@ export function WaiterDashboard({
         confirmedByName: waiterName,
       });
     } catch (err) {
-      console.error('Failed to persist payment data:', err);
+      console.error('Failed to confirm payment:', err);
+      alert('Payment confirmation failed. Please try again or ask your supervisor to confirm this payment.');
+      return;
     }
     onUpdateOrderStatus(order.id, 'served', { assignedWaiterId: waiter.id });
 
@@ -1840,33 +1842,13 @@ export function WaiterDashboard({
           onClose={() => { setShowOrderEntry(false); setSelectedTableNumber(null); setExistingOrderForEntry(null); autoMergeRef.current = null; }}
           onSubmitOrder={async (items, notes) => {
             if (!onCreateOrder) { alert('Order creation not available.'); return; }
-            // 0 = Bar/Walk-up (no table number) — pass as undefined via a special value
-            if (selectedTableNumber === 0) {
-              const { createOrder } = await import('../../api/orders');
-              const staffId = localStorage.getItem('staffId') ||
-                (() => { try { return JSON.parse(localStorage.getItem('authUser') || '{}')?.id; } catch { return null; } })();
-              await createOrder({
-                tableNumber: undefined,
-                items: items.map((i) => ({
-                  menuItemId: i.menuItem?.id ?? '',
-                  menuItemName: i.menuItem?.name ?? '',
-                  quantity: i.quantity,
-                  unitPrice: i.menuItem?.price ?? 0,
-                  notes: i.specialInstructions,
-                })),
-                notes: notes,
-                createdBy: staffId ?? undefined,
-              } as any);
-            } else {
-              // Extra args (confirmMerge) flow through as any — prop type stays simple
-              await (onCreateOrder as any)(
-                selectedTableNumber!,
-                items,
-                notes,
-                undefined, undefined, undefined, undefined,
-                confirmMerge,
-              );
-            }
+            await (onCreateOrder as any)(
+              selectedTableNumber!,
+              items,
+              notes,
+              undefined, undefined, undefined, undefined,
+              confirmMerge,
+            );
           }}
         />
       )}
