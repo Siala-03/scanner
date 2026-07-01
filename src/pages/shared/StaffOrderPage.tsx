@@ -516,7 +516,12 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
       submitKeyRef.current = crypto.randomUUID();
     } catch (e) {
       console.error(e);
-      alert('Failed to place order. Please try again.');
+      const isTimeout = (e as any)?.code === 'TIMEOUT' || (e instanceof Error && e.message.includes('timed out'));
+      if (isTimeout) {
+        alert('The request timed out. Your order may still have been placed — please check the orders list before trying again.');
+      } else {
+        alert('Failed to place order. Please try again.');
+      }
     } finally {
       isSubmittingRef.current = false;
       setIsSubmitting(false);

@@ -473,9 +473,14 @@ export async function createOrder(order: CreateOrderInput): Promise<Order> {
 
     const result = await withTimeout(
       db.from('orders').insert(attempt).select().single(),
-      8000,
+      5000,
       { data: null, error: { message: 'Request timed out', code: 'TIMEOUT' } } as any
     );
+
+    // Timeout is not a schema error — retrying with fewer columns won't help
+    if (result.error?.code === 'TIMEOUT') {
+      throw result.error;
+    }
 
     if (result.error?.code === '23505') {
       const { data: existing } = await withTimeout(
@@ -646,10 +651,11 @@ export async function confirmPayment(
   for (const payload of attempts) {
     result = await withTimeout(
       db.from('orders').update(payload).eq('id', orderId).select().single(),
-      8000,
+      5000,
       { data: null, error: { message: 'Request timed out', code: 'TIMEOUT' } } as any
     );
     if (!result.error) return result.data as Order;
+    if (result.error?.code === 'TIMEOUT') break;
     console.warn('[confirmPayment] Attempt failed, trying smaller payload:', result.error.message);
   }
 
