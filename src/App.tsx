@@ -50,6 +50,7 @@ import { EbmSettings } from './pages/manager/EbmSettings';
 import { ReportsPage } from './pages/manager/ReportsPage';
 import { StaffOrderPage } from './pages/shared/StaffOrderPage';
 import { InstallPrompt } from './components/ui/InstallPrompt';
+import { usePullToRefresh } from './hooks/usePullToRefresh';
 
 type UserRole = 'customer' | 'waiter' | 'cashier' | 'supervisor' | 'manager' | 'kitchen' | 'superadmin' | 'supplier' | null;
 type ManagerPage = 'dashboard' | 'menu' | 'staff' | 'analytics' | 'performance' | 'qrcodes' | 'inventory' | 'history' | 'expenses' | 'payment-cancellations' | 'credit' | 'loyalty' | 'promotions' | 'reservations' | 'scheduling' | 'reviews' | 'settings' | 'ebm' | 'reports';
@@ -109,6 +110,7 @@ const MANAGER_NAV_FLAT: Array<{ id: ManagerPage; label: string }> = [
 ];
 
 export function App() {
+  usePullToRefresh();
   const servvLogo = '/assets/logo_servv_white.PNG';
   const [selectedRole, setSelectedRole] = useState<UserRole>(null);
   const [authUser, setAuthUser] = useState<Staff | null>(null);

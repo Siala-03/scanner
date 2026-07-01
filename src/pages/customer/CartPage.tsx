@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ShoppingBagIcon, ArrowRightIcon, CheckCircleIcon, BellRingIcon, CheckIcon, TagIcon } from 'lucide-react';
 import { CartItem, Customer, LoyaltySummary, Reward } from '../../types';
@@ -40,6 +40,7 @@ export function CartPage({
   const [deliveryProvider, setDeliveryProvider] = useState<'vubavuba' | null>(null);
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [isOrdering, setIsOrdering] = useState(false);
+  const isOrderingRef = useRef(false);
   const [orderPlaced, setOrderPlaced] = useState(false);
   const [identifiedCustomer, setIdentifiedCustomer] = useState<Customer | null>(null);
   const [loyaltySummary, setLoyaltySummary] = useState<LoyaltySummary | null>(null);
@@ -132,6 +133,8 @@ export function CartPage({
   };
 
   const handleSubmitOrder = async () => {
+    if (isOrderingRef.current) return;
+    isOrderingRef.current = true;
     setIsOrdering(true);
     setRewardError('');
     try {
@@ -144,6 +147,7 @@ export function CartPage({
       console.error('Place order failed', err);
       setRewardError(err instanceof Error ? err.message : 'Unable to place order right now. Please try again.');
     } finally {
+      isOrderingRef.current = false;
       setIsOrdering(false);
     }
   };

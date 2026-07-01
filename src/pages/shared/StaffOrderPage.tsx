@@ -118,6 +118,8 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
   const [confirmOccupied, setConfirmOccupied] = useState<number | null>(null);
   const [mergeCandidate, setMergeCandidate] = useState<Order | null>(null);
   const mergeResolveRef = useRef<((result: boolean) => void) | null>(null);
+  const isSubmittingRef = useRef(false);
+  const submitKeyRef = useRef(crypto.randomUUID());
 
   const { tables, isLoading: tablesLoading } = useTables();
   const { menuItems, isLoading: menuLoading } = useMenu();
@@ -399,10 +401,12 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
   // ── Submit ────────────────────────────────────────────────────────────────────
   const handleSubmit = async () => {
     if (cart.length === 0) return;
+    if (isSubmittingRef.current) return;
     if (sharedTerminalMode && !selectedStaffId) {
       alert('Select the active waiter before placing an order.');
       return;
     }
+    isSubmittingRef.current = true;
     setIsSubmitting(true);
     try {
       const checkoutCart = [...cart];
@@ -442,6 +446,7 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
         assignedWaiterId: selectedStaffId || undefined,
         requiresKitchen: needsKitchen,
         allowMergeToOpenTab,
+        idempotencyKey: submitKeyRef.current,
       } as any);
 
       const nowIso = new Date().toISOString();
@@ -508,10 +513,12 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
       setCart([]);
       setOrderNotes('');
       setShowMobileCart(false);
+      submitKeyRef.current = crypto.randomUUID();
     } catch (e) {
       console.error(e);
       alert('Failed to place order. Please try again.');
     } finally {
+      isSubmittingRef.current = false;
       setIsSubmitting(false);
     }
   };
