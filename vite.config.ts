@@ -54,6 +54,10 @@ export default defineConfig({
         // Keep build stable when app bundle temporarily exceeds Workbox 2 MiB default.
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        // Manifest icons are already referenced by the browser directly — excluding
+        // them from glob precaching prevents the duplicate-entry conflict where
+        // Workbox would add the same URL both with and without a revision hash.
+        globIgnores: ['**/favicon_black.png'],
       },
     }),
   ],

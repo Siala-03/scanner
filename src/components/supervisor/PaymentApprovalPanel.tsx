@@ -4,7 +4,7 @@ import {
   SmartphoneIcon, RefreshCwIcon, UserIcon, PlusIcon, XIcon,
   WifiOffIcon, CircleEllipsisIcon,
 } from 'lucide-react';
-import { fetchOrders, confirmPayment, fetchOrderCancellationRequests, requestOrderCancellation } from '../../api/orders';
+import { fetchUnpaidOrders, confirmPayment, fetchOrderCancellationRequests, requestOrderCancellation } from '../../api/orders';
 import { VoidReasonModal } from '../shared/VoidReasonModal';
 import { fiscalizeOrder } from '../../api/ebm';
 import { formatPrice } from '../../utils/currency';
@@ -121,32 +121,40 @@ export function PaymentApprovalPanel({ restaurantId, restaurantName, restaurantI
   const loadPendingOrders = useCallback(async () => {
     if (!restaurantId) return;
     try {
-      const [all, cancellationRequests] = await Promise.all([
-        fetchOrders('all', restaurantId),
+      // Use allSettled so a cancellation-request failure doesn't kill the whole panel
+      const [ordersResult, cancelResult] = await Promise.allSettled([
+        fetchUnpaidOrders(restaurantId),
         fetchOrderCancellationRequests('pending', restaurantId),
       ]);
-      const pending = (all as any[]).filter((o) => {
-        const ps = o.paymentStatus ?? o.payment_status;
-        const st = o.status;
-        return ps !== 'confirmed' && ps !== 'paid' && st !== 'cancelled' && st !== 'completed';
-      });
-      // Cache to localStorage so the panel can show stale data when offline
+
+      if (ordersResult.status === 'rejected') {
+        console.error('Failed to load pending orders:', ordersResult.reason);
+        // Fall back to stale cache
+        if (ordersRef.current.length === 0) {
+          try {
+            const cached = localStorage.getItem(CACHE_KEY);
+            if (cached) {
+              const parsed = JSON.parse(cached) as Order[];
+              ordersRef.current = parsed;
+              setOrders(parsed);
+            }
+          } catch { /* ignore */ }
+        }
+        return;
+      }
+
+      // fetchUnpaidOrders already filters out confirmed/paid/cancelled orders;
+      // additionally exclude 'completed' status here.
+      const pending = (ordersResult.value as any[]).filter((o) => o.status !== 'completed');
+
       try { localStorage.setItem(CACHE_KEY, JSON.stringify(pending)); } catch { /* ignore */ }
       ordersRef.current = pending;
       setOrders(pending);
-      setPendingCancelRequests(new Set(cancellationRequests.map((r) => r.order_id)));
-    } catch (err) {
-      console.error('Failed to load pending orders:', err);
-      // Offline or network error — restore from localStorage cache
-      if (ordersRef.current.length === 0) {
-        try {
-          const cached = localStorage.getItem(CACHE_KEY);
-          if (cached) {
-            const parsed = JSON.parse(cached) as Order[];
-            ordersRef.current = parsed;
-            setOrders(parsed);
-          }
-        } catch { /* ignore */ }
+
+      if (cancelResult.status === 'fulfilled') {
+        setPendingCancelRequests(new Set(cancelResult.value.map((r) => r.order_id)));
+      } else {
+        console.warn('Failed to load cancellation requests:', cancelResult.reason);
       }
     } finally {
       setLoading(false);

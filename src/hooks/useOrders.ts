@@ -457,8 +457,12 @@ export function useOrders(): UseOrdersReturn {
       const idempotencyKey = crypto.randomUUID();
       const localOrderId = `offline-${idempotencyKey}`;
       const now = new Date();
-      // Read staffId now so both localOrder and the queue payload share it
+      // Read staffId now so both localOrder and the queue payload share it.
+      // Only stamp assignedWaiterId when the logged-in user is actually a waiter —
+      // managers/supervisors placing orders should not appear as the assigned waiter.
       const hookStaffId = localStorage.getItem('staffId');
+      const hookStaffRole = localStorage.getItem('staffRole');
+      const waiterStaffId = hookStaffRole === 'waiter' ? hookStaffId : null;
 
       const localOrder: Order = {
         id: localOrderId,
@@ -477,9 +481,9 @@ export function useOrders(): UseOrdersReturn {
         requiresKitchen,
         deliveryProvider: delivery?.provider,
         deliveryAddress: delivery?.address,
-        // These two fields make isAssignedToCurrentWaiter() return true,
-        // so the order appears in the waiter's incoming list while queued.
-        assignedWaiterId: hookStaffId ?? undefined,
+        // Makes isAssignedToCurrentWaiter() return true so the order appears
+        // in the waiter's incoming list while queued. Only set for waiter role.
+        assignedWaiterId: waiterStaffId ?? undefined,
         createdAt: now,
         updatedAt: now,
       } as Order;
@@ -502,7 +506,7 @@ export function useOrders(): UseOrdersReturn {
           requiresKitchen,
           deliveryProvider: delivery?.provider,
           deliveryAddress: delivery?.address,
-          assignedWaiterId: hookStaffId || undefined,
+          assignedWaiterId: waiterStaffId || undefined,
           loyaltyRewardId,
           promotionCode,
           idempotencyKey,

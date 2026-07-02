@@ -45,10 +45,16 @@ export function OrdersHistoryTable({ orders, onSelectOrder, onExport }: OrdersHi
   const staffIds = useMemo(() => new Set(staff.map(s => s.id)), [staff]);
 
   /** Resolve the responsible waiter for an order using three-tier fallback. */
-  const resolveWaiterId = (order: any): string | null =>
-    (order.assignedWaiterId && staffIds.has(order.assignedWaiterId) ? order.assignedWaiterId : null) ??
-    (order.created_by && staffIds.has(order.created_by) ? order.created_by : null) ??
-    (order.tableNumber != null ? tableToWaiter.get(order.tableNumber) ?? null : null);
+  const resolveWaiterId = (order: any): string | null => {
+    const assigned = order.assignedWaiterId ?? order.assigned_waiter_id;
+    if (assigned && staffIds.has(assigned)) return assigned;
+    // Only fall back to the creator if they are a waiter — managers/supervisors
+    // who placed or managed the order should not appear as the assigned waiter.
+    const creator = order.createdBy ?? order.created_by;
+    const creatorStaff = creator ? staff.find(s => s.id === creator) : null;
+    if (creatorStaff && creatorStaff.role === 'waiter') return creatorStaff.id;
+    return order.tableNumber != null ? tableToWaiter.get(order.tableNumber) ?? null : null;
+  };
 
   // Get unique waiters from orders
   const waiters = useMemo(() => {
@@ -137,8 +143,8 @@ export function OrdersHistoryTable({ orders, onSelectOrder, onExport }: OrdersHi
     return sorted;
   }, [filteredOrders, sortConfig]);
 
-  // Reset to page 1 whenever filters or sort produce a new result set
-  useEffect(() => { setPage(1); }, [filteredOrders]);
+  // Reset to page 1 when the user changes a filter — not on background staff refreshes
+  useEffect(() => { setPage(1); }, [searchQuery, statusFilter, waiterFilter, dateFrom, dateTo]);
 
   const pagedOrders = useMemo(
     () => sortedOrders.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
