@@ -496,6 +496,21 @@ export function App() {
       }
     }
 
+    // Check for simple reservation deep-link: /t/:table/reservation (or /reserve)
+    const simpleReserveMatch = path.match(/^\/t\/(\d+)\/(reservation|reserve)\/?$/);
+    if (simpleReserveMatch) {
+      const num = parseInt(simpleReserveMatch[1], 10);
+      if (!isNaN(num)) {
+        const restaurantIdFromQuery = query.get('restaurantId');
+        if (restaurantIdFromQuery) persistRestaurantContext(restaurantIdFromQuery);
+        setSelectedRole('customer');
+        setCustomerInitialTab('reserve');
+        setTableNumber(num);
+        setRouteResolved(true);
+        return;
+      }
+    }
+
     // Check for table QR code path: /t/123
     const tableMatch = path.match(/^\/t\/(\d+)/);
     if (tableMatch) {
@@ -915,6 +930,7 @@ export function App() {
               restaurantInfo={receiptSettings}
               staffId={authUser?.id}
               staffName={authUser?.name}
+              orders={orders}
             />
           </div>
         )}

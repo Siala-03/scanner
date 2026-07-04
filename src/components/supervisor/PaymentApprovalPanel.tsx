@@ -100,14 +100,27 @@ interface PaymentApprovalPanelProps {
   restaurantInfo?: { address?: string; phone?: string; email?: string; logo?: string; city?: string; country?: string; momoCode?: string };
   staffId?: string;
   staffName?: string;
+  /** Pre-loaded orders from the parent's useOrders hook. When provided, the panel
+   *  skips its own fetch and derives display state directly from this array. */
+  orders?: any[];
 }
 
 const CACHE_KEY = 'supervisor_pending_orders_cache';
 
-export function PaymentApprovalPanel({ restaurantId, restaurantName, restaurantInfo, staffId, staffName }: PaymentApprovalPanelProps) {
-  const [orders,       setOrders]       = useState<Order[]>([]);
+function filterPending(allOrders: any[]): any[] {
+  return allOrders.filter((o) => {
+    const ps = o.paymentStatus ?? o.payment_status;
+    const st = o.status;
+    return ps !== 'confirmed' && ps !== 'paid' && st !== 'cancelled';
+  });
+}
+
+export function PaymentApprovalPanel({ restaurantId, restaurantName, restaurantInfo, staffId, staffName, orders: externalOrders }: PaymentApprovalPanelProps) {
+  const [orders,       setOrders]       = useState<Order[]>(() =>
+    externalOrders ? filterPending(externalOrders) as Order[] : []
+  );
   const [staffMap,     setStaffMap]     = useState<Record<string, string>>({});
-  const [loading,      setLoading]      = useState(true);
+  const [loading,      setLoading]      = useState(!externalOrders);
   const [confirming,   setConfirming]   = useState<string | null>(null);
   const [cancelling,   setCancelling]   = useState<string | null>(null);
   const [pendingCancelRequests, setPendingCancelRequests] = useState<Set<string>>(new Set());
@@ -118,8 +131,27 @@ export function PaymentApprovalPanel({ restaurantId, restaurantName, restaurantI
   const [isOnline,     setIsOnline]     = useState(() => navigator.onLine);
   const ordersRef = useRef<Order[]>([]); // keeps last-known list for offline fallback
 
+  // When a parent-supplied orders array is provided, derive display state from it
+  // directly — no separate API call needed.
+  useEffect(() => {
+    if (externalOrders === undefined) return;
+    const pending = filterPending(externalOrders) as Order[];
+    ordersRef.current = pending;
+    setOrders(pending);
+    setLoading(false);
+  }, [externalOrders]);
+
   const loadPendingOrders = useCallback(async () => {
     if (!restaurantId) return;
+
+    // When parent supplies orders, only refresh cancellation requests.
+    if (externalOrders !== undefined) {
+      fetchOrderCancellationRequests('pending', restaurantId)
+        .then((r) => setPendingCancelRequests(new Set(r.map((x) => x.order_id))))
+        .catch(() => { /* non-fatal */ });
+      return;
+    }
+
     try {
       // Use allSettled so a cancellation-request failure doesn't kill the whole panel
       const [ordersResult, cancelResult] = await Promise.allSettled([
@@ -129,7 +161,6 @@ export function PaymentApprovalPanel({ restaurantId, restaurantName, restaurantI
 
       if (ordersResult.status === 'rejected') {
         console.error('Failed to load pending orders:', ordersResult.reason);
-        // Fall back to stale cache
         if (ordersRef.current.length === 0) {
           try {
             const cached = localStorage.getItem(CACHE_KEY);
@@ -143,10 +174,7 @@ export function PaymentApprovalPanel({ restaurantId, restaurantName, restaurantI
         return;
       }
 
-      // fetchUnpaidOrders already filters out confirmed/paid/cancelled orders;
-      // additionally exclude 'completed' status here.
-      const pending = (ordersResult.value as any[]).filter((o) => o.status !== 'completed');
-
+      const pending = ordersResult.value as any[];
       try { localStorage.setItem(CACHE_KEY, JSON.stringify(pending)); } catch { /* ignore */ }
       ordersRef.current = pending;
       setOrders(pending);
@@ -159,7 +187,7 @@ export function PaymentApprovalPanel({ restaurantId, restaurantName, restaurantI
     } finally {
       setLoading(false);
     }
-  }, [restaurantId]);
+  }, [restaurantId, externalOrders]);
 
   useEffect(() => {
     if (!restaurantId) return;

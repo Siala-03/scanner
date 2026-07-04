@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { PrinterIcon, DownloadIcon, PlusIcon, Trash2, GlobeIcon } from 'lucide-react';
+import { PrinterIcon, DownloadIcon, PlusIcon, Trash2, GlobeIcon, CalendarIcon, CopyIcon, CheckIcon } from 'lucide-react';
 import QRCode from 'react-qr-code';
 import { Button } from '../../components/ui/Button';
 
@@ -23,6 +23,7 @@ export function QRCodeGenerator({
   restaurantName
 }: QRCodeGeneratorProps) {
   const [isAddingTable, setIsAddingTable] = useState(false);
+  const [reservationLinkCopied, setReservationLinkCopied] = useState(false);
 
   const handleAddTable = async () => {
     try {
@@ -270,6 +271,49 @@ export function QRCodeGenerator({
                   <DownloadIcon className="w-4 h-4" />
                   Download Online QR
                 </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Reservation Link */}
+        {restaurantId && (
+          <div className="mb-6 p-4 rounded-xl border-2 border-indigo-500/40 bg-indigo-500/10">
+            <div className="flex flex-col sm:flex-row items-center gap-6">
+              <div className="p-3 bg-white rounded-lg border border-indigo-200 flex-shrink-0">
+                <QRCode
+                  value={`${resolvedBaseUrl}/r/${encodeURIComponent(restaurantId)}/t/${ONLINE_TABLE}/reserve`}
+                  size={160}
+                  level="H"
+                />
+              </div>
+              <div className="flex-1 text-center sm:text-left">
+                <div className="flex items-center justify-center sm:justify-start gap-2 mb-1">
+                  <CalendarIcon className="w-5 h-5 text-indigo-400" />
+                  <h2 className="text-lg font-bold text-indigo-300">Reservation Link</h2>
+                </div>
+                <p className="text-slate-400 text-sm mb-3">
+                  Share this link or QR code so customers can book a table directly. Opens the reservation form instantly.
+                </p>
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="flex-1 px-3 py-2 rounded-lg bg-slate-800 border border-slate-600 font-mono text-xs text-indigo-300 break-all select-all">
+                    {`${resolvedBaseUrl}/r/${encodeURIComponent(restaurantId)}/t/${ONLINE_TABLE}/reserve`}
+                  </div>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(`${resolvedBaseUrl}/r/${encodeURIComponent(restaurantId)}/t/${ONLINE_TABLE}/reserve`);
+                      setReservationLinkCopied(true);
+                      setTimeout(() => setReservationLinkCopied(false), 2000);
+                    }}
+                    className="p-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white transition-colors flex-shrink-0"
+                    title="Copy link"
+                  >
+                    {reservationLinkCopied ? <CheckIcon className="w-4 h-4" /> : <CopyIcon className="w-4 h-4" />}
+                  </button>
+                </div>
+                <p className="text-xs text-slate-500">
+                  Short form also works: <span className="font-mono text-indigo-400">{resolvedBaseUrl}/t/{ONLINE_TABLE}/reservation</span>
+                </p>
               </div>
             </div>
           </div>
