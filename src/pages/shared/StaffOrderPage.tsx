@@ -1,3 +1,4 @@
+
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import {
   ChevronLeftIcon,
@@ -435,6 +436,18 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
     }
     isSubmittingRef.current = true;
     setIsSubmitting(true);
+
+    // Open the print window NOW — during the user gesture — before any await.
+    // After the first await the browser revokes popup permission, so this is
+    // the only place window.open() is guaranteed to succeed for auto-print.
+    let chitPrintWindow: Window | null = null;
+    try {
+      chitPrintWindow = window.open('', 'chit_print', 'width=302,height=700,toolbar=0,scrollbars=1,status=0');
+      if (chitPrintWindow) {
+        chitPrintWindow.document.write('<html><body style="background:#fff;font-family:Arial;padding:40px;text-align:center;color:#555"><p>Preparing chit…</p></body></html>');
+      }
+    } catch { /* popup blocked — chit won't auto-print */ }
+
     try {
       const checkoutCart = [...cart];
       const visibleNotes = [
@@ -538,24 +551,27 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
       setSuccessTable(label);
       setLastPlacedOrder(printableOrder);
 
-      // Auto-print bar chit on every order submission
-      try {
-        printReceipt(buildChitHtml({
-          restaurantName: restaurantName,
-          orderNumber: printableOrder.orderNumber ?? printableOrder.id,
-          tableLabel: label,
-          waiterName: selectedStaffName || resolveStaffName() || undefined,
-          items: printableOrder.items.map((item: any) => ({
-            quantity: item.quantity,
-            name: item.menuItemName ?? item.menuItem?.name ?? 'Item',
-            notes: item.specialInstructions || undefined,
-            totalPrice: item.totalPrice,
-          })),
-          total: printableOrder.total,
-          notes: orderNotes.trim() || undefined,
-        }));
-      } catch {
-        // Non-fatal — chit print failure doesn't block order flow
+      // Write chit content into the pre-opened window and trigger print
+      if (chitPrintWindow && !chitPrintWindow.closed) {
+        try {
+          const chitHtml = buildChitHtml({
+            restaurantName: restaurantName,
+            orderNumber: printableOrder.orderNumber ?? printableOrder.id,
+            tableLabel: label,
+            waiterName: selectedStaffName || resolveStaffName() || undefined,
+            items: printableOrder.items.map((item: any) => ({
+              quantity: item.quantity,
+              name: item.menuItemName ?? item.menuItem?.name ?? 'Item',
+              notes: item.specialInstructions || undefined,
+              totalPrice: item.totalPrice,
+            })),
+            total: printableOrder.total,
+            notes: orderNotes.trim() || undefined,
+          });
+          chitPrintWindow.document.open();
+          chitPrintWindow.document.write(chitHtml);
+          chitPrintWindow.document.close();
+        } catch { chitPrintWindow?.close(); }
       }
 
       setCart([]);
@@ -564,6 +580,7 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
       submitKeyRef.current = crypto.randomUUID();
     } catch (e) {
       console.error(e);
+      try { chitPrintWindow?.close(); } catch { /* ignore */ }
       const isTimeout = (e as any)?.code === 'TIMEOUT' || (e instanceof Error && e.message.includes('timed out'));
       if (isTimeout) {
         alert('The request timed out. Your order may still have been placed — please check the orders list before trying again.');

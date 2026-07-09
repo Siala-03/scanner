@@ -694,13 +694,13 @@ export function buildChitHtml(data: ChitData): string {
 <button class="print-btn no-print" onclick="window.print()">Print Chit</button>
 
 <script>
-  if (window.opener || window.name === 'receipt_print') {
+  if (window.opener || window.name === 'chit_print') {
     setTimeout(function() {
       window.print();
       window.addEventListener('afterprint', function() {
         setTimeout(function() { window.close(); }, 300);
       });
-    }, 500);
+    }, 300);
   }
 <\/script>
 
