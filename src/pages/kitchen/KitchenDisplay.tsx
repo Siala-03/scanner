@@ -281,7 +281,7 @@ export function KitchenDisplay({ onLogout, restaurantId, restaurantName }: { onL
         pendingOrders: liveStats.pendingOrders,
         preparingOrders: liveStats.preparingOrders,
         readyOrders: liveStats.readyOrders,
-        itemCounts: backendAnalytics.popularItems.length > 0 ? backendAnalytics.popularItems : liveStats.itemCounts,
+        itemCounts: (backendAnalytics.popularItems ?? []).length > 0 ? backendAnalytics.popularItems : liveStats.itemCounts,
       }
     : liveStats;
 
