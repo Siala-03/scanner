@@ -1901,6 +1901,9 @@ export function WaiterDashboard({
           tableNumber={selectedTableNumber}
           isOpen={showOrderEntry}
           existingOrder={existingOrderForEntry}
+          restaurantName={restaurantName}
+          restaurantInfo={restaurantInfo}
+          waiterName={waiterName}
           onClose={() => { setShowOrderEntry(false); setSelectedTableNumber(null); setExistingOrderForEntry(null); autoMergeRef.current = null; }}
           onSubmitOrder={async (items, notes) => {
             if (!onCreateOrder) { alert('Order creation not available.'); return; }

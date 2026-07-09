@@ -426,9 +426,9 @@ export function buildReceiptHtml(receipt: ReceiptData): string {
     .loyalty-box .pts { font-size: 15pt; font-weight: 900; color: #92400e; }
     .loyalty-box .lbl { font-size: 8pt; font-weight: 700; color: #92400e; letter-spacing: 1px; text-transform: uppercase; }
 
-    .footer { text-align: center; font-size: 9pt; color: #333; line-height: 1.7; }
+    .footer { text-align: center; font-size: 9pt; color: #000; line-height: 1.7; }
     .thanks { font-size: 11pt; font-weight: 900; color: #000; letter-spacing: 1px; margin-bottom: 3px; }
-    .powered { font-size: 8pt; color: #777; margin-top: 6px; letter-spacing: 1px; }
+    .powered { font-size: 8pt; color: #000; margin-top: 6px; letter-spacing: 1px; }
 
     .print-btn { margin-top: 16px; padding: 8px 28px; background: #111; color: #fff; border: none; border-radius: 3px; font-family: inherit; font-size: 12px; cursor: pointer; }
     .print-btn:hover { background: #333; }
@@ -566,6 +566,13 @@ export function buildReceiptHtml(receipt: ReceiptData): string {
 
 export interface ChitData {
   restaurantName?: string;
+  restaurantLogo?: string;
+  restaurantAddress?: string;
+  restaurantPhone?: string;
+  restaurantEmail?: string;
+  restaurantCity?: string;
+  restaurantCountry?: string;
+  restaurantMomoCode?: string;
   orderNumber: string | number;
   tableLabel: string;
   waiterName?: string;
@@ -581,7 +588,11 @@ export interface ChitData {
  * Same paper size and auto-print behaviour as buildReceiptHtml.
  */
 export function buildChitHtml(data: ChitData): string {
-  const { restaurantName, orderNumber, tableLabel, waiterName, items, total, notes } = data;
+  const {
+    restaurantName, restaurantLogo, restaurantAddress, restaurantPhone,
+    restaurantEmail, restaurantCity, restaurantCountry, restaurantMomoCode,
+    orderNumber, tableLabel, waiterName, items, total, notes,
+  } = data;
   const now = data.time ?? new Date();
   const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
@@ -594,6 +605,8 @@ export function buildChitHtml(data: ChitData): string {
       ${item.totalPrice != null ? `<td class="price">${fmt(item.totalPrice)}</td>` : ''}
     </tr>`).join('');
 
+  const addrLine = [restaurantAddress, restaurantCity, restaurantCountry].filter(Boolean).join(', ');
+
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -602,7 +615,7 @@ export function buildChitHtml(data: ChitData): string {
   <style>
     @page { size: 80mm auto; margin: 0; }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif; font-size: 10pt; color: #000; line-height: 1.45; }
+    body { font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif; font-size: 9pt; color: #000; line-height: 1.45; }
 
     @media screen {
       body { background: #c8c8c8; display: flex; flex-direction: column; align-items: center; padding: 20px 12px 40px; }
@@ -615,35 +628,40 @@ export function buildChitHtml(data: ChitData): string {
       * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     }
 
-    .hdr { text-align: center; padding-bottom: 6px; }
+    .hdr  { text-align: center; padding-bottom: 6px; }
+    .logo { max-height: 55px; max-width: 140px; object-fit: contain; display: block; margin: 0 auto 5px; }
     .brand { font-size: 13pt; font-weight: 900; letter-spacing: 2px; text-transform: uppercase; }
-    .badge { display: inline-block; margin-top: 5px; padding: 2px 12px; border: 2px solid #000; font-size: 9pt; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; }
+    .addr  { font-size: 8pt; color: #333; margin-top: 3px; line-height: 1.5; }
+    .badge { display: inline-block; margin-top: 5px; padding: 2px 10px; border: 1.5px solid #000; font-size: 8pt; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; }
 
     .solid  { border: none; border-top: 2px solid #000; margin: 7px 0; }
     .dashed { border: none; border-top: 1px dashed #666; margin: 5px 0; }
 
     .order-block { text-align: center; padding: 4px 0; }
-    .order-num { font-size: 22pt; font-weight: 900; line-height: 1.1; }
-    .table-label { font-size: 14pt; font-weight: 700; margin-top: 2px; text-transform: uppercase; }
+    .order-num   { font-size: 20pt; font-weight: 900; line-height: 1.1; }
+    .table-label { font-size: 13pt; font-weight: 700; margin-top: 2px; text-transform: uppercase; }
 
-    .meta { width: 100%; border-collapse: collapse; font-size: 9pt; margin: 5px 0; }
+    .meta { width: 100%; border-collapse: collapse; font-size: 8.5pt; margin: 4px 0; }
     .meta td { padding: 1px 0; vertical-align: top; }
-    .meta td:first-child { color: #555; width: 38%; }
+    .meta td:first-child { color: #333; width: 38%; }
     .meta td:last-child  { font-weight: 700; text-align: right; }
 
-    .items { width: 100%; border-collapse: collapse; font-size: 11pt; }
-    .items td { padding: 5px 0; vertical-align: top; border-bottom: 1px dotted #bbb; }
-    .items .qty   { width: 28px; color: #333; font-size: 10pt; font-weight: 700; }
-    .items .name  { font-weight: 700; }
-    .items .price { text-align: right; white-space: nowrap; font-size: 9pt; color: #333; }
-    .note { font-size: 8pt; color: #555; font-style: italic; margin-top: 1px; font-weight: 400; }
+    .items { width: 100%; border-collapse: collapse; font-size: 9.5pt; }
+    .items td { padding: 4px 0; vertical-align: top; border-bottom: 1px dotted #bbb; }
+    .items .qty   { width: 24px; color: #000; font-size: 9pt; font-weight: 700; }
+    .items .name  { font-weight: 700; padding-right: 4px; }
+    .items .price { text-align: right; white-space: nowrap; font-size: 8.5pt; font-weight: 700; }
+    .note { font-size: 7.5pt; color: #333; font-style: italic; margin-top: 1px; font-weight: 400; }
 
-    .special-box { border: 2px solid #000; padding: 5px 7px; margin: 6px 0; font-size: 9pt; font-weight: 700; line-height: 1.5; }
+    .special-box { border: 1.5px solid #000; padding: 4px 6px; margin: 5px 0; font-size: 8.5pt; font-weight: 700; line-height: 1.5; }
     .special-box .lbl { font-size: 7pt; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 2px; }
 
-    .total-row { display: flex; justify-content: space-between; font-size: 12pt; font-weight: 900; margin-top: 6px; }
+    .grand { width: 100%; border-collapse: collapse; margin-top: 5px; }
+    .grand td { font-size: 12pt; font-weight: 900; padding: 2px 0; }
+    .grand td:last-child { text-align: right; }
 
-    .footer { text-align: center; font-size: 8pt; color: #888; margin-top: 8px; letter-spacing: 1px; }
+    .footer { text-align: center; font-size: 8pt; color: #333; margin-top: 8px; letter-spacing: 1px; }
+    .powered { font-size: 7.5pt; color: #555; margin-top: 3px; }
 
     .print-btn { margin-top: 16px; padding: 8px 28px; background: #111; color: #fff; border: none; border-radius: 3px; font-family: inherit; font-size: 12px; cursor: pointer; }
     .print-btn:hover { background: #333; }
@@ -654,7 +672,14 @@ export function buildChitHtml(data: ChitData): string {
 <div class="paper">
 
   <div class="hdr">
+    ${restaurantLogo ? `<img src="${restaurantLogo}" alt="${restaurantName}" class="logo">` : ''}
     ${restaurantName ? `<div class="brand">${restaurantName}</div>` : ''}
+    ${addrLine || restaurantPhone ? `
+    <div class="addr">
+      ${addrLine ? `${addrLine}<br>` : ''}
+      ${restaurantPhone ?? ''}${restaurantEmail ? `<br>${restaurantEmail}` : ''}
+      ${restaurantMomoCode ? `<br><strong>MoMo: ${restaurantMomoCode}</strong>` : ''}
+    </div>` : ''}
     <div class="badge">Bar Chit</div>
   </div>
 
@@ -682,12 +707,14 @@ export function buildChitHtml(data: ChitData): string {
 
   <hr class="solid">
 
-  <div class="total-row">
-    <span>TOTAL</span>
-    <span>${fmt(total)}</span>
-  </div>
+  <table class="grand">
+    <tr><td>TOTAL</td><td>${fmt(total)}</td></tr>
+  </table>
 
-  <div class="footer">PRINTED ${timeStr} &mdash; SERVV</div>
+  <div class="footer">
+    <div>Printed ${timeStr}</div>
+    <div class="powered">Powered by SERVV</div>
+  </div>
 
 </div>
 
@@ -817,8 +844,8 @@ export function buildKitchenTicketHtml(ticket: KitchenTicketData): string {
 
     .loyalty-box { border: 1.5px dashed #b8952a; border-radius: 3px; padding: 5px 7px; font-size: 9pt; background: #fffbf0; color: #92400e; }
 
-    .footer { text-align: center; font-size: 9pt; color: #333; line-height: 1.7; }
-    .powered { font-size: 8pt; color: #777; margin-top: 4px; letter-spacing: 1px; }
+    .footer { text-align: center; font-size: 9pt; color: #000; line-height: 1.7; }
+    .powered { font-size: 8pt; color: #000; margin-top: 4px; letter-spacing: 1px; }
 
     .print-btn { margin-top: 16px; padding: 8px 28px; background: #111; color: #fff; border: none; border-radius: 3px; font-family: inherit; font-size: 12px; cursor: pointer; }
     .print-btn:hover { background: #333; }
@@ -1059,9 +1086,9 @@ export function buildExpenseReceiptHtml(
 
     .notes-box { border: 1px dashed #888; border-radius: 3px; padding: 5px 7px; font-size: 9pt; color: #333; font-style: italic; line-height: 1.5; }
 
-    .footer { text-align: center; font-size: 9pt; color: #333; line-height: 1.7; }
+    .footer { text-align: center; font-size: 9pt; color: #000; line-height: 1.7; }
     .thanks { font-size: 11pt; font-weight: 900; color: #000; letter-spacing: 1px; margin-bottom: 3px; }
-    .powered { font-size: 8pt; color: #777; margin-top: 6px; letter-spacing: 1px; }
+    .powered { font-size: 8pt; color: #000; margin-top: 6px; letter-spacing: 1px; }
 
     .print-btn { margin-top: 16px; padding: 8px 28px; background: #111; color: #fff; border: none; border-radius: 3px; font-family: inherit; font-size: 12px; cursor: pointer; }
     .print-btn:hover { background: #333; }

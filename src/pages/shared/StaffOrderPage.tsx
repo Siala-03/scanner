@@ -327,6 +327,13 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
     try {
       printReceipt(buildChitHtml({
         restaurantName: restaurantName,
+        restaurantLogo: restaurantInfo?.logo,
+        restaurantAddress: restaurantInfo?.address,
+        restaurantPhone: restaurantInfo?.phone,
+        restaurantEmail: restaurantInfo?.email,
+        restaurantCity: restaurantInfo?.city,
+        restaurantCountry: restaurantInfo?.country,
+        restaurantMomoCode: restaurantInfo?.momoCode,
         orderNumber: lastPlacedOrder.orderNumber ?? lastPlacedOrder.id,
         tableLabel: label,
         waiterName: selectedStaffName || resolveStaffName() || undefined,
@@ -556,6 +563,13 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
         try {
           const chitHtml = buildChitHtml({
             restaurantName: restaurantName,
+            restaurantLogo: restaurantInfo?.logo,
+            restaurantAddress: restaurantInfo?.address,
+            restaurantPhone: restaurantInfo?.phone,
+            restaurantEmail: restaurantInfo?.email,
+            restaurantCity: restaurantInfo?.city,
+            restaurantCountry: restaurantInfo?.country,
+            restaurantMomoCode: restaurantInfo?.momoCode,
             orderNumber: printableOrder.orderNumber ?? printableOrder.id,
             tableLabel: label,
             waiterName: selectedStaffName || resolveStaffName() || undefined,

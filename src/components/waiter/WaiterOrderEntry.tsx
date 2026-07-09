@@ -21,10 +21,10 @@ interface WaiterOrderEntryProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmitOrder: (items: CartItem[], notes?: string) => void;
-  existingOrder?: {
-    id: string;
-    items: OrderItem[];
-  } | null;
+  existingOrder?: { id: string; items: OrderItem[] } | null;
+  restaurantName?: string;
+  restaurantInfo?: { logo?: string; address?: string; city?: string; country?: string; phone?: string; email?: string; momoCode?: string };
+  waiterName?: string;
 }
 
 interface LocalCartItem extends OrderItem {
@@ -39,7 +39,10 @@ export function WaiterOrderEntry({
   isOpen,
   onClose,
   onSubmitOrder,
-  existingOrder
+  existingOrder,
+  restaurantName,
+  restaurantInfo,
+  waiterName,
 }: WaiterOrderEntryProps) {
   const { menuItems, isLoading } = useMenu();
   const [activeCategory, setActiveCategory] = useState('all');
@@ -182,8 +185,17 @@ export function WaiterOrderEntry({
         try {
           const label = tableNumber === 0 ? 'Bar / Walk-up' : `Table ${tableNumber}`;
           const chitHtml = buildChitHtml({
+            restaurantName,
+            restaurantLogo: restaurantInfo?.logo,
+            restaurantAddress: restaurantInfo?.address,
+            restaurantPhone: restaurantInfo?.phone,
+            restaurantEmail: restaurantInfo?.email,
+            restaurantCity: restaurantInfo?.city,
+            restaurantCountry: restaurantInfo?.country,
+            restaurantMomoCode: restaurantInfo?.momoCode,
             tableLabel: label,
             orderNumber: Date.now(),
+            waiterName,
             items: cart.map(item => ({
               quantity: item.quantity,
               name: item.menuItemName ?? item.menuItem?.name ?? 'Item',
