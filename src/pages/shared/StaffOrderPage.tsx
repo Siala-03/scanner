@@ -229,6 +229,10 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
     setActiveCategory('all');
     setSearchQuery('');
     setConfirmOccupied(null);
+    // Rotate the key on every new table selection so a stale key from a
+    // previously failed-but-actually-created order can never be reused
+    // against a different table, which would return the wrong order.
+    submitKeyRef.current = crypto.randomUUID();
     setStep('order-entry');
   };
 
