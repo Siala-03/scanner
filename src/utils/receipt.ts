@@ -615,7 +615,7 @@ export function buildChitHtml(data: ChitData): string {
   <style>
     @page { size: 80mm auto; margin: 0; }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif; font-size: 9pt; color: #000; line-height: 1.45; }
+    body { font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif; font-size: 9pt; color: #000; font-weight: 600; line-height: 1.45; }
 
     @media screen {
       body { background: #c8c8c8; display: flex; flex-direction: column; align-items: center; padding: 20px 12px 40px; }
@@ -631,11 +631,11 @@ export function buildChitHtml(data: ChitData): string {
     .hdr  { text-align: center; padding-bottom: 6px; }
     .logo { max-height: 55px; max-width: 140px; object-fit: contain; display: block; margin: 0 auto 5px; }
     .brand { font-size: 13pt; font-weight: 900; letter-spacing: 2px; text-transform: uppercase; }
-    .addr  { font-size: 8pt; color: #333; margin-top: 3px; line-height: 1.5; }
+    .addr  { font-size: 8pt; color: #000; margin-top: 3px; line-height: 1.5; }
     .badge { display: inline-block; margin-top: 5px; padding: 2px 10px; border: 1.5px solid #000; font-size: 8pt; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; }
 
     .solid  { border: none; border-top: 2px solid #000; margin: 7px 0; }
-    .dashed { border: none; border-top: 1px dashed #666; margin: 5px 0; }
+    .dashed { border: none; border-top: 1px dashed #000; margin: 5px 0; }
 
     .order-block { text-align: center; padding: 4px 0; }
     .order-num   { font-size: 20pt; font-weight: 900; line-height: 1.1; }
@@ -643,15 +643,15 @@ export function buildChitHtml(data: ChitData): string {
 
     .meta { width: 100%; border-collapse: collapse; font-size: 8.5pt; margin: 4px 0; }
     .meta td { padding: 1px 0; vertical-align: top; }
-    .meta td:first-child { color: #333; width: 38%; }
+    .meta td:first-child { color: #000; width: 38%; }
     .meta td:last-child  { font-weight: 700; text-align: right; }
 
     .items { width: 100%; border-collapse: collapse; font-size: 9.5pt; }
-    .items td { padding: 4px 0; vertical-align: top; border-bottom: 1px dotted #bbb; }
+    .items td { padding: 4px 0; vertical-align: top; border-bottom: 1px dotted #000; }
     .items .qty   { width: 24px; color: #000; font-size: 9pt; font-weight: 700; }
     .items .name  { font-weight: 700; padding-right: 4px; }
     .items .price { text-align: right; white-space: nowrap; font-size: 8.5pt; font-weight: 700; }
-    .note { font-size: 7.5pt; color: #333; font-style: italic; margin-top: 1px; font-weight: 400; }
+    .note { font-size: 7.5pt; color: #000; font-style: italic; margin-top: 1px; font-weight: 600; }
 
     .special-box { border: 1.5px solid #000; padding: 4px 6px; margin: 5px 0; font-size: 8.5pt; font-weight: 700; line-height: 1.5; }
     .special-box .lbl { font-size: 7pt; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 2px; }
@@ -660,8 +660,8 @@ export function buildChitHtml(data: ChitData): string {
     .grand td { font-size: 12pt; font-weight: 900; padding: 2px 0; }
     .grand td:last-child { text-align: right; }
 
-    .footer { text-align: center; font-size: 8pt; color: #333; margin-top: 8px; letter-spacing: 1px; }
-    .powered { font-size: 7.5pt; color: #555; margin-top: 3px; }
+    .footer { text-align: center; font-size: 8pt; color: #000; margin-top: 8px; letter-spacing: 1px; }
+    .powered { font-size: 7.5pt; color: #000; margin-top: 3px; }
 
     .print-btn { margin-top: 16px; padding: 8px 28px; background: #111; color: #fff; border: none; border-radius: 3px; font-family: inherit; font-size: 12px; cursor: pointer; }
     .print-btn:hover { background: #333; }
