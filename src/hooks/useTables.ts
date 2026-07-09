@@ -143,8 +143,21 @@ export function useTables() {
     if (!restaurantId) throw new Error('No restaurant context');
 
     mutationCountRef.current++;
-    const nextTableNumber = getNextAvailableTableNumber(tables);
-    const newTables = [...tables, nextTableNumber].sort((a, b) => a - b);
+
+    // Fetch fresh DB state first so the next table number doesn't collide
+    // with rows added from another session or browser tab.
+    let dbNumbers: number[] = tables;
+    try {
+      const backendTables = await fetchTables();
+      dbNumbers = backendTables.map(t => t.table_number);
+      // Sync local state with DB while we're here
+      const merged = [...new Set([...dbNumbers, ...tables])].sort((a, b) => a - b);
+      setTables(merged);
+      setStoredTables(restaurantId, merged);
+    } catch { /* use cached local state if fetch fails */ }
+
+    const nextTableNumber = getNextAvailableTableNumber(dbNumbers);
+    const newTables = [...new Set([...dbNumbers, nextTableNumber])].sort((a, b) => a - b);
 
     // Optimistic update for immediate UI feedback
     setTables(newTables);
@@ -155,7 +168,7 @@ export function useTables() {
       window.dispatchEvent(new CustomEvent('tablesUpdated'));
     } catch (err) {
       // Roll back optimistic update — table was never saved to the database
-      const rolledBack = tables.filter(t => t !== nextTableNumber);
+      const rolledBack = newTables.filter(t => t !== nextTableNumber);
       setTables(rolledBack);
       setStoredTables(restaurantId, rolledBack);
       console.error('useTables: Failed to add table:', err);
