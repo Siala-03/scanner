@@ -64,6 +64,7 @@ export async function createTable(tableNumber: number, capacity: number = 4): Pr
   const { data, error } = await supabase
     .from('tables')
     .insert({
+      id: crypto.randomUUID(),
       table_number: tableNumber,
       capacity,
       status: 'available',
