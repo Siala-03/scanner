@@ -275,19 +275,19 @@ export function KitchenDisplay({ onLogout, restaurantId, restaurantName }: { onL
   const liveStats: KitchenStats = calculateStats(orders);
   const stats: KitchenStats = backendAnalytics
     ? {
-        totalOrders: backendAnalytics.totalOrders,
-        completedOrders: backendAnalytics.completedOrders,
-        avgPrepTime: backendAnalytics.avgPrepTime,
+        totalOrders: backendAnalytics.totalOrders ?? 0,
+        completedOrders: backendAnalytics.completedOrders ?? 0,
+        avgPrepTime: backendAnalytics.avgPrepTime ?? 0,
         pendingOrders: liveStats.pendingOrders,
         preparingOrders: liveStats.preparingOrders,
         readyOrders: liveStats.readyOrders,
-        itemCounts: (backendAnalytics.popularItems ?? []).length > 0 ? backendAnalytics.popularItems : liveStats.itemCounts,
+        itemCounts: (backendAnalytics.popularItems ?? []).length > 0 ? backendAnalytics.popularItems! : liveStats.itemCounts,
       }
     : liveStats;
 
   const now = Date.now();
   const sessionThroughputLastHour = completedToday.filter((ts) => now - ts <= 60 * 60 * 1000).length;
-  const throughputLastHour = backendAnalytics ? backendAnalytics.completedOrders : sessionThroughputLastHour;
+  const throughputLastHour = backendAnalytics ? (backendAnalytics.completedOrders ?? 0) : sessionThroughputLastHour;
   const urgentOrdersCount = orders.filter((o) => getAgeMinutes(o.createdAt) > 15).length;
   const averageQueueAge = orders.length > 0
     ? Math.round(orders.reduce((sum, order) => sum + getAgeMinutes(order.createdAt), 0) / orders.length)
