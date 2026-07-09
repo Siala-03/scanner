@@ -930,7 +930,6 @@ export function App() {
               restaurantInfo={receiptSettings}
               staffId={authUser?.id}
               staffName={authUser?.name}
-              orders={orders}
             />
           </div>
         )}

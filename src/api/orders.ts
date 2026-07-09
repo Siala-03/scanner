@@ -112,10 +112,13 @@ export async function fetchUnpaidOrders(restaurantId?: string): Promise<Order[]>
   const restaurant = restaurantId || getRestaurantId();
   if (!restaurant) return [];
 
+  // Filter on the server so we never hit the 1000-row Supabase default limit.
+  // Only orders that are not confirmed/paid and not cancelled are returned.
   const { data, error } = await db
     .from('orders')
     .select('*')
     .eq('restaurant_id', restaurant)
+    .not('payment_status', 'in', '("confirmed","paid")')
     .neq('status', 'cancelled')
     .order('created_at', { ascending: false });
 
@@ -127,9 +130,7 @@ export async function fetchUnpaidOrders(restaurantId?: string): Promise<Order[]>
     );
   }
 
-  return ((data ?? []) as any[]).filter((o) =>
-    o.payment_status !== 'confirmed' && o.payment_status !== 'paid'
-  ) as Order[];
+  return (data ?? []) as Order[];
 }
 
 export async function fetchOrdersByDateRange(startDate: string, endDate: string, restaurantId?: string): Promise<Order[]> {
