@@ -1,8 +1,8 @@
 import { useOfflineStatus } from '../../hooks/useOfflineStatus';
-import { RefreshCwIcon, WifiOffIcon } from 'lucide-react';
+import { RefreshCwIcon, WifiOffIcon, XCircleIcon } from 'lucide-react';
 
 export function OfflineBanner() {
-  const { isOnline, pendingCount, failedCount, isSyncing, retryAll } = useOfflineStatus();
+  const { isOnline, pendingCount, failedCount, isSyncing, retryAll, clearAll } = useOfflineStatus();
 
   if (isOnline && pendingCount === 0 && failedCount === 0) return null;
 
@@ -65,14 +65,29 @@ export function OfflineBanner() {
         )}
       </span>
       {(failedCount > 0 || pendingCount > 0) && (
-        <button
-          onClick={retryAll}
-          disabled={isSyncing}
-          className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-700 text-slate-300 hover:bg-slate-600 text-xs font-medium transition-colors disabled:opacity-50"
-        >
-          <RefreshCwIcon className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-          {isSyncing ? 'Syncing…' : 'Retry now'}
-        </button>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <button
+            onClick={retryAll}
+            disabled={isSyncing}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-700 text-slate-300 hover:bg-slate-600 text-xs font-medium transition-colors disabled:opacity-50"
+          >
+            <RefreshCwIcon className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+            {isSyncing ? 'Syncing…' : 'Retry now'}
+          </button>
+          <button
+            onClick={() => {
+              if (confirm('Mark all queued items as done? Use this only if the orders already appear confirmed in the system.')) {
+                void clearAll();
+              }
+            }}
+            disabled={isSyncing}
+            title="Force clear stuck queue items"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-900/40 text-red-300 hover:bg-red-900/60 text-xs font-medium transition-colors disabled:opacity-50"
+          >
+            <XCircleIcon className="w-3.5 h-3.5" />
+            Force clear
+          </button>
+        </div>
       )}
     </div>
   );

@@ -17,6 +17,7 @@ export interface OfflineStatus {
   failedCount: number;    // orders that hit max retries
   isSyncing: boolean;     // a flush is currently running
   retryAll: () => void;   // manually trigger a flush attempt
+  clearAll: () => void;   // mark all queued entries as done (use when server already has them)
 }
 
 export function useOfflineStatus(): OfflineStatus {
@@ -56,24 +57,24 @@ export function useOfflineStatus(): OfflineStatus {
     syncingRef.current = true;
     setIsSyncing(true);
     try {
-      // Reset all failed/pending order entries
+      // Reset ALL non-done entries including 'sending' — a page refresh mid-flush
+      // leaves entries permanently stuck in 'sending' that retryAll never touches.
       const allOrders = await queue.getAll();
       for (const entry of allOrders) {
-        if (entry.status === 'failed' || entry.status === 'pending') {
+        if (entry.status !== 'done') {
           await queue.resetEntry(entry.idempotencyKey);
         }
       }
-      // Reset failed/pending payment entries
+      // Same for payment and status queues
       const allPayments = await queue.getAllPayments();
       for (const entry of allPayments) {
-        if (entry.status === 'failed' || entry.status === 'pending') {
+        if (entry.status !== 'done') {
           await queue.resetPaymentEntry(entry.idempotencyKey);
         }
       }
-      // Reset failed/pending status update entries
       const allStatusUpdates = await queue.getAllStatusUpdates();
       for (const entry of allStatusUpdates) {
-        if (entry.queueStatus === 'failed' || entry.queueStatus === 'pending') {
+        if (entry.queueStatus !== 'done') {
           await queue.resetStatusEntry(entry.idempotencyKey);
         }
       }
@@ -127,5 +128,17 @@ export function useOfflineStatus(): OfflineStatus {
     };
   }, [refresh]);
 
-  return { isOnline, pendingCount, failedCount, isSyncing, retryAll };
+  const clearAll = useCallback(async () => {
+    const [allOrders, allPayments, allStatusUpdates] = await Promise.all([
+      queue.getAll(),
+      queue.getAllPayments(),
+      queue.getAllStatusUpdates(),
+    ]);
+    for (const e of allOrders)       await queue.markDone(e.idempotencyKey, e.confirmedOrderId || 'cleared');
+    for (const e of allPayments)     await queue.markPaymentDone(e.idempotencyKey);
+    for (const e of allStatusUpdates) await queue.markStatusDone(e.idempotencyKey);
+    void refresh();
+  }, [refresh]);
+
+  return { isOnline, pendingCount, failedCount, isSyncing, retryAll, clearAll };
 }
