@@ -162,14 +162,38 @@ export function WaiterOrderEntry({
   const handleSubmit = async () => {
     if (cart.length === 0) return;
 
-    // Open print window NOW — during user gesture, before any await
-    let chitPrintWindow: Window | null = null;
+    // Build and open the chit window synchronously during user gesture — before any await.
+    // All cart data is available now so no placeholder is needed; write the full chit immediately.
     try {
-      chitPrintWindow = window.open('', 'chit_print', 'width=302,height=700,toolbar=0,scrollbars=1,status=0');
-      if (chitPrintWindow) {
-        chitPrintWindow.document.write('<html><body style="background:#fff;font-family:Arial;padding:40px;text-align:center;color:#555"><p>Preparing chit…</p></body></html>');
+      const label = tableNumber === 0 ? 'Bar / Walk-up' : `Table ${tableNumber}`;
+      const chitHtml = buildChitHtml({
+        restaurantName,
+        restaurantLogo: restaurantInfo?.logo,
+        restaurantAddress: restaurantInfo?.address,
+        restaurantPhone: restaurantInfo?.phone,
+        restaurantEmail: restaurantInfo?.email,
+        restaurantCity: restaurantInfo?.city,
+        restaurantCountry: restaurantInfo?.country,
+        restaurantMomoCode: restaurantInfo?.momoCode,
+        tableLabel: label,
+        orderNumber: Date.now(),
+        waiterName,
+        items: cart.map(item => ({
+          quantity: item.quantity,
+          name: item.menuItemName ?? item.menuItem?.name ?? 'Item',
+          notes: item.specialInstructions || undefined,
+          totalPrice: (item.unitPrice ?? item.menuItem?.price ?? 0) * item.quantity,
+        })),
+        total: cart.reduce((s, i) => s + (i.unitPrice ?? i.menuItem?.price ?? 0) * i.quantity, 0),
+        notes: orderNotes.trim() || undefined,
+      });
+      const win = window.open('', 'chit_print', 'width=302,height=700,toolbar=0,scrollbars=1,status=0');
+      if (win) {
+        win.document.open();
+        win.document.write(chitHtml);
+        win.document.close();
       }
-    } catch { /* popup blocked */ }
+    } catch { /* popup blocked or build failed — order proceeds regardless */ }
 
     setIsSubmitting(true);
     try {
@@ -180,44 +204,12 @@ export function WaiterOrderEntry({
       }));
       await onSubmitOrder(orderItems, orderNotes || undefined);
 
-      // Fill in the chit after order is placed
-      if (chitPrintWindow && !chitPrintWindow.closed) {
-        try {
-          const label = tableNumber === 0 ? 'Bar / Walk-up' : `Table ${tableNumber}`;
-          const chitHtml = buildChitHtml({
-            restaurantName,
-            restaurantLogo: restaurantInfo?.logo,
-            restaurantAddress: restaurantInfo?.address,
-            restaurantPhone: restaurantInfo?.phone,
-            restaurantEmail: restaurantInfo?.email,
-            restaurantCity: restaurantInfo?.city,
-            restaurantCountry: restaurantInfo?.country,
-            restaurantMomoCode: restaurantInfo?.momoCode,
-            tableLabel: label,
-            orderNumber: Date.now(),
-            waiterName,
-            items: cart.map(item => ({
-              quantity: item.quantity,
-              name: item.menuItemName ?? item.menuItem?.name ?? 'Item',
-              notes: item.specialInstructions || undefined,
-              totalPrice: (item.unitPrice ?? item.menuItem?.price ?? 0) * item.quantity,
-            })),
-            total: cart.reduce((s, i) => s + (i.unitPrice ?? i.menuItem?.price ?? 0) * i.quantity, 0),
-            notes: orderNotes.trim() || undefined,
-          });
-          chitPrintWindow.document.open();
-          chitPrintWindow.document.write(chitHtml);
-          chitPrintWindow.document.close();
-        } catch { chitPrintWindow?.close(); }
-      }
-
       setCart([]);
       setOrderNotes('');
       setShowCart(false);
       onClose();
     } catch (error) {
       console.error('Failed to submit order:', error);
-      try { chitPrintWindow?.close(); } catch { /* ignore */ }
       alert('Failed to submit order. Please try again.');
     } finally {
       setIsSubmitting(false);

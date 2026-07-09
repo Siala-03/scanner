@@ -451,7 +451,9 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
     try {
       chitPrintWindow = window.open('', 'chit_print', 'width=302,height=700,toolbar=0,scrollbars=1,status=0');
       if (chitPrintWindow) {
-        chitPrintWindow.document.write('<html><body style="background:#fff;font-family:Arial;padding:40px;text-align:center;color:#555"><p>Preparing chit…</p></body></html>');
+        chitPrintWindow.document.open();
+        chitPrintWindow.document.write('<html><body style="background:#fff;font-family:Arial;padding:40px;text-align:center;color:#000"><p>Preparing chit…</p></body></html>');
+        chitPrintWindow.document.close();
       }
     } catch { /* popup blocked — chit won't auto-print */ }
 
