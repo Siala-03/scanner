@@ -13,6 +13,7 @@ import { MenuItem, OrderItem, CartItem } from '../../types/index';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { formatPrice } from '../../utils/currency';
+import { buildChitHtml } from '../../utils/receipt';
 import { useMenu } from '../../hooks/useMenu';
 
 interface WaiterOrderEntryProps {
@@ -157,7 +158,16 @@ export function WaiterOrderEntry({
   // Submit order
   const handleSubmit = async () => {
     if (cart.length === 0) return;
-    
+
+    // Open print window NOW — during user gesture, before any await
+    let chitPrintWindow: Window | null = null;
+    try {
+      chitPrintWindow = window.open('', 'chit_print', 'width=302,height=700,toolbar=0,scrollbars=1,status=0');
+      if (chitPrintWindow) {
+        chitPrintWindow.document.write('<html><body style="background:#fff;font-family:Arial;padding:40px;text-align:center;color:#555"><p>Preparing chit…</p></body></html>');
+      }
+    } catch { /* popup blocked */ }
+
     setIsSubmitting(true);
     try {
       const orderItems: CartItem[] = cart.map(({ tempId, ...item }) => ({
@@ -166,12 +176,36 @@ export function WaiterOrderEntry({
         specialInstructions: item.specialInstructions
       }));
       await onSubmitOrder(orderItems, orderNotes || undefined);
+
+      // Fill in the chit after order is placed
+      if (chitPrintWindow && !chitPrintWindow.closed) {
+        try {
+          const label = tableNumber === 0 ? 'Bar / Walk-up' : `Table ${tableNumber}`;
+          const chitHtml = buildChitHtml({
+            tableLabel: label,
+            orderNumber: Date.now(),
+            items: cart.map(item => ({
+              quantity: item.quantity,
+              name: item.menuItemName ?? item.menuItem?.name ?? 'Item',
+              notes: item.specialInstructions || undefined,
+              totalPrice: (item.unitPrice ?? item.menuItem?.price ?? 0) * item.quantity,
+            })),
+            total: cart.reduce((s, i) => s + (i.unitPrice ?? i.menuItem?.price ?? 0) * i.quantity, 0),
+            notes: orderNotes.trim() || undefined,
+          });
+          chitPrintWindow.document.open();
+          chitPrintWindow.document.write(chitHtml);
+          chitPrintWindow.document.close();
+        } catch { chitPrintWindow?.close(); }
+      }
+
       setCart([]);
       setOrderNotes('');
       setShowCart(false);
       onClose();
     } catch (error) {
       console.error('Failed to submit order:', error);
+      try { chitPrintWindow?.close(); } catch { /* ignore */ }
       alert('Failed to submit order. Please try again.');
     } finally {
       setIsSubmitting(false);
