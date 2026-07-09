@@ -144,7 +144,7 @@ export function useTables() {
 
     mutationCountRef.current++;
 
-    // Fetch fresh DB state first so we don't pick a number already used by this restaurant.
+    // Fetch fresh DB state so we never collide with tables added from another session.
     let ownNumbers: number[] = tables;
     try {
       const backendTables = await fetchTables();
@@ -152,44 +152,24 @@ export function useTables() {
       const merged = [...new Set([...ownNumbers, ...tables])].sort((a, b) => a - b);
       setTables(merged);
       setStoredTables(restaurantId, merged);
-    } catch { /* fall back to cached local state */ }
+    } catch { /* use cached local state if fetch fails */ }
 
-    // The table_number column has a global unique constraint across all restaurants.
-    // If the chosen number collides, increment and retry until one succeeds.
-    const globally_taken = new Set(ownNumbers);
-    const MAX_ATTEMPTS = 50;
+    const nextTableNumber = getNextAvailableTableNumber(ownNumbers);
+    const optimistic = [...new Set([...ownNumbers, nextTableNumber])].sort((a, b) => a - b);
 
-    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-      const nextTableNumber = getNextAvailableTableNumber([...globally_taken]);
+    setTables(optimistic);
+    setStoredTables(restaurantId, optimistic);
 
-      const optimistic = [...new Set([...ownNumbers, nextTableNumber])].sort((a, b) => a - b);
-      setTables(optimistic);
-      setStoredTables(restaurantId, optimistic);
-
-      try {
-        await createTable(nextTableNumber);
-        window.dispatchEvent(new CustomEvent('tablesUpdated'));
-        return;
-      } catch (err: unknown) {
-        const pgErr = err as { code?: string };
-        if (pgErr?.code === '23505') {
-          // Number is taken globally — mark it and try the next one
-          globally_taken.add(nextTableNumber);
-          const rolledBack = optimistic.filter(t => t !== nextTableNumber);
-          setTables(rolledBack);
-          setStoredTables(restaurantId, rolledBack);
-          continue;
-        }
-        // Any other error — restore state and surface it
-        const rolledBack = optimistic.filter(t => t !== nextTableNumber);
-        setTables(rolledBack);
-        setStoredTables(restaurantId, rolledBack);
-        console.error('useTables: Failed to add table:', err);
-        throw err;
-      }
+    try {
+      await createTable(nextTableNumber);
+      window.dispatchEvent(new CustomEvent('tablesUpdated'));
+    } catch (err) {
+      const rolledBack = optimistic.filter(t => t !== nextTableNumber);
+      setTables(rolledBack);
+      setStoredTables(restaurantId, rolledBack);
+      console.error('useTables: Failed to add table:', err);
+      throw err;
     }
-
-    throw new Error('Could not find a free table number after several attempts. Please try again.');
   };
 
   // Remove table
