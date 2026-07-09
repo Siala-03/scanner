@@ -88,7 +88,7 @@ export function useTables() {
       // Merge backend + localStorage so optimistically-added tables are never lost.
       const localTables = getStoredTables(restaurantId);
       if (backendTables && backendTables.length > 0) {
-        const backendNumbers = backendTables.map(t => t.tableNumber || t.table_number);
+        const backendNumbers = backendTables.map(t => t.table_number);
         const merged = [...new Set([...backendNumbers, ...localTables])].sort((a, b) => a - b);
         setTables(merged);
         // Persist the merged list so it's available when offline.
@@ -143,28 +143,21 @@ export function useTables() {
     if (!restaurantId) throw new Error('No restaurant context');
 
     mutationCountRef.current++;
+    const nextTableNumber = getNextAvailableTableNumber(tables);
+    const newTables = [...tables, nextTableNumber].sort((a, b) => a - b);
+
+    // Optimistic update for immediate UI feedback
+    setTables(newTables);
+    setStoredTables(restaurantId, newTables);
+
     try {
-      console.log('useTables: Adding table...');
-      const nextTableNumber = getNextAvailableTableNumber(tables);
-      console.log('useTables: Next table number:', nextTableNumber);
-
-      // Always update local state first for immediate UI feedback
-      const newTables = [...tables, nextTableNumber].sort((a, b) => a - b);
-      setTables(newTables);
-      setStoredTables(restaurantId, newTables);
-      console.log('useTables: Local state updated');
-
-      // Try to create table in backend
-      try {
-        await createTable(nextTableNumber);
-        console.log('useTables: Table created in backend');
-      } catch (backendError) {
-        console.warn('useTables: Backend not available, table stored locally only:', backendError);
-      }
-
-      // Notify other useTables instances to reload
+      await createTable(nextTableNumber);
       window.dispatchEvent(new CustomEvent('tablesUpdated'));
     } catch (err) {
+      // Roll back optimistic update — table was never saved to the database
+      const rolledBack = tables.filter(t => t !== nextTableNumber);
+      setTables(rolledBack);
+      setStoredTables(restaurantId, rolledBack);
       console.error('useTables: Failed to add table:', err);
       throw err;
     }
@@ -181,7 +174,7 @@ export function useTables() {
       try {
         const allTables = await fetchTables();
         const tableToDelete = allTables.find(
-          (t) => (t.tableNumber ?? t.table_number) === tableNumber
+          (t) => t.table_number === tableNumber
         );
         if (tableToDelete) {
           await deleteTable(tableToDelete.id);

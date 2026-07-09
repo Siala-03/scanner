@@ -60,13 +60,10 @@ export async function fetchTablesForRestaurant(restaurantId: string): Promise<Ta
 export async function createTable(tableNumber: number, capacity: number = 4): Promise<Table> {
   const restaurantId = getRestaurantId();
   if (!restaurantId) throw new Error('No company selected');
-  
-  const id = `table-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  
+
   const { data, error } = await supabase
     .from('tables')
     .insert({
-      id,
       table_number: tableNumber,
       capacity,
       status: 'available',

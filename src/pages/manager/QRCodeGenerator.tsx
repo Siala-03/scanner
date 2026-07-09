@@ -27,14 +27,11 @@ export function QRCodeGenerator({
 
   const handleAddTable = async () => {
     try {
-      console.log('Adding table...');
       setIsAddingTable(true);
       await onAddTable();
-      console.log('Table added successfully');
     } catch (error) {
       console.error('Failed to add table:', error);
-      // Don't show alert - we handle backend failures gracefully now
-      // The table will still be added locally for QR code generation
+      alert('Failed to save table to the database. Please try again.');
     } finally {
       setIsAddingTable(false);
     }
