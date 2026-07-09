@@ -19,7 +19,7 @@ import { OpenTabModal } from '../../components/shared/OpenTabModal';
 import { supabase } from '../../lib/supabase';
 import { fetchKitchenOrders } from '../../api/orders';
 import { formatPrice } from '../../utils/currency';
-import { buildReceiptHtml, orderToReceiptData, printReceipt } from '../../utils/receipt';
+import { buildReceiptHtml, orderToReceiptData, printReceipt, buildChitHtml } from '../../utils/receipt';
 import type { ReceiptData } from '../../utils/receipt';
 import { printOrderReceipt as printThermal } from '../../utils/sunmiPrinter';
 import { Modal } from '../../components/ui/Modal';
@@ -316,6 +316,29 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
     return 'Supervisor';
   };
 
+  const handleReprintChit = () => {
+    if (!lastPlacedOrder) return;
+    const label = lastPlacedOrder.tableNumber != null ? `Table ${lastPlacedOrder.tableNumber}` : 'Bar / Walk-up';
+    try {
+      printReceipt(buildChitHtml({
+        restaurantName: restaurantName,
+        orderNumber: lastPlacedOrder.orderNumber ?? lastPlacedOrder.id,
+        tableLabel: label,
+        waiterName: selectedStaffName || resolveStaffName() || undefined,
+        items: lastPlacedOrder.items.map((item: any) => ({
+          quantity: item.quantity,
+          name: item.menuItemName ?? item.menuItem?.name ?? 'Item',
+          notes: item.specialInstructions || undefined,
+          totalPrice: item.totalPrice,
+        })),
+        total: lastPlacedOrder.total,
+        notes: lastPlacedOrder.notes?.trim() || undefined,
+      }));
+    } catch {
+      alert('Could not open print window. Please allow pop-ups in your browser.');
+    }
+  };
+
   const handlePrintLastReceipt = () => {
     if (!lastPlacedOrder || isPrintingReceipt) return;
     void handlePrintSmart();
@@ -510,6 +533,27 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
       const label = selectedTable === 'bar' ? 'Bar / Walk-up' : `Table ${selectedTable}`;
       setSuccessTable(label);
       setLastPlacedOrder(printableOrder);
+
+      // Auto-print bar chit on every order submission
+      try {
+        printReceipt(buildChitHtml({
+          restaurantName: restaurantName,
+          orderNumber: printableOrder.orderNumber ?? printableOrder.id,
+          tableLabel: label,
+          waiterName: selectedStaffName || resolveStaffName() || undefined,
+          items: printableOrder.items.map((item: any) => ({
+            quantity: item.quantity,
+            name: item.menuItemName ?? item.menuItem?.name ?? 'Item',
+            notes: item.specialInstructions || undefined,
+            totalPrice: item.totalPrice,
+          })),
+          total: printableOrder.total,
+          notes: orderNotes.trim() || undefined,
+        }));
+      } catch {
+        // Non-fatal — chit print failure doesn't block order flow
+      }
+
       setCart([]);
       setOrderNotes('');
       setShowMobileCart(false);
@@ -883,6 +927,7 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
             onSelectedStaffIdChange={setSelectedStaffId}
             onSubmit={handleSubmit}
             onPrintReceipt={handlePrintLastReceipt}
+            onReprintChit={handleReprintChit}
             onDone={handleDoneAfterSuccess}
           />
         </div>
@@ -919,6 +964,7 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
               onSelectedStaffIdChange={setSelectedStaffId}
               onSubmit={() => { handleSubmit(); setShowMobileCart(false); }}
               onPrintReceipt={handlePrintLastReceipt}
+              onReprintChit={handleReprintChit}
               onDone={handleDoneAfterSuccess}
             />
           </div>
@@ -996,6 +1042,7 @@ function CartPanel({
   onSelectedStaffIdChange,
   onSubmit,
   onPrintReceipt,
+  onReprintChit,
   onDone,
 }: {
   cart: CartEntry[];
@@ -1017,6 +1064,7 @@ function CartPanel({
   onSelectedStaffIdChange: (v: string) => void;
   onSubmit: () => void;
   onPrintReceipt: () => void;
+  onReprintChit?: () => void;
   onDone: () => void;
 }) {
   if (successTable) {
@@ -1036,6 +1084,15 @@ function CartPanel({
                 <PrinterIcon className="inline w-4 h-4 mr-1.5" />
                 {isPrintingReceipt ? 'Printing...' : 'Print Receipt'}
               </button>
+              {onReprintChit && (
+                <button
+                  onClick={onReprintChit}
+                  className="w-full rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-2.5 text-sm font-semibold text-amber-300 hover:bg-amber-500/20"
+                >
+                  <PrinterIcon className="inline w-4 h-4 mr-1.5" />
+                  Reprint Chit
+                </button>
+              )}
             </>
           )}
           <button

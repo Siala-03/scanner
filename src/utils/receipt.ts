@@ -562,6 +562,154 @@ export function buildReceiptHtml(receipt: ReceiptData): string {
 }
 
 // ============================================
+// BAR CHIT / DOCKET GENERATION
+// ============================================
+
+export interface ChitData {
+  restaurantName?: string;
+  orderNumber: string | number;
+  tableLabel: string;
+  waiterName?: string;
+  time?: Date;
+  items: Array<{ quantity: number; name: string; notes?: string; totalPrice?: number }>;
+  total: number;
+  notes?: string;
+}
+
+/**
+ * Build a compact 80mm bar chit/docket HTML.
+ * Printed once per order round so bar staff know exactly what to prepare.
+ * Same paper size and auto-print behaviour as buildReceiptHtml.
+ */
+export function buildChitHtml(data: ChitData): string {
+  const { restaurantName, orderNumber, tableLabel, waiterName, items, total, notes } = data;
+  const now = data.time ?? new Date();
+  const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+
+  const fmt = (v: number) => 'RWF ' + Math.round(v).toLocaleString('en-US');
+
+  const itemsHtml = items.map(item => `
+    <tr>
+      <td class="qty">${item.quantity}&times;</td>
+      <td class="name">${item.name}${item.notes ? `<div class="note">&#8627; ${item.notes}</div>` : ''}</td>
+      ${item.totalPrice != null ? `<td class="price">${fmt(item.totalPrice)}</td>` : ''}
+    </tr>`).join('');
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Chit #${orderNumber}</title>
+  <style>
+    @page { size: 80mm auto; margin: 0; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif; font-size: 10pt; color: #000; line-height: 1.45; }
+
+    @media screen {
+      body { background: #c8c8c8; display: flex; flex-direction: column; align-items: center; padding: 20px 12px 40px; }
+      .paper { background: #fff; width: 80mm; padding: 6mm 5mm 10mm; box-shadow: 0 3px 16px rgba(0,0,0,.22); }
+    }
+    @media print {
+      html, body { background: #fff; display: block; }
+      .paper { padding: 3mm 4mm 14mm; }
+      .no-print { display: none !important; }
+      * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    }
+
+    .hdr { text-align: center; padding-bottom: 6px; }
+    .brand { font-size: 13pt; font-weight: 900; letter-spacing: 2px; text-transform: uppercase; }
+    .badge { display: inline-block; margin-top: 5px; padding: 2px 12px; border: 2px solid #000; font-size: 9pt; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; }
+
+    .solid  { border: none; border-top: 2px solid #000; margin: 7px 0; }
+    .dashed { border: none; border-top: 1px dashed #666; margin: 5px 0; }
+
+    .order-block { text-align: center; padding: 4px 0; }
+    .order-num { font-size: 22pt; font-weight: 900; line-height: 1.1; }
+    .table-label { font-size: 14pt; font-weight: 700; margin-top: 2px; text-transform: uppercase; }
+
+    .meta { width: 100%; border-collapse: collapse; font-size: 9pt; margin: 5px 0; }
+    .meta td { padding: 1px 0; vertical-align: top; }
+    .meta td:first-child { color: #555; width: 38%; }
+    .meta td:last-child  { font-weight: 700; text-align: right; }
+
+    .items { width: 100%; border-collapse: collapse; font-size: 11pt; }
+    .items td { padding: 5px 0; vertical-align: top; border-bottom: 1px dotted #bbb; }
+    .items .qty   { width: 28px; color: #333; font-size: 10pt; font-weight: 700; }
+    .items .name  { font-weight: 700; }
+    .items .price { text-align: right; white-space: nowrap; font-size: 9pt; color: #333; }
+    .note { font-size: 8pt; color: #555; font-style: italic; margin-top: 1px; font-weight: 400; }
+
+    .special-box { border: 2px solid #000; padding: 5px 7px; margin: 6px 0; font-size: 9pt; font-weight: 700; line-height: 1.5; }
+    .special-box .lbl { font-size: 7pt; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 2px; }
+
+    .total-row { display: flex; justify-content: space-between; font-size: 12pt; font-weight: 900; margin-top: 6px; }
+
+    .footer { text-align: center; font-size: 8pt; color: #888; margin-top: 8px; letter-spacing: 1px; }
+
+    .print-btn { margin-top: 16px; padding: 8px 28px; background: #111; color: #fff; border: none; border-radius: 3px; font-family: inherit; font-size: 12px; cursor: pointer; }
+    .print-btn:hover { background: #333; }
+  </style>
+</head>
+<body>
+
+<div class="paper">
+
+  <div class="hdr">
+    ${restaurantName ? `<div class="brand">${restaurantName}</div>` : ''}
+    <div class="badge">Bar Chit</div>
+  </div>
+
+  <hr class="solid">
+
+  <div class="order-block">
+    <div class="order-num">#${orderNumber}</div>
+    <div class="table-label">${tableLabel}</div>
+  </div>
+
+  <hr class="dashed">
+
+  <table class="meta">
+    <tr><td>Time</td><td>${timeStr}</td></tr>
+    ${waiterName ? `<tr><td>Waiter</td><td>${waiterName}</td></tr>` : ''}
+  </table>
+
+  <hr class="dashed">
+
+  ${notes ? `<div class="special-box"><div class="lbl">&#9888; Note</div>${notes}</div>` : ''}
+
+  <table class="items">
+    <tbody>${itemsHtml}</tbody>
+  </table>
+
+  <hr class="solid">
+
+  <div class="total-row">
+    <span>TOTAL</span>
+    <span>${fmt(total)}</span>
+  </div>
+
+  <div class="footer">PRINTED ${timeStr} &mdash; SERVV</div>
+
+</div>
+
+<button class="print-btn no-print" onclick="window.print()">Print Chit</button>
+
+<script>
+  if (window.opener || window.name === 'receipt_print') {
+    setTimeout(function() {
+      window.print();
+      window.addEventListener('afterprint', function() {
+        setTimeout(function() { window.close(); }, 300);
+      });
+    }, 500);
+  }
+<\/script>
+
+</body>
+</html>`;
+}
+
+// ============================================
 // KITCHEN TICKET GENERATION
 // ============================================
 
