@@ -446,7 +446,6 @@ export function buildReceiptHtml(receipt: ReceiptData): string {
       ${restaurantPhone}${restaurantEmail ? `<br>${restaurantEmail}` : ''}
       ${restaurantMomoCode ? `<br><strong style="font-size:10pt;letter-spacing:0.5px">MoMo: ${restaurantMomoCode}</strong>` : ''}
     </div>
-    <div class="rbadge">Official Receipt</div>
   </div>
 
   <hr class="solid">
