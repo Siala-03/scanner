@@ -88,7 +88,8 @@ export async function fetchOrders(status?: string, restaurantId?: string): Promi
     const { data, error } = await db
       .from('orders')
       .select('*')
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(100000);
     if (error) return [];
     return (data ?? []) as Order[];
   }
@@ -97,7 +98,8 @@ export async function fetchOrders(status?: string, restaurantId?: string): Promi
     .from('orders')
     .select('*')
     .eq('restaurant_id', restaurant)
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .limit(100000);
 
   if (status && status !== 'all') {
     query = query.eq('status', status);
@@ -143,7 +145,8 @@ export async function fetchOrdersByDateRange(startDate: string, endDate: string,
     .eq('restaurant_id', restaurant)
     .gte('created_at', startDate)
     .lte('created_at', endDate)
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .limit(100000);
 
   if (error) return [];
   return (data ?? []) as Order[];
