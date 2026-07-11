@@ -96,7 +96,8 @@ async function computeProgress(
       .eq('restaurant_id', kpi.restaurant_id)
       .eq('status', 'served')
       .gte('created_at', start.toISOString())
-      .lte('created_at', end.toISOString());
+      .lte('created_at', end.toISOString())
+      .limit(100000);
 
     if (ordersError) {
       console.warn('KPI computeProgress orders query failed:', ordersError.message);

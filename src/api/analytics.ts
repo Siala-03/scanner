@@ -62,7 +62,8 @@ export async function fetchTodayKPIs(): Promise<KPIMetrics> {
     .from('orders')
     .select('*')
     .eq('restaurant_id', restaurantId)
-    .gte('created_at', today.toISOString());
+    .gte('created_at', today.toISOString())
+    .limit(100000);
 
   if (error) throw error;
 
@@ -115,7 +116,8 @@ export async function fetchWeeklyRevenue(): Promise<WeeklyRevenue> {
     .from('orders')
     .select('total, created_at')
     .eq('restaurant_id', restaurantId)
-    .gte('created_at', twoWeeksAgo.toISOString());
+    .gte('created_at', twoWeeksAgo.toISOString())
+    .limit(100000);
 
   if (error) throw error;
 
@@ -168,7 +170,8 @@ export async function fetchRevenueByDateRange(startDate: string, endDate: string
     .select('total, created_at')
     .eq('restaurant_id', restaurantId)
     .gte('created_at', startDate)
-    .lte('created_at', endDate);
+    .lte('created_at', endDate)
+    .limit(100000);
 
   if (error) return [];
 
