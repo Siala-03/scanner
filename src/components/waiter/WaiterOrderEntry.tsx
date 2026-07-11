@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import {
   SearchIcon,
@@ -50,6 +50,7 @@ export function WaiterOrderEntry({
   const [cart, setCart] = useState<LocalCartItem[]>([]);
   const [orderNotes, setOrderNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const isSubmittingRef = useRef(false);
   const [showCart, setShowCart] = useState(false);
 
   // Reset state when order entry opens fresh
@@ -161,41 +162,22 @@ export function WaiterOrderEntry({
   // Submit order
   const handleSubmit = async () => {
     if (cart.length === 0) return;
-
-    // Build and open the chit window synchronously during user gesture — before any await.
-    // All cart data is available now so no placeholder is needed; write the full chit immediately.
-    try {
-      const label = tableNumber === 0 ? 'Bar / Walk-up' : `Table ${tableNumber}`;
-      const chitHtml = buildChitHtml({
-        restaurantName,
-        restaurantLogo: restaurantInfo?.logo,
-        restaurantAddress: restaurantInfo?.address,
-        restaurantPhone: restaurantInfo?.phone,
-        restaurantEmail: restaurantInfo?.email,
-        restaurantCity: restaurantInfo?.city,
-        restaurantCountry: restaurantInfo?.country,
-        restaurantMomoCode: restaurantInfo?.momoCode,
-        tableLabel: label,
-        orderNumber: Date.now(),
-        waiterName,
-        items: cart.map(item => ({
-          quantity: item.quantity,
-          name: item.menuItemName ?? item.menuItem?.name ?? 'Item',
-          notes: item.specialInstructions || undefined,
-          totalPrice: (item.unitPrice ?? item.menuItem?.price ?? 0) * item.quantity,
-        })),
-        total: cart.reduce((s, i) => s + (i.unitPrice ?? i.menuItem?.price ?? 0) * i.quantity, 0),
-        notes: orderNotes.trim() || undefined,
-      });
-      const win = window.open('', 'chit_print', 'width=302,height=700,toolbar=0,scrollbars=1,status=0');
-      if (win) {
-        win.document.open();
-        win.document.write(chitHtml);
-        win.document.close();
-      }
-    } catch { /* popup blocked or build failed — order proceeds regardless */ }
-
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     setIsSubmitting(true);
+
+    // Open the print window NOW — during the user gesture — before any await.
+    // Write a placeholder so the window exists; full chit is written only on success.
+    let chitPrintWindow: Window | null = null;
+    try {
+      chitPrintWindow = window.open('', 'chit_print', 'width=302,height=700,toolbar=0,scrollbars=1,status=0');
+      if (chitPrintWindow) {
+        chitPrintWindow.document.open();
+        chitPrintWindow.document.write('<html><body style="background:#fff;font-family:Arial;padding:40px;text-align:center;color:#000"><p>Preparing chit…</p></body></html>');
+        chitPrintWindow.document.close();
+      }
+    } catch { /* popup blocked — chit won't print */ }
+
     try {
       const orderItems: CartItem[] = cart.map(({ tempId, ...item }) => ({
         menuItem: item.menuItem,
@@ -204,14 +186,47 @@ export function WaiterOrderEntry({
       }));
       await onSubmitOrder(orderItems, orderNotes || undefined);
 
+      // Order confirmed — now write the full chit
+      if (chitPrintWindow && !chitPrintWindow.closed) {
+        try {
+          const label = tableNumber === 0 ? 'Bar / Walk-up' : `Table ${tableNumber}`;
+          const chitHtml = buildChitHtml({
+            restaurantName,
+            restaurantLogo: restaurantInfo?.logo,
+            restaurantAddress: restaurantInfo?.address,
+            restaurantPhone: restaurantInfo?.phone,
+            restaurantEmail: restaurantInfo?.email,
+            restaurantCity: restaurantInfo?.city,
+            restaurantCountry: restaurantInfo?.country,
+            restaurantMomoCode: restaurantInfo?.momoCode,
+            tableLabel: label,
+            orderNumber: Date.now(),
+            waiterName,
+            items: cart.map(item => ({
+              quantity: item.quantity,
+              name: item.menuItemName ?? item.menuItem?.name ?? 'Item',
+              notes: item.specialInstructions || undefined,
+              totalPrice: (item.unitPrice ?? item.menuItem?.price ?? 0) * item.quantity,
+            })),
+            total: cart.reduce((s, i) => s + (i.unitPrice ?? i.menuItem?.price ?? 0) * i.quantity, 0),
+            notes: orderNotes.trim() || undefined,
+          });
+          chitPrintWindow.document.open();
+          chitPrintWindow.document.write(chitHtml);
+          chitPrintWindow.document.close();
+        } catch { chitPrintWindow?.close(); }
+      }
+
       setCart([]);
       setOrderNotes('');
       setShowCart(false);
       onClose();
     } catch (error) {
       console.error('Failed to submit order:', error);
+      try { chitPrintWindow?.close(); } catch { /* ignore */ }
       alert('Failed to submit order. Please try again.');
     } finally {
+      isSubmittingRef.current = false;
       setIsSubmitting(false);
     }
   };
