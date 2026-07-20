@@ -16,6 +16,8 @@ export interface Restaurant {
   logo_url?: string;
   managerCount?: number;
   settings?: Record<string, unknown>;
+  is_active?: boolean;
+  subscription_status?: 'trial' | 'active' | 'suspended' | 'cancelled';
 }
 
 /** Receipt-header settings stored in restaurants.settings.receipt */
@@ -97,6 +99,17 @@ export async function updateRestaurant(id: string, restaurant: Partial<Restauran
 
 export async function deleteRestaurant(id: string): Promise<void> {
   await callEdgeFn('restaurants', { method: 'DELETE', params: { id } });
+}
+
+export async function setRestaurantActive(id: string, active: boolean): Promise<Restaurant> {
+  return callEdgeFn('restaurants', {
+    method: 'PUT',
+    params: { id },
+    body: {
+      is_active: active,
+      subscription_status: active ? 'active' : 'suspended',
+    },
+  });
 }
 
 /**
@@ -273,7 +286,7 @@ export async function fetchRestaurantPublic(restaurantId: string): Promise<Resta
   console.log('Fetching restaurant public for ID:', restaurantId);
   const { data, error } = await supabase
     .from('restaurants')
-    .select('id, name, email, phone, address, outlet_type')
+    .select('id, name, email, phone, address, outlet_type, is_active, subscription_status')
     .eq('id', restaurantId)
     .single();
 

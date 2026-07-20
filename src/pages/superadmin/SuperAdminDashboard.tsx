@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, Building2, Users, TrendingUp, Lock, QrCode, ChevronDown } from 'lucide-react';
+import { Plus, Edit2, Trash2, Building2, Users, TrendingUp, Lock, QrCode, ChevronDown, PowerOff, Power } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Modal } from '../../components/ui/Modal';
 import { Input } from '../../components/ui/Input';
 import { changePassword } from '../../api/auth';
-import { fetchRestaurants, createRestaurant, updateRestaurant, deleteRestaurant, type Restaurant, type OutletType } from '../../api/restaurants';
+import { fetchRestaurants, createRestaurant, updateRestaurant, deleteRestaurant, setRestaurantActive, type Restaurant, type OutletType } from '../../api/restaurants';
 import { fetchTablesForRestaurant, deleteTable } from '../../api/tables';
 
 interface Table {
@@ -40,6 +40,7 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
   const [isPasswordLoading, setIsPasswordLoading] = useState(false);
   const [formError, setFormError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -201,6 +202,25 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
     }
   };
 
+  const handleToggleActive = async (restaurant: Restaurant) => {
+    const willSuspend = restaurant.is_active !== false;
+    const label = restaurant.name;
+    const msg = willSuspend
+      ? `Suspend access for "${label}"? They will be locked out until reactivated.`
+      : `Reactivate "${label}"? They will regain full access.`;
+    if (!confirm(msg)) return;
+    setTogglingId(restaurant.id);
+    try {
+      await setRestaurantActive(restaurant.id, !willSuspend);
+      await loadRestaurants();
+    } catch (error) {
+      console.error('Failed to toggle restaurant status:', error);
+      alert('Failed to update status. Please try again.');
+    } finally {
+      setTogglingId(null);
+    }
+  };
+
   const resetForm = () => {
     setFormData({
       name:            '',
@@ -276,8 +296,12 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
           <Card className="bg-slate-800/70 border-slate-700 p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-slate-400 text-sm">Active Status</p>
-                <p className="text-2xl font-bold mt-2 text-green-500">Operational</p>
+                <p className="text-slate-400 text-sm">Active / Suspended</p>
+                <p className="text-2xl font-bold mt-2">
+                  <span className="text-green-400">{restaurants.filter(r => r.is_active !== false).length}</span>
+                  <span className="text-slate-500 mx-1">/</span>
+                  <span className="text-red-400">{restaurants.filter(r => r.is_active === false).length}</span>
+                </p>
               </div>
               <TrendingUp className="w-8 h-8 text-green-500" />
             </div>
@@ -303,6 +327,7 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
                   <tr className="border-b border-slate-700">
                     <th className="px-4 py-3 text-left text-sm font-semibold">Name</th>
                     <th className="px-4 py-3 text-left text-sm font-semibold">Type</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold">Status</th>
                     <th className="px-4 py-3 text-left text-sm font-semibold">Email</th>
                     <th className="px-4 py-3 text-left text-sm font-semibold">Phone</th>
                     <th className="px-4 py-3 text-left text-sm font-semibold">Address</th>
@@ -311,7 +336,7 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
                 </thead>
                 <tbody>
                   {restaurants.map((restaurant) => (
-                    <tr key={restaurant.id} className="border-b border-slate-700 hover:bg-slate-700/30">
+                    <tr key={restaurant.id} className={`border-b border-slate-700 hover:bg-slate-700/30 ${restaurant.is_active === false ? 'opacity-60' : ''}`}>
                       <td className="px-4 py-3">
                         <div className="font-medium">{restaurant.name}</div>
                       </td>
@@ -326,6 +351,17 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
                           {restaurant.outlet_type || 'restaurant'}
                         </span>
                       </td>
+                      <td className="px-4 py-3">
+                        {restaurant.is_active === false ? (
+                          <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-red-500/15 text-red-300 border border-red-500/25">
+                            Suspended
+                          </span>
+                        ) : (
+                          <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-green-500/15 text-green-300 border border-green-500/25">
+                            {restaurant.subscription_status === 'trial' ? 'Trial' : 'Active'}
+                          </span>
+                        )}
+                      </td>
                       <td className="px-4 py-3 text-sm">{restaurant.email}</td>
                       <td className="px-4 py-3 text-sm">{restaurant.phone}</td>
                       <td className="px-4 py-3 text-sm text-slate-400">{restaurant.address}</td>
@@ -337,6 +373,17 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
                             title="Edit"
                           >
                             <Edit2 className="w-4 h-4 text-blue-400" />
+                          </button>
+                          <button
+                            onClick={() => handleToggleActive(restaurant)}
+                            disabled={togglingId === restaurant.id}
+                            className={`p-1 hover:bg-slate-600 rounded transition disabled:opacity-50 ${restaurant.is_active === false ? 'text-green-400' : 'text-amber-400'}`}
+                            title={restaurant.is_active === false ? 'Reactivate' : 'Suspend'}
+                          >
+                            {restaurant.is_active === false
+                              ? <Power className="w-4 h-4" />
+                              : <PowerOff className="w-4 h-4" />
+                            }
                           </button>
                           <button
                             onClick={() => handleDelete(restaurant.id)}
