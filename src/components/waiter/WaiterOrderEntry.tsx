@@ -224,7 +224,13 @@ export function WaiterOrderEntry({
     } catch (error) {
       console.error('Failed to submit order:', error);
       try { chitPrintWindow?.close(); } catch { /* ignore */ }
-      alert('Failed to submit order. Please try again.');
+      const msg = error instanceof Error ? error.message : String(error);
+      const isIdb = /indexeddb|idb|database connection|blocked/i.test(msg);
+      if (isIdb) {
+        alert('Order queue error: ' + msg + '\n\nTip: close any other open tabs for this app and try again.');
+      } else {
+        alert('Failed to submit order. Please try again.');
+      }
     } finally {
       isSubmittingRef.current = false;
       setIsSubmitting(false);

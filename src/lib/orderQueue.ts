@@ -47,11 +47,14 @@ export interface QueueEntry {
 // ─── DB bootstrap ────────────────────────────────────────────────────────────
 
 let _db: IDBDatabase | null = null;
+// Deduplicates concurrent openDB() calls — only one IDBOpenDBRequest at a time.
+let _opening: Promise<IDBDatabase> | null = null;
 
 function openDB(): Promise<IDBDatabase> {
   if (_db) return Promise.resolve(_db);
+  if (_opening) return _opening;
 
-  return new Promise((resolve, reject) => {
+  _opening = new Promise<IDBDatabase>((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
 
     req.onupgradeneeded = (e) => {
@@ -83,11 +86,32 @@ function openDB(): Promise<IDBDatabase> {
 
     req.onsuccess = (e) => {
       _db = (e.target as IDBOpenDBRequest).result;
-      resolve(_db!);
+      _opening = null;
+      // When another tab upgrades the schema, release this connection so the
+      // upgrade can proceed. Clearing _db ensures the next openDB() call
+      // re-opens a fresh connection at the new version.
+      _db.onversionchange = () => {
+        _db?.close();
+        _db = null;
+      };
+      resolve(_db);
     };
 
-    req.onerror = () => reject(req.error);
+    req.onerror = () => {
+      _opening = null;
+      reject(req.error);
+    };
+
+    // Another tab holds an open connection at an older schema version, blocking
+    // our upgrade from completing. Reject so the caller surfaces a clear error
+    // instead of hanging forever.
+    req.onblocked = () => {
+      _opening = null;
+      reject(new Error('Order queue unavailable: please close other open tabs and try again.'));
+    };
   });
+
+  return _opening;
 }
 
 function tx(
@@ -95,7 +119,15 @@ function tx(
   mode: IDBTransactionMode,
   storeName = STORE
 ): { store: IDBObjectStore; done: Promise<void> } {
-  const t = db.transaction(storeName, mode);
+  let t: IDBTransaction;
+  try {
+    t = db.transaction(storeName, mode);
+  } catch (err) {
+    // Connection was closed (e.g. onversionchange fired between openDB returning
+    // and this call). Clear the cache so the next openDB() re-opens cleanly.
+    if (_db === db) _db = null;
+    throw err;
+  }
   const store = t.objectStore(storeName);
   const done = new Promise<void>((res, rej) => {
     t.oncomplete = () => res();
