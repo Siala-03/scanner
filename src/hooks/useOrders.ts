@@ -173,6 +173,17 @@ export function useOrders(): UseOrdersReturn {
         const localOrders = prev.filter(
           (o) => o.id.startsWith('temp-') || o.id.startsWith('offline-')
         );
+
+        // Guard: if the fetch returned nothing but we already have server orders,
+        // skip this update. fetchOrders returns [] on ANY Supabase error, so an
+        // empty result with existing orders is almost certainly a transient failure
+        // rather than a legitimate "zero orders" state. Realtime handles real
+        // deletions; the poll is just a fallback for missed events.
+        const hasServerOrders = prev.some(
+          (o) => !o.id.startsWith('temp-') && !o.id.startsWith('offline-')
+        );
+        if (normalized.length === 0 && hasServerOrders) return prev;
+
         // Dedupe: drop offline orders whose idempotency key matches a server order
         const stillPending = localOrders.filter((local) => {
           if (!local.id.startsWith('offline-')) return !fetchedIds.has(local.id);

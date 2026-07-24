@@ -76,32 +76,42 @@ export function useTables() {
       return;
     }
 
+    // Show cached tables immediately so the grid never flashes "Loading…" when
+    // the component remounts (e.g. supervisor navigating to/from Take Order).
+    const cachedTables = getStoredTables(restaurantId);
+    if (cachedTables.length > 0) {
+      setTables(cachedTables);
+      setIsLoading(false);
+    } else {
+      setIsLoading(true);
+    }
+
     const mutationAtStart = mutationCountRef.current;
 
     try {
-      setIsLoading(true);
       const backendTables = await fetchTables();
 
       // If a mutation happened while we were waiting, discard the stale response
       if (mutationCountRef.current !== mutationAtStart) return;
 
-      // Merge backend + localStorage so optimistically-added tables are never lost.
-      const localTables = getStoredTables(restaurantId);
+      // Re-read localStorage in case a mutation updated it while we were fetching
+      const freshLocal = getStoredTables(restaurantId);
+
       if (backendTables && backendTables.length > 0) {
         const backendNumbers = backendTables.map(t => t.table_number);
-        const merged = [...new Set([...backendNumbers, ...localTables])].sort((a, b) => a - b);
+        const merged = [...new Set([...backendNumbers, ...freshLocal])].sort((a, b) => a - b);
         setTables(merged);
         // Persist the merged list so it's available when offline.
         setStoredTables(restaurantId, merged);
-      } else {
-        // Backend has no tables — trust localStorage
-        setTables(localTables);
+      } else if (freshLocal.length > 0) {
+        // Backend returned empty (error or genuinely empty) — trust localStorage
+        setTables(freshLocal);
       }
+      // If both are empty, keep whatever we set above ([] or cached)
     } catch (err) {
       console.warn('Failed to fetch tables from backend, using local storage:', err);
-      // Fall back to locally stored tables
-      const localTables = getStoredTables(restaurantId);
-      setTables(localTables);
+      const freshLocal = getStoredTables(restaurantId);
+      if (freshLocal.length > 0) setTables(freshLocal);
     } finally {
       setIsLoading(false);
     }
