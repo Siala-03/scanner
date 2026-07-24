@@ -97,18 +97,19 @@ export function useTables() {
       // Re-read localStorage in case a mutation updated it while we were fetching
       const freshLocal = getStoredTables(restaurantId);
 
-      if (backendTables && backendTables.length > 0) {
-        const backendNumbers = backendTables.map(t => t.table_number);
-        const merged = [...new Set([...backendNumbers, ...freshLocal])].sort((a, b) => a - b);
+      if (backendTables.length > 0) {
+        const merged = [...new Set([...backendTables.map(t => t.table_number), ...freshLocal])].sort((a, b) => a - b);
         setTables(merged);
-        // Persist the merged list so it's available when offline.
         setStoredTables(restaurantId, merged);
-      } else if (freshLocal.length > 0) {
-        // Backend returned empty (error or genuinely empty) — trust localStorage
-        setTables(freshLocal);
+      } else {
+        // fetchTables now throws on error, so an empty array means the restaurant
+        // genuinely has no tables. Clear stale localStorage to stay in sync.
+        setTables([]);
+        setStoredTables(restaurantId, []);
       }
-      // If both are empty, keep whatever we set above ([] or cached)
     } catch (err) {
+      // Network / RLS error — preserve whatever is currently showing.
+      // Don't wipe cached or locally-added tables just because the fetch failed.
       console.warn('Failed to fetch tables from backend, using local storage:', err);
       const freshLocal = getStoredTables(restaurantId);
       if (freshLocal.length > 0) setTables(freshLocal);

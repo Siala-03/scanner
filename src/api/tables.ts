@@ -35,14 +35,17 @@ export interface Table {
 export async function fetchTables(): Promise<Table[]> {
   const restaurantId = getRestaurantId();
   if (!restaurantId) return [];
-  
+
   const { data, error } = await supabase
     .from('tables')
     .select('*')
     .eq('restaurant_id', restaurantId)
     .order('table_number');
 
-  if (error) return [];
+  // Throw so callers can distinguish a network/RLS error from a legitimately
+  // empty table list. Returning [] on error caused useTables to wipe cached
+  // tables whenever the fetch failed transiently.
+  if (error) throw error;
   return data || [];
 }
 
