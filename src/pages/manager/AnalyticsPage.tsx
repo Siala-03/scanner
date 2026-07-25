@@ -200,13 +200,18 @@ export function AnalyticsPage() {
       });
     }
 
-    let revenue = 0;
+    let confirmedRevenue = 0;
+    let unconfirmedRevenue = 0;
     let orderCount = 0;
     const periodCustomers = new Set<string>();
 
     filteredOrders.forEach((o) => {
       orderCount += 1;
-      if (isConfirmed(o)) revenue += o.total ?? o.total_price ?? 0;
+      if (isConfirmed(o)) {
+        confirmedRevenue += o.total ?? o.total_price ?? 0;
+      } else if (o.status !== 'cancelled') {
+        unconfirmedRevenue += o.total ?? o.total_price ?? 0;
+      }
       const k = o.customerId ?? o.customer_id ?? o.customerName ?? o.customer_name;
       if (k) periodCustomers.add(String(k));
     });
@@ -215,9 +220,12 @@ export function AnalyticsPage() {
     periodCustomers.forEach((k) => { if (!priorCustomers.has(k)) newCustomers++; });
 
     return {
-      revenue,
+      revenue: confirmedRevenue,
+      confirmedRevenue,
+      unconfirmedRevenue,
+      totalRevenue: confirmedRevenue + unconfirmedRevenue,
       orders: orderCount,
-      avgOrderValue: orderCount > 0 ? revenue / orderCount : 0,
+      avgOrderValue: orderCount > 0 ? confirmedRevenue / orderCount : 0,
       newCustomers,
     };
   }, [orders, filteredOrders, periodWindow, filterMode]);
@@ -550,7 +558,7 @@ export function AnalyticsPage() {
     : customStart && customEnd ? `${customStart} — ${customEnd}`
     : 'Custom Range';
 
-  const revenueProgress  = Math.min(100, kpiTargets.revenue > 0      ? (periodMetrics.revenue      / kpiTargets.revenue)      * 100 : 0);
+  const revenueProgress  = Math.min(100, kpiTargets.revenue > 0      ? (periodMetrics.totalRevenue  / kpiTargets.revenue)      * 100 : 0);
   const ordersProgress   = Math.min(100, kpiTargets.orders > 0       ? (periodMetrics.orders        / kpiTargets.orders)        * 100 : 0);
   const avgOvProgress    = Math.min(100, kpiTargets.avgOrderValue > 0 ? (periodMetrics.avgOrderValue / kpiTargets.avgOrderValue) * 100 : 0);
 
@@ -651,11 +659,11 @@ export function AnalyticsPage() {
         )}
 
         {/* ── KPI cards ─────────────────────────────────────────────────── */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-          {/* Revenue */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-2">
+          {/* Total Revenue */}
           <Card className="bg-slate-800 p-4">
-            <p className="text-xs text-slate-400 mb-1">Revenue</p>
-            <p className="text-2xl font-bold text-emerald-400">{formatPrice(periodMetrics.revenue)}</p>
+            <p className="text-xs text-slate-400 mb-1">Total Revenue</p>
+            <p className="text-2xl font-bold text-emerald-400">{formatPrice(periodMetrics.totalRevenue)}</p>
             <div className="h-1.5 bg-slate-700 rounded mt-2 overflow-hidden">
               <div style={{ width: `${revenueProgress}%` }} className="h-full bg-emerald-400 transition-all" />
             </div>
@@ -711,6 +719,20 @@ export function AnalyticsPage() {
             {filterMode === 'custom' && (
               <p className="text-xs text-slate-600 mt-0.5">Approximate for custom range</p>
             )}
+          </Card>
+        </div>
+
+        {/* ── Revenue breakdown: confirmed vs awaiting ──────────────────── */}
+        <div className="grid grid-cols-2 gap-3 mb-4">
+          <Card className="bg-slate-800 p-4">
+            <p className="text-xs text-slate-400 mb-1">Confirmed Revenue</p>
+            <p className="text-2xl font-bold text-teal-400">{formatPrice(periodMetrics.confirmedRevenue)}</p>
+            <p className="text-xs text-slate-500 mt-1">Payment confirmed by supervisor</p>
+          </Card>
+          <Card className={`p-4 ${periodMetrics.unconfirmedRevenue > 0 ? 'bg-orange-500/10 border border-orange-500/30' : 'bg-slate-800'}`}>
+            <p className={`text-xs mb-1 ${periodMetrics.unconfirmedRevenue > 0 ? 'text-orange-300' : 'text-slate-400'}`}>Awaiting Payment</p>
+            <p className={`text-2xl font-bold ${periodMetrics.unconfirmedRevenue > 0 ? 'text-orange-400' : 'text-slate-500'}`}>{formatPrice(periodMetrics.unconfirmedRevenue)}</p>
+            <p className="text-xs text-slate-500 mt-1">Not yet confirmed</p>
           </Card>
         </div>
 

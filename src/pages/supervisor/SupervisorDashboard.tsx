@@ -117,11 +117,13 @@ export function SupervisorDashboard({ restaurantName, ordersByHour, statusBreakd
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
           <div className="rounded-xl border border-emerald-500/30 p-3 bg-emerald-500/10">
             <div className="flex items-center justify-between">
-              <div className="text-xs uppercase tracking-wide text-emerald-300">Revenue Today</div>
+              <div className="text-xs uppercase tracking-wide text-emerald-300">Total Revenue Today</div>
               <DollarSignIcon className="w-4 h-4 text-emerald-300" />
             </div>
-            <div className="mt-2 text-2xl font-semibold text-emerald-300">{kpiLoading ? '—' : formatPrice(kpis?.totalRevenue ?? 0)}</div>
-            <div className="text-xs text-emerald-200/80 mt-1">Confirmed payments only</div>
+            <div className="mt-2 text-2xl font-semibold text-emerald-300">{formatPrice(confirmedPaymentTotal + pendingPaymentTotal)}</div>
+            <div className="text-xs text-emerald-200/80 mt-1">
+              {formatPrice(confirmedPaymentTotal)} confirmed · {formatPrice(pendingPaymentTotal)} awaiting
+            </div>
           </div>
 
           <div className="rounded-xl border border-slate-700 p-3 bg-slate-800/70">
@@ -384,17 +386,18 @@ export function SupervisorDashboard({ restaurantName, ordersByHour, statusBreakd
           {kpiLoading ? (
             <p className="text-slate-400">Loading KPIs…</p>
           ) : kpis ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               <div>
                 <p className="text-slate-300 text-sm">Total Orders</p>
                 <p className="text-2xl font-bold">{kpis.totalOrders}</p>
               </div>
               <div>
-                <p className="text-slate-300 text-sm">Revenue (served)</p>
-                <p className="text-2xl font-bold">{formatPrice(kpis.totalRevenue)}</p>
+                <p className="text-slate-300 text-sm">Total Revenue</p>
+                <p className="text-2xl font-bold text-emerald-300">{formatPrice(confirmedPaymentTotal + pendingPaymentTotal)}</p>
+                <p className="text-xs text-slate-400 mt-0.5">{formatPrice(confirmedPaymentTotal)} confirmed · {formatPrice(pendingPaymentTotal)} awaiting</p>
               </div>
               <div>
-                <p className="text-slate-300 text-sm">Avg Order Value (served)</p>
+                <p className="text-slate-300 text-sm">Avg Order Value</p>
                 <p className="text-2xl font-bold">{formatPrice(kpis.avgOrderValue)}</p>
               </div>
               <div>

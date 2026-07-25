@@ -264,16 +264,37 @@ export function ReportsPage({ restaurantName = '' }: { restaurantName?: string }
   // ─── 1. Executive Summary ─────────────────────────────────────────────────
 
   const metrics = useMemo(() => {
-    let revenue = 0, orderCount = 0;
-    filteredOrders.forEach((o) => { orderCount++; if (isConfirmed(o)) revenue += o.total ?? 0; });
+    let confirmedRevenue = 0, unconfirmedRevenue = 0, orderCount = 0;
+    filteredOrders.forEach((o) => {
+      orderCount++;
+      if (isConfirmed(o)) { confirmedRevenue += o.total ?? 0; }
+      else if (o.status !== 'cancelled') { unconfirmedRevenue += o.total ?? 0; }
+    });
     const totalExpenses = expenses.reduce((s, e) => s + (e.amount ?? 0), 0);
-    return { revenue, orders: orderCount, avgOrderValue: orderCount > 0 ? revenue / orderCount : 0, expenses: totalExpenses };
+    return {
+      revenue: confirmedRevenue,
+      confirmedRevenue,
+      unconfirmedRevenue,
+      totalRevenue: confirmedRevenue + unconfirmedRevenue,
+      orders: orderCount,
+      avgOrderValue: orderCount > 0 ? confirmedRevenue / orderCount : 0,
+      expenses: totalExpenses,
+    };
   }, [filteredOrders, expenses]);
 
   const priorMetrics = useMemo(() => {
-    let revenue = 0, orderCount = 0;
-    filteredPriorOrders.forEach((o) => { orderCount++; if (isConfirmed(o)) revenue += o.total ?? 0; });
-    return { revenue, orders: orderCount, avgOrderValue: orderCount > 0 ? revenue / orderCount : 0 };
+    let confirmedRevenue = 0, unconfirmedRevenue = 0, orderCount = 0;
+    filteredPriorOrders.forEach((o) => {
+      orderCount++;
+      if (isConfirmed(o)) { confirmedRevenue += o.total ?? 0; }
+      else if (o.status !== 'cancelled') { unconfirmedRevenue += o.total ?? 0; }
+    });
+    return {
+      revenue: confirmedRevenue,
+      totalRevenue: confirmedRevenue + unconfirmedRevenue,
+      orders: orderCount,
+      avgOrderValue: orderCount > 0 ? confirmedRevenue / orderCount : 0,
+    };
   }, [filteredPriorOrders]);
 
   // ─── 2. Revenue & Orders Trend ────────────────────────────────────────────
@@ -489,7 +510,9 @@ export function ReportsPage({ restaurantName = '' }: { restaurantName?: string }
 
     sep('EXECUTIVE SUMMARY');
     rows.push(['Metric', 'Value']);
-    rows.push(['Total Revenue', String(Math.round(metrics.revenue))]);
+    rows.push(['Total Revenue (All)', String(Math.round(metrics.totalRevenue))]);
+    rows.push(['Confirmed Revenue', String(Math.round(metrics.confirmedRevenue))]);
+    rows.push(['Awaiting Payment', String(Math.round(metrics.unconfirmedRevenue))]);
     rows.push(['Total Orders', String(metrics.orders)]);
     rows.push(['Avg Order Value', String(Math.round(metrics.avgOrderValue))]);
     rows.push(['Total Expenses', String(Math.round(metrics.expenses))]);
@@ -549,7 +572,7 @@ export function ReportsPage({ restaurantName = '' }: { restaurantName?: string }
     );
   }
 
-  const revDelta = pctDelta(metrics.revenue, priorMetrics.revenue);
+  const revDelta = pctDelta(metrics.totalRevenue, priorMetrics.totalRevenue);
   const ordDelta = pctDelta(metrics.orders, priorMetrics.orders);
   const avgDelta = pctDelta(metrics.avgOrderValue, priorMetrics.avgOrderValue);
   const pLabel = periodLabel(filterMode, periodWindow);
@@ -611,8 +634,10 @@ export function ReportsPage({ restaurantName = '' }: { restaurantName?: string }
       </div>
 
       {/* ── 1. Executive Summary ── */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <KPICard icon={<DollarSignIcon className="w-5 h-5" />} label="Revenue" value={formatPrice(metrics.revenue)} delta={revDelta} accent="emerald" />
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+        <KPICard icon={<DollarSignIcon className="w-5 h-5" />} label="Total Revenue" value={formatPrice(metrics.totalRevenue)} delta={revDelta} accent="emerald" />
+        <KPICard icon={<DollarSignIcon className="w-5 h-5" />} label="Confirmed" value={formatPrice(metrics.confirmedRevenue)} accent="teal" />
+        <KPICard icon={<DollarSignIcon className="w-5 h-5" />} label="Awaiting Payment" value={formatPrice(metrics.unconfirmedRevenue)} accent="orange" />
         <KPICard icon={<ShoppingCartIcon className="w-5 h-5" />} label="Orders" value={String(metrics.orders)} delta={ordDelta} accent="blue" />
         <KPICard icon={<TrendingUpIcon className="w-5 h-5" />} label="Avg Order" value={formatPrice(metrics.avgOrderValue)} delta={avgDelta} accent="amber" />
         <KPICard icon={<ReceiptIcon className="w-5 h-5" />} label="Expenses" value={formatPrice(metrics.expenses)} accent="red" />
@@ -857,7 +882,9 @@ export function ReportsPage({ restaurantName = '' }: { restaurantName?: string }
           <div className="meta">{pLabel} &mdash; Generated {new Date().toLocaleString()}</div>
 
           <div className="kpi-row">
-            <div className="kpi"><div className="label">Revenue</div><div className="value">{formatPrice(metrics.revenue)}</div><div className={`delta ${revDelta.up ? 'delta-up' : 'delta-down'}`}>{revDelta.up ? '+' : '-'}{revDelta.pct}% vs prior</div></div>
+            <div className="kpi"><div className="label">Total Revenue</div><div className="value">{formatPrice(metrics.totalRevenue)}</div><div className={`delta ${revDelta.up ? 'delta-up' : 'delta-down'}`}>{revDelta.up ? '+' : '-'}{revDelta.pct}% vs prior</div></div>
+            <div className="kpi"><div className="label">Confirmed</div><div className="value">{formatPrice(metrics.confirmedRevenue)}</div></div>
+            <div className="kpi"><div className="label">Awaiting Payment</div><div className="value">{formatPrice(metrics.unconfirmedRevenue)}</div></div>
             <div className="kpi"><div className="label">Orders</div><div className="value">{metrics.orders}</div><div className={`delta ${ordDelta.up ? 'delta-up' : 'delta-down'}`}>{ordDelta.up ? '+' : '-'}{ordDelta.pct}% vs prior</div></div>
             <div className="kpi"><div className="label">Avg Order</div><div className="value">{formatPrice(metrics.avgOrderValue)}</div><div className={`delta ${avgDelta.up ? 'delta-up' : 'delta-down'}`}>{avgDelta.up ? '+' : '-'}{avgDelta.pct}% vs prior</div></div>
             <div className="kpi"><div className="label">Expenses</div><div className="value">{formatPrice(metrics.expenses)}</div></div>
@@ -929,8 +956,22 @@ function KPICard({ icon, label, value, delta, accent }: {
   icon: React.ReactNode; label: string; value: string;
   delta?: { pct: number; up: boolean }; accent?: string;
 }) {
-  const borderColor = accent === 'emerald' ? 'border-emerald-500/30' : accent === 'blue' ? 'border-blue-500/30' : accent === 'amber' ? 'border-amber-500/30' : accent === 'red' ? 'border-red-500/30' : 'border-slate-700';
-  const iconColor = accent === 'emerald' ? 'text-emerald-400' : accent === 'blue' ? 'text-blue-400' : accent === 'amber' ? 'text-amber-400' : accent === 'red' ? 'text-red-400' : 'text-slate-400';
+  const borderColor =
+    accent === 'emerald' ? 'border-emerald-500/30'
+    : accent === 'teal'  ? 'border-teal-500/30'
+    : accent === 'blue'  ? 'border-blue-500/30'
+    : accent === 'amber' ? 'border-amber-500/30'
+    : accent === 'orange'? 'border-orange-500/30'
+    : accent === 'red'   ? 'border-red-500/30'
+    : 'border-slate-700';
+  const iconColor =
+    accent === 'emerald' ? 'text-emerald-400'
+    : accent === 'teal'  ? 'text-teal-400'
+    : accent === 'blue'  ? 'text-blue-400'
+    : accent === 'amber' ? 'text-amber-400'
+    : accent === 'orange'? 'text-orange-400'
+    : accent === 'red'   ? 'text-red-400'
+    : 'text-slate-400';
   return (
     <div className={`bg-slate-800/60 rounded-xl border ${borderColor} p-4 hover:bg-slate-800/80 transition-colors`}>
       <div className={`flex items-center gap-2 ${iconColor} mb-2`}>

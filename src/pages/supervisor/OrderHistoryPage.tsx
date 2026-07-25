@@ -35,7 +35,6 @@ export function OrderHistoryPage({ onBack, existingOrders, restaurantName = '', 
   const [error, setError] = useState<string | null>(null);
   const [usingLocalData, setUsingLocalData] = useState(false);
   const [exactTotalCount, setExactTotalCount] = useState<number | null>(null);
-  const [includeUnconfirmed, setIncludeUnconfirmed] = useState(false);
   const [voidTargetId, setVoidTargetId] = useState<string | null>(null);
   const [isVoiding, setIsVoiding] = useState(false);
 
@@ -113,10 +112,6 @@ export function OrderHistoryPage({ onBack, existingOrders, restaurantName = '', 
       .filter(o => !isConfirmed(o))
       .reduce((sum, o) => sum + (typeof o.total === 'number' ? o.total : 0), 0);
 
-    const displayedRevenue = includeUnconfirmed
-      ? confirmedRevenue + unconfirmedRevenue
-      : confirmedRevenue;
-
     const avgOrderValue = servedOrders.length > 0
       ? (confirmedRevenue + unconfirmedRevenue) / servedOrders.length
       : 0;
@@ -125,12 +120,12 @@ export function OrderHistoryPage({ onBack, existingOrders, restaurantName = '', 
       totalOrders: exactTotalCount ?? orders.length,
       confirmedRevenue,
       unconfirmedRevenue,
-      displayedRevenue,
+      totalRevenue: confirmedRevenue + unconfirmedRevenue,
       avgOrderValue,
       pendingCount: orders.filter(o => o.status === 'pending').length,
       servedCount: servedOrders.length,
     };
-  }, [orders, exactTotalCount, includeUnconfirmed]);
+  }, [orders, exactTotalCount]);
 
   const handleExport = () => {
     downloadCsv('order-history.csv', buildOrdersCsv(orders as any));
@@ -262,7 +257,7 @@ export function OrderHistoryPage({ onBack, existingOrders, restaurantName = '', 
       <div className="max-w-6xl mx-auto p-4 md:p-8">
 
         {/* Summary Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 md:gap-4 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3 md:gap-4 mb-6">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0 }}>
             <Card className="bg-slate-800/50 backdrop-blur border border-slate-700/50 p-4">
               <div className="flex items-center gap-2 mb-1">
@@ -293,32 +288,34 @@ export function OrderHistoryPage({ onBack, existingOrders, restaurantName = '', 
             </Card>
           </motion.div>
 
-          {/* Revenue card with confirmed / all toggle */}
+          {/* Total Revenue */}
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
             <Card className="bg-slate-800/50 backdrop-blur border border-slate-700/50 p-4">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-xs text-slate-400 uppercase">
-                  {includeUnconfirmed ? 'Total Revenue' : 'Confirmed Revenue'}
-                </span>
-                <button
-                  onClick={() => setIncludeUnconfirmed(v => !v)}
-                  title={includeUnconfirmed ? 'Showing all payments — click to show confirmed only' : 'Showing confirmed only — click to include unconfirmed'}
-                  className={`relative inline-flex h-4 w-8 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${includeUnconfirmed ? 'bg-amber-500' : 'bg-slate-600'}`}
-                >
-                  <span className={`inline-block h-3 w-3 transform rounded-full bg-white shadow transition-transform duration-200 ${includeUnconfirmed ? 'translate-x-4' : 'translate-x-0'}`} />
-                </button>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-xs text-slate-400 uppercase">Total Revenue</span>
               </div>
               <p className="text-2xl font-bold text-amber-400">
-                RWF {Math.round(stats.displayedRevenue).toLocaleString()}
+                RWF {Math.round(stats.totalRevenue).toLocaleString()}
               </p>
-              <p className="text-[10px] text-slate-500 mt-0.5">
-                {includeUnconfirmed ? 'Confirmed + awaiting' : 'Confirmed only'}
-              </p>
+              <p className="text-[10px] text-slate-500 mt-0.5">Confirmed + awaiting</p>
             </Card>
           </motion.div>
 
-          {/* Unconfirmed / awaiting payment */}
+          {/* Confirmed Revenue */}
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+            <Card className="bg-slate-800/50 backdrop-blur border border-slate-700/50 p-4">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-xs text-slate-400 uppercase">Confirmed Revenue</span>
+              </div>
+              <p className="text-2xl font-bold text-emerald-400">
+                RWF {Math.round(stats.confirmedRevenue).toLocaleString()}
+              </p>
+              <p className="text-[10px] text-slate-500 mt-0.5">Payment confirmed</p>
+            </Card>
+          </motion.div>
+
+          {/* Awaiting Payment */}
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}>
             <Card className={`backdrop-blur p-4 border ${stats.unconfirmedRevenue > 0 ? 'bg-orange-500/10 border-orange-500/40' : 'bg-slate-800/50 border-slate-700/50'}`}>
               <div className="flex items-center gap-2 mb-1">
                 <span className={`text-xs uppercase ${stats.unconfirmedRevenue > 0 ? 'text-orange-400' : 'text-slate-400'}`}>Awaiting Payment</span>
@@ -330,7 +327,7 @@ export function OrderHistoryPage({ onBack, existingOrders, restaurantName = '', 
             </Card>
           </motion.div>
 
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}>
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
             <Card className="bg-slate-800/50 backdrop-blur border border-slate-700/50 p-4">
               <div className="flex items-center gap-2 mb-1">
                 <span className="text-xs text-slate-400 uppercase">Avg Order Value</span>
