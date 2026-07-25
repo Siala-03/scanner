@@ -5,7 +5,7 @@ import type { Order as OrderType, OrderStatus } from '../../types';
 import { Card } from '../../components/ui/Card';
 import { OrdersHistoryTable } from '../../components/supervisor/OrdersHistoryTable';
 import { OrderDetailModal } from '../../components/waiter/OrderDetailModal';
-import { fetchOrders, cancelOrder, fetchCancellationRequestByOrderId } from '../../api/orders';
+import { fetchOrders, cancelOrder, fetchCancellationRequestByOrderId, fetchOrderCount } from '../../api/orders';
 import type { CancellationDetails } from '../../components/waiter/OrderDetailModal';
 import { VoidReasonModal } from '../../components/shared/VoidReasonModal';
 import type { RestaurantReceiptSettings } from '../../api/restaurants';
@@ -34,6 +34,7 @@ export function OrderHistoryPage({ onBack, existingOrders, restaurantName = '', 
   const [cancellationDetails, setCancellationDetails] = useState<CancellationDetails | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [usingLocalData, setUsingLocalData] = useState(false);
+  const [exactTotalCount, setExactTotalCount] = useState<number | null>(null);
   const [voidTargetId, setVoidTargetId] = useState<string | null>(null);
   const [isVoiding, setIsVoiding] = useState(false);
 
@@ -59,6 +60,10 @@ export function OrderHistoryPage({ onBack, existingOrders, restaurantName = '', 
     async function loadOrders() {
       try {
         setLoading(true);
+
+        // Fetch the exact count independently — Supabase's server-side row cap
+        // does not apply to count-only queries, so this is always accurate.
+        fetchOrderCount().then(c => setExactTotalCount(c)).catch(() => {});
 
         // Use existing orders first (from parent state)
         if (existingOrders && existingOrders.length > 0) {
@@ -98,13 +103,13 @@ export function OrderHistoryPage({ onBack, existingOrders, restaurantName = '', 
     const avgOrderValue = servedOrders.length > 0 ? totalRevenue / servedOrders.length : 0;
     
     return {
-      totalOrders: orders.length,
+      totalOrders: exactTotalCount ?? orders.length,
       totalRevenue,
       avgOrderValue,
       pendingCount: orders.filter(o => o.status === 'pending').length,
       servedCount: servedOrders.length
     };
-  }, [orders]);
+  }, [orders, exactTotalCount]);
 
   const handleExport = () => {
     downloadCsv('order-history.csv', buildOrdersCsv(orders as any));

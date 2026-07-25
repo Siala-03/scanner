@@ -840,17 +840,21 @@ export function WaiterDashboard({
   const { kpis } = useStaffKPIs();
   const { tables: allTables } = useTables();
 
-  // Compute which tables have active orders from the live orders prop
+  // Compute which tables have active orders from the live orders prop.
+  // Orders older than 24 h are treated as stale and never mark a table occupied.
   const tableOccupancy = useMemo(() => {
     const map: Record<number, 'occupied' | 'urgent'> = {};
     const now = Date.now();
+    const staleThreshold = now - 24 * 60 * 60 * 1000;
     orders.forEach((o) => {
       if (!['pending', 'verified', 'preparing', 'ready'].includes(o.status)) return;
       const ps = o.paymentStatus ?? (o as any).payment_status;
       if (ps === 'confirmed') return;
       const tNum = o.tableNumber ?? (o as any).table_number;
       if (tNum == null || tNum === 999) return;
-      const age = (now - new Date(o.createdAt).getTime()) / 60000;
+      const created = new Date(o.createdAt).getTime();
+      if (created < staleThreshold) return; // stale order — don't pin the table as busy
+      const age = (now - created) / 60000;
       const next: 'occupied' | 'urgent' = age > 15 ? 'urgent' : 'occupied';
       if (!map[tNum] || (map[tNum] === 'occupied' && next === 'urgent')) map[tNum] = next;
     });

@@ -166,6 +166,7 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
     try {
       const active = await fetchKitchenOrders();
       const now = Date.now();
+      const staleThreshold = now - 24 * 60 * 60 * 1000;
       const map: Record<number, TableStatus> = {};
       (active as any[]).forEach((order) => {
         const tNum: number | undefined = order.tableNumber ?? order.table_number;
@@ -175,7 +176,9 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
         const st = order.status;
         if (ps === 'confirmed' || st === 'completed' || st === 'cancelled') return;
         const createdAt = order.createdAt ?? order.created_at;
-        const age = createdAt ? (now - new Date(createdAt).getTime()) / 60000 : 0;
+        const created = createdAt ? new Date(createdAt).getTime() : 0;
+        if (created < staleThreshold) return; // stale order — don't pin the table as busy
+        const age = created ? (now - created) / 60000 : 0;
         const next: TableStatus = age > 15 ? 'urgent' : 'occupied';
         const current = map[tNum];
         if (!current || (current === 'occupied' && next === 'urgent')) {

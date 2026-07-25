@@ -156,15 +156,34 @@ export async function fetchKitchenOrders(restaurantId?: string): Promise<Order[]
   const restaurant = restaurantId || getRestaurantId();
   if (!restaurant) return [];
 
+  // Only look back 24 hours — orders older than that are stale and should
+  // never keep a table marked as occupied/urgent.
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
   const { data, error } = await db
     .from('orders')
     .select('*')
     .eq('restaurant_id', restaurant)
     .in('status', ['pending', 'verified', 'preparing', 'ready'])
+    .gte('created_at', since)
     .order('created_at', { ascending: true });
 
   if (error) return [];
   return (data ?? []) as Order[];
+}
+
+/** Returns the exact total order count for a restaurant without fetching rows. */
+export async function fetchOrderCount(restaurantId?: string): Promise<number> {
+  const restaurant = restaurantId || getRestaurantId();
+  if (!restaurant) return 0;
+
+  const { count, error } = await db
+    .from('orders')
+    .select('*', { count: 'exact', head: true })
+    .eq('restaurant_id', restaurant);
+
+  if (error) return 0;
+  return count ?? 0;
 }
 
 export async function fetchOrderById(id: string): Promise<Order> {
