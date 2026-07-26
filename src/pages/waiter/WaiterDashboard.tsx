@@ -33,6 +33,7 @@ import { WaiterOrderEntry } from '../../components/waiter/WaiterOrderEntry';
 import { loadReviews } from '../../utils/reviewsStorage';
 import { useStaffKPIs } from '../../hooks/useKPIs';
 import { orderToReceiptData, buildReceiptHtml, printReceipt } from '../../utils/receipt';
+import { markBillPresented, isBillPresented } from '../../utils/billTracking';
 import type { PaymentEntry } from '../../utils/receipt';
 import { ReceiptShareModal } from '../../components/ui/ReceiptShareModal';
 import { PaymentCaptureModal } from '../../components/ui/PaymentCaptureModal';
@@ -841,11 +842,13 @@ export function WaiterDashboard({
   const { tables: allTables } = useTables();
 
   // Compute which tables have active orders from the live orders prop.
-  // Orders older than 24 h are treated as stale and never mark a table occupied.
+  // Orders older than 5 h are treated as stale and never mark a table occupied.
+  // If the full bill has been presented (receipt printed), urgency is suppressed — table stays
+  // 'occupied' until payment is confirmed, which clears it entirely.
   const tableOccupancy = useMemo(() => {
     const map: Record<number, 'occupied' | 'urgent'> = {};
     const now = Date.now();
-    const staleThreshold = now - 24 * 60 * 60 * 1000;
+    const staleThreshold = now - 5 * 60 * 60 * 1000;
     orders.forEach((o) => {
       if (!['pending', 'verified', 'preparing', 'ready'].includes(o.status)) return;
       const ps = o.paymentStatus ?? (o as any).payment_status;
@@ -853,9 +856,10 @@ export function WaiterDashboard({
       const tNum = o.tableNumber ?? (o as any).table_number;
       if (tNum == null || tNum === 999) return;
       const created = new Date(o.createdAt).getTime();
-      if (created < staleThreshold) return; // stale order — don't pin the table as busy
+      if (created < staleThreshold) return;
       const age = (now - created) / 60000;
-      const next: 'occupied' | 'urgent' = age > 15 ? 'urgent' : 'occupied';
+      const billOut = isBillPresented(o.id);
+      const next: 'occupied' | 'urgent' = (age > 15 && !billOut) ? 'urgent' : 'occupied';
       if (!map[tNum] || (map[tNum] === 'occupied' && next === 'urgent')) map[tNum] = next;
     });
     return map;
@@ -1221,6 +1225,7 @@ export function WaiterDashboard({
   };
 
   const handlePrintReceipt = (order: Order) => {
+    markBillPresented(order.id);
     setPaymentCaptureOrder(order);
   };
 

@@ -158,7 +158,7 @@ export async function fetchKitchenOrders(restaurantId?: string): Promise<Order[]
 
   // Only look back 24 hours — orders older than that are stale and should
   // never keep a table marked as occupied/urgent.
-  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const since = new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString();
 
   const { data, error } = await db
     .from('orders')

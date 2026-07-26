@@ -21,6 +21,7 @@ import { supabase } from '../../lib/supabase';
 import { fetchKitchenOrders } from '../../api/orders';
 import { formatPrice } from '../../utils/currency';
 import { buildReceiptHtml, orderToReceiptData, printReceipt, buildChitHtml } from '../../utils/receipt';
+import { markBillPresented, isBillPresented } from '../../utils/billTracking';
 import type { ReceiptData } from '../../utils/receipt';
 import { printOrderReceipt as printThermal } from '../../utils/sunmiPrinter';
 import { Modal } from '../../components/ui/Modal';
@@ -166,7 +167,7 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
     try {
       const active = await fetchKitchenOrders();
       const now = Date.now();
-      const staleThreshold = now - 24 * 60 * 60 * 1000;
+      const staleThreshold = now - 5 * 60 * 60 * 1000;
       const map: Record<number, TableStatus> = {};
       (active as any[]).forEach((order) => {
         const tNum: number | undefined = order.tableNumber ?? order.table_number;
@@ -177,9 +178,10 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
         if (ps === 'confirmed' || st === 'completed' || st === 'cancelled') return;
         const createdAt = order.createdAt ?? order.created_at;
         const created = createdAt ? new Date(createdAt).getTime() : 0;
-        if (created < staleThreshold) return; // stale order — don't pin the table as busy
+        if (created < staleThreshold) return;
         const age = created ? (now - created) / 60000 : 0;
-        const next: TableStatus = age > 15 ? 'urgent' : 'occupied';
+        const billOut = isBillPresented(order.id);
+        const next: TableStatus = (age > 15 && !billOut) ? 'urgent' : 'occupied';
         const current = map[tNum];
         if (!current || (current === 'occupied' && next === 'urgent')) {
           map[tNum] = next;
@@ -384,6 +386,7 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
     setIsPrintingReceipt(true);
     try {
       printReceipt(buildReceiptHtml(data));
+      if (lastPlacedOrder?.id) markBillPresented(lastPlacedOrder.id);
     } catch {
       alert('Could not open print window. Please allow pop-ups in your browser.');
     } finally {
@@ -417,6 +420,7 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
         })
       );
       printReceipt(html);
+      if (lastPlacedOrder?.id) markBillPresented(lastPlacedOrder.id);
       setShowReceiptNoteModal(false);
     } catch (e) {
       console.error(e);
