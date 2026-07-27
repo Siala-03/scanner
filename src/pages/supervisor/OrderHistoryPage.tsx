@@ -112,16 +112,11 @@ export function OrderHistoryPage({ onBack, existingOrders, restaurantName = '', 
       .filter(o => !isConfirmed(o))
       .reduce((sum, o) => sum + (typeof o.total === 'number' ? o.total : 0), 0);
 
-    const avgOrderValue = servedOrders.length > 0
-      ? (confirmedRevenue + unconfirmedRevenue) / servedOrders.length
-      : 0;
-
     return {
       totalOrders: exactTotalCount ?? orders.length,
       confirmedRevenue,
       unconfirmedRevenue,
       totalRevenue: confirmedRevenue + unconfirmedRevenue,
-      avgOrderValue,
       pendingCount: orders.filter(o => o.status === 'pending').length,
       servedCount: servedOrders.length,
     };
@@ -257,7 +252,7 @@ export function OrderHistoryPage({ onBack, existingOrders, restaurantName = '', 
       <div className="max-w-6xl mx-auto p-4 md:p-8">
 
         {/* Summary Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3 md:gap-4 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 md:gap-4 mb-6">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0 }}>
             <Card className="bg-slate-800/50 backdrop-blur border border-slate-700/50 p-4">
               <div className="flex items-center gap-2 mb-1">
@@ -327,16 +322,6 @@ export function OrderHistoryPage({ onBack, existingOrders, restaurantName = '', 
             </Card>
           </motion.div>
 
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
-            <Card className="bg-slate-800/50 backdrop-blur border border-slate-700/50 p-4">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-xs text-slate-400 uppercase">Avg Order Value</span>
-              </div>
-              <p className="text-2xl font-bold text-blue-400">
-                RWF {Math.round(stats.avgOrderValue).toLocaleString()}
-              </p>
-            </Card>
-          </motion.div>
         </div>
 
         {/* Orders Table */}

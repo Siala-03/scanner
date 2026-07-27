@@ -1,7 +1,5 @@
 import {
   Clock3Icon,
-  ClockIcon,
-  CheckCircleIcon,
   DollarSignIcon,
   ReceiptTextIcon,
   TrendingUpIcon,
@@ -156,27 +154,22 @@ export function SupervisorDashboard({ restaurantName, ordersByHour, statusBreakd
           </div>
         </div>
 
-        {/* Payment status overview */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
-          <div className="rounded-xl border border-amber-500/30 p-4 bg-amber-500/5 flex items-center gap-4">
-            <div className="w-10 h-10 rounded-full bg-amber-500/15 flex items-center justify-center shrink-0">
-              <ClockIcon className="w-5 h-5 text-amber-400" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-xs uppercase tracking-wide text-amber-400">Pending Payments</div>
-              <div className="text-2xl font-bold text-amber-300 mt-0.5">{pendingPaymentCount} orders</div>
-              <div className="text-sm text-amber-200/70">{formatPrice(pendingPaymentTotal)} outstanding</div>
-            </div>
+        {/* Revenue overview — 3 stat cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+          <div className="rounded-xl border border-slate-700 p-4 bg-slate-800/70">
+            <div className="text-xs uppercase tracking-wide text-slate-400 mb-1">Total Revenue</div>
+            <div className="text-2xl font-bold text-amber-300">{formatPrice(confirmedPaymentTotal + pendingPaymentTotal)}</div>
+            <div className="text-xs text-slate-400 mt-1">Confirmed + awaiting</div>
           </div>
-          <div className="rounded-xl border border-emerald-500/30 p-4 bg-emerald-500/5 flex items-center gap-4">
-            <div className="w-10 h-10 rounded-full bg-emerald-500/15 flex items-center justify-center shrink-0">
-              <CheckCircleIcon className="w-5 h-5 text-emerald-400" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-xs uppercase tracking-wide text-emerald-400">Confirmed Payments</div>
-              <div className="text-2xl font-bold text-emerald-300 mt-0.5">{confirmedPaymentCount} orders</div>
-              <div className="text-sm text-emerald-200/70">{formatPrice(confirmedPaymentTotal)} collected</div>
-            </div>
+          <div className="rounded-xl border border-emerald-500/30 p-4 bg-emerald-500/5">
+            <div className="text-xs uppercase tracking-wide text-emerald-400 mb-1">Confirmed Revenue</div>
+            <div className="text-2xl font-bold text-emerald-300">{formatPrice(confirmedPaymentTotal)}</div>
+            <div className="text-xs text-emerald-200/60 mt-1">Payment confirmed · {confirmedPaymentCount} orders</div>
+          </div>
+          <div className={`rounded-xl border p-4 ${pendingPaymentTotal > 0 ? 'border-orange-500/30 bg-orange-500/5' : 'border-slate-700 bg-slate-800/70'}`}>
+            <div className={`text-xs uppercase tracking-wide mb-1 ${pendingPaymentTotal > 0 ? 'text-orange-400' : 'text-slate-400'}`}>Awaiting Payment</div>
+            <div className={`text-2xl font-bold ${pendingPaymentTotal > 0 ? 'text-orange-300' : 'text-slate-400'}`}>{formatPrice(pendingPaymentTotal)}</div>
+            <div className="text-xs text-slate-400 mt-1">Not yet confirmed · {pendingPaymentCount} orders</div>
           </div>
         </div>
 
