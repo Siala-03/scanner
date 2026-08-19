@@ -783,7 +783,8 @@ export function buildKitchenTicketHtml(ticket: KitchenTicketData): string {
     year: 'numeric', month: 'short', day: 'numeric',
     hour: '2-digit', minute: '2-digit',
   });
-  const placedAtStr = placedAt.toLocaleString('en-US', {
+  const placedAtStr = placedAt.toLocaleString('en-GB', {
+    day: '2-digit', month: 'short', year: 'numeric',
     hour: '2-digit', minute: '2-digit',
   });
 
