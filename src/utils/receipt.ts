@@ -594,6 +594,7 @@ export function buildChitHtml(data: ChitData): string {
     orderNumber, tableLabel, waiterName, items, total, notes,
   } = data;
   const now = data.time ?? new Date();
+  const dateStr = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
   const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
   const fmt = (v: number) => 'RWF ' + Math.round(v).toLocaleString('en-US');
@@ -693,6 +694,7 @@ export function buildChitHtml(data: ChitData): string {
   <hr class="dashed">
 
   <table class="meta">
+    <tr><td>Date</td><td>${dateStr}</td></tr>
     <tr><td>Time</td><td>${timeStr}</td></tr>
     ${waiterName ? `<tr><td>Waiter</td><td>${waiterName}</td></tr>` : ''}
   </table>
