@@ -1797,7 +1797,7 @@ export function WaiterDashboard({
       {/* Manual table picker */}
       {showTablePicker && (
         <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center bg-black/60 p-4">
-          <div className="w-full max-w-lg rounded-2xl border border-slate-700 bg-slate-900 p-5 shadow-2xl">
+          <div className="w-full max-w-2xl rounded-2xl border border-slate-700 bg-slate-900 p-5 shadow-2xl">
             <div className="mb-4 flex items-center justify-between">
               <div>
                 <h3 className="text-lg font-bold text-white">Select Table</h3>
@@ -1828,7 +1828,7 @@ export function WaiterDashboard({
             </button>
 
             {/* Table grid */}
-            <div className="grid grid-cols-3 gap-3 max-h-[55vh] overflow-y-auto pr-1">
+            <div className="grid grid-cols-3 gap-3 max-h-[65vh] overflow-y-auto pr-1">
               {[...allTables].sort((a, b) => a - b).map((tNum) => {
                 const status = tableOccupancy[tNum];
                 const activeOrder = status ? findActiveOrderForTable(tNum) : null;
