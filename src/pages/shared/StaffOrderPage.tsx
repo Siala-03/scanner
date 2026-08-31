@@ -11,6 +11,8 @@ import {
   XIcon,
   UtensilsIcon,
   PrinterIcon,
+  ReceiptTextIcon,
+  ClockIcon,
 } from 'lucide-react';
 import { useMenu } from '../../hooks/useMenu';
 import { useTables } from '../../hooks/useTables';
@@ -103,6 +105,7 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
   // null = Bar / Walk-up (no table number)
   const [selectedTable, setSelectedTable] = useState<number | null | 'bar'>('bar');
   const [tableOccupancy, setTableOccupancy] = useState<Record<number, TableStatus>>({});
+  const [tableOrderMeta, setTableOrderMeta] = useState<Record<number, { id: string; createdAt: string }>>({});
   const [occupancyLoading, setOccupancyLoading] = useState(false);
 
   const [cart, setCart] = useState<CartEntry[]>([]);
@@ -169,6 +172,7 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
       const now = Date.now();
       const staleThreshold = now - 5 * 60 * 60 * 1000;
       const map: Record<number, TableStatus> = {};
+      const metaMap: Record<number, { id: string; createdAt: string }> = {};
       (active as any[]).forEach((order) => {
         const tNum: number | undefined = order.tableNumber ?? order.table_number;
         if (tNum == null || tNum === 999) return;
@@ -185,9 +189,11 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
         const current = map[tNum];
         if (!current || (current === 'occupied' && next === 'urgent')) {
           map[tNum] = next;
+          metaMap[tNum] = { id: order.id, createdAt: createdAt ?? '' };
         }
       });
       setTableOccupancy(map);
+      setTableOrderMeta(metaMap);
     } catch {
       /* non-critical */
     } finally {
@@ -748,20 +754,41 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
               No tables configured. Add tables in QR Codes settings.
             </div>
           ) : (
-            <div className="grid grid-cols-4 gap-3 sm:grid-cols-5 md:grid-cols-6">
-              {[...tables].sort((a, b) => a - b).map((tNum) => (
-                <button
-                  key={tNum}
-                  onClick={() => confirmAndSelectTable(tNum)}
-                  className={`relative flex flex-col items-center justify-center rounded-xl border-2 py-4 font-bold text-lg transition-all ${tableStatusClasses(tNum)}`}
-                >
-                  <span className={`absolute top-2 right-2 w-2 h-2 rounded-full ${tableStatusDot(tNum)}`} />
-                  {tNum}
-                  <span className="text-xs font-normal opacity-70 mt-0.5">
-                    {tableOccupancy[tNum] === 'urgent' ? 'urgent' : tableOccupancy[tNum] === 'occupied' ? 'busy' : 'free'}
-                  </span>
-                </button>
-              ))}
+            <div className="grid grid-cols-3 gap-3">
+              {[...tables].sort((a, b) => a - b).map((tNum) => {
+                const status = tableOccupancy[tNum];
+                const meta = tableOrderMeta[tNum];
+                const billOut = meta ? isBillPresented(meta.id) : false;
+                const createdMs = meta?.createdAt ? new Date(meta.createdAt).getTime() : 0;
+                const elapsedMin = createdMs ? Math.floor((Date.now() - createdMs) / 60000) : 0;
+                const elapsedStr = elapsedMin >= 60
+                  ? `${Math.floor(elapsedMin / 60)}h ${elapsedMin % 60}m`
+                  : `${elapsedMin}m`;
+                const timeColor = status === 'urgent' ? 'text-red-300' : 'text-amber-300';
+                return (
+                  <button
+                    key={tNum}
+                    onClick={() => confirmAndSelectTable(tNum)}
+                    className={`relative flex flex-col items-center justify-center rounded-xl border-2 min-h-[6.5rem] transition-all ${tableStatusClasses(tNum)}`}
+                  >
+                    <span className={`absolute top-2 right-2 w-2 h-2 rounded-full ${tableStatusDot(tNum)}`} />
+                    {billOut && (
+                      <span className="absolute top-2 left-2">
+                        <ReceiptTextIcon className="w-3.5 h-3.5 text-blue-400" />
+                      </span>
+                    )}
+                    <span className="font-bold text-xl">{tNum}</span>
+                    {status && createdMs ? (
+                      <span className={`text-sm font-bold mt-0.5 flex items-center gap-0.5 ${timeColor} ${status === 'urgent' ? 'animate-pulse' : ''}`}>
+                        <ClockIcon className="w-3 h-3" />{elapsedStr}
+                      </span>
+                    ) : null}
+                    <span className="text-xs font-normal opacity-70 mt-0.5">
+                      {status === 'urgent' ? 'urgent' : status === 'occupied' ? 'busy' : 'free'}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>

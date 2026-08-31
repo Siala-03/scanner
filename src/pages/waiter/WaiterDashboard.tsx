@@ -23,6 +23,7 @@ import {
   ClockIcon,
   PencilIcon,
   XIcon,
+  ReceiptTextIcon,
 } from 'lucide-react';
 import { formatPrice } from '../../utils/currency';
 import { Order, Staff, CartItem, OrderItem, Reservation } from '../../types';
@@ -1827,12 +1828,18 @@ export function WaiterDashboard({
             </button>
 
             {/* Table grid */}
-            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2.5 max-h-[50vh] overflow-y-auto pr-1">
+            <div className="grid grid-cols-3 gap-3 max-h-[55vh] overflow-y-auto pr-1">
               {[...allTables].sort((a, b) => a - b).map((tNum) => {
                 const status = tableOccupancy[tNum];
                 const activeOrder = status ? findActiveOrderForTable(tNum) : null;
                 const itemCount = activeOrder?.items?.length ?? 0;
                 const orderTotal = activeOrder?.total ?? 0;
+                const billOut = activeOrder ? isBillPresented(activeOrder.id) : false;
+                const createdMs = activeOrder ? new Date(activeOrder.createdAt).getTime() : 0;
+                const elapsedMin = createdMs ? Math.floor((Date.now() - createdMs) / 60000) : 0;
+                const elapsedStr = elapsedMin >= 60
+                  ? `${Math.floor(elapsedMin / 60)}h ${elapsedMin % 60}m`
+                  : `${elapsedMin}m`;
 
                 const borderCls = status === 'urgent'
                   ? 'border-red-500/70 bg-red-500/10 hover:bg-red-500/20'
@@ -1841,6 +1848,7 @@ export function WaiterDashboard({
                     : 'border-slate-700 bg-slate-800/80 hover:border-emerald-500/50 hover:bg-slate-800';
                 const dot = status === 'urgent' ? 'bg-red-400 animate-pulse' : status === 'occupied' ? 'bg-amber-400' : 'bg-emerald-400';
                 const numColor = status === 'urgent' ? 'text-red-200' : status === 'occupied' ? 'text-amber-200' : 'text-slate-200';
+                const timeColor = status === 'urgent' ? 'text-red-300' : 'text-amber-300';
                 return (
                   <button
                     key={tNum}
@@ -1862,10 +1870,20 @@ export function WaiterDashboard({
                         setShowOrderEntry(true);
                       }
                     }}
-                    className={`relative flex flex-col items-center justify-center rounded-xl border p-3 min-h-[4.5rem] transition-all ${borderCls}`}
+                    className={`relative flex flex-col items-center justify-center rounded-xl border p-3 min-h-[6.5rem] transition-all ${borderCls}`}
                   >
                     <span className={`absolute top-2 right-2 w-2 h-2 rounded-full ${dot}`} />
-                    <span className={`text-lg font-bold ${numColor}`}>{tNum}</span>
+                    {billOut && (
+                      <span className="absolute top-2 left-2">
+                        <ReceiptTextIcon className="w-3.5 h-3.5 text-blue-400" />
+                      </span>
+                    )}
+                    <span className={`text-xl font-bold ${numColor}`}>{tNum}</span>
+                    {status && createdMs ? (
+                      <span className={`text-sm font-bold mt-0.5 ${timeColor} ${status === 'urgent' ? 'animate-pulse' : ''}`}>
+                        {elapsedStr}
+                      </span>
+                    ) : null}
                     {status ? (
                       <span className="text-[10px] text-slate-400 mt-0.5">
                         {itemCount} item{itemCount !== 1 ? 's' : ''} · {formatPrice(orderTotal)}
