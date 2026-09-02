@@ -368,7 +368,7 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
       .map((rec) => {
         const item = {
           id: rec.menuItemId || rec.id,
-          name: rec.menuItemId || rec.id,
+          name: rec.description || rec.menuItemId || rec.id,
           category: rec.category || 'Other',
         };
         const stock = rec.stock;
