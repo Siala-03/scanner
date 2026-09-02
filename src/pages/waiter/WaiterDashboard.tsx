@@ -28,16 +28,14 @@ import {
 import { formatPrice } from '../../utils/currency';
 import { Order, Staff, CartItem, OrderItem, Reservation } from '../../types';
 import { getReservations, updateReservation } from '../../api/reservations';
-import { requestOrderCancellation, confirmPayment } from '../../api/orders';
+import { requestOrderCancellation } from '../../api/orders';
 import { QRScanner } from '../../components/waiter/QRScanner';
 import { WaiterOrderEntry } from '../../components/waiter/WaiterOrderEntry';
 import { loadReviews } from '../../utils/reviewsStorage';
 import { useStaffKPIs } from '../../hooks/useKPIs';
 import { orderToReceiptData, buildReceiptHtml, printReceipt } from '../../utils/receipt';
 import { markBillPresented, isBillPresented } from '../../utils/billTracking';
-import type { PaymentEntry } from '../../utils/receipt';
 import { ReceiptShareModal } from '../../components/ui/ReceiptShareModal';
-import { PaymentCaptureModal } from '../../components/ui/PaymentCaptureModal';
 import { supabase } from '../../lib/supabase';
 import { markTableSessionPendingCloseFromReceipt } from '../../utils/tableSessions';
 import { OnlineOrdersForWaiter } from '../../components/waiter/OnlineOrdersSection';
@@ -868,7 +866,6 @@ export function WaiterDashboard({
   const [socketCalls, setSocketCalls] = useState<{ tableNumber: number; timestamp: Date }[]>([]);
   const [showShareModal, setShowShareModal] = useState(false);
   const [selectedOrderForShare, setSelectedOrderForShare] = useState<Order | null>(null);
-  const [paymentCaptureOrder, setPaymentCaptureOrder] = useState<Order | null>(null);
   const [todayReservations, setTodayReservations] = useState<Reservation[]>([]);
   const [reservationsExpanded, setReservationsExpanded] = useState(true);
   // Track order IDs we've already seen so we can detect truly new ones
@@ -1302,7 +1299,29 @@ export function WaiterDashboard({
 
   const handlePrintReceipt = (order: Order) => {
     markBillPresented(order.id);
-    setPaymentCaptureOrder(order);
+    const receiptData = orderToReceiptData(order, {
+      restaurantName: restaurantName || 'Company',
+      restaurantAddress: restaurantInfo?.address || '',
+      restaurantPhone: restaurantInfo?.phone || '',
+      restaurantEmail: restaurantInfo?.email || '',
+      restaurantLogo: restaurantInfo?.logo,
+      restaurantCity: restaurantInfo?.city,
+      restaurantCountry: restaurantInfo?.country,
+      restaurantMomoCode: restaurantInfo?.momoCode,
+      taxRate: 0,
+      serverName: waiterName,
+      orderType: order.deliveryAddress ? 'delivery' : 'dine-in',
+      paymentStatus: 'pending',
+      payments: [{ method: 'Pending', amount: order.total ?? 0 }],
+    });
+    try {
+      printReceipt(buildReceiptHtml(receiptData));
+    } catch {
+      alert('Could not open print window. Please allow pop-ups in your browser.');
+    }
+    if (order.tableNumber != null) {
+      markTableSessionPendingCloseFromReceipt(order.tableNumber).catch(() => {});
+    }
   };
 
   const handleCancelRound = async (orderId: string, round: number, reason: string) => {
@@ -1314,67 +1333,6 @@ export function WaiterDashboard({
     setPendingCancelRequests((prev) => new Set(prev).add(orderId));
   };
 
-  const handlePaymentConfirmed = async (payments: PaymentEntry[], change: number, receiptNote?: string) => {
-    const order = paymentCaptureOrder;
-    if (!order) return;
-    setPaymentCaptureOrder(null);
-
-    const paymentBreakdown = payments.map(p => ({
-      method: p.method,
-      amount: p.amount,
-      ...(p.reference ? { reference: p.reference } : {}),
-    }));
-    const primaryMethod = payments.reduce((a, b) => a.amount >= b.amount ? a : b);
-
-    try {
-      await confirmPayment(order.id, {
-        paymentType: primaryMethod.method,
-        paymentBreakdown,
-        confirmedBy: String(waiter.id),
-        confirmedByName: waiterName,
-      });
-    } catch (err) {
-      console.error('Failed to confirm payment:', err);
-      alert('Payment confirmation failed. Please try again or ask your supervisor to confirm this payment.');
-      return;
-    }
-    onUpdateOrderStatus(order.id, 'served', { assignedWaiterId: waiter.id });
-
-    try {
-      const combinedNotes = [cleanSourceTag(order.notes), receiptNote?.trim() || '']
-        .filter(Boolean)
-        .join('\n');
-      const receiptData = orderToReceiptData(order, {
-        restaurantName: restaurantName || 'Company',
-        restaurantAddress: restaurantInfo?.address || '',
-        restaurantPhone: restaurantInfo?.phone || '',
-        restaurantEmail: restaurantInfo?.email || '',
-        restaurantLogo: restaurantInfo?.logo,
-        restaurantCity: restaurantInfo?.city,
-        restaurantCountry: restaurantInfo?.country,
-        restaurantMomoCode: restaurantInfo?.momoCode,
-        taxRate: 0,
-        serverName: waiterName,
-        orderType: order.deliveryAddress ? 'delivery' : 'dine-in',
-        payments,
-        paymentStatus: 'paid',
-        change,
-        notes: combinedNotes || undefined,
-      });
-      try {
-        printReceipt(buildReceiptHtml(receiptData));
-      } catch {
-        alert('Could not open print window. Please allow pop-ups in your browser.');
-      }
-      if (order.tableNumber != null) {
-        await markTableSessionPendingCloseFromReceipt(order.tableNumber);
-      }
-    } catch (_e) {
-      if (order.tableNumber != null) {
-        await markTableSessionPendingCloseFromReceipt(order.tableNumber);
-      }
-    }
-  };
 
   const handleShare = (order: Order) => {
     setSelectedOrderForShare(order);
@@ -2026,14 +1984,6 @@ export function WaiterDashboard({
         />
       )}
 
-      {paymentCaptureOrder && (
-        <PaymentCaptureModal
-          total={paymentCaptureOrder.total ?? 0}
-          currency="RWF"
-          onConfirm={handlePaymentConfirmed}
-          onCancel={() => setPaymentCaptureOrder(null)}
-        />
-      )}
 
       {/* Occupied-table dialog — shows existing order and asks how to proceed */}
       {confirmOccupied !== null && (
