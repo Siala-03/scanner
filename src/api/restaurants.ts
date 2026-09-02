@@ -1,5 +1,6 @@
 ﻿import { supabase, callEdgeFn } from '../lib/supabase';
 import type { IpRestrictionSettings } from '../utils/ipRestriction';
+import { setPrinterWidth } from '../utils/receipt';
 
 export type OutletType = 'restaurant' | 'bar' | 'minimart' | 'hotel' | 'cafe';
 
@@ -30,6 +31,7 @@ export interface RestaurantReceiptSettings {
   email?: string;
   currency?: string; // e.g. 'RWF' | 'KShs' | 'UGX'
   momoCode?: string;
+  printerWidth?: '58mm' | '80mm';
 }
 
 export async function fetchRestaurants(): Promise<Restaurant[]> {
@@ -138,7 +140,7 @@ export async function fetchReceiptSettings(restaurantId: string): Promise<Restau
   }
 
   const receiptFromSettings = (data?.settings as Record<string, unknown> | undefined)?.receipt as RestaurantReceiptSettings | undefined;
-  return {
+  const result: RestaurantReceiptSettings = {
     logo: receiptFromSettings?.logo || (data as any)?.logo_url || undefined,
     address: receiptFromSettings?.address || (data as any)?.address || undefined,
     city: receiptFromSettings?.city || (data as any)?.city || undefined,
@@ -147,7 +149,10 @@ export async function fetchReceiptSettings(restaurantId: string): Promise<Restau
     email: receiptFromSettings?.email || (data as any)?.email || undefined,
     currency: receiptFromSettings?.currency || undefined,
     momoCode: receiptFromSettings?.momoCode || (data as any)?.momo_code || undefined,
+    printerWidth: receiptFromSettings?.printerWidth || undefined,
   };
+  if (result.printerWidth) setPrinterWidth(result.printerWidth);
+  return result;
 }
 
 /**
@@ -159,6 +164,9 @@ export async function saveReceiptSettings(
   receiptSettings: RestaurantReceiptSettings,
   restaurantName?: string,
 ): Promise<void> {
+  // Update local printer width immediately so callers see the change without re-fetching.
+  if (receiptSettings.printerWidth) setPrinterWidth(receiptSettings.printerWidth);
+
   // Fetch whole row (schema-safe) so we can merge settings when available.
   const { data: current } = await supabase
     .from('restaurants')

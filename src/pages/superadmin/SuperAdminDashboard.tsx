@@ -5,7 +5,7 @@ import { Card } from '../../components/ui/Card';
 import { Modal } from '../../components/ui/Modal';
 import { Input } from '../../components/ui/Input';
 import { changePassword } from '../../api/auth';
-import { fetchRestaurants, createRestaurant, updateRestaurant, deleteRestaurant, setRestaurantActive, type Restaurant, type OutletType } from '../../api/restaurants';
+import { fetchRestaurants, createRestaurant, updateRestaurant, deleteRestaurant, setRestaurantActive, fetchReceiptSettings, saveReceiptSettings, type Restaurant, type OutletType } from '../../api/restaurants';
 import { fetchTablesForRestaurant, deleteTable } from '../../api/tables';
 
 interface Table {
@@ -53,6 +53,7 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
     managerUsername: '',
     managerPassword: ''
   });
+  const [printerWidth, setPrinterWidth] = useState<'58mm' | '80mm'>('80mm');
 
   useEffect(() => {
     loadRestaurants();
@@ -141,6 +142,13 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
           address:     formData.address,
           outlet_type: formData.outlet_type,
         });
+        // Persist printer width into receipt settings (non-blocking if it fails)
+        try {
+          const current = await fetchReceiptSettings(editingId);
+          await saveReceiptSettings(editingId, { ...current, printerWidth });
+        } catch {
+          // non-critical
+        }
       } else {
         await createRestaurant({
           name:            formData.name,
@@ -173,7 +181,7 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
     }
   };
 
-  const handleEdit = (restaurant: Restaurant) => {
+  const handleEdit = async (restaurant: Restaurant) => {
     setFormData({
       name:            restaurant.name,
       email:           restaurant.email,
@@ -187,6 +195,13 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
       managerPassword: '',
     });
     setFormError('');
+    setPrinterWidth('80mm');
+    try {
+      const receiptSettings = await fetchReceiptSettings(restaurant.id);
+      setPrinterWidth(receiptSettings.printerWidth ?? '80mm');
+    } catch {
+      // non-critical — keep default
+    }
     setEditingId(restaurant.id);
     setShowCreateModal(true);
   };
@@ -235,6 +250,7 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
       managerPassword: '',
     });
     setEditingId(null);
+    setPrinterWidth('80mm');
   };
 
   return (
@@ -618,6 +634,29 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
                   : 'Restaurant, bar, hotel and cafe outlets use the standard table ordering interface.'}
               </p>
             </div>
+
+            {editingId && (
+              <div className="space-y-1">
+                <label className="block text-sm font-medium text-slate-300">Printer Paper Width</label>
+                <div className="flex gap-2">
+                  {(['58mm', '80mm'] as const).map((w) => (
+                    <button
+                      key={w}
+                      type="button"
+                      onClick={() => setPrinterWidth(w)}
+                      className={`flex-1 py-2 rounded-lg border text-sm font-medium transition-colors ${
+                        printerWidth === w
+                          ? 'bg-indigo-500/20 border-indigo-500 text-indigo-300'
+                          : 'bg-slate-800 border-slate-600 text-slate-400 hover:border-slate-500'
+                      }`}
+                    >
+                      {w} {w === '58mm' ? '(XPrinter)' : '(standard)'}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-slate-500">Thermal printer paper roll width for this client.</p>
+              </div>
+            )}
 
             {!editingId && (
               <div className="border-t border-slate-600 pt-4 mt-6">

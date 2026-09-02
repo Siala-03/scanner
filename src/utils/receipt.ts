@@ -1,6 +1,21 @@
 import { Order } from '../types';
 
 // ============================================
+// PRINTER WIDTH HELPERS
+// ============================================
+
+const PRINTER_WIDTH_KEY = 'printerWidth';
+
+export function getPrinterWidth(): '58mm' | '80mm' {
+  const stored = localStorage.getItem(PRINTER_WIDTH_KEY);
+  return stored === '58mm' ? '58mm' : '80mm';
+}
+
+export function setPrinterWidth(width: '58mm' | '80mm'): void {
+  localStorage.setItem(PRINTER_WIDTH_KEY, width);
+}
+
+// ============================================
 // CURRENCY FORMATTING
 // ============================================
 
@@ -302,7 +317,7 @@ export function orderToReceiptData(
  * Uses @page { size: 80mm auto } so XPrinter / any 80mm USB printer
  * via window.print() gets the correct paper width automatically.
  */
-export function buildReceiptHtml(receipt: ReceiptData): string {
+export function buildReceiptHtml(receipt: ReceiptData, printerWidth: '58mm' | '80mm' = getPrinterWidth()): string {
   const {
     restaurantName,
     restaurantAddress,
@@ -371,13 +386,13 @@ export function buildReceiptHtml(receipt: ReceiptData): string {
   <meta charset="UTF-8">
   <title>Receipt #${orderNumber}</title>
   <style>
-    @page { size: 80mm auto; margin: 0; }
+    @page { size: ${printerWidth} auto; margin: 0; }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif; font-size: 10pt; color: #000; line-height: 1.45; }
 
     @media screen {
       body { background: #c8c8c8; display: flex; flex-direction: column; align-items: center; padding: 20px 12px 40px; }
-      .paper { background: #fff; width: 80mm; padding: 6mm 5mm 10mm; box-shadow: 0 3px 16px rgba(0,0,0,.22); }
+      .paper { background: #fff; width: ${printerWidth}; padding: 6mm 5mm 10mm; box-shadow: 0 3px 16px rgba(0,0,0,.22); }
     }
     @media print {
       html, body { background: #fff; display: block; }
@@ -587,7 +602,7 @@ export interface ChitData {
  * Printed once per order round so bar staff know exactly what to prepare.
  * Same paper size and auto-print behaviour as buildReceiptHtml.
  */
-export function buildChitHtml(data: ChitData): string {
+export function buildChitHtml(data: ChitData, printerWidth: '58mm' | '80mm' = getPrinterWidth()): string {
   const {
     restaurantName, restaurantLogo, restaurantAddress, restaurantPhone,
     restaurantEmail, restaurantCity, restaurantCountry, restaurantMomoCode,
@@ -614,13 +629,13 @@ export function buildChitHtml(data: ChitData): string {
   <meta charset="UTF-8">
   <title>Chit #${orderNumber}</title>
   <style>
-    @page { size: 80mm auto; margin: 0; }
+    @page { size: ${printerWidth} auto; margin: 0; }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif; font-size: 9pt; color: #000; font-weight: 600; line-height: 1.45; }
 
     @media screen {
       body { background: #c8c8c8; display: flex; flex-direction: column; align-items: center; padding: 20px 12px 40px; }
-      .paper { background: #fff; width: 80mm; padding: 6mm 5mm 10mm; box-shadow: 0 3px 16px rgba(0,0,0,.22); }
+      .paper { background: #fff; width: ${printerWidth}; padding: 6mm 5mm 10mm; box-shadow: 0 3px 16px rgba(0,0,0,.22); }
     }
     @media print {
       html, body { background: #fff; display: block; }
@@ -758,7 +773,7 @@ export interface KitchenTicketData {
  * Generate an 80mm kitchen order ticket (KOT) using the same CSS base
  * as buildReceiptHtml so all printed documents look consistent.
  */
-export function buildKitchenTicketHtml(ticket: KitchenTicketData): string {
+export function buildKitchenTicketHtml(ticket: KitchenTicketData, printerWidth: '58mm' | '80mm' = getPrinterWidth()): string {
   const {
     restaurantName,
     restaurantLogo,
@@ -800,13 +815,13 @@ export function buildKitchenTicketHtml(ticket: KitchenTicketData): string {
   <meta charset="UTF-8">
   <title>Kitchen Ticket #${orderNumber}</title>
   <style>
-    @page { size: 80mm auto; margin: 0; }
+    @page { size: ${printerWidth} auto; margin: 0; }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif; font-size: 10pt; color: #000; line-height: 1.45; }
 
     @media screen {
       body { background: #c8c8c8; display: flex; flex-direction: column; align-items: center; padding: 20px 12px 40px; }
-      .paper { background: #fff; width: 80mm; padding: 6mm 5mm 10mm; box-shadow: 0 3px 16px rgba(0,0,0,.22); }
+      .paper { background: #fff; width: ${printerWidth}; padding: 6mm 5mm 10mm; box-shadow: 0 3px 16px rgba(0,0,0,.22); }
     }
     @media print {
       html, body { background: #fff; display: block; }
@@ -933,8 +948,9 @@ export function buildKitchenTicketHtml(ticket: KitchenTicketData): string {
 /**
  * Open a kitchen ticket in a named 80mm-wide window.
  */
-export function printKitchenTicket(html: string): void {
-  const printWindow = window.open('', 'kitchen_print', 'width=302,height=700,toolbar=0,scrollbars=1,status=0');
+export function printKitchenTicket(html: string, printerWidth: '58mm' | '80mm' = getPrinterWidth()): void {
+  const popupWidth = printerWidth === '58mm' ? 219 : 302;
+  const printWindow = window.open('', 'kitchen_print', `width=${popupWidth},height=700,toolbar=0,scrollbars=1,status=0`);
   if (!printWindow) {
     throw new Error('Unable to open print window. Please allow pop-ups.');
   }
@@ -951,8 +967,9 @@ export function printKitchenTicket(html: string): void {
  * Open receipt in a named 80mm-wide window.
  * The embedded script auto-prints and auto-closes when opened this way.
  */
-export function printReceipt(html: string): void {
-  const printWindow = window.open('', 'receipt_print', 'width=302,height=700,toolbar=0,scrollbars=1,status=0');
+export function printReceipt(html: string, printerWidth: '58mm' | '80mm' = getPrinterWidth()): void {
+  const popupWidth = printerWidth === '58mm' ? 219 : 302;
+  const printWindow = window.open('', 'receipt_print', `width=${popupWidth},height=700,toolbar=0,scrollbars=1,status=0`);
   if (!printWindow) {
     throw new Error('Unable to open print window. Please allow pop-ups.');
   }
@@ -1020,7 +1037,8 @@ export function buildExpenseReceiptHtml(
   restaurantName = 'Company',
   restaurantAddress = '',
   restaurantPhone = '',
-  restaurantLogo = ''
+  restaurantLogo = '',
+  printerWidth: '58mm' | '80mm' = getPrinterWidth()
 ): string {
   const taxAmount = expense.taxAmount !== undefined
     ? expense.taxAmount
@@ -1040,13 +1058,13 @@ export function buildExpenseReceiptHtml(
   <meta charset="UTF-8">
   <title>Expense Receipt #${receiptRef}</title>
   <style>
-    @page { size: 80mm auto; margin: 0; }
+    @page { size: ${printerWidth} auto; margin: 0; }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif; font-size: 10pt; color: #000; line-height: 1.45; }
 
     @media screen {
       body { background: #c8c8c8; display: flex; flex-direction: column; align-items: center; padding: 20px 12px 40px; }
-      .paper { background: #fff; width: 80mm; padding: 6mm 5mm 10mm; box-shadow: 0 3px 16px rgba(0,0,0,.22); }
+      .paper { background: #fff; width: ${printerWidth}; padding: 6mm 5mm 10mm; box-shadow: 0 3px 16px rgba(0,0,0,.22); }
     }
     @media print {
       html, body { background: #fff; display: block; }
@@ -1186,8 +1204,9 @@ export function downloadExpenseReceiptHtml(html: string, filename?: string): voi
   URL.revokeObjectURL(url);
 }
 
-export function printExpenseReceipt(html: string): void {
-  const printWindow = window.open('', 'receipt_print', 'width=302,height=700,toolbar=0,scrollbars=1,status=0');
+export function printExpenseReceipt(html: string, printerWidth: '58mm' | '80mm' = getPrinterWidth()): void {
+  const popupWidth = printerWidth === '58mm' ? 219 : 302;
+  const printWindow = window.open('', 'receipt_print', `width=${popupWidth},height=700,toolbar=0,scrollbars=1,status=0`);
   if (!printWindow) {
     throw new Error('Unable to open print window. Please allow pop-ups.');
   }

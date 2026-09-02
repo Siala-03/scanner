@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { BuildingIcon, PhoneIcon, MailIcon, MapPinIcon, GlobeIcon, ImageIcon, SaveIcon, UploadIcon, XIcon, CoinsIcon, ShieldCheckIcon, WifiIcon, RefreshCwIcon, SmartphoneIcon } from 'lucide-react';
+import { BuildingIcon, PhoneIcon, MailIcon, MapPinIcon, GlobeIcon, ImageIcon, SaveIcon, UploadIcon, XIcon, CoinsIcon, ShieldCheckIcon, WifiIcon, RefreshCwIcon, SmartphoneIcon, PrinterIcon } from 'lucide-react';
 import { fetchReceiptSettings, saveReceiptSettings, fetchIpRestriction, saveIpRestriction } from '../../api/restaurants';
 import type { RestaurantReceiptSettings } from '../../api/restaurants';
 import { setCurrency, CURRENCY_OPTIONS, getCurrency, CurrencyCode } from '../../utils/currency';
@@ -310,6 +310,32 @@ export function RestaurantSettings({ restaurantId, restaurantName, onNameChange,
             Applies to all prices shown in menus, orders, receipts and dashboards.
           </p>
         </div>
+      </div>
+
+      {/* ── Printer ── */}
+      <div className="bg-slate-800/60 rounded-xl border border-slate-700 p-6 space-y-4">
+        <h2 className="text-sm font-semibold text-slate-200 uppercase tracking-wider flex items-center gap-2">
+          <PrinterIcon className="w-4 h-4 text-amber-400" /> Printer Paper Width
+        </h2>
+        <div className="flex gap-3">
+          {(['58mm', '80mm'] as const).map((w) => (
+            <button
+              key={w}
+              type="button"
+              onClick={() => setSettings((prev) => ({ ...prev, printerWidth: w }))}
+              className={`flex-1 py-2.5 rounded-lg border text-sm font-medium transition-colors ${
+                (settings.printerWidth ?? '80mm') === w
+                  ? 'bg-amber-500/20 border-amber-500 text-amber-300'
+                  : 'bg-slate-800 border-slate-600 text-slate-400 hover:border-slate-500'
+              }`}
+            >
+              {w} {w === '58mm' ? '(XPrinter / compact)' : '(standard)'}
+            </button>
+          ))}
+        </div>
+        <p className="text-xs text-slate-500">
+          Match this to your thermal printer's physical paper roll width. Affects all receipt, chit and kitchen ticket printouts.
+        </p>
       </div>
 
       {/* ── Receipt Preview hint ── */}
