@@ -107,6 +107,13 @@ function nk(k: string): string {
   return k.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
+function todayIso(): string {
+  return new Date().toISOString().split('T')[0];
+}
+function expiryIso(): string {
+  return new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+}
+
 /** Normalise any common date string to YYYY-MM-DD for Postgres.
  *  Handles: DD/MM/YYYY, DD-MM-YYYY, MM/DD/YYYY (ambiguous — assumes DD/MM when day≤12),
  *  YYYY/MM/DD, Excel serial numbers, and already-correct YYYY-MM-DD. */
@@ -179,8 +186,8 @@ function parseCsvRows(content: string): InventoryImportRow[] {
       menuItemId: id,
       description: rawDescription === undefined ? undefined : String(rawDescription).trim(),
       category: rawCategory ? String(rawCategory).trim() : undefined,
-      expiryDate: normaliseDate(row.expirydate),
-      purchaseDate: normaliseDate(row.purchasedate),
+      expiryDate: normaliseDate(row.expirydate) || expiryIso(),
+      purchaseDate: normaliseDate(row.purchasedate) || todayIso(),
       qtyStart,
       stock,
       lowStockThreshold: Math.round(parseFloat(row.lowstockthreshold ?? row.threshold ?? '5') || 5),
@@ -218,8 +225,8 @@ function parseExcelRows(buffer: ArrayBuffer): InventoryImportRow[] {
         menuItemId: id,
         description: rawDescription === undefined ? undefined : String(rawDescription).trim(),
         category: rawCategory ? String(rawCategory).trim() : undefined,
-        expiryDate: normaliseDate(row.expirydate),
-        purchaseDate: normaliseDate(row.purchasedate),
+        expiryDate: normaliseDate(row.expirydate) || expiryIso(),
+        purchaseDate: normaliseDate(row.purchasedate) || todayIso(),
         qtyStart,
         stock,
         lowStockThreshold: Math.round(Number(row.lowstockthreshold ?? row.threshold ?? 5)),
@@ -252,8 +259,8 @@ export async function importInventoryFromFile(file: File): Promise<InventoryImpo
       menuItemId: String(r.menu_item_id || r.menuItemId || r.id || `row-${i}`),
       description: String(r.description ?? ''),
       category: String(r.category ?? r.cat ?? ''),
-      expiryDate: normaliseDate(r.expiry_date ?? r.expiryDate),
-      purchaseDate: normaliseDate(r.purchase_date ?? r.purchaseDate),
+      expiryDate: normaliseDate(r.expiry_date ?? r.expiryDate) || expiryIso(),
+      purchaseDate: normaliseDate(r.purchase_date ?? r.purchaseDate) || todayIso(),
       qtyStart: Math.round(Number(r.qty_start ?? r.qtyStart ?? r.current_qty ?? r.currentQty ?? r.stock ?? 0)),
       stock: Math.round(Number(r.current_qty ?? r.currentQty ?? r.stock ?? 0)),
       lowStockThreshold: Math.round(Number(r.low_stock_threshold ?? r.lowStockThreshold ?? 5)),
