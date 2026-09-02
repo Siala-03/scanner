@@ -71,9 +71,11 @@ export async function loginStaff(
 
   const staff = normalizeStaff(raw);
 
-  localStorage.setItem('staffId',      staff.id);
-  localStorage.setItem('staffRole',    staff.role);
-  localStorage.setItem('restaurantId', staff.restaurantId || '');
+  localStorage.setItem('staffId',   staff.id);
+  localStorage.setItem('staffRole', staff.role);
+  if (staff.restaurantId) {
+    localStorage.setItem('restaurantId', staff.restaurantId);
+  }
 
   if (raw.token) {
     localStorage.setItem('token', raw.token);
@@ -173,6 +175,8 @@ export function logoutStaff(): void {
   localStorage.removeItem('token');
   localStorage.removeItem('staffRole');
   localStorage.removeItem('restaurantId');
+  localStorage.removeItem('authUser');
+  localStorage.removeItem('selectedRole');
 }
 
 export async function changePassword(
