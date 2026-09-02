@@ -785,7 +785,7 @@ export function WaiterDashboard({
 
   const [portalPage, setPortalPage] = useState<'orders' | 'analytics'>('orders');
   const [analyticsRange, setAnalyticsRange] = useState<AnalyticsRange>('weekly');
-  const [activeTab, setActiveTab] = useState<'incoming' | 'kitchen' | 'ready' | 'served' | 'online'>('incoming');
+  const [activeTab, setActiveTab] = useState<'incoming' | 'kitchen' | 'ready' | 'served' | 'online'>('kitchen');
   const [showQRScanner, setShowQRScanner] = useState(false);
   const [showOrderEntry, setShowOrderEntry] = useState(false);
   const [showTablePicker, setShowTablePicker] = useState(false);
@@ -1332,12 +1332,14 @@ export function WaiterDashboard({
     onDismissWaiterCall?.(tableNumber);
   };
 
-  // Auto-switch to incoming tab when a new order arrives
+  // Show incoming tab only when QR orders exist; auto-switch to it on arrival, fall back when cleared
   useEffect(() => {
     if (incomingOrders.length > 0 && activeTab !== 'incoming') {
-      // Don't auto-switch — just pulse the tab indicator (handled by `dot` prop)
+      setActiveTab('incoming');
+    } else if (incomingOrders.length === 0 && activeTab === 'incoming') {
+      setActiveTab('kitchen');
     }
-  }, [incomingOrders.length, activeTab]);
+  }, [incomingOrders.length]);
 
   return (
     <div className="dark min-h-screen bg-slate-900 text-slate-100 pb-24 sm:pb-8">
@@ -1543,13 +1545,15 @@ export function WaiterDashboard({
             {/* Order status tabs */}
             <div className="-mx-4 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
               <div className="flex min-w-max gap-2">
-                <TabButton
-                  label="Incoming"
-                  count={incomingOrders.length}
-                  active={activeTab === 'incoming'}
-                  dot={incomingOrders.length > 0}
-                  onClick={() => setActiveTab('incoming')}
-                />
+                {incomingOrders.length > 0 && (
+                  <TabButton
+                    label="Incoming"
+                    count={incomingOrders.length}
+                    active={activeTab === 'incoming'}
+                    dot
+                    onClick={() => setActiveTab('incoming')}
+                  />
+                )}
                 <TabButton
                   label="In Kitchen"
                   count={kitchenOrders.length}
