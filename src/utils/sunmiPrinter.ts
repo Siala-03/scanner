@@ -8,6 +8,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { ReceiptData } from './receipt';
+import { getPrinterWidth } from './receipt';
 import { formatCurrency, formatDateTime } from './receipt';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -162,16 +163,16 @@ function printViaHtmlPopup(textLines: string[]): void {
 <head>
 <meta charset="UTF-8">
 <style>
-  @page { size: 80mm auto; margin: 0; }
+  @page { size: ${getPrinterWidth()} auto; margin: 0; }
   * { margin:0; padding:0; box-sizing:border-box; }
-  body { font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif; font-size: 10pt; color: #000; }
+  body { font-family: 'Courier New', Courier, monospace; font-size: ${getPrinterWidth() === '58mm' ? '8pt' : '9.5pt'}; color: #000; }
   @media screen {
     body { background: #c8c8c8; display: flex; justify-content: center; padding: 20px; }
-    pre { background: #fff; padding: 8px 10px; box-shadow: 0 2px 10px rgba(0,0,0,.2); width: 80mm; }
+    pre { background: #fff; padding: ${getPrinterWidth() === '58mm' ? '4px 6px' : '8px 10px'}; box-shadow: 0 2px 10px rgba(0,0,0,.2); width: ${getPrinterWidth()}; }
   }
   @media print {
     html, body { background: #fff; display: block; }
-    body { padding: 3mm 4mm 14mm; width: 80mm; }
+    body { padding: ${getPrinterWidth() === '58mm' ? '2mm 2mm 10mm' : '3mm 3mm 14mm'}; width: ${getPrinterWidth()}; }
     .no-print { display: none !important; }
   }
   pre { white-space: pre-wrap; word-break: break-all; line-height: 1.4; }
@@ -192,7 +193,8 @@ function printViaHtmlPopup(textLines: string[]): void {
 </body>
 </html>`;
 
-  const win = window.open('', 'receipt_print', 'width=302,height=700,toolbar=0,scrollbars=1,status=0');
+  const popupWidth = getPrinterWidth() === '58mm' ? 219 : 302;
+  const win = window.open('', 'receipt_print', `width=${popupWidth},height=700,toolbar=0,scrollbars=1,status=0`);
   if (!win) { window.print(); return; }
   win.document.open();
   win.document.write(html);
