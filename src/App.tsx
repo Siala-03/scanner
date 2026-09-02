@@ -1,3 +1,4 @@
+
 import { useCallback, useState, useEffect, useRef } from 'react';
 import { saveOfflineProfile } from './utils/offlineAuth';
 import { motion } from 'framer-motion';
@@ -383,6 +384,7 @@ export function App() {
       setSupervisorPage('dashboard');
       setIsScanning(false);
       setDetectedTable(null);
+      window.dispatchEvent(new Event('restaurantIdChanged'));
       window.history.pushState({}, '', '/');
     }
   };
@@ -410,6 +412,7 @@ export function App() {
     setSupervisorPage('dashboard');
     setIsScanning(false);
     setDetectedTable(null);
+    window.dispatchEvent(new Event('restaurantIdChanged'));
     window.history.pushState({}, '', '/');
   };
 

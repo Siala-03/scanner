@@ -147,22 +147,30 @@ export function useOrders(): UseOrdersReturn {
   const [orders, setOrders] = useState<Order[]>([]);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
-  const [restaurantId] = useState<string | undefined>(
-    () => localStorage.getItem('restaurantId') || undefined
+  // Read restaurantId dynamically so a login/logout that updates localStorage
+  // is immediately reflected — never frozen in a useState initializer.
+  const getActiveRestaurantId = useCallback(
+    () => localStorage.getItem('restaurantId') || undefined,
+    []
   );
+  const [restaurantId, setRestaurantId] = useState<string | undefined>(getActiveRestaurantId);
 
-  // Keep restaurantId in sync whenever the app sets/changes it
+  // Re-sync when the app changes the active restaurant (login / logout / switch)
   useEffect(() => {
     const handleChange = () => {
+      const next = getActiveRestaurantId();
+      setRestaurantId(next);
+      // Immediately flush stale orders so the previous tenant's data is gone
+      setOrders([]);
     };
     window.addEventListener('restaurantIdChanged', handleChange);
     return () => window.removeEventListener('restaurantIdChanged', handleChange);
-  }, []);
+  }, [getActiveRestaurantId]);
 
   const statusChangeInFlight = useRef<Set<string>>(new Set());
 
   const loadOrders = useCallback(async (restId?: string) => {
-    const id = restId || restaurantId;
+    const id = restId || getActiveRestaurantId();
     try {
       const fetched = await apiFetchOrders('all', id);
       const normalized = (fetched ?? []).map((o: any) => normalizeOrderPayload(o)).filter(Boolean) as Order[];
@@ -205,7 +213,7 @@ export function useOrders(): UseOrdersReturn {
     } catch (e: any) {
       console.error('[Orders] Poll failed:', e?.message ?? e);
     }
-  }, [restaurantId]);
+  }, [getActiveRestaurantId]);
 
   useEffect(() => {
     loadOrders();
