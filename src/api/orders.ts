@@ -83,8 +83,10 @@ function generateShortOrderNumber(): string {
 export async function fetchOrders(status?: string, restaurantId?: string): Promise<Order[]> {
   const restaurant = restaurantId || getRestaurantId();
   
-  // Superadmin sees all orders if no restaurant specified
+  // Only superadmin may fetch without a restaurant filter; everyone else gets nothing.
   if (!restaurant) {
+    const role = typeof window !== 'undefined' ? localStorage.getItem('staffRole') : null;
+    if (role !== 'superadmin') return [];
     const { data, error } = await db
       .from('orders')
       .select('*')

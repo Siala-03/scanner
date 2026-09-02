@@ -171,6 +171,14 @@ export function useOrders(): UseOrdersReturn {
 
   const loadOrders = useCallback(async (restId?: string) => {
     const id = restId || getActiveRestaurantId();
+    // No restaurant after logout — clear immediately, don't hit the network.
+    if (!id) {
+      const role = localStorage.getItem('staffRole');
+      if (role !== 'superadmin') {
+        setOrders([]);
+        return;
+      }
+    }
     try {
       const fetched = await apiFetchOrders('all', id);
       const normalized = (fetched ?? []).map((o: any) => normalizeOrderPayload(o)).filter(Boolean) as Order[];
