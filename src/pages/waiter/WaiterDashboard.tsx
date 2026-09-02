@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+ import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { OpenTabModal } from '../../components/shared/OpenTabModal';
 import type { ConfirmMergeFn } from '../../hooks/useOrders';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -707,6 +707,8 @@ function ActiveOrderRow({
                 ) : cancelRoundMode ? (
                   <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-4 space-y-3">
                     <p className="text-sm font-semibold text-red-300">Request Round Cancellation</p>
+
+                    {/* Round selector */}
                     {rounds.length > 1 && (
                       <div className="flex flex-wrap gap-2">
                         {rounds.map((r) => (
@@ -720,6 +722,23 @@ function ActiveOrderRow({
                         ))}
                       </div>
                     )}
+
+                    {/* Items in the selected round */}
+                    {selectedRound !== null && (() => {
+                      const roundItems = (order.items || []).filter((i: any) => (i.round ?? 1) === selectedRound);
+                      return roundItems.length > 0 ? (
+                        <div className="rounded-lg bg-slate-900/60 border border-slate-700 px-3 py-2 space-y-1">
+                          <p className="text-xs text-slate-400 font-medium mb-1">Round {selectedRound} items:</p>
+                          {roundItems.map((i: any, idx: number) => (
+                            <div key={idx} className="flex justify-between text-xs text-slate-300">
+                              <span>{i.quantity}× {i.menuItem?.name ?? i.menuItemName ?? 'Unknown'}</span>
+                              <span className="text-slate-500">{formatPrice((i.unitPrice ?? 0) * i.quantity)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : null;
+                    })()}
+
                     <textarea
                       value={cancelReason}
                       onChange={(e) => setCancelReason(e.target.value)}

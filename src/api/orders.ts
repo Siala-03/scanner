@@ -387,15 +387,17 @@ export async function createOrder(order: CreateOrderInput): Promise<Order> {
       const nextRound = maxRound + 1;
       const roundedItems = items.map(i => ({ ...i, round: nextRound }));
 
+      const mergedRequiresKitchen = Boolean((mergeTarget as any).requires_kitchen ?? (mergeTarget as any).requiresKitchen) || Boolean(order.requiresKitchen);
+      const mergeStatus = staffRole === 'waiter' ? (mergedRequiresKitchen ? 'verified' : 'ready') : 'pending';
       const mergePayloads: Array<Record<string, unknown>> = [
         {
           items: [...existingItems, ...roundedItems],
           subtotal: mergedSubtotal,
           total: mergedTotal,
           notes: mergedNotes,
-          status: 'pending',
+          status: mergeStatus,
           payment_status: 'unpaid',
-          requires_kitchen: Boolean((mergeTarget as any).requires_kitchen ?? (mergeTarget as any).requiresKitchen) || Boolean(order.requiresKitchen),
+          requires_kitchen: mergedRequiresKitchen,
           assigned_waiter_id: (mergeTarget as any).assigned_waiter_id || assignedWaiterId,
           updated_at: new Date().toISOString(),
         },
@@ -404,14 +406,14 @@ export async function createOrder(order: CreateOrderInput): Promise<Order> {
           subtotal: mergedSubtotal,
           total: mergedTotal,
           notes: mergedNotes,
-          status: 'pending',
+          status: mergeStatus,
           payment_status: 'unpaid',
           updated_at: new Date().toISOString(),
         },
         {
           items: [...existingItems, ...roundedItems],
           total: mergedTotal,
-          status: 'pending',
+          status: mergeStatus,
           updated_at: new Date().toISOString(),
         },
       ];
@@ -452,6 +454,13 @@ export async function createOrder(order: CreateOrderInput): Promise<Order> {
     }
   }
 
+  // Waiter-placed orders skip "incoming" — they are already approved by definition.
+  // Kitchen orders go to "verified" so the KDS picks them up; non-kitchen go straight to "ready".
+  const isWaiterPlaced = staffRole === 'waiter' && !isOnlineOrder;
+  const initialStatus = isWaiterPlaced
+    ? (order.requiresKitchen ? 'verified' : 'ready')
+    : 'pending';
+
   const payload: Record<string, unknown> = {
     id: orderId,
     order_number: orderNumber,
@@ -459,7 +468,7 @@ export async function createOrder(order: CreateOrderInput): Promise<Order> {
     customer_name: order.customerName || null,
     customer_phone: (order as any).customerPhone || null,
     customer_id: order.customerId || null,
-    status: 'pending',
+    status: initialStatus,
     idempotency_key: idempotencyKey,
     items,
     subtotal: total,
