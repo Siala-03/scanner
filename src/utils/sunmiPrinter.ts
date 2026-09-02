@@ -165,7 +165,7 @@ function printViaHtmlPopup(textLines: string[]): void {
 <style>
   @page { size: ${getPrinterWidth()} auto; margin: 0; }
   * { margin:0; padding:0; box-sizing:border-box; }
-  body { font-family: 'Courier New', Courier, monospace; font-size: ${getPrinterWidth() === '58mm' ? '8pt' : '9.5pt'}; color: #000; }
+  body { font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif; font-size: ${getPrinterWidth() === '58mm' ? '8pt' : '9.5pt'}; color: #000; }
   @media screen {
     body { background: #c8c8c8; display: flex; justify-content: center; padding: 20px; }
     pre { background: #fff; padding: ${getPrinterWidth() === '58mm' ? '4px 6px' : '8px 10px'}; box-shadow: 0 2px 10px rgba(0,0,0,.2); width: ${getPrinterWidth()}; }

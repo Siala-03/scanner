@@ -388,7 +388,7 @@ export function buildReceiptHtml(receipt: ReceiptData, printerWidth: '58mm' | '8
   <style>
     @page { size: ${printerWidth} auto; margin: 0; }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Courier New', Courier, monospace; font-size: ${printerWidth === '58mm' ? '7.5pt' : '9.5pt'}; color: #000; line-height: 1.4; word-break: break-word; overflow-wrap: break-word; }
+    body { font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif; font-size: ${printerWidth === '58mm' ? '7.5pt' : '9.5pt'}; color: #000; line-height: 1.4; word-break: break-word; overflow-wrap: break-word; }
 
     @media screen {
       body { background: #c8c8c8; display: flex; flex-direction: column; align-items: center; padding: 20px 12px 40px; }
@@ -631,7 +631,7 @@ export function buildChitHtml(data: ChitData, printerWidth: '58mm' | '80mm' = ge
   <style>
     @page { size: ${printerWidth} auto; margin: 0; }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Courier New', Courier, monospace; font-size: ${printerWidth === '58mm' ? '7.5pt' : '9pt'}; color: #000; font-weight: 600; line-height: 1.4; word-break: break-word; overflow-wrap: break-word; }
+    body { font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif; font-size: ${printerWidth === '58mm' ? '7.5pt' : '9pt'}; color: #000; font-weight: 600; line-height: 1.4; word-break: break-word; overflow-wrap: break-word; }
 
     @media screen {
       body { background: #c8c8c8; display: flex; flex-direction: column; align-items: center; padding: 20px 12px 40px; }
@@ -817,7 +817,7 @@ export function buildKitchenTicketHtml(ticket: KitchenTicketData, printerWidth: 
   <style>
     @page { size: ${printerWidth} auto; margin: 0; }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Courier New', Courier, monospace; font-size: ${printerWidth === '58mm' ? '8pt' : '10pt'}; color: #000; line-height: 1.4; word-break: break-word; overflow-wrap: break-word; }
+    body { font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif; font-size: ${printerWidth === '58mm' ? '8pt' : '10pt'}; color: #000; line-height: 1.4; word-break: break-word; overflow-wrap: break-word; }
 
     @media screen {
       body { background: #c8c8c8; display: flex; flex-direction: column; align-items: center; padding: 20px 12px 40px; }
@@ -1060,7 +1060,7 @@ export function buildExpenseReceiptHtml(
   <style>
     @page { size: ${printerWidth} auto; margin: 0; }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Courier New', Courier, monospace; font-size: ${printerWidth === '58mm' ? '7.5pt' : '9.5pt'}; color: #000; line-height: 1.4; word-break: break-word; overflow-wrap: break-word; }
+    body { font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif; font-size: ${printerWidth === '58mm' ? '7.5pt' : '9.5pt'}; color: #000; line-height: 1.4; word-break: break-word; overflow-wrap: break-word; }
 
     @media screen {
       body { background: #c8c8c8; display: flex; flex-direction: column; align-items: center; padding: 20px 12px 40px; }
