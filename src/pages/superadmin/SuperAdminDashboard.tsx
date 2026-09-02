@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Plus, Edit2, Trash2, Building2, Users, TrendingUp, Lock, QrCode, ChevronDown, PowerOff, Power } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
@@ -54,6 +54,7 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
     managerPassword: ''
   });
   const [printerWidth, setPrinterWidth] = useState<'58mm' | '80mm'>('80mm');
+  const [savingPrinterId, setSavingPrinterId] = useState<string | null>(null);
 
   useEffect(() => {
     loadRestaurants();
@@ -236,6 +237,25 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
     }
   };
 
+  const handleSetPrinterWidth = useCallback(async (restaurant: Restaurant, width: '58mm' | '80mm') => {
+    setSavingPrinterId(restaurant.id);
+    try {
+      const current = await fetchReceiptSettings(restaurant.id);
+      await saveReceiptSettings(restaurant.id, { ...current, printerWidth: width });
+      // Update local restaurant settings optimistically
+      setRestaurants((prev) => prev.map((r) => {
+        if (r.id !== restaurant.id) return r;
+        const existing = (r.settings as Record<string, unknown> | undefined) || {};
+        const receipt = ((existing.receipt as Record<string, unknown> | undefined) || {});
+        return { ...r, settings: { ...existing, receipt: { ...receipt, printerWidth: width } } };
+      }));
+    } catch {
+      alert('Failed to save printer width. Please try again.');
+    } finally {
+      setSavingPrinterId(null);
+    }
+  }, []);
+
   const resetForm = () => {
     setFormData({
       name:            '',
@@ -347,6 +367,7 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
                     <th className="px-4 py-3 text-left text-sm font-semibold">Email</th>
                     <th className="px-4 py-3 text-left text-sm font-semibold">Phone</th>
                     <th className="px-4 py-3 text-left text-sm font-semibold">Address</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold">Printer</th>
                     <th className="px-4 py-3 text-left text-sm font-semibold">Actions</th>
                   </tr>
                 </thead>
@@ -381,6 +402,29 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
                       <td className="px-4 py-3 text-sm">{restaurant.email}</td>
                       <td className="px-4 py-3 text-sm">{restaurant.phone}</td>
                       <td className="px-4 py-3 text-sm text-slate-400">{restaurant.address}</td>
+                      <td className="px-4 py-3">
+                        {(() => {
+                          const currentWidth = ((restaurant.settings as any)?.receipt?.printerWidth as '58mm' | '80mm' | undefined) ?? '80mm';
+                          return (
+                            <div className="flex gap-1">
+                              {(['58mm', '80mm'] as const).map((w) => (
+                                <button
+                                  key={w}
+                                  disabled={savingPrinterId === restaurant.id}
+                                  onClick={() => handleSetPrinterWidth(restaurant, w)}
+                                  className={`px-2 py-0.5 rounded text-xs font-medium border transition-colors disabled:opacity-50 ${
+                                    currentWidth === w
+                                      ? 'bg-indigo-500/20 border-indigo-500 text-indigo-300'
+                                      : 'bg-slate-800 border-slate-600 text-slate-500 hover:text-slate-300 hover:border-slate-500'
+                                  }`}
+                                >
+                                  {w}
+                                </button>
+                              ))}
+                            </div>
+                          );
+                        })()}
+                      </td>
                       <td className="px-4 py-3">
                         <div className="flex gap-2">
                           <button
