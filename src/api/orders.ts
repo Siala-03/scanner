@@ -565,6 +565,8 @@ export async function updateOrderStatus(
   id: string,
   statusUpdate: UpdateOrderStatusInput
 ): Promise<Order> {
+  const restaurantId = getRestaurantId();
+  if (!restaurantId) throw new Error('No company selected');
   const now = new Date().toISOString();
   const fullUpdates: Record<string, unknown> = {
     status: statusUpdate.status,
@@ -590,7 +592,7 @@ export async function updateOrderStatus(
     }
   }
 
-  let result = await db.from('orders').update(fullUpdates).eq('id', id).select().single();
+  let result = await db.from('orders').update(fullUpdates).eq('id', id).eq('restaurant_id', restaurantId).select().single();
 
   // If full update fails, try assignment-only variants before dropping waiter linkage.
   if (result.error) {
@@ -605,6 +607,7 @@ export async function updateOrderStatus(
           updated_at: new Date().toISOString(),
         })
         .eq('id', id)
+        .eq('restaurant_id', restaurantId)
         .select()
         .single();
     }
@@ -618,6 +621,7 @@ export async function updateOrderStatus(
           updated_at: new Date().toISOString(),
         })
         .eq('id', id)
+        .eq('restaurant_id', restaurantId)
         .select()
         .single();
     }
@@ -627,6 +631,7 @@ export async function updateOrderStatus(
         .from('orders')
         .update({ status: statusUpdate.status, updated_at: new Date().toISOString() })
         .eq('id', id)
+        .eq('restaurant_id', restaurantId)
         .select()
         .single();
     }
@@ -653,6 +658,8 @@ export async function confirmPayment(
     note?: string;
   }
 ): Promise<Order> {
+  const restaurantId = opts.restaurantId || getRestaurantId();
+  if (!restaurantId) throw new Error('No company selected');
   const now = new Date().toISOString();
 
   const paymentFields: Record<string, unknown> = {
@@ -688,7 +695,7 @@ export async function confirmPayment(
   let result: any;
   for (const payload of attempts) {
     result = await withTimeout(
-      db.from('orders').update(payload).eq('id', orderId).select().single(),
+      db.from('orders').update(payload).eq('id', orderId).eq('restaurant_id', restaurantId).select().single(),
       5000,
       { data: null, error: { message: 'Request timed out', code: 'TIMEOUT' } } as any
     );
@@ -705,25 +712,29 @@ export async function updateOrderItemStatus(
   itemId: string,
   status: string
 ): Promise<Order> {
+  const restaurantId = getRestaurantId();
+  if (!restaurantId) throw new Error('No company selected');
   const { data: order, error: fetchError } = await db
     .from('orders')
     .select('items')
     .eq('id', orderId)
+    .eq('restaurant_id', restaurantId)
     .single();
 
   if (fetchError) throw fetchError;
 
-  const updatedItems = (order.items || []).map((item: any) => 
+  const updatedItems = (order.items || []).map((item: any) =>
     item.id === itemId ? { ...item, status } : item
   );
 
   const { data, error } = await db
     .from('orders')
-    .update({ 
+    .update({
       items: updatedItems,
       updated_at: new Date().toISOString()
     })
     .eq('id', orderId)
+    .eq('restaurant_id', restaurantId)
     .select()
     .single();
 
@@ -732,11 +743,14 @@ export async function updateOrderItemStatus(
 }
 
 export async function cancelOrder(id: string, reason?: string): Promise<void> {
+  const restaurantId = getRestaurantId();
+  if (!restaurantId) throw new Error('No company selected');
   // Fetch items before cancelling so we can restore inventory
   const { data: order } = await db
     .from('orders')
     .select('items, order_number')
     .eq('id', id)
+    .eq('restaurant_id', restaurantId)
     .single();
 
   let { error } = await db
@@ -746,14 +760,16 @@ export async function cancelOrder(id: string, reason?: string): Promise<void> {
       ...(reason ? { cancel_reason: reason } : {}),
       updated_at: new Date().toISOString(),
     })
-    .eq('id', id);
+    .eq('id', id)
+    .eq('restaurant_id', restaurantId);
 
   // PGRST204 = column not in schema cache (migration 074 not yet applied) — retry without it
   if (error?.code === 'PGRST204') {
     ({ error } = await db
       .from('orders')
       .update({ status: 'cancelled', updated_at: new Date().toISOString() })
-      .eq('id', id));
+      .eq('id', id)
+      .eq('restaurant_id', restaurantId));
   }
 
   if (error) throw error;

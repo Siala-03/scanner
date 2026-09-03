@@ -1,5 +1,20 @@
 import { supabase } from '../lib/supabase';
 
+function getRestaurantId(): string | null {
+  if (typeof window === 'undefined') return null;
+  const direct = localStorage.getItem('restaurantId');
+  if (direct && direct.trim()) return direct;
+  const authUserRaw = localStorage.getItem('authUser');
+  if (authUserRaw) {
+    try {
+      const u = JSON.parse(authUserRaw);
+      const id = u?.restaurantId || u?.restaurant_id;
+      if (typeof id === 'string' && id.trim()) return id;
+    } catch { /* ignore */ }
+  }
+  return null;
+}
+
 const SHIFT_SELECT_CANDIDATES = [
   'id, restaurant_id, cashier_id, cashier_name, opened_at, closed_at, opening_float, closing_float, expected_cash, cash_variance, total_sales, total_transactions, status, notes',
   'id, restaurant_id, cashier_id, opened_at, closed_at, opening_float, closing_float, expected_cash, cash_variance, total_sales, total_transactions, status, notes',
@@ -142,6 +157,8 @@ export async function closeShift(
     notes?: string;
   }
 ): Promise<CashierShift> {
+  const restaurantId = getRestaurantId();
+  if (!restaurantId) throw new Error('No company selected');
   const cashVariance =
     Math.round((params.closingFloat - params.expectedCash) * 100) / 100;
 
@@ -180,6 +197,7 @@ export async function closeShift(
       .from('cashier_shifts')
       .update(payload)
       .eq('id', shiftId)
+      .eq('restaurant_id', restaurantId)
       .select()
       .single();
 

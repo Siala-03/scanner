@@ -4,6 +4,21 @@ function resolveTenantRestaurantId(fallback?: string): string {
   return (fallback || '').trim();
 }
 
+function getRestaurantId(): string | null {
+  if (typeof window === 'undefined') return null;
+  const direct = localStorage.getItem('restaurantId');
+  if (direct && direct.trim()) return direct;
+  const authUserRaw = localStorage.getItem('authUser');
+  if (authUserRaw) {
+    try {
+      const u = JSON.parse(authUserRaw);
+      const id = u?.restaurantId || u?.restaurant_id;
+      if (typeof id === 'string' && id.trim()) return id;
+    } catch { /* ignore */ }
+  }
+  return null;
+}
+
 export interface MinimartRefund {
   id: string;
   orderId?: string;
@@ -187,7 +202,8 @@ export async function approveRefundRequest(params: {
       reviewed_at:  new Date().toISOString(),
       review_notes: params.reviewNotes ?? null,
     })
-    .eq('id', params.requestId);
+    .eq('id', params.requestId)
+    .eq('restaurant_id', params.restaurantId);
 
   if (error) throw error;
 
@@ -200,7 +216,8 @@ export async function approveRefundRequest(params: {
       refunded_at:   new Date().toISOString(),
       refunded_by:   params.reviewedBy,
     })
-    .eq('id', params.orderId);
+    .eq('id', params.orderId)
+    .eq('restaurant_id', params.restaurantId);
   // Best-effort: silently ignore if these columns don't exist yet in the schema
 
   // 4. Restore inventory stock for each refunded item
@@ -269,6 +286,8 @@ export async function denyRefundRequest(params: {
   reviewedBy: string;
   reviewNotes?: string;
 }): Promise<void> {
+  const restaurantId = getRestaurantId();
+  if (!restaurantId) throw new Error('No company selected');
   const { error } = await supabase
     .from('minimart_refund_requests')
     .update({
@@ -277,7 +296,8 @@ export async function denyRefundRequest(params: {
       reviewed_at:  new Date().toISOString(),
       review_notes: params.reviewNotes ?? null,
     })
-    .eq('id', params.requestId);
+    .eq('id', params.requestId)
+    .eq('restaurant_id', restaurantId);
 
   if (error) throw error;
 }

@@ -119,10 +119,13 @@ export async function fetchStaffOnDuty(): Promise<Staff[]> {
 }
 
 export async function updateStaffStatus(id: string, isOnDuty: boolean): Promise<Staff> {
+  const restaurantId = getRestaurantId();
+  if (!restaurantId) throw new Error('No company selected');
   const { data, error } = await supabase
     .from('staff')
     .update({ is_on_duty: isOnDuty })
     .eq('id', id)
+    .eq('restaurant_id', restaurantId)
     .select()
     .single();
   if (error) throw error;
@@ -130,10 +133,13 @@ export async function updateStaffStatus(id: string, isOnDuty: boolean): Promise<
 }
 
 export async function updateStaffAssignments(id: string, assignedTables: number[]): Promise<Staff> {
+  const restaurantId = getRestaurantId();
+  if (!restaurantId) throw new Error('No company selected');
   const { data, error } = await supabase
     .from('staff')
     .update({ assigned_tables: assignedTables })
     .eq('id', id)
+    .eq('restaurant_id', restaurantId)
     .select()
     .single();
   if (error) throw error;
@@ -141,10 +147,13 @@ export async function updateStaffAssignments(id: string, assignedTables: number[
 }
 
 export async function updateStaffRole(id: string, role: StaffRole): Promise<Staff> {
+  const restaurantId = getRestaurantId();
+  if (!restaurantId) throw new Error('No company selected');
   const { data, error } = await supabase
     .from('staff')
     .update({ role })
     .eq('id', id)
+    .eq('restaurant_id', restaurantId)
     .select()
     .single();
   if (error) throw error;

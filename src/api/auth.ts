@@ -142,10 +142,13 @@ export async function signUpStaff(input: {
 }
 
 export async function updateStaffRole(staffId: string, role: string): Promise<Staff> {
+  const restaurantId = getRestaurantId();
+  if (!restaurantId) throw new Error('No company selected');
   const { data, error } = await supabase
     .from('staff')
     .update({ role })
     .eq('id', staffId)
+    .eq('restaurant_id', restaurantId)
     .select()
     .single();
   if (error) throw error;
@@ -153,10 +156,13 @@ export async function updateStaffRole(staffId: string, role: string): Promise<St
 }
 
 export async function updateStaffDuty(staffId: string, isOnDuty: boolean): Promise<Staff> {
+  const restaurantId = getRestaurantId();
+  if (!restaurantId) throw new Error('No company selected');
   const { data, error } = await supabase
     .from('staff')
     .update({ is_on_duty: isOnDuty })
     .eq('id', staffId)
+    .eq('restaurant_id', restaurantId)
     .select()
     .single();
   if (error) throw error;

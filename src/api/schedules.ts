@@ -2,6 +2,21 @@ import { apiRequest } from './http';
 import { StaffSchedule } from '../types';
 import { supabase } from '../lib/supabase';
 
+function getRestaurantId(): string | null {
+  if (typeof window === 'undefined') return null;
+  const direct = localStorage.getItem('restaurantId');
+  if (direct && direct.trim()) return direct;
+  const authUserRaw = localStorage.getItem('authUser');
+  if (authUserRaw) {
+    try {
+      const u = JSON.parse(authUserRaw);
+      const id = u?.restaurantId || u?.restaurant_id;
+      if (typeof id === 'string' && id.trim()) return id;
+    } catch { /* ignore */ }
+  }
+  return null;
+}
+
 const API_BASE = import.meta.env.VITE_API_URL || '';
 const SCHEDULES_BASE_PATH = API_BASE.includes('/functions/v1') ? '/schedules' : '/api/schedules';
 
@@ -73,13 +88,25 @@ export async function deleteSchedule(id: string): Promise<void> {
 }
 
 export async function confirmArrival(id: string, time?: string): Promise<void> {
+  const restaurantId = getRestaurantId();
+  if (!restaurantId) throw new Error('No company selected');
   const t = time || new Date().toTimeString().slice(0, 5);
-  const { error } = await supabase.from('staff_schedules').update({ arrived_at: t }).eq('id', id);
+  const { error } = await supabase
+    .from('staff_schedules')
+    .update({ arrived_at: t })
+    .eq('id', id)
+    .eq('restaurant_id', restaurantId);
   if (error) throw error;
 }
 
 export async function confirmDeparture(id: string, time?: string): Promise<void> {
+  const restaurantId = getRestaurantId();
+  if (!restaurantId) throw new Error('No company selected');
   const t = time || new Date().toTimeString().slice(0, 5);
-  const { error } = await supabase.from('staff_schedules').update({ departed_at: t }).eq('id', id);
+  const { error } = await supabase
+    .from('staff_schedules')
+    .update({ departed_at: t })
+    .eq('id', id)
+    .eq('restaurant_id', restaurantId);
   if (error) throw error;
 }
