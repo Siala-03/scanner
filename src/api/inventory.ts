@@ -1037,7 +1037,10 @@ export async function updateSupplier(id: string, supplier: Partial<Supplier>): P
 }
 
 export async function deleteSupplier(id: string): Promise<void> {
-  const { error } = await supabase.from('suppliers').delete().eq('id', id);
+  const restaurantId = getRestaurantId();
+  if (!restaurantId) throw new Error('No company selected');
+
+  const { error } = await supabase.from('suppliers').delete().eq('id', id).eq('restaurant_id', restaurantId);
   if (error) throw error;
 }
 
@@ -1299,7 +1302,10 @@ export async function receivePurchaseOrder(
 }
 
 export async function deletePurchaseOrder(id: string): Promise<void> {
-  const { error } = await supabase.from('purchase_orders').delete().eq('id', id);
+  const restaurantId = getRestaurantId();
+  if (!restaurantId) throw new Error('No company selected');
+
+  const { error } = await supabase.from('purchase_orders').delete().eq('id', id).eq('restaurant_id', restaurantId);
   if (error) throw error;
 }
 

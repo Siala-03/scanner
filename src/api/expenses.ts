@@ -274,6 +274,9 @@ export async function updateExpenseCategory(
   id: string,
   data: Partial<ExpenseCategoryFormData>
 ): Promise<ExpenseCategory> {
+  const restaurantId = getRestaurantId();
+  if (!restaurantId) throw new Error('No company selected');
+
   const { data: result, error } = await supabase
     .from('expense_categories')
     .update({
@@ -283,6 +286,7 @@ export async function updateExpenseCategory(
       icon: data.icon,
     })
     .eq('id', id)
+    .eq('restaurant_id', restaurantId)
     .select()
     .single();
 
@@ -291,10 +295,14 @@ export async function updateExpenseCategory(
 }
 
 export async function deleteExpenseCategory(id: string): Promise<void> {
+  const restaurantId = getRestaurantId();
+  if (!restaurantId) throw new Error('No company selected');
+
   const { error } = await supabase
     .from('expense_categories')
     .delete()
-    .eq('id', id);
+    .eq('id', id)
+    .eq('restaurant_id', restaurantId);
 
   if (error) { console.error('deleteExpenseCategory error:', error); throw error; }
 }
@@ -510,6 +518,9 @@ export async function updateExpense(
   id: string,
   data: Partial<ExpenseFormData>
 ): Promise<Expense> {
+  const restaurantId = getRestaurantId();
+  if (!restaurantId) throw new Error('No company selected');
+
   const updateData: any = {};
   if (data.categoryId !== undefined) updateData.category_id = data.categoryId;
   if (data.vendorName !== undefined) updateData.vendor_name = data.vendorName;
@@ -525,6 +536,7 @@ export async function updateExpense(
     .from('expenses')
     .update(updateData)
     .eq('id', id)
+    .eq('restaurant_id', restaurantId)
     .select()
     .single();
 
@@ -533,10 +545,14 @@ export async function updateExpense(
 }
 
 export async function deleteExpense(id: string): Promise<void> {
+  const restaurantId = getRestaurantId();
+  if (!restaurantId) throw new Error('No company selected');
+
   const { error } = await supabase
     .from('expenses')
     .delete()
-    .eq('id', id);
+    .eq('id', id)
+    .eq('restaurant_id', restaurantId);
 
   if (error) { console.error('deleteExpense error:', error); throw error; }
 }
@@ -546,11 +562,14 @@ export async function deleteExpense(id: string): Promise<void> {
 // ============================================
 
 export async function submitExpenseForApproval(expenseId: string): Promise<Expense> {
-  const staffId = getStaffId();
+  const restaurantId = getRestaurantId();
+  if (!restaurantId) throw new Error('No company selected');
+
   const { data, error } = await supabase
     .from('expenses')
     .update({ status: 'pending' })
     .eq('id', expenseId)
+    .eq('restaurant_id', restaurantId)
     .select()
     .single();
 
@@ -559,6 +578,9 @@ export async function submitExpenseForApproval(expenseId: string): Promise<Expen
 }
 
 export async function approveExpense(expenseId: string, notes?: string): Promise<Expense> {
+  const restaurantId = getRestaurantId();
+  if (!restaurantId) throw new Error('No company selected');
+
   const staffId = getStaffId();
   let payload: Record<string, unknown> = {
     status: 'approved',
@@ -569,7 +591,7 @@ export async function approveExpense(expenseId: string, notes?: string): Promise
 
   const missingColPattern = /Could not find the '([^']+)' column of 'expenses'/i;
 
-  let result = await supabase.from('expenses').update(payload).eq('id', expenseId).select().single();
+  let result = await supabase.from('expenses').update(payload).eq('id', expenseId).eq('restaurant_id', restaurantId).select().single();
 
   for (let attempt = 0; attempt < 10 && result.error; attempt++) {
     const col = String(result.error?.message || '').match(missingColPattern)?.[1];
@@ -579,7 +601,7 @@ export async function approveExpense(expenseId: string, notes?: string): Promise
     } else {
       break;
     }
-    result = await supabase.from('expenses').update(payload).eq('id', expenseId).select().single();
+    result = await supabase.from('expenses').update(payload).eq('id', expenseId).eq('restaurant_id', restaurantId).select().single();
   }
 
   if (result.error) { console.error('approveExpense error:', result.error); throw result.error; }
@@ -587,6 +609,9 @@ export async function approveExpense(expenseId: string, notes?: string): Promise
 }
 
 export async function rejectExpense(expenseId: string, rejectionReason: string): Promise<Expense> {
+  const restaurantId = getRestaurantId();
+  if (!restaurantId) throw new Error('No company selected');
+
   const staffId = getStaffId();
   let payload: Record<string, unknown> = {
     status: 'rejected',
@@ -597,7 +622,7 @@ export async function rejectExpense(expenseId: string, rejectionReason: string):
 
   const missingColPattern = /Could not find the '([^']+)' column of 'expenses'/i;
 
-  let result = await supabase.from('expenses').update(payload).eq('id', expenseId).select().single();
+  let result = await supabase.from('expenses').update(payload).eq('id', expenseId).eq('restaurant_id', restaurantId).select().single();
 
   for (let attempt = 0; attempt < 10 && result.error; attempt++) {
     const col = String(result.error?.message || '').match(missingColPattern)?.[1];
@@ -611,7 +636,7 @@ export async function rejectExpense(expenseId: string, rejectionReason: string):
     } else {
       break;
     }
-    result = await supabase.from('expenses').update(payload).eq('id', expenseId).select().single();
+    result = await supabase.from('expenses').update(payload).eq('id', expenseId).eq('restaurant_id', restaurantId).select().single();
   }
 
   if (result.error) { console.error('rejectExpense error:', result.error); throw result.error; }
@@ -619,6 +644,9 @@ export async function rejectExpense(expenseId: string, rejectionReason: string):
 }
 
 export async function recallExpense(expenseId: string, reason?: string): Promise<Expense> {
+  const restaurantId = getRestaurantId();
+  if (!restaurantId) throw new Error('No company selected');
+
   const { data, error } = await supabase
     .from('expenses')
     .update({
@@ -626,6 +654,7 @@ export async function recallExpense(expenseId: string, reason?: string): Promise
       notes: reason || '',
     })
     .eq('id', expenseId)
+    .eq('restaurant_id', restaurantId)
     .select()
     .single();
 
@@ -674,6 +703,9 @@ export async function updateRecurringExpense(
   recId: string,
   recData: Partial<RecurringExpenseFormData>
 ): Promise<RecurringExpense> {
+  const restaurantId = getRestaurantId();
+  if (!restaurantId) throw new Error('No company selected');
+
   const updateData: any = {};
   if (recData.categoryId) updateData.category_id = recData.categoryId;
   if (recData.vendorName) updateData.vendor_name = recData.vendorName;
@@ -686,6 +718,7 @@ export async function updateRecurringExpense(
     .from('expenses')
     .update(updateData)
     .eq('id', recId)
+    .eq('restaurant_id', restaurantId)
     .select()
     .single();
 

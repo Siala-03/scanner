@@ -277,10 +277,14 @@ export async function getStaffKPIs(): Promise<KPIWithProgress[]> {
 }
 
 export async function assignKPI(staffId: string, kpiId: number): Promise<void> {
+  const restaurantId = getRestaurantId();
+  if (!restaurantId) return;
+
   const { data: existing } = await supabase
     .from('kpis')
     .select('assigned_staff_ids')
     .eq('id', kpiId)
+    .eq('restaurant_id', restaurantId)
     .single();
 
   if (!existing) return;
@@ -290,14 +294,19 @@ export async function assignKPI(staffId: string, kpiId: number): Promise<void> {
   await supabase
     .from('kpis')
     .update({ assigned_staff_ids: ids })
-    .eq('id', kpiId);
+    .eq('id', kpiId)
+    .eq('restaurant_id', restaurantId);
 }
 
 export async function unassignKPI(staffId: string, kpiId: number): Promise<void> {
+  const restaurantId = getRestaurantId();
+  if (!restaurantId) return;
+
   const { data: existing } = await supabase
     .from('kpis')
     .select('assigned_staff_ids')
     .eq('id', kpiId)
+    .eq('restaurant_id', restaurantId)
     .single();
 
   if (!existing) return;
@@ -306,7 +315,8 @@ export async function unassignKPI(staffId: string, kpiId: number): Promise<void>
   await supabase
     .from('kpis')
     .update({ assigned_staff_ids: ids })
-    .eq('id', kpiId);
+    .eq('id', kpiId)
+    .eq('restaurant_id', restaurantId);
 }
 
 export async function updateKPI(
@@ -321,6 +331,9 @@ export async function updateKPI(
     assignedStaffIds?: string[];
   }
 ): Promise<KPI> {
+  const restaurantId = getRestaurantId();
+  if (!restaurantId) throw new Error('No company selected');
+
   const payload: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (kpi.staffRole !== undefined) payload.staff_role = kpi.staffRole;
   if (kpi.name !== undefined) payload.name = kpi.name;
@@ -334,6 +347,7 @@ export async function updateKPI(
     .from('kpis')
     .update(payload)
     .eq('id', kpiId)
+    .eq('restaurant_id', restaurantId)
     .select()
     .single();
 
@@ -359,10 +373,14 @@ export async function updateKPI(
 export async function updateKPIProgress(_kpiId: number, _currentValue: number): Promise<void> {}
 
 export async function deleteKPI(kpiId: number): Promise<{ success: boolean }> {
+  const restaurantId = getRestaurantId();
+  if (!restaurantId) throw new Error('No company selected');
+
   const { error } = await supabase
     .from('kpis')
     .delete()
-    .eq('id', kpiId);
+    .eq('id', kpiId)
+    .eq('restaurant_id', restaurantId);
 
   if (error) throw error;
   return { success: true };

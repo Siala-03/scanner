@@ -189,10 +189,14 @@ export async function fetchOrderCount(restaurantId?: string): Promise<number> {
 }
 
 export async function fetchOrderById(id: string): Promise<Order> {
+  const restaurantId = getRestaurantId();
+  if (!restaurantId) throw new Error('No company selected');
+
   const { data, error } = await db
     .from('orders')
     .select('*')
     .eq('id', id)
+    .eq('restaurant_id', restaurantId)
     .single();
 
   if (error) throw error;
