@@ -141,10 +141,14 @@ export async function getCreditAccounts(): Promise<CustomerCreditAccount[]> {
 }
 
 export async function getCreditAccount(accountId: string): Promise<CustomerCreditAccount> {
+  const restaurantId = getRestaurantId();
+  if (!restaurantId) throw new Error('No company selected');
+
   const { data, error } = await supabase
     .from('credit_accounts')
     .select('*')
     .eq('id', accountId)
+    .eq('restaurant_id', restaurantId)
     .single();
 
   if (error) { console.error('getCreditAccount error:', error); throw error; }
@@ -223,6 +227,9 @@ export async function updateCreditAccount(
     notes: string;
   }>
 ): Promise<CustomerCreditAccount> {
+  const restaurantId = getRestaurantId();
+  if (!restaurantId) throw new Error('No company selected');
+
   const fullPayload = {
     credit_limit: data.creditLimit,
     status: data.status,
@@ -234,6 +241,7 @@ export async function updateCreditAccount(
     .from('credit_accounts')
     .update(fullPayload)
     .eq('id', accountId)
+    .eq('restaurant_id', restaurantId)
     .select()
     .single();
 
@@ -247,6 +255,7 @@ export async function updateCreditAccount(
         updated_at: new Date().toISOString(),
       })
       .eq('id', accountId)
+      .eq('restaurant_id', restaurantId)
       .select()
       .single());
   }
@@ -256,10 +265,14 @@ export async function updateCreditAccount(
 }
 
 export async function deleteCreditAccount(accountId: string): Promise<void> {
+  const restaurantId = getRestaurantId();
+  if (!restaurantId) throw new Error('No company selected');
+
   const { error } = await supabase
     .from('credit_accounts')
     .delete()
-    .eq('id', accountId);
+    .eq('id', accountId)
+    .eq('restaurant_id', restaurantId);
 
   if (error) { console.error('deleteCreditAccount error:', error); throw error; }
 }
@@ -267,10 +280,14 @@ export async function deleteCreditAccount(accountId: string): Promise<void> {
 // ── Credit Transactions ────────────────────────────────────────────────────
 
 export async function getCreditTransactions(accountId: string): Promise<CreditTransaction[]> {
+  const restaurantId = getRestaurantId();
+  if (!restaurantId) return [];
+
   const { data, error } = await supabase
     .from('credit_transactions')
     .select('*')
     .eq('account_id', accountId)
+    .eq('restaurant_id', restaurantId)
     .order('created_at', { ascending: false });
 
   if (error) { console.error('getCreditTransactions error:', error); return []; }
@@ -286,10 +303,14 @@ export async function addCreditCharge(data: {
   performedBy: string;
   performedByName: string;
 }): Promise<{ transaction: CreditTransaction; account: CustomerCreditAccount }> {
+  const restaurantId = getRestaurantId();
+  if (!restaurantId) throw new Error('No company selected');
+
   const { data: account, error: accError } = await supabase
     .from('credit_accounts')
     .select('current_balance')
     .eq('id', data.accountId)
+    .eq('restaurant_id', restaurantId)
     .single();
 
   const currentBalance = !accError && account ? Number(account.current_balance || 0) : 0;
@@ -311,7 +332,7 @@ export async function addCreditCharge(data: {
       performed_by_name: data.performedByName,
       timestamp: new Date().toISOString(),
       created_at: new Date().toISOString(),
-      restaurant_id: getRestaurantId() || 'default_restaurant',
+      restaurant_id: restaurantId,
       metadata: data.orderId ? { orderId: data.orderId } : null,
     });
   } catch (txError) {
@@ -323,7 +344,8 @@ export async function addCreditCharge(data: {
     await supabase
       .from('credit_accounts')
       .update({ current_balance: balanceAfter })
-      .eq('id', data.accountId);
+      .eq('id', data.accountId)
+      .eq('restaurant_id', restaurantId);
   }
 
   const updatedAccount = await getCreditAccount(data.accountId);
@@ -340,10 +362,14 @@ export async function addCreditPayment(data: {
   paidByName: string;
   notes?: string;
 }): Promise<{ transaction: CreditTransaction; payment: CreditPayment; account: CustomerCreditAccount }> {
+  const restaurantId = getRestaurantId();
+  if (!restaurantId) throw new Error('No company selected');
+
   const { data: account, error: accError } = await supabase
     .from('credit_accounts')
     .select('current_balance')
     .eq('id', data.accountId)
+    .eq('restaurant_id', restaurantId)
     .single();
 
   const currentBalance = !accError && account ? Number(account.current_balance || 0) : 0;
@@ -364,7 +390,7 @@ export async function addCreditPayment(data: {
       performed_by_name: data.paidByName,
       timestamp: new Date().toISOString(),
       created_at: new Date().toISOString(),
-      restaurant_id: getRestaurantId() || 'default_restaurant',
+      restaurant_id: restaurantId,
       metadata: {
         paymentMethod: data.paymentMethod,
         reference: data.reference || null,
@@ -379,7 +405,8 @@ export async function addCreditPayment(data: {
     await supabase
       .from('credit_accounts')
       .update({ current_balance: newBalance })
-      .eq('id', data.accountId);
+      .eq('id', data.accountId)
+      .eq('restaurant_id', restaurantId);
   }
 
   const updatedAccount = await getCreditAccount(data.accountId);
@@ -402,10 +429,14 @@ export async function addCreditAdjustment(data: {
   performedBy: string;
   performedByName: string;
 }): Promise<{ transaction: CreditTransaction; account: CustomerCreditAccount }> {
+  const restaurantId = getRestaurantId();
+  if (!restaurantId) throw new Error('No company selected');
+
   const { data: account, error: accError } = await supabase
     .from('credit_accounts')
     .select('current_balance')
     .eq('id', data.accountId)
+    .eq('restaurant_id', restaurantId)
     .single();
 
   const currentBalance = !accError && account ? Number(account.current_balance || 0) : 0;
@@ -426,7 +457,7 @@ export async function addCreditAdjustment(data: {
       performed_by_name: data.performedByName,
       timestamp: new Date().toISOString(),
       created_at: new Date().toISOString(),
-      restaurant_id: getRestaurantId() || 'default_restaurant',
+      restaurant_id: restaurantId,
       metadata: { reason: data.reason },
     });
   } catch (error) {
@@ -438,7 +469,8 @@ export async function addCreditAdjustment(data: {
     await supabase
       .from('credit_accounts')
       .update({ current_balance: balanceAfter })
-      .eq('id', data.accountId);
+      .eq('id', data.accountId)
+      .eq('restaurant_id', restaurantId);
   }
 
   const updatedAccount = await getCreditAccount(data.accountId);
@@ -510,6 +542,9 @@ export async function reviewCreditApplication(
     reviewedByName: string;
   }
 ): Promise<CreditApplication> {
+  const restaurantId = getRestaurantId();
+  if (!restaurantId) throw new Error('No company selected');
+
   const staffId = getStaffId();
   const staffName = getStaffName();
 
@@ -531,6 +566,7 @@ export async function reviewCreditApplication(
     .from('credit_applications')
     .update(updateData)
     .eq('id', applicationId)
+    .eq('restaurant_id', restaurantId)
     .select()
     .single();
 
