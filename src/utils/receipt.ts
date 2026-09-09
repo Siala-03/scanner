@@ -576,9 +576,11 @@ export function buildReceiptHtml(receipt: ReceiptData, printerWidth: '58mm' | '8
 }
 
 // ============================================
-// BAR CHIT / DOCKET GENERATION
+// BAR CHIT / DOCKET GENERATION (disabled — not used by current clients)
 // ============================================
 
+/* eslint-disable */
+/*
 export interface ChitData {
   restaurantName?: string;
   restaurantLogo?: string;
@@ -597,11 +599,6 @@ export interface ChitData {
   notes?: string;
 }
 
-/**
- * Build a compact 80mm bar chit/docket HTML.
- * Printed once per order round so bar staff know exactly what to prepare.
- * Same paper size and auto-print behaviour as buildReceiptHtml.
- */
 export function buildChitHtml(data: ChitData, printerWidth: '58mm' | '80mm' = getPrinterWidth()): string {
   const {
     restaurantName, restaurantLogo, restaurantAddress, restaurantPhone,
@@ -751,6 +748,8 @@ export function buildChitHtml(data: ChitData, printerWidth: '58mm' | '80mm' = ge
 </body>
 </html>`;
 }
+*/
+/* eslint-enable */
 
 // ============================================
 // KITCHEN TICKET GENERATION

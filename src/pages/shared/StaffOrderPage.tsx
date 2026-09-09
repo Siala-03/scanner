@@ -22,7 +22,7 @@ import { OpenTabModal } from '../../components/shared/OpenTabModal';
 import { supabase } from '../../lib/supabase';
 import { fetchKitchenOrders } from '../../api/orders';
 import { formatPrice } from '../../utils/currency';
-import { buildReceiptHtml, orderToReceiptData, printReceipt, buildChitHtml } from '../../utils/receipt';
+import { buildReceiptHtml, orderToReceiptData, printReceipt } from '../../utils/receipt';
 import { markBillPresented, isBillPresented } from '../../utils/billTracking';
 import type { ReceiptData } from '../../utils/receipt';
 import { printOrderReceipt as printThermal } from '../../utils/sunmiPrinter';
@@ -332,6 +332,7 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
     return 'Supervisor';
   };
 
+  /* Bar chit disabled — not used by current clients
   const handleReprintChit = () => {
     if (!lastPlacedOrder) return;
     const label = lastPlacedOrder.tableNumber != null ? `Table ${lastPlacedOrder.tableNumber}` : 'Bar / Walk-up';
@@ -361,6 +362,7 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
       alert('Could not open print window. Please allow pop-ups in your browser.');
     }
   };
+  */
 
   const handlePrintLastReceipt = () => {
     if (!lastPlacedOrder || isPrintingReceipt) return;
@@ -460,15 +462,6 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
     // Open the print window NOW — during the user gesture — before any await.
     // After the first await the browser revokes popup permission, so this is
     // the only place window.open() is guaranteed to succeed for auto-print.
-    let chitPrintWindow: Window | null = null;
-    try {
-      chitPrintWindow = window.open('', 'chit_print', 'width=302,height=700,toolbar=0,scrollbars=1,status=0');
-      if (chitPrintWindow) {
-        chitPrintWindow.document.open();
-        chitPrintWindow.document.write('<html><body style="background:#fff;font-family:Arial;padding:40px;text-align:center;color:#000"><p>Preparing chit…</p></body></html>');
-        chitPrintWindow.document.close();
-      }
-    } catch { /* popup blocked — chit won't auto-print */ }
 
     try {
       const checkoutCart = [...cart];
@@ -573,43 +566,12 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
       setSuccessTable(label);
       setLastPlacedOrder(printableOrder);
 
-      // Write chit content into the pre-opened window and trigger print
-      if (chitPrintWindow && !chitPrintWindow.closed) {
-        try {
-          const chitHtml = buildChitHtml({
-            restaurantName: restaurantName,
-            restaurantLogo: restaurantInfo?.logo,
-            restaurantAddress: restaurantInfo?.address,
-            restaurantPhone: restaurantInfo?.phone,
-            restaurantEmail: restaurantInfo?.email,
-            restaurantCity: restaurantInfo?.city,
-            restaurantCountry: restaurantInfo?.country,
-            restaurantMomoCode: restaurantInfo?.momoCode,
-            orderNumber: printableOrder.orderNumber ?? printableOrder.id,
-            tableLabel: label,
-            waiterName: selectedStaffName || resolveStaffName() || undefined,
-            items: printableOrder.items.map((item: any) => ({
-              quantity: item.quantity,
-              name: item.menuItemName ?? item.menuItem?.name ?? 'Item',
-              notes: item.specialInstructions || undefined,
-              totalPrice: item.totalPrice,
-            })),
-            total: printableOrder.total,
-            notes: orderNotes.trim() || undefined,
-          });
-          chitPrintWindow.document.open();
-          chitPrintWindow.document.write(chitHtml);
-          chitPrintWindow.document.close();
-        } catch { chitPrintWindow?.close(); }
-      }
-
       setCart([]);
       setOrderNotes('');
       setShowMobileCart(false);
       submitKeyRef.current = crypto.randomUUID();
     } catch (e) {
       console.error(e);
-      try { chitPrintWindow?.close(); } catch { /* ignore */ }
       const isTimeout = (e as any)?.code === 'TIMEOUT' || (e instanceof Error && e.message.includes('timed out'));
       if (isTimeout) {
         alert('The request timed out. Your order may still have been placed — please check the orders list before trying again.');
@@ -998,7 +960,6 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
             onSelectedStaffIdChange={setSelectedStaffId}
             onSubmit={handleSubmit}
             onPrintReceipt={handlePrintLastReceipt}
-            onReprintChit={handleReprintChit}
             onDone={handleDoneAfterSuccess}
           />
         </div>
@@ -1035,7 +996,6 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
               onSelectedStaffIdChange={setSelectedStaffId}
               onSubmit={() => { handleSubmit(); setShowMobileCart(false); }}
               onPrintReceipt={handlePrintLastReceipt}
-              onReprintChit={handleReprintChit}
               onDone={handleDoneAfterSuccess}
             />
           </div>
@@ -1113,7 +1073,6 @@ function CartPanel({
   onSelectedStaffIdChange,
   onSubmit,
   onPrintReceipt,
-  onReprintChit,
   onDone,
 }: {
   cart: CartEntry[];
@@ -1135,7 +1094,6 @@ function CartPanel({
   onSelectedStaffIdChange: (v: string) => void;
   onSubmit: () => void;
   onPrintReceipt: () => void;
-  onReprintChit?: () => void;
   onDone: () => void;
 }) {
   if (successTable) {
@@ -1155,15 +1113,6 @@ function CartPanel({
                 <PrinterIcon className="inline w-4 h-4 mr-1.5" />
                 {isPrintingReceipt ? 'Printing...' : 'Print Receipt'}
               </button>
-              {onReprintChit && (
-                <button
-                  onClick={onReprintChit}
-                  className="w-full rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-2.5 text-sm font-semibold text-amber-300 hover:bg-amber-500/20"
-                >
-                  <PrinterIcon className="inline w-4 h-4 mr-1.5" />
-                  Reprint Chit
-                </button>
-              )}
             </>
           )}
           <button

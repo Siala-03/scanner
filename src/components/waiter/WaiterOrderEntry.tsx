@@ -13,7 +13,6 @@ import { MenuItem, OrderItem, CartItem } from '../../types/index';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { formatPrice } from '../../utils/currency';
-import { buildChitHtml } from '../../utils/receipt';
 import { useMenu } from '../../hooks/useMenu';
 
 interface WaiterOrderEntryProps {
@@ -166,18 +165,6 @@ export function WaiterOrderEntry({
     isSubmittingRef.current = true;
     setIsSubmitting(true);
 
-    // Open the print window NOW — during the user gesture — before any await.
-    // Write a placeholder so the window exists; full chit is written only on success.
-    let chitPrintWindow: Window | null = null;
-    try {
-      chitPrintWindow = window.open('', 'chit_print', 'width=302,height=700,toolbar=0,scrollbars=1,status=0');
-      if (chitPrintWindow) {
-        chitPrintWindow.document.open();
-        chitPrintWindow.document.write('<html><body style="background:#fff;font-family:Arial;padding:40px;text-align:center;color:#000"><p>Preparing chit…</p></body></html>');
-        chitPrintWindow.document.close();
-      }
-    } catch { /* popup blocked — chit won't print */ }
-
     try {
       const orderItems: CartItem[] = cart.map(({ tempId, ...item }) => ({
         menuItem: item.menuItem,
@@ -186,44 +173,12 @@ export function WaiterOrderEntry({
       }));
       await onSubmitOrder(orderItems, orderNotes || undefined);
 
-      // Order confirmed — now write the full chit
-      if (chitPrintWindow && !chitPrintWindow.closed) {
-        try {
-          const label = tableNumber === 0 ? 'Bar / Walk-up' : `Table ${tableNumber}`;
-          const chitHtml = buildChitHtml({
-            restaurantName,
-            restaurantLogo: restaurantInfo?.logo,
-            restaurantAddress: restaurantInfo?.address,
-            restaurantPhone: restaurantInfo?.phone,
-            restaurantEmail: restaurantInfo?.email,
-            restaurantCity: restaurantInfo?.city,
-            restaurantCountry: restaurantInfo?.country,
-            restaurantMomoCode: restaurantInfo?.momoCode,
-            tableLabel: label,
-            orderNumber: Date.now(),
-            waiterName,
-            items: cart.map(item => ({
-              quantity: item.quantity,
-              name: item.menuItemName ?? item.menuItem?.name ?? 'Item',
-              notes: item.specialInstructions || undefined,
-              totalPrice: (item.unitPrice ?? item.menuItem?.price ?? 0) * item.quantity,
-            })),
-            total: cart.reduce((s, i) => s + (i.unitPrice ?? i.menuItem?.price ?? 0) * i.quantity, 0),
-            notes: orderNotes.trim() || undefined,
-          });
-          chitPrintWindow.document.open();
-          chitPrintWindow.document.write(chitHtml);
-          chitPrintWindow.document.close();
-        } catch { chitPrintWindow?.close(); }
-      }
-
       setCart([]);
       setOrderNotes('');
       setShowCart(false);
       onClose();
     } catch (error) {
       console.error('Failed to submit order:', error);
-      try { chitPrintWindow?.close(); } catch { /* ignore */ }
       const msg = error instanceof Error ? error.message : String(error);
       const isIdb = /indexeddb|idb|database connection|blocked/i.test(msg);
       if (isIdb) {
