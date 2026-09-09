@@ -386,17 +386,17 @@ export function buildReceiptHtml(receipt: ReceiptData, printerWidth: '58mm' | '8
   <meta charset="UTF-8">
   <title>Receipt #${orderNumber}</title>
   <style>
-    @page { size: ${printerWidth} auto; margin: 0; }
+    @page { size: ${printerWidth} auto; margin: 0 ${printerWidth === '58mm' ? '5mm' : '4mm'}; }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif; font-size: ${printerWidth === '58mm' ? '7.5pt' : '9.5pt'}; color: #000; line-height: 1.4; word-break: break-word; overflow-wrap: break-word; }
 
     @media screen {
       body { background: #c8c8c8; display: flex; flex-direction: column; align-items: center; padding: 20px 12px 40px; }
-      .paper { background: #fff; width: ${printerWidth}; padding: ${printerWidth === '58mm' ? '4mm 3mm 8mm' : '6mm 5mm 10mm'}; box-shadow: 0 3px 16px rgba(0,0,0,.22); }
+      .paper { background: #fff; width: ${printerWidth === '58mm' ? '48mm' : '72mm'}; padding: ${printerWidth === '58mm' ? '4mm 2mm 8mm' : '6mm 3mm 10mm'}; box-shadow: 0 3px 16px rgba(0,0,0,.22); }
     }
     @media print {
       html, body { background: #fff; display: block; }
-      .paper { padding: ${printerWidth === '58mm' ? '2mm 2mm 10mm' : '3mm 3mm 14mm'}; }
+      .paper { padding: ${printerWidth === '58mm' ? '2mm 1mm 10mm' : '3mm 2mm 14mm'}; }
       .footer { page-break-inside: avoid; }
       .no-print { display: none !important; }
       * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
@@ -629,17 +629,17 @@ export function buildChitHtml(data: ChitData, printerWidth: '58mm' | '80mm' = ge
   <meta charset="UTF-8">
   <title>Chit #${orderNumber}</title>
   <style>
-    @page { size: ${printerWidth} auto; margin: 0; }
+    @page { size: ${printerWidth} auto; margin: 0 ${printerWidth === '58mm' ? '5mm' : '4mm'}; }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif; font-size: ${printerWidth === '58mm' ? '7.5pt' : '9pt'}; color: #000; font-weight: 600; line-height: 1.4; word-break: break-word; overflow-wrap: break-word; }
 
     @media screen {
       body { background: #c8c8c8; display: flex; flex-direction: column; align-items: center; padding: 20px 12px 40px; }
-      .paper { background: #fff; width: ${printerWidth}; padding: ${printerWidth === '58mm' ? '4mm 3mm 8mm' : '6mm 5mm 10mm'}; box-shadow: 0 3px 16px rgba(0,0,0,.22); }
+      .paper { background: #fff; width: ${printerWidth === '58mm' ? '48mm' : '72mm'}; padding: ${printerWidth === '58mm' ? '4mm 2mm 8mm' : '6mm 3mm 10mm'}; box-shadow: 0 3px 16px rgba(0,0,0,.22); }
     }
     @media print {
       html, body { background: #fff; display: block; }
-      .paper { padding: ${printerWidth === '58mm' ? '2mm 2mm 10mm' : '3mm 3mm 14mm'}; }
+      .paper { padding: ${printerWidth === '58mm' ? '2mm 1mm 10mm' : '3mm 2mm 14mm'}; }
       .no-print { display: none !important; }
       * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     }
@@ -815,17 +815,17 @@ export function buildKitchenTicketHtml(ticket: KitchenTicketData, printerWidth: 
   <meta charset="UTF-8">
   <title>Kitchen Ticket #${orderNumber}</title>
   <style>
-    @page { size: ${printerWidth} auto; margin: 0; }
+    @page { size: ${printerWidth} auto; margin: 0 ${printerWidth === '58mm' ? '5mm' : '4mm'}; }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif; font-size: ${printerWidth === '58mm' ? '8pt' : '10pt'}; color: #000; line-height: 1.4; word-break: break-word; overflow-wrap: break-word; }
 
     @media screen {
       body { background: #c8c8c8; display: flex; flex-direction: column; align-items: center; padding: 20px 12px 40px; }
-      .paper { background: #fff; width: ${printerWidth}; padding: ${printerWidth === '58mm' ? '4mm 3mm 8mm' : '6mm 5mm 10mm'}; box-shadow: 0 3px 16px rgba(0,0,0,.22); }
+      .paper { background: #fff; width: ${printerWidth === '58mm' ? '48mm' : '72mm'}; padding: ${printerWidth === '58mm' ? '4mm 2mm 8mm' : '6mm 3mm 10mm'}; box-shadow: 0 3px 16px rgba(0,0,0,.22); }
     }
     @media print {
       html, body { background: #fff; display: block; }
-      .paper { padding: ${printerWidth === '58mm' ? '2mm 2mm 10mm' : '3mm 3mm 14mm'}; }
+      .paper { padding: ${printerWidth === '58mm' ? '2mm 1mm 10mm' : '3mm 2mm 14mm'}; }
       .no-print { display: none !important; }
       * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     }
@@ -1058,17 +1058,17 @@ export function buildExpenseReceiptHtml(
   <meta charset="UTF-8">
   <title>Expense Receipt #${receiptRef}</title>
   <style>
-    @page { size: ${printerWidth} auto; margin: 0; }
+    @page { size: ${printerWidth} auto; margin: 0 ${printerWidth === '58mm' ? '5mm' : '4mm'}; }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif; font-size: ${printerWidth === '58mm' ? '7.5pt' : '9.5pt'}; color: #000; line-height: 1.4; word-break: break-word; overflow-wrap: break-word; }
 
     @media screen {
       body { background: #c8c8c8; display: flex; flex-direction: column; align-items: center; padding: 20px 12px 40px; }
-      .paper { background: #fff; width: ${printerWidth}; padding: ${printerWidth === '58mm' ? '4mm 3mm 8mm' : '6mm 5mm 10mm'}; box-shadow: 0 3px 16px rgba(0,0,0,.22); }
+      .paper { background: #fff; width: ${printerWidth === '58mm' ? '48mm' : '72mm'}; padding: ${printerWidth === '58mm' ? '4mm 2mm 8mm' : '6mm 3mm 10mm'}; box-shadow: 0 3px 16px rgba(0,0,0,.22); }
     }
     @media print {
       html, body { background: #fff; display: block; }
-      .paper { padding: ${printerWidth === '58mm' ? '2mm 2mm 10mm' : '3mm 3mm 14mm'}; }
+      .paper { padding: ${printerWidth === '58mm' ? '2mm 1mm 10mm' : '3mm 2mm 14mm'}; }
       .footer { page-break-inside: avoid; }
       .no-print { display: none !important; }
       * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
