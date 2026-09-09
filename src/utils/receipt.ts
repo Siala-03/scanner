@@ -411,26 +411,26 @@ export function buildReceiptHtml(receipt: ReceiptData, printerWidth: '58mm' | '8
     .solid  { border: none; border-top: 2px solid #000; margin: 6px 0; }
     .dashed { border: none; border-top: 1.5px dashed #000; margin: 5px 0; }
 
-    .meta { width: 100%; border-collapse: collapse; font-size: ${printerWidth === '58mm' ? '7pt' : '8pt'}; }
-    .meta td { padding: 1px 0; vertical-align: top; word-break: break-word; overflow-wrap: break-word; overflow: hidden; }
-    .meta td:first-child { color: #000; width: 38%; }
+    .meta { width: 100%; border-collapse: collapse; font-size: ${printerWidth === '58mm' ? '7pt' : '8pt'}; font-weight: 900; }
+    .meta td { padding: 1px 0; vertical-align: top; word-break: break-word; overflow-wrap: break-word; overflow: hidden; font-weight: 900; }
+    .meta td:first-child { color: #000; width: 38%; font-weight: 900; }
     .meta td:last-child  { font-weight: 900; text-align: left; width: 62%; word-break: break-word; overflow-wrap: break-word; }
 
-    .items { width: 100%; border-collapse: collapse; font-size: ${printerWidth === '58mm' ? '7.5pt' : '9pt'}; table-layout: fixed; }
+    .items { width: 100%; border-collapse: collapse; font-size: ${printerWidth === '58mm' ? '7.5pt' : '9pt'}; table-layout: fixed; font-weight: 900; }
     .items th { font-size: ${printerWidth === '58mm' ? '6.5pt' : '7.5pt'}; font-weight: 900; letter-spacing: 0.5px; text-transform: uppercase; color: #000; padding: 0 0 3px; border-bottom: 2px solid #000; text-align: left; }
     .items th:last-child { text-align: right; }
-    .items td { padding: 3px 0; vertical-align: top; border-bottom: 1.5px dotted #000; overflow: hidden; }
-    .items .qty   { width: 8%; color: #000; }
-    .items .name  { width: 62%; padding-right: 4px; word-break: break-word; overflow-wrap: break-word; }
+    .items td { padding: 3px 0; vertical-align: top; border-bottom: 1.5px dotted #000; overflow: hidden; font-weight: 900; }
+    .items .qty   { width: 8%; color: #000; font-weight: 900; }
+    .items .name  { width: 62%; padding-right: 4px; word-break: break-word; overflow-wrap: break-word; font-weight: 900; }
     .items .price { width: 30%; text-align: right; font-weight: 900; white-space: nowrap; overflow: hidden; }
-    .note { font-size: ${printerWidth === '58mm' ? '6.5pt' : '7.5pt'}; color: #000; font-style: italic; margin-top: 1px; }
+    .note { font-size: ${printerWidth === '58mm' ? '6.5pt' : '7.5pt'}; color: #000; font-style: italic; margin-top: 1px; font-weight: 900; }
 
-    .totals { width: 100%; border-collapse: collapse; font-size: ${printerWidth === '58mm' ? '7.5pt' : '9pt'}; }
-    .totals td { padding: 2px 0; }
-    .totals td:last-child { text-align: right; }
+    .totals { width: 100%; border-collapse: collapse; font-size: ${printerWidth === '58mm' ? '7.5pt' : '9pt'}; font-weight: 900; }
+    .totals td { padding: 2px 0; font-weight: 900; }
+    .totals td:last-child { text-align: right; font-weight: 900; }
     .grand td { font-size: ${printerWidth === '58mm' ? '10pt' : '12pt'}; font-weight: 900; border-top: 2px solid #000; padding-top: 5px; }
 
-    .pay-row { display: flex; justify-content: space-between; font-size: ${printerWidth === '58mm' ? '7pt' : '8pt'}; padding: 1px 0; }
+    .pay-row { display: flex; justify-content: space-between; font-size: ${printerWidth === '58mm' ? '7pt' : '8pt'}; padding: 1px 0; font-weight: 900; }
     .sbadge { display: inline-block; padding: 1px 6px; border-radius: 10px; font-size: 6.5pt; font-weight: 900; letter-spacing: 0.5px; text-transform: uppercase; }
     .s-paid    { background: #d1fae5; color: #065f46; }
     .s-pending { background: #fef3c7; color: #92400e; }
@@ -657,17 +657,17 @@ export function buildChitHtml(data: ChitData, printerWidth: '58mm' | '80mm' = ge
     .order-num   { font-size: ${printerWidth === '58mm' ? '16pt' : '20pt'}; font-weight: 900; line-height: 1.1; }
     .table-label { font-size: ${printerWidth === '58mm' ? '10pt' : '13pt'}; font-weight: 900; margin-top: 2px; text-transform: uppercase; }
 
-    .meta { width: 100%; border-collapse: collapse; font-size: ${printerWidth === '58mm' ? '7pt' : '8.5pt'}; margin: 3px 0; }
-    .meta td { padding: 1px 0; vertical-align: top; word-break: break-word; overflow-wrap: break-word; overflow: hidden; }
-    .meta td:first-child { color: #000; width: 38%; }
+    .meta { width: 100%; border-collapse: collapse; font-size: ${printerWidth === '58mm' ? '7pt' : '8.5pt'}; margin: 3px 0; font-weight: 900; }
+    .meta td { padding: 1px 0; vertical-align: top; word-break: break-word; overflow-wrap: break-word; overflow: hidden; font-weight: 900; }
+    .meta td:first-child { color: #000; width: 38%; font-weight: 900; }
     .meta td:last-child  { font-weight: 900; text-align: left; width: 62%; word-break: break-word; overflow-wrap: break-word; }
 
-    .items { width: 100%; border-collapse: collapse; font-size: ${printerWidth === '58mm' ? '7.5pt' : '9.5pt'}; table-layout: fixed; }
-    .items td { padding: 3px 0; vertical-align: top; border-bottom: 1.5px dotted #000; overflow: hidden; }
+    .items { width: 100%; border-collapse: collapse; font-size: ${printerWidth === '58mm' ? '7.5pt' : '9.5pt'}; table-layout: fixed; font-weight: 900; }
+    .items td { padding: 3px 0; vertical-align: top; border-bottom: 1.5px dotted #000; overflow: hidden; font-weight: 900; }
     .items .qty   { width: 8%; color: #000; font-weight: 900; }
     .items .name  { width: 62%; font-weight: 900; padding-right: 4px; word-break: break-word; overflow-wrap: break-word; }
     .items .price { width: 30%; text-align: right; white-space: nowrap; font-size: ${printerWidth === '58mm' ? '7pt' : '8.5pt'}; font-weight: 900; overflow: hidden; }
-    .note { font-size: ${printerWidth === '58mm' ? '6.5pt' : '7.5pt'}; color: #000; font-style: italic; margin-top: 1px; font-weight: 700; }
+    .note { font-size: ${printerWidth === '58mm' ? '6.5pt' : '7.5pt'}; color: #000; font-style: italic; margin-top: 1px; font-weight: 900; }
 
     .special-box { border: 1.5px solid #000; padding: 3px 5px; margin: 4px 0; font-size: ${printerWidth === '58mm' ? '7pt' : '8.5pt'}; font-weight: 900; line-height: 1.4; }
     .special-box .lbl { font-size: 6.5pt; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 1px; }
@@ -844,18 +844,18 @@ export function buildKitchenTicketHtml(ticket: KitchenTicketData, printerWidth: 
     .status-badge { display: inline-block; margin-top: 4px; padding: 1px 8px; border: 1.5px solid #000; font-size: ${printerWidth === '58mm' ? '7.5pt' : '9pt'}; font-weight: 900; letter-spacing: 1px; text-transform: uppercase; }
 
     .meta { width: 100%; border-collapse: collapse; font-size: ${printerWidth === '58mm' ? '7.5pt' : '9pt'}; }
-    .meta td { padding: 1px 0; vertical-align: top; word-break: break-word; overflow-wrap: break-word; overflow: hidden; }
-    .meta td:first-child { color: #000; width: 38%; }
+    .meta td { padding: 1px 0; vertical-align: top; word-break: break-word; overflow-wrap: break-word; overflow: hidden; font-weight: 900; }
+    .meta td:first-child { color: #000; width: 38%; font-weight: 900; }
     .meta td:last-child  { font-weight: 900; text-align: left; width: 62%; word-break: break-word; overflow-wrap: break-word; }
 
-    .urgency-row { display: flex; justify-content: space-between; align-items: center; font-size: ${printerWidth === '58mm' ? '7.5pt' : '9pt'}; margin: 3px 0; }
+    .urgency-row { display: flex; justify-content: space-between; align-items: center; font-size: ${printerWidth === '58mm' ? '7.5pt' : '9pt'}; margin: 3px 0; font-weight: 900; }
     .urgency-badge { padding: 1px 6px; border-radius: 3px; font-weight: 900; font-size: ${printerWidth === '58mm' ? '7pt' : '8pt'}; letter-spacing: 0.5px; }
 
-    .items { width: 100%; border-collapse: collapse; font-size: ${printerWidth === '58mm' ? '9pt' : '11pt'}; table-layout: fixed; }
-    .items td { padding: 4px 0; vertical-align: top; border-bottom: 1.5px dotted #000; overflow: hidden; }
+    .items { width: 100%; border-collapse: collapse; font-size: ${printerWidth === '58mm' ? '9pt' : '11pt'}; table-layout: fixed; font-weight: 900; }
+    .items td { padding: 4px 0; vertical-align: top; border-bottom: 1.5px dotted #000; overflow: hidden; font-weight: 900; }
     .items .qty  { width: 8%; color: #000; font-weight: 900; }
     .items .name { width: 92%; font-weight: 900; word-break: break-word; overflow-wrap: break-word; }
-    .note { font-size: ${printerWidth === '58mm' ? '7pt' : '8pt'}; color: #000; font-style: italic; margin-top: 1px; font-weight: 700; }
+    .note { font-size: ${printerWidth === '58mm' ? '7pt' : '8pt'}; color: #000; font-style: italic; margin-top: 1px; font-weight: 900; }
 
     .special-box { border: 2px solid #000; padding: ${printerWidth === '58mm' ? '4px 5px' : '6px 8px'}; margin: ${printerWidth === '58mm' ? '5px 0' : '8px 0'}; font-size: ${printerWidth === '58mm' ? '7.5pt' : '9pt'}; font-weight: 900; line-height: 1.4; }
     .special-box .lbl { font-size: 6.5pt; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 1px; }
@@ -1083,20 +1083,20 @@ export function buildExpenseReceiptHtml(
     .solid  { border: none; border-top: 2px solid #000; margin: 6px 0; }
     .dashed { border: none; border-top: 1.5px dashed #000; margin: 5px 0; }
 
-    .meta { width: 100%; border-collapse: collapse; font-size: ${printerWidth === '58mm' ? '7pt' : '8.5pt'}; }
-    .meta td { padding: 1px 0; vertical-align: top; word-break: break-word; overflow-wrap: break-word; overflow: hidden; }
-    .meta td:first-child { color: #000; width: 40%; }
+    .meta { width: 100%; border-collapse: collapse; font-size: ${printerWidth === '58mm' ? '7pt' : '8.5pt'}; font-weight: 900; }
+    .meta td { padding: 1px 0; vertical-align: top; word-break: break-word; overflow-wrap: break-word; overflow: hidden; font-weight: 900; }
+    .meta td:first-child { color: #000; width: 40%; font-weight: 900; }
     .meta td:last-child  { font-weight: 900; text-align: left; width: 60%; word-break: break-word; overflow-wrap: break-word; }
 
     .desc-lbl { font-size: ${printerWidth === '58mm' ? '6.5pt' : '8pt'}; font-weight: 900; letter-spacing: 1px; text-transform: uppercase; color: #000; margin-bottom: 2px; }
-    .desc-box { font-size: ${printerWidth === '58mm' ? '7pt' : '9pt'}; line-height: 1.4; color: #000; border-top: 1px dotted #000; border-bottom: 1.5px dotted #000; padding: 4px 0; margin: 2px 0; }
+    .desc-box { font-size: ${printerWidth === '58mm' ? '7pt' : '9pt'}; line-height: 1.4; color: #000; border-top: 1.5px dotted #000; border-bottom: 1.5px dotted #000; padding: 4px 0; margin: 2px 0; font-weight: 900; }
 
-    .totals { width: 100%; border-collapse: collapse; font-size: ${printerWidth === '58mm' ? '7.5pt' : '9pt'}; }
-    .totals td { padding: 2px 0; }
-    .totals td:last-child { text-align: right; }
+    .totals { width: 100%; border-collapse: collapse; font-size: ${printerWidth === '58mm' ? '7.5pt' : '9pt'}; font-weight: 900; }
+    .totals td { padding: 2px 0; font-weight: 900; }
+    .totals td:last-child { text-align: right; font-weight: 900; }
     .grand td { font-size: ${printerWidth === '58mm' ? '10pt' : '12pt'}; font-weight: 900; border-top: 2px solid #000; padding-top: 5px; }
 
-    .pay-row { display: flex; justify-content: space-between; font-size: ${printerWidth === '58mm' ? '7pt' : '8pt'}; padding: 1px 0; }
+    .pay-row { display: flex; justify-content: space-between; font-size: ${printerWidth === '58mm' ? '7pt' : '8pt'}; padding: 1px 0; font-weight: 900; }
     .sbadge { display: inline-block; padding: 1px 6px; border-radius: 10px; font-size: 6.5pt; font-weight: 900; letter-spacing: 0.5px; text-transform: uppercase; }
     .s-paid     { background: #d1fae5; color: #065f46; }
     .s-pending  { background: #fef3c7; color: #92400e; }
