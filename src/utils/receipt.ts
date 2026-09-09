@@ -386,13 +386,13 @@ export function buildReceiptHtml(receipt: ReceiptData, printerWidth: '58mm' | '8
   <meta charset="UTF-8">
   <title>Receipt #${orderNumber}</title>
   <style>
-    @page { size: ${printerWidth} auto; margin: 0; }
+    @page { size: ${printerWidth} auto; margin: 0 ${printerWidth === '58mm' ? '3mm' : '4mm'}; }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif; font-size: ${printerWidth === '58mm' ? '7.5pt' : '9.5pt'}; color: #000; line-height: 1.4; word-break: break-word; overflow-wrap: break-word; }
 
     @media screen {
       body { background: #c8c8c8; display: flex; flex-direction: column; align-items: center; padding: 20px 12px 40px; }
-      .paper { background: #fff; width: ${printerWidth}; padding: ${printerWidth === '58mm' ? '4mm 3mm 8mm' : '6mm 5mm 10mm'}; box-shadow: 0 3px 16px rgba(0,0,0,.22); }
+      .paper { background: #fff; width: ${printerWidth === '58mm' ? '52mm' : '72mm'}; padding: ${printerWidth === '58mm' ? '4mm 3mm 8mm' : '6mm 5mm 10mm'}; box-shadow: 0 3px 16px rgba(0,0,0,.22); }
     }
     @media print {
       html, body { background: #fff; display: block; }
@@ -404,7 +404,7 @@ export function buildReceiptHtml(receipt: ReceiptData, printerWidth: '58mm' | '8
 
     .hdr { text-align: center; padding-bottom: 6px; }
     .logo { max-height: ${printerWidth === '58mm' ? '45px' : '60px'}; max-width: ${printerWidth === '58mm' ? '100px' : '150px'}; object-fit: contain; display: block; margin: 0 auto 4px; }
-    .brand { font-size: ${printerWidth === '58mm' ? '11pt' : '14pt'}; font-weight: 900; letter-spacing: 1px; text-transform: uppercase; }
+    .brand { font-size: ${printerWidth === '58mm' ? '10pt' : '12pt'}; font-weight: 900; letter-spacing: 0.5px; text-transform: uppercase; }
     .addr { font-size: ${printerWidth === '58mm' ? '7pt' : '8.5pt'}; color: #333; margin-top: 2px; line-height: 1.4; }
     .rbadge { display: inline-block; margin-top: 5px; padding: 1px 6px; border: 1.5px solid #000; font-size: 7pt; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
 
@@ -629,13 +629,13 @@ export function buildChitHtml(data: ChitData, printerWidth: '58mm' | '80mm' = ge
   <meta charset="UTF-8">
   <title>Chit #${orderNumber}</title>
   <style>
-    @page { size: ${printerWidth} auto; margin: 0; }
+    @page { size: ${printerWidth} auto; margin: 0 ${printerWidth === '58mm' ? '3mm' : '4mm'}; }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif; font-size: ${printerWidth === '58mm' ? '7.5pt' : '9pt'}; color: #000; font-weight: 600; line-height: 1.4; word-break: break-word; overflow-wrap: break-word; }
 
     @media screen {
       body { background: #c8c8c8; display: flex; flex-direction: column; align-items: center; padding: 20px 12px 40px; }
-      .paper { background: #fff; width: ${printerWidth}; padding: ${printerWidth === '58mm' ? '4mm 3mm 8mm' : '6mm 5mm 10mm'}; box-shadow: 0 3px 16px rgba(0,0,0,.22); }
+      .paper { background: #fff; width: ${printerWidth === '58mm' ? '52mm' : '72mm'}; padding: ${printerWidth === '58mm' ? '4mm 3mm 8mm' : '6mm 5mm 10mm'}; box-shadow: 0 3px 16px rgba(0,0,0,.22); }
     }
     @media print {
       html, body { background: #fff; display: block; }
@@ -646,7 +646,7 @@ export function buildChitHtml(data: ChitData, printerWidth: '58mm' | '80mm' = ge
 
     .hdr  { text-align: center; padding-bottom: 5px; }
     .logo { max-height: ${printerWidth === '58mm' ? '40px' : '55px'}; max-width: ${printerWidth === '58mm' ? '90px' : '140px'}; object-fit: contain; display: block; margin: 0 auto 4px; }
-    .brand { font-size: ${printerWidth === '58mm' ? '10pt' : '13pt'}; font-weight: 900; letter-spacing: 1px; text-transform: uppercase; }
+    .brand { font-size: ${printerWidth === '58mm' ? '10pt' : '12pt'}; font-weight: 900; letter-spacing: 0.5px; text-transform: uppercase; }
     .addr  { font-size: ${printerWidth === '58mm' ? '6.5pt' : '8pt'}; color: #000; margin-top: 2px; line-height: 1.4; }
     .badge { display: inline-block; margin-top: 4px; padding: 1px 6px; border: 1.5px solid #000; font-size: 6.5pt; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
 
@@ -815,13 +815,13 @@ export function buildKitchenTicketHtml(ticket: KitchenTicketData, printerWidth: 
   <meta charset="UTF-8">
   <title>Kitchen Ticket #${orderNumber}</title>
   <style>
-    @page { size: ${printerWidth} auto; margin: 0; }
+    @page { size: ${printerWidth} auto; margin: 0 ${printerWidth === '58mm' ? '3mm' : '4mm'}; }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif; font-size: ${printerWidth === '58mm' ? '8pt' : '10pt'}; color: #000; line-height: 1.4; word-break: break-word; overflow-wrap: break-word; }
 
     @media screen {
       body { background: #c8c8c8; display: flex; flex-direction: column; align-items: center; padding: 20px 12px 40px; }
-      .paper { background: #fff; width: ${printerWidth}; padding: ${printerWidth === '58mm' ? '4mm 3mm 8mm' : '6mm 5mm 10mm'}; box-shadow: 0 3px 16px rgba(0,0,0,.22); }
+      .paper { background: #fff; width: ${printerWidth === '58mm' ? '52mm' : '72mm'}; padding: ${printerWidth === '58mm' ? '4mm 3mm 8mm' : '6mm 5mm 10mm'}; box-shadow: 0 3px 16px rgba(0,0,0,.22); }
     }
     @media print {
       html, body { background: #fff; display: block; }
@@ -832,7 +832,7 @@ export function buildKitchenTicketHtml(ticket: KitchenTicketData, printerWidth: 
 
     .hdr { text-align: center; padding-bottom: 6px; }
     .logo { max-height: ${printerWidth === '58mm' ? '45px' : '60px'}; max-width: ${printerWidth === '58mm' ? '100px' : '150px'}; object-fit: contain; display: block; margin: 0 auto 4px; }
-    .brand { font-size: ${printerWidth === '58mm' ? '11pt' : '14pt'}; font-weight: 900; letter-spacing: 1px; text-transform: uppercase; }
+    .brand { font-size: ${printerWidth === '58mm' ? '10pt' : '12pt'}; font-weight: 900; letter-spacing: 0.5px; text-transform: uppercase; }
     .rbadge { display: inline-block; margin-top: 5px; padding: 1px 8px; border: 1.5px solid #000; font-size: ${printerWidth === '58mm' ? '7pt' : '8pt'}; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
 
     .solid  { border: none; border-top: 2px solid #000; margin: 6px 0; }
@@ -949,7 +949,7 @@ export function buildKitchenTicketHtml(ticket: KitchenTicketData, printerWidth: 
  * Open a kitchen ticket in a named 80mm-wide window.
  */
 export function printKitchenTicket(html: string, printerWidth: '58mm' | '80mm' = getPrinterWidth()): void {
-  const popupWidth = printerWidth === '58mm' ? 219 : 302;
+  const popupWidth = printerWidth === '58mm' ? 240 : 322;
   const printWindow = window.open('', 'kitchen_print', `width=${popupWidth},height=700,toolbar=0,scrollbars=1,status=0`);
   if (!printWindow) {
     throw new Error('Unable to open print window. Please allow pop-ups.');
@@ -968,7 +968,7 @@ export function printKitchenTicket(html: string, printerWidth: '58mm' | '80mm' =
  * The embedded script auto-prints and auto-closes when opened this way.
  */
 export function printReceipt(html: string, printerWidth: '58mm' | '80mm' = getPrinterWidth()): void {
-  const popupWidth = printerWidth === '58mm' ? 219 : 302;
+  const popupWidth = printerWidth === '58mm' ? 240 : 322;
   const printWindow = window.open('', 'receipt_print', `width=${popupWidth},height=700,toolbar=0,scrollbars=1,status=0`);
   if (!printWindow) {
     throw new Error('Unable to open print window. Please allow pop-ups.');
@@ -1058,13 +1058,13 @@ export function buildExpenseReceiptHtml(
   <meta charset="UTF-8">
   <title>Expense Receipt #${receiptRef}</title>
   <style>
-    @page { size: ${printerWidth} auto; margin: 0; }
+    @page { size: ${printerWidth} auto; margin: 0 ${printerWidth === '58mm' ? '3mm' : '4mm'}; }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif; font-size: ${printerWidth === '58mm' ? '7.5pt' : '9.5pt'}; color: #000; line-height: 1.4; word-break: break-word; overflow-wrap: break-word; }
 
     @media screen {
       body { background: #c8c8c8; display: flex; flex-direction: column; align-items: center; padding: 20px 12px 40px; }
-      .paper { background: #fff; width: ${printerWidth}; padding: ${printerWidth === '58mm' ? '4mm 3mm 8mm' : '6mm 5mm 10mm'}; box-shadow: 0 3px 16px rgba(0,0,0,.22); }
+      .paper { background: #fff; width: ${printerWidth === '58mm' ? '52mm' : '72mm'}; padding: ${printerWidth === '58mm' ? '4mm 3mm 8mm' : '6mm 5mm 10mm'}; box-shadow: 0 3px 16px rgba(0,0,0,.22); }
     }
     @media print {
       html, body { background: #fff; display: block; }
@@ -1076,7 +1076,7 @@ export function buildExpenseReceiptHtml(
 
     .hdr { text-align: center; padding-bottom: 6px; }
     .logo { max-height: ${printerWidth === '58mm' ? '45px' : '60px'}; max-width: ${printerWidth === '58mm' ? '100px' : '150px'}; object-fit: contain; display: block; margin: 0 auto 4px; }
-    .brand { font-size: ${printerWidth === '58mm' ? '11pt' : '14pt'}; font-weight: 900; letter-spacing: 1px; text-transform: uppercase; }
+    .brand { font-size: ${printerWidth === '58mm' ? '10pt' : '12pt'}; font-weight: 900; letter-spacing: 0.5px; text-transform: uppercase; }
     .sub { font-size: ${printerWidth === '58mm' ? '7pt' : '8.5pt'}; color: #333; margin-top: 2px; line-height: 1.4; }
     .rbadge { display: inline-block; margin-top: 5px; padding: 1px 6px; border: 1.5px solid #000; font-size: 7pt; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
 
@@ -1204,7 +1204,7 @@ export function downloadExpenseReceiptHtml(html: string, filename?: string): voi
 }
 
 export function printExpenseReceipt(html: string, printerWidth: '58mm' | '80mm' = getPrinterWidth()): void {
-  const popupWidth = printerWidth === '58mm' ? 219 : 302;
+  const popupWidth = printerWidth === '58mm' ? 240 : 322;
   const printWindow = window.open('', 'receipt_print', `width=${popupWidth},height=700,toolbar=0,scrollbars=1,status=0`);
   if (!printWindow) {
     throw new Error('Unable to open print window. Please allow pop-ups.');
