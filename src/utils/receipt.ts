@@ -388,7 +388,7 @@ export function buildReceiptHtml(receipt: ReceiptData, printerWidth: '58mm' | '8
   <style>
     @page { size: ${printerWidth} auto; margin: 0 ${printerWidth === '58mm' ? '5mm' : '4mm'}; }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif; font-size: ${printerWidth === '58mm' ? '7.5pt' : '9pt'}; color: #000; line-height: 1.4; word-break: break-word; overflow-wrap: break-word; }
+    body { font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif; font-size: ${printerWidth === '58mm' ? '7.5pt' : '9pt'}; font-weight: 700; color: #000; line-height: 1.4; word-break: break-word; overflow-wrap: break-word; }
 
     @media screen {
       body { background: #c8c8c8; display: flex; flex-direction: column; align-items: center; padding: 20px 12px 40px; }
@@ -405,25 +405,25 @@ export function buildReceiptHtml(receipt: ReceiptData, printerWidth: '58mm' | '8
     .hdr { text-align: center; padding-bottom: 6px; }
     .logo { max-height: ${printerWidth === '58mm' ? '45px' : '60px'}; max-width: ${printerWidth === '58mm' ? '100px' : '150px'}; object-fit: contain; display: block; margin: 0 auto 4px; }
     .brand { font-size: ${printerWidth === '58mm' ? '10pt' : '12pt'}; font-weight: 900; letter-spacing: 0.5px; text-transform: uppercase; }
-    .addr { font-size: ${printerWidth === '58mm' ? '7pt' : '8pt'}; color: #333; margin-top: 2px; line-height: 1.4; }
-    .rbadge { display: inline-block; margin-top: 5px; padding: 1px 6px; border: 1.5px solid #000; font-size: 7pt; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+    .addr { font-size: ${printerWidth === '58mm' ? '7pt' : '8pt'}; color: #000; margin-top: 2px; line-height: 1.4; }
+    .rbadge { display: inline-block; margin-top: 5px; padding: 1px 6px; border: 1.5px solid #000; font-size: 7pt; font-weight: 900; letter-spacing: 1px; text-transform: uppercase; }
 
     .solid  { border: none; border-top: 2px solid #000; margin: 6px 0; }
-    .dashed { border: none; border-top: 1px dashed #666; margin: 5px 0; }
+    .dashed { border: none; border-top: 1px dashed #000; margin: 5px 0; }
 
     .meta { width: 100%; border-collapse: collapse; font-size: ${printerWidth === '58mm' ? '7pt' : '8pt'}; }
     .meta td { padding: 1px 0; vertical-align: top; word-break: break-word; overflow-wrap: break-word; overflow: hidden; }
-    .meta td:first-child { color: #444; width: 38%; }
-    .meta td:last-child  { font-weight: 700; text-align: right; width: 62%; word-break: break-word; overflow-wrap: break-word; }
+    .meta td:first-child { color: #000; width: 38%; }
+    .meta td:last-child  { font-weight: 900; text-align: right; width: 62%; word-break: break-word; overflow-wrap: break-word; }
 
     .items { width: 100%; border-collapse: collapse; font-size: ${printerWidth === '58mm' ? '7.5pt' : '9pt'}; table-layout: fixed; }
-    .items th { font-size: ${printerWidth === '58mm' ? '6.5pt' : '7.5pt'}; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; color: #333; padding: 0 0 3px; border-bottom: 1.5px solid #000; text-align: left; }
+    .items th { font-size: ${printerWidth === '58mm' ? '6.5pt' : '7.5pt'}; font-weight: 900; letter-spacing: 0.5px; text-transform: uppercase; color: #000; padding: 0 0 3px; border-bottom: 2px solid #000; text-align: left; }
     .items th:last-child { text-align: right; }
-    .items td { padding: 3px 0; vertical-align: top; border-bottom: 1px dotted #bbb; overflow: hidden; }
-    .items .qty   { width: 8%; color: #333; }
+    .items td { padding: 3px 0; vertical-align: top; border-bottom: 1px dotted #000; overflow: hidden; }
+    .items .qty   { width: 8%; color: #000; }
     .items .name  { width: 62%; padding-right: 4px; word-break: break-word; overflow-wrap: break-word; }
-    .items .price { width: 30%; text-align: right; font-weight: 700; white-space: nowrap; overflow: hidden; }
-    .note { font-size: ${printerWidth === '58mm' ? '6.5pt' : '7.5pt'}; color: #555; font-style: italic; margin-top: 1px; }
+    .items .price { width: 30%; text-align: right; font-weight: 900; white-space: nowrap; overflow: hidden; }
+    .note { font-size: ${printerWidth === '58mm' ? '6.5pt' : '7.5pt'}; color: #000; font-style: italic; margin-top: 1px; }
 
     .totals { width: 100%; border-collapse: collapse; font-size: ${printerWidth === '58mm' ? '7.5pt' : '9pt'}; }
     .totals td { padding: 2px 0; }
@@ -431,15 +431,15 @@ export function buildReceiptHtml(receipt: ReceiptData, printerWidth: '58mm' | '8
     .grand td { font-size: ${printerWidth === '58mm' ? '10pt' : '12pt'}; font-weight: 900; border-top: 2px solid #000; padding-top: 5px; }
 
     .pay-row { display: flex; justify-content: space-between; font-size: ${printerWidth === '58mm' ? '7pt' : '8pt'}; padding: 1px 0; }
-    .sbadge { display: inline-block; padding: 1px 6px; border-radius: 10px; font-size: 6.5pt; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; }
+    .sbadge { display: inline-block; padding: 1px 6px; border-radius: 10px; font-size: 6.5pt; font-weight: 900; letter-spacing: 0.5px; text-transform: uppercase; }
     .s-paid    { background: #d1fae5; color: #065f46; }
     .s-pending { background: #fef3c7; color: #92400e; }
 
-    .notes-box { border: 1px dashed #888; border-radius: 3px; padding: 3px 5px; font-size: ${printerWidth === '58mm' ? '7pt' : '8pt'}; color: #333; font-style: italic; line-height: 1.4; }
+    .notes-box { border: 1px dashed #000; border-radius: 3px; padding: 3px 5px; font-size: ${printerWidth === '58mm' ? '7pt' : '8pt'}; color: #000; font-style: italic; line-height: 1.4; }
 
     .loyalty-box { border: 1.5px dashed #b8952a; border-radius: 3px; padding: 5px; text-align: center; background: #fffbf0; }
     .loyalty-box .pts { font-size: ${printerWidth === '58mm' ? '12pt' : '14pt'}; font-weight: 900; color: #92400e; }
-    .loyalty-box .lbl { font-size: 6.5pt; font-weight: 700; color: #92400e; letter-spacing: 0.5px; text-transform: uppercase; }
+    .loyalty-box .lbl { font-size: 6.5pt; font-weight: 900; color: #92400e; letter-spacing: 0.5px; text-transform: uppercase; }
 
     .footer { text-align: center; font-size: ${printerWidth === '58mm' ? '7pt' : '8.5pt'}; color: #000; line-height: 1.6; }
     .thanks { font-size: ${printerWidth === '58mm' ? '9pt' : '10.5pt'}; font-weight: 900; color: #000; letter-spacing: 0.5px; margin-bottom: 2px; }
@@ -631,7 +631,7 @@ export function buildChitHtml(data: ChitData, printerWidth: '58mm' | '80mm' = ge
   <style>
     @page { size: ${printerWidth} auto; margin: 0 ${printerWidth === '58mm' ? '5mm' : '4mm'}; }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif; font-size: ${printerWidth === '58mm' ? '7.5pt' : '9pt'}; color: #000; font-weight: 600; line-height: 1.4; word-break: break-word; overflow-wrap: break-word; }
+    body { font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif; font-size: ${printerWidth === '58mm' ? '7.5pt' : '9pt'}; color: #000; font-weight: 700; line-height: 1.4; word-break: break-word; overflow-wrap: break-word; }
 
     @media screen {
       body { background: #c8c8c8; display: flex; flex-direction: column; align-items: center; padding: 20px 12px 40px; }
@@ -648,28 +648,28 @@ export function buildChitHtml(data: ChitData, printerWidth: '58mm' | '80mm' = ge
     .logo { max-height: ${printerWidth === '58mm' ? '40px' : '55px'}; max-width: ${printerWidth === '58mm' ? '90px' : '140px'}; object-fit: contain; display: block; margin: 0 auto 4px; }
     .brand { font-size: ${printerWidth === '58mm' ? '10pt' : '12pt'}; font-weight: 900; letter-spacing: 0.5px; text-transform: uppercase; }
     .addr  { font-size: ${printerWidth === '58mm' ? '6.5pt' : '8pt'}; color: #000; margin-top: 2px; line-height: 1.4; }
-    .badge { display: inline-block; margin-top: 4px; padding: 1px 6px; border: 1.5px solid #000; font-size: 6.5pt; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+    .badge { display: inline-block; margin-top: 4px; padding: 1px 6px; border: 1.5px solid #000; font-size: 6.5pt; font-weight: 900; letter-spacing: 1px; text-transform: uppercase; }
 
     .solid  { border: none; border-top: 2px solid #000; margin: 5px 0; }
     .dashed { border: none; border-top: 1px dashed #000; margin: 4px 0; }
 
     .order-block { text-align: center; padding: 3px 0; }
     .order-num   { font-size: ${printerWidth === '58mm' ? '16pt' : '20pt'}; font-weight: 900; line-height: 1.1; }
-    .table-label { font-size: ${printerWidth === '58mm' ? '10pt' : '13pt'}; font-weight: 700; margin-top: 2px; text-transform: uppercase; }
+    .table-label { font-size: ${printerWidth === '58mm' ? '10pt' : '13pt'}; font-weight: 900; margin-top: 2px; text-transform: uppercase; }
 
     .meta { width: 100%; border-collapse: collapse; font-size: ${printerWidth === '58mm' ? '7pt' : '8.5pt'}; margin: 3px 0; }
-    .meta td { padding: 1px 0; vertical-align: top; word-break: break-word; overflow-wrap: break-word; }
+    .meta td { padding: 1px 0; vertical-align: top; word-break: break-word; overflow-wrap: break-word; overflow: hidden; }
     .meta td:first-child { color: #000; width: 38%; }
-    .meta td:last-child  { font-weight: 700; text-align: right; max-width: 62%; word-break: break-word; }
+    .meta td:last-child  { font-weight: 900; text-align: right; width: 62%; word-break: break-word; overflow-wrap: break-word; }
 
-    .items { width: 100%; border-collapse: collapse; font-size: ${printerWidth === '58mm' ? '7.5pt' : '9.5pt'}; }
-    .items td { padding: 3px 0; vertical-align: top; border-bottom: 1px dotted #000; }
-    .items .qty   { width: 18px; color: #000; font-weight: 700; }
-    .items .name  { font-weight: 700; padding-right: 4px; word-break: break-word; }
-    .items .price { text-align: right; white-space: nowrap; font-size: ${printerWidth === '58mm' ? '7pt' : '8.5pt'}; font-weight: 700; }
-    .note { font-size: ${printerWidth === '58mm' ? '6.5pt' : '7.5pt'}; color: #000; font-style: italic; margin-top: 1px; font-weight: 600; }
+    .items { width: 100%; border-collapse: collapse; font-size: ${printerWidth === '58mm' ? '7.5pt' : '9.5pt'}; table-layout: fixed; }
+    .items td { padding: 3px 0; vertical-align: top; border-bottom: 1px dotted #000; overflow: hidden; }
+    .items .qty   { width: 8%; color: #000; font-weight: 900; }
+    .items .name  { width: 62%; font-weight: 900; padding-right: 4px; word-break: break-word; overflow-wrap: break-word; }
+    .items .price { width: 30%; text-align: right; white-space: nowrap; font-size: ${printerWidth === '58mm' ? '7pt' : '8.5pt'}; font-weight: 900; overflow: hidden; }
+    .note { font-size: ${printerWidth === '58mm' ? '6.5pt' : '7.5pt'}; color: #000; font-style: italic; margin-top: 1px; font-weight: 700; }
 
-    .special-box { border: 1.5px solid #000; padding: 3px 5px; margin: 4px 0; font-size: ${printerWidth === '58mm' ? '7pt' : '8.5pt'}; font-weight: 700; line-height: 1.4; }
+    .special-box { border: 1.5px solid #000; padding: 3px 5px; margin: 4px 0; font-size: ${printerWidth === '58mm' ? '7pt' : '8.5pt'}; font-weight: 900; line-height: 1.4; }
     .special-box .lbl { font-size: 6.5pt; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 1px; }
 
     .grand { width: 100%; border-collapse: collapse; margin-top: 4px; }
@@ -817,7 +817,7 @@ export function buildKitchenTicketHtml(ticket: KitchenTicketData, printerWidth: 
   <style>
     @page { size: ${printerWidth} auto; margin: 0 ${printerWidth === '58mm' ? '5mm' : '4mm'}; }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif; font-size: ${printerWidth === '58mm' ? '8pt' : '10pt'}; color: #000; line-height: 1.4; word-break: break-word; overflow-wrap: break-word; }
+    body { font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif; font-size: ${printerWidth === '58mm' ? '8pt' : '10pt'}; font-weight: 700; color: #000; line-height: 1.4; word-break: break-word; overflow-wrap: break-word; }
 
     @media screen {
       body { background: #c8c8c8; display: flex; flex-direction: column; align-items: center; padding: 20px 12px 40px; }
@@ -833,31 +833,31 @@ export function buildKitchenTicketHtml(ticket: KitchenTicketData, printerWidth: 
     .hdr { text-align: center; padding-bottom: 6px; }
     .logo { max-height: ${printerWidth === '58mm' ? '45px' : '60px'}; max-width: ${printerWidth === '58mm' ? '100px' : '150px'}; object-fit: contain; display: block; margin: 0 auto 4px; }
     .brand { font-size: ${printerWidth === '58mm' ? '10pt' : '12pt'}; font-weight: 900; letter-spacing: 0.5px; text-transform: uppercase; }
-    .rbadge { display: inline-block; margin-top: 5px; padding: 1px 8px; border: 1.5px solid #000; font-size: ${printerWidth === '58mm' ? '7pt' : '8pt'}; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+    .rbadge { display: inline-block; margin-top: 5px; padding: 1px 8px; border: 1.5px solid #000; font-size: ${printerWidth === '58mm' ? '7pt' : '8pt'}; font-weight: 900; letter-spacing: 1px; text-transform: uppercase; }
 
     .solid  { border: none; border-top: 2px solid #000; margin: 6px 0; }
-    .dashed { border: none; border-top: 1px dashed #666; margin: 5px 0; }
+    .dashed { border: none; border-top: 1px dashed #000; margin: 5px 0; }
 
     .order-block { text-align: center; padding: 3px 0; }
     .order-num { font-size: ${printerWidth === '58mm' ? '18pt' : '24pt'}; font-weight: 900; line-height: 1.1; }
-    .table-num { font-size: ${printerWidth === '58mm' ? '11pt' : '14pt'}; font-weight: 700; margin-top: 2px; }
-    .status-badge { display: inline-block; margin-top: 4px; padding: 1px 8px; border: 1.5px solid #000; font-size: ${printerWidth === '58mm' ? '7.5pt' : '9pt'}; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+    .table-num { font-size: ${printerWidth === '58mm' ? '11pt' : '14pt'}; font-weight: 900; margin-top: 2px; }
+    .status-badge { display: inline-block; margin-top: 4px; padding: 1px 8px; border: 1.5px solid #000; font-size: ${printerWidth === '58mm' ? '7.5pt' : '9pt'}; font-weight: 900; letter-spacing: 1px; text-transform: uppercase; }
 
     .meta { width: 100%; border-collapse: collapse; font-size: ${printerWidth === '58mm' ? '7.5pt' : '9pt'}; }
-    .meta td { padding: 1px 0; vertical-align: top; word-break: break-word; overflow-wrap: break-word; }
-    .meta td:first-child { color: #333; width: 40%; }
-    .meta td:last-child  { font-weight: 700; text-align: right; max-width: 60%; word-break: break-word; }
+    .meta td { padding: 1px 0; vertical-align: top; word-break: break-word; overflow-wrap: break-word; overflow: hidden; }
+    .meta td:first-child { color: #000; width: 38%; }
+    .meta td:last-child  { font-weight: 900; text-align: right; width: 62%; word-break: break-word; overflow-wrap: break-word; }
 
     .urgency-row { display: flex; justify-content: space-between; align-items: center; font-size: ${printerWidth === '58mm' ? '7.5pt' : '9pt'}; margin: 3px 0; }
-    .urgency-badge { padding: 1px 6px; border-radius: 3px; font-weight: 700; font-size: ${printerWidth === '58mm' ? '7pt' : '8pt'}; letter-spacing: 0.5px; }
+    .urgency-badge { padding: 1px 6px; border-radius: 3px; font-weight: 900; font-size: ${printerWidth === '58mm' ? '7pt' : '8pt'}; letter-spacing: 0.5px; }
 
-    .items { width: 100%; border-collapse: collapse; font-size: ${printerWidth === '58mm' ? '9pt' : '11pt'}; }
-    .items td { padding: 4px 0; vertical-align: top; border-bottom: 1px dotted #bbb; }
-    .items .qty  { width: ${printerWidth === '58mm' ? '20px' : '28px'}; color: #333; font-weight: 700; }
-    .items .name { font-weight: 700; word-break: break-word; }
-    .note { font-size: ${printerWidth === '58mm' ? '7pt' : '8pt'}; color: #555; font-style: italic; margin-top: 1px; font-weight: 400; }
+    .items { width: 100%; border-collapse: collapse; font-size: ${printerWidth === '58mm' ? '9pt' : '11pt'}; table-layout: fixed; }
+    .items td { padding: 4px 0; vertical-align: top; border-bottom: 1px dotted #000; overflow: hidden; }
+    .items .qty  { width: 8%; color: #000; font-weight: 900; }
+    .items .name { width: 92%; font-weight: 900; word-break: break-word; overflow-wrap: break-word; }
+    .note { font-size: ${printerWidth === '58mm' ? '7pt' : '8pt'}; color: #000; font-style: italic; margin-top: 1px; font-weight: 700; }
 
-    .special-box { border: 2px solid #000; padding: ${printerWidth === '58mm' ? '4px 5px' : '6px 8px'}; margin: ${printerWidth === '58mm' ? '5px 0' : '8px 0'}; font-size: ${printerWidth === '58mm' ? '7.5pt' : '9pt'}; font-weight: 700; line-height: 1.4; }
+    .special-box { border: 2px solid #000; padding: ${printerWidth === '58mm' ? '4px 5px' : '6px 8px'}; margin: ${printerWidth === '58mm' ? '5px 0' : '8px 0'}; font-size: ${printerWidth === '58mm' ? '7.5pt' : '9pt'}; font-weight: 900; line-height: 1.4; }
     .special-box .lbl { font-size: 6.5pt; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 1px; }
 
     .loyalty-box { border: 1.5px dashed #b8952a; border-radius: 3px; padding: 4px 6px; font-size: ${printerWidth === '58mm' ? '7.5pt' : '9pt'}; background: #fffbf0; color: #92400e; }
@@ -1060,7 +1060,7 @@ export function buildExpenseReceiptHtml(
   <style>
     @page { size: ${printerWidth} auto; margin: 0 ${printerWidth === '58mm' ? '5mm' : '4mm'}; }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif; font-size: ${printerWidth === '58mm' ? '7.5pt' : '9.5pt'}; color: #000; line-height: 1.4; word-break: break-word; overflow-wrap: break-word; }
+    body { font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif; font-size: ${printerWidth === '58mm' ? '7.5pt' : '9pt'}; font-weight: 700; color: #000; line-height: 1.4; word-break: break-word; overflow-wrap: break-word; }
 
     @media screen {
       body { background: #c8c8c8; display: flex; flex-direction: column; align-items: center; padding: 20px 12px 40px; }
@@ -1077,34 +1077,34 @@ export function buildExpenseReceiptHtml(
     .hdr { text-align: center; padding-bottom: 6px; }
     .logo { max-height: ${printerWidth === '58mm' ? '45px' : '60px'}; max-width: ${printerWidth === '58mm' ? '100px' : '150px'}; object-fit: contain; display: block; margin: 0 auto 4px; }
     .brand { font-size: ${printerWidth === '58mm' ? '10pt' : '12pt'}; font-weight: 900; letter-spacing: 0.5px; text-transform: uppercase; }
-    .sub { font-size: ${printerWidth === '58mm' ? '7pt' : '8.5pt'}; color: #333; margin-top: 2px; line-height: 1.4; }
-    .rbadge { display: inline-block; margin-top: 5px; padding: 1px 6px; border: 1.5px solid #000; font-size: 7pt; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+    .sub { font-size: ${printerWidth === '58mm' ? '7pt' : '8pt'}; color: #000; margin-top: 2px; line-height: 1.4; }
+    .rbadge { display: inline-block; margin-top: 5px; padding: 1px 6px; border: 1.5px solid #000; font-size: 7pt; font-weight: 900; letter-spacing: 1px; text-transform: uppercase; }
 
     .solid  { border: none; border-top: 2px solid #000; margin: 6px 0; }
-    .dashed { border: none; border-top: 1px dashed #666; margin: 5px 0; }
+    .dashed { border: none; border-top: 1px dashed #000; margin: 5px 0; }
 
     .meta { width: 100%; border-collapse: collapse; font-size: ${printerWidth === '58mm' ? '7pt' : '8.5pt'}; }
-    .meta td { padding: 1px 0; vertical-align: top; word-break: break-word; overflow-wrap: break-word; }
-    .meta td:first-child { color: #555; width: 43%; }
-    .meta td:last-child  { font-weight: 700; text-align: right; max-width: 57%; word-break: break-word; }
+    .meta td { padding: 1px 0; vertical-align: top; word-break: break-word; overflow-wrap: break-word; overflow: hidden; }
+    .meta td:first-child { color: #000; width: 40%; }
+    .meta td:last-child  { font-weight: 900; text-align: right; width: 60%; word-break: break-word; overflow-wrap: break-word; }
 
-    .desc-lbl { font-size: ${printerWidth === '58mm' ? '6.5pt' : '8pt'}; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #333; margin-bottom: 2px; }
-    .desc-box { font-size: ${printerWidth === '58mm' ? '7pt' : '9pt'}; line-height: 1.4; color: #000; border-top: 1px dotted #bbb; border-bottom: 1px dotted #bbb; padding: 4px 0; margin: 2px 0; }
+    .desc-lbl { font-size: ${printerWidth === '58mm' ? '6.5pt' : '8pt'}; font-weight: 900; letter-spacing: 1px; text-transform: uppercase; color: #000; margin-bottom: 2px; }
+    .desc-box { font-size: ${printerWidth === '58mm' ? '7pt' : '9pt'}; line-height: 1.4; color: #000; border-top: 1px dotted #000; border-bottom: 1px dotted #000; padding: 4px 0; margin: 2px 0; }
 
-    .totals { width: 100%; border-collapse: collapse; font-size: ${printerWidth === '58mm' ? '7.5pt' : '9.5pt'}; }
+    .totals { width: 100%; border-collapse: collapse; font-size: ${printerWidth === '58mm' ? '7.5pt' : '9pt'}; }
     .totals td { padding: 2px 0; }
     .totals td:last-child { text-align: right; }
     .grand td { font-size: ${printerWidth === '58mm' ? '10pt' : '12pt'}; font-weight: 900; border-top: 2px solid #000; padding-top: 5px; }
 
-    .pay-row { display: flex; justify-content: space-between; font-size: ${printerWidth === '58mm' ? '7pt' : '8.5pt'}; padding: 1px 0; }
-    .sbadge { display: inline-block; padding: 1px 6px; border-radius: 10px; font-size: 6.5pt; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; }
+    .pay-row { display: flex; justify-content: space-between; font-size: ${printerWidth === '58mm' ? '7pt' : '8pt'}; padding: 1px 0; }
+    .sbadge { display: inline-block; padding: 1px 6px; border-radius: 10px; font-size: 6.5pt; font-weight: 900; letter-spacing: 0.5px; text-transform: uppercase; }
     .s-paid     { background: #d1fae5; color: #065f46; }
     .s-pending  { background: #fef3c7; color: #92400e; }
     .s-approved { background: #d1fae5; color: #065f46; }
     .s-rejected { background: #fee2e2; color: #991b1b; }
     .s-draft    { background: #f1f5f9; color: #475569; }
 
-    .notes-box { border: 1px dashed #888; border-radius: 3px; padding: 3px 5px; font-size: ${printerWidth === '58mm' ? '7pt' : '8.5pt'}; color: #333; font-style: italic; line-height: 1.4; }
+    .notes-box { border: 1px dashed #000; border-radius: 3px; padding: 3px 5px; font-size: ${printerWidth === '58mm' ? '7pt' : '8pt'}; color: #000; font-style: italic; line-height: 1.4; }
 
     .footer { text-align: center; font-size: ${printerWidth === '58mm' ? '7pt' : '8.5pt'}; color: #000; line-height: 1.6; }
     .thanks { font-size: ${printerWidth === '58mm' ? '9pt' : '10.5pt'}; font-weight: 900; color: #000; letter-spacing: 0.5px; margin-bottom: 2px; }
