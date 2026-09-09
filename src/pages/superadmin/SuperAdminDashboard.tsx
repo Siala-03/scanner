@@ -694,7 +694,7 @@ export function SuperAdminDashboard({ onNavigate }: SuperAdminDashboardProps) {
                           : 'bg-slate-800 border-slate-600 text-slate-400 hover:border-slate-500'
                       }`}
                     >
-                      {w} {w === '58mm' ? '(XPrinter)' : '(standard)'}
+                      {w} {w === '58mm' ? '(ZPrinter 58)' : '(ZPrinter 80)'}
                     </button>
                   ))}
                 </div>
