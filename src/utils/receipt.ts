@@ -387,7 +387,7 @@ export function buildReceiptHtml(receipt: ReceiptData, printerWidth: '58mm' | '8
   <title>Receipt #${orderNumber}</title>
   <style>
     @page { size: ${printerWidth} auto; margin: 0 ${printerWidth === '58mm' ? '5mm' : '4mm'}; }
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; font-weight: 900 !important; }
     body { font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif; font-size: ${printerWidth === '58mm' ? '7.5pt' : '9pt'}; font-weight: 700; color: #000; line-height: 1.4; word-break: break-word; overflow-wrap: break-word; }
 
     @media screen {
@@ -409,7 +409,7 @@ export function buildReceiptHtml(receipt: ReceiptData, printerWidth: '58mm' | '8
     .rbadge { display: inline-block; margin-top: 5px; padding: 1px 6px; border: 1.5px solid #000; font-size: 7pt; font-weight: 900; letter-spacing: 1px; text-transform: uppercase; }
 
     .solid  { border: none; border-top: 2px solid #000; margin: 6px 0; }
-    .dashed { border: none; border-top: 1px dashed #000; margin: 5px 0; }
+    .dashed { border: none; border-top: 1.5px dashed #000; margin: 5px 0; }
 
     .meta { width: 100%; border-collapse: collapse; font-size: ${printerWidth === '58mm' ? '7pt' : '8pt'}; }
     .meta td { padding: 1px 0; vertical-align: top; word-break: break-word; overflow-wrap: break-word; overflow: hidden; }
@@ -419,7 +419,7 @@ export function buildReceiptHtml(receipt: ReceiptData, printerWidth: '58mm' | '8
     .items { width: 100%; border-collapse: collapse; font-size: ${printerWidth === '58mm' ? '7.5pt' : '9pt'}; table-layout: fixed; }
     .items th { font-size: ${printerWidth === '58mm' ? '6.5pt' : '7.5pt'}; font-weight: 900; letter-spacing: 0.5px; text-transform: uppercase; color: #000; padding: 0 0 3px; border-bottom: 2px solid #000; text-align: left; }
     .items th:last-child { text-align: right; }
-    .items td { padding: 3px 0; vertical-align: top; border-bottom: 1px dotted #000; overflow: hidden; }
+    .items td { padding: 3px 0; vertical-align: top; border-bottom: 1.5px dotted #000; overflow: hidden; }
     .items .qty   { width: 8%; color: #000; }
     .items .name  { width: 62%; padding-right: 4px; word-break: break-word; overflow-wrap: break-word; }
     .items .price { width: 30%; text-align: right; font-weight: 900; white-space: nowrap; overflow: hidden; }
@@ -435,7 +435,7 @@ export function buildReceiptHtml(receipt: ReceiptData, printerWidth: '58mm' | '8
     .s-paid    { background: #d1fae5; color: #065f46; }
     .s-pending { background: #fef3c7; color: #92400e; }
 
-    .notes-box { border: 1px dashed #000; border-radius: 3px; padding: 3px 5px; font-size: ${printerWidth === '58mm' ? '7pt' : '8pt'}; color: #000; font-style: italic; line-height: 1.4; }
+    .notes-box { border: 1.5px dashed #000; border-radius: 3px; padding: 3px 5px; font-size: ${printerWidth === '58mm' ? '7pt' : '8pt'}; color: #000; font-style: italic; line-height: 1.4; }
 
     .loyalty-box { border: 1.5px dashed #b8952a; border-radius: 3px; padding: 5px; text-align: center; background: #fffbf0; }
     .loyalty-box .pts { font-size: ${printerWidth === '58mm' ? '12pt' : '14pt'}; font-weight: 900; color: #92400e; }
@@ -485,10 +485,10 @@ export function buildReceiptHtml(receipt: ReceiptData, printerWidth: '58mm' | '8
 
   <table class="totals">
     ${taxRate > 0 ? `
-    <tr><td style="color:#555">Subtotal</td><td>${fmt(receipt.subtotal)}</td></tr>
-    <tr><td style="color:#555">Tax (${taxRate}%)</td><td>${fmt(taxAmount)}</td></tr>` : ''}
+    <tr><td>Subtotal</td><td>${fmt(receipt.subtotal)}</td></tr>
+    <tr><td>Tax (${taxRate}%)</td><td>${fmt(taxAmount)}</td></tr>` : ''}
     <tr class="grand">
-      <td>TOTAL <span style="font-size:7pt;font-weight:400;color:#555">(Tax Incl.)</span></td>
+      <td>TOTAL <span style="font-size:7pt;font-weight:900">(Tax Incl.)</span></td>
       <td>${fmt(total)}</td>
     </tr>
   </table>
@@ -497,30 +497,30 @@ export function buildReceiptHtml(receipt: ReceiptData, printerWidth: '58mm' | '8
 
   ${payments.map(p => `
   <div class="pay-row">
-    <span style="color:#333">${p.method}${p.reference ? ` <span style="font-size:8pt;color:#555">(${p.reference})</span>` : ''}</span>
-    <span style="font-weight:700">${fmt(p.amount)}</span>
+    <span>${p.method}${p.reference ? ` <span style="font-size:8pt">(${p.reference})</span>` : ''}</span>
+    <span style="font-weight:900">${fmt(p.amount)}</span>
   </div>`).join('')}
   ${payments.length > 1 ? `
-  <div class="pay-row" style="border-top:1px solid #ccc;margin-top:3px;padding-top:4px;font-weight:700">
+  <div class="pay-row" style="border-top:2px solid #000;margin-top:3px;padding-top:4px;font-weight:900">
     <span>Total Paid</span>
     <span>${fmt(payments.reduce((s, p) => s + p.amount, 0))}</span>
   </div>` : ''}
   <div class="pay-row" style="margin-top:3px">
-    <span style="color:#333">Status</span>
+    <span>Status</span>
     <span class="sbadge ${paymentStatus === 'paid' ? 's-paid' : 's-pending'}">${paymentStatus}</span>
   </div>
-  ${change !== undefined && change > 0 ? `<div class="pay-row"><span style="color:#333">Change</span><span style="font-weight:700">${fmt(change)}</span></div>` : ''}
+  ${change !== undefined && change > 0 ? `<div class="pay-row"><span>Change</span><span style="font-weight:900">${fmt(change)}</span></div>` : ''}
 
   ${deliveryAddress ? `
   <hr class="dashed">
-  <div style="font-size:8pt;color:#444;line-height:1.6">
-    <strong style="color:#000;text-transform:uppercase;letter-spacing:1px;font-size:7pt">Delivery</strong><br>
+  <div style="font-size:8pt;line-height:1.6">
+    <strong style="text-transform:uppercase;letter-spacing:1px;font-size:7pt">Delivery</strong><br>
     ${receipt.deliveryProvider ? `${receipt.deliveryProvider} &middot; ` : ''}${deliveryAddress}
   </div>` : ''}
 
   ${(notes || specialInstructions) ? `
   <hr class="dashed">
-  <div style="font-size:8pt;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#333;margin-bottom:4px">Comment / Note</div>
+  <div style="font-size:8pt;font-weight:900;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px">Comment / Note</div>
   <div class="notes-box">
     ${notes ? `<div><strong>Order Note:</strong> ${notes}</div>` : ''}
     ${notes && specialInstructions ? `<div style="height:4px"></div>` : ''}
@@ -532,13 +532,13 @@ export function buildReceiptHtml(receipt: ReceiptData, printerWidth: '58mm' | '8
   <div class="loyalty-box">
     <div class="lbl">Points Earned This Visit</div>
     <div class="pts">+${loyaltyPoints.pointsEarned} pts</div>
-    <div style="font-size:8pt;color:#92400e;margin-top:3px">Balance: ${loyaltyPoints.pointsBalance} pts</div>
+    <div style="font-size:8pt;font-weight:900;color:#92400e;margin-top:3px">Balance: ${loyaltyPoints.pointsBalance} pts</div>
   </div>` : ''}
 
   ${osdcReceiptSign || osdcReceiptNo ? `
   <hr class="dashed">
-  <div style="font-size:8pt;line-height:1.6;color:#222">
-    <div style="font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:2px">RRA EBM Certified</div>
+  <div style="font-size:8pt;font-weight:900;line-height:1.6">
+    <div style="font-weight:900;letter-spacing:1px;text-transform:uppercase;margin-bottom:2px">RRA EBM Certified</div>
     ${osdcReceiptNo ? `<div>Receipt No: <strong>${osdcReceiptNo}</strong></div>` : ''}
     ${osdcSdcDateTime ? `<div>SDC Time: <strong>${osdcSdcDateTime}</strong></div>` : ''}
     ${osdcReceiptSign ? `<div style="word-break:break-all">EBM Signature: <strong>${osdcReceiptSign}</strong></div>` : ''}
@@ -552,7 +552,7 @@ export function buildReceiptHtml(receipt: ReceiptData, printerWidth: '58mm' | '8
   <div class="footer">
     <div class="thanks">Thank you for chosing us!</div>
     <div>We hope to see you again soon.</div>
-    <div style="font-size:8pt;color:#555;margin-top:4px">${receiptId}</div>
+    <div style="font-size:8pt;font-weight:900;margin-top:4px">${receiptId}</div>
     <div class="powered">Powered by SERVV</div>
   </div>
 
@@ -630,7 +630,7 @@ export function buildChitHtml(data: ChitData, printerWidth: '58mm' | '80mm' = ge
   <title>Chit #${orderNumber}</title>
   <style>
     @page { size: ${printerWidth} auto; margin: 0 ${printerWidth === '58mm' ? '5mm' : '4mm'}; }
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; font-weight: 900 !important; }
     body { font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif; font-size: ${printerWidth === '58mm' ? '7.5pt' : '9pt'}; color: #000; font-weight: 700; line-height: 1.4; word-break: break-word; overflow-wrap: break-word; }
 
     @media screen {
@@ -651,7 +651,7 @@ export function buildChitHtml(data: ChitData, printerWidth: '58mm' | '80mm' = ge
     .badge { display: inline-block; margin-top: 4px; padding: 1px 6px; border: 1.5px solid #000; font-size: 6.5pt; font-weight: 900; letter-spacing: 1px; text-transform: uppercase; }
 
     .solid  { border: none; border-top: 2px solid #000; margin: 5px 0; }
-    .dashed { border: none; border-top: 1px dashed #000; margin: 4px 0; }
+    .dashed { border: none; border-top: 1.5px dashed #000; margin: 4px 0; }
 
     .order-block { text-align: center; padding: 3px 0; }
     .order-num   { font-size: ${printerWidth === '58mm' ? '16pt' : '20pt'}; font-weight: 900; line-height: 1.1; }
@@ -663,7 +663,7 @@ export function buildChitHtml(data: ChitData, printerWidth: '58mm' | '80mm' = ge
     .meta td:last-child  { font-weight: 900; text-align: left; width: 62%; word-break: break-word; overflow-wrap: break-word; }
 
     .items { width: 100%; border-collapse: collapse; font-size: ${printerWidth === '58mm' ? '7.5pt' : '9.5pt'}; table-layout: fixed; }
-    .items td { padding: 3px 0; vertical-align: top; border-bottom: 1px dotted #000; overflow: hidden; }
+    .items td { padding: 3px 0; vertical-align: top; border-bottom: 1.5px dotted #000; overflow: hidden; }
     .items .qty   { width: 8%; color: #000; font-weight: 900; }
     .items .name  { width: 62%; font-weight: 900; padding-right: 4px; word-break: break-word; overflow-wrap: break-word; }
     .items .price { width: 30%; text-align: right; white-space: nowrap; font-size: ${printerWidth === '58mm' ? '7pt' : '8.5pt'}; font-weight: 900; overflow: hidden; }
@@ -816,7 +816,7 @@ export function buildKitchenTicketHtml(ticket: KitchenTicketData, printerWidth: 
   <title>Kitchen Ticket #${orderNumber}</title>
   <style>
     @page { size: ${printerWidth} auto; margin: 0 ${printerWidth === '58mm' ? '5mm' : '4mm'}; }
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; font-weight: 900 !important; }
     body { font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif; font-size: ${printerWidth === '58mm' ? '8pt' : '10pt'}; font-weight: 700; color: #000; line-height: 1.4; word-break: break-word; overflow-wrap: break-word; }
 
     @media screen {
@@ -836,7 +836,7 @@ export function buildKitchenTicketHtml(ticket: KitchenTicketData, printerWidth: 
     .rbadge { display: inline-block; margin-top: 5px; padding: 1px 8px; border: 1.5px solid #000; font-size: ${printerWidth === '58mm' ? '7pt' : '8pt'}; font-weight: 900; letter-spacing: 1px; text-transform: uppercase; }
 
     .solid  { border: none; border-top: 2px solid #000; margin: 6px 0; }
-    .dashed { border: none; border-top: 1px dashed #000; margin: 5px 0; }
+    .dashed { border: none; border-top: 1.5px dashed #000; margin: 5px 0; }
 
     .order-block { text-align: center; padding: 3px 0; }
     .order-num { font-size: ${printerWidth === '58mm' ? '18pt' : '24pt'}; font-weight: 900; line-height: 1.1; }
@@ -852,7 +852,7 @@ export function buildKitchenTicketHtml(ticket: KitchenTicketData, printerWidth: 
     .urgency-badge { padding: 1px 6px; border-radius: 3px; font-weight: 900; font-size: ${printerWidth === '58mm' ? '7pt' : '8pt'}; letter-spacing: 0.5px; }
 
     .items { width: 100%; border-collapse: collapse; font-size: ${printerWidth === '58mm' ? '9pt' : '11pt'}; table-layout: fixed; }
-    .items td { padding: 4px 0; vertical-align: top; border-bottom: 1px dotted #000; overflow: hidden; }
+    .items td { padding: 4px 0; vertical-align: top; border-bottom: 1.5px dotted #000; overflow: hidden; }
     .items .qty  { width: 8%; color: #000; font-weight: 900; }
     .items .name { width: 92%; font-weight: 900; word-break: break-word; overflow-wrap: break-word; }
     .note { font-size: ${printerWidth === '58mm' ? '7pt' : '8pt'}; color: #000; font-style: italic; margin-top: 1px; font-weight: 700; }
@@ -1059,7 +1059,7 @@ export function buildExpenseReceiptHtml(
   <title>Expense Receipt #${receiptRef}</title>
   <style>
     @page { size: ${printerWidth} auto; margin: 0 ${printerWidth === '58mm' ? '5mm' : '4mm'}; }
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; font-weight: 900 !important; }
     body { font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif; font-size: ${printerWidth === '58mm' ? '7.5pt' : '9pt'}; font-weight: 700; color: #000; line-height: 1.4; word-break: break-word; overflow-wrap: break-word; }
 
     @media screen {
@@ -1081,7 +1081,7 @@ export function buildExpenseReceiptHtml(
     .rbadge { display: inline-block; margin-top: 5px; padding: 1px 6px; border: 1.5px solid #000; font-size: 7pt; font-weight: 900; letter-spacing: 1px; text-transform: uppercase; }
 
     .solid  { border: none; border-top: 2px solid #000; margin: 6px 0; }
-    .dashed { border: none; border-top: 1px dashed #000; margin: 5px 0; }
+    .dashed { border: none; border-top: 1.5px dashed #000; margin: 5px 0; }
 
     .meta { width: 100%; border-collapse: collapse; font-size: ${printerWidth === '58mm' ? '7pt' : '8.5pt'}; }
     .meta td { padding: 1px 0; vertical-align: top; word-break: break-word; overflow-wrap: break-word; overflow: hidden; }
@@ -1089,7 +1089,7 @@ export function buildExpenseReceiptHtml(
     .meta td:last-child  { font-weight: 900; text-align: left; width: 60%; word-break: break-word; overflow-wrap: break-word; }
 
     .desc-lbl { font-size: ${printerWidth === '58mm' ? '6.5pt' : '8pt'}; font-weight: 900; letter-spacing: 1px; text-transform: uppercase; color: #000; margin-bottom: 2px; }
-    .desc-box { font-size: ${printerWidth === '58mm' ? '7pt' : '9pt'}; line-height: 1.4; color: #000; border-top: 1px dotted #000; border-bottom: 1px dotted #000; padding: 4px 0; margin: 2px 0; }
+    .desc-box { font-size: ${printerWidth === '58mm' ? '7pt' : '9pt'}; line-height: 1.4; color: #000; border-top: 1px dotted #000; border-bottom: 1.5px dotted #000; padding: 4px 0; margin: 2px 0; }
 
     .totals { width: 100%; border-collapse: collapse; font-size: ${printerWidth === '58mm' ? '7.5pt' : '9pt'}; }
     .totals td { padding: 2px 0; }
@@ -1104,7 +1104,7 @@ export function buildExpenseReceiptHtml(
     .s-rejected { background: #fee2e2; color: #991b1b; }
     .s-draft    { background: #f1f5f9; color: #475569; }
 
-    .notes-box { border: 1px dashed #000; border-radius: 3px; padding: 3px 5px; font-size: ${printerWidth === '58mm' ? '7pt' : '8pt'}; color: #000; font-style: italic; line-height: 1.4; }
+    .notes-box { border: 1.5px dashed #000; border-radius: 3px; padding: 3px 5px; font-size: ${printerWidth === '58mm' ? '7pt' : '8pt'}; color: #000; font-style: italic; line-height: 1.4; }
 
     .footer { text-align: center; font-size: ${printerWidth === '58mm' ? '7pt' : '8.5pt'}; color: #000; line-height: 1.6; }
     .thanks { font-size: ${printerWidth === '58mm' ? '9pt' : '10.5pt'}; font-weight: 900; color: #000; letter-spacing: 0.5px; margin-bottom: 2px; }
@@ -1142,23 +1142,23 @@ export function buildExpenseReceiptHtml(
   <hr class="dashed">
 
   <table class="totals">
-    <tr><td style="color:#555">Subtotal</td><td>${fmt(expense.amount)}</td></tr>
-    ${taxAmount > 0 ? `<tr><td style="color:#555">Tax (${expense.taxRate}%)</td><td>${fmt(taxAmount)}</td></tr>` : ''}
+    <tr><td>Subtotal</td><td>${fmt(expense.amount)}</td></tr>
+    ${taxAmount > 0 ? `<tr><td>Tax (${expense.taxRate}%)</td><td>${fmt(taxAmount)}</td></tr>` : ''}
     <tr class="grand"><td>TOTAL</td><td>${fmt(total)}</td></tr>
   </table>
 
   <hr class="dashed">
 
   <div class="pay-row">
-    <span style="color:#555">Payment</span>
+    <span>Payment</span>
     <span style="text-transform:capitalize">${paymentMethod}</span>
   </div>
   <div class="pay-row">
-    <span style="color:#555">Payment Status</span>
+    <span>Payment Status</span>
     <span class="sbadge s-${expense.paymentStatus}">${expense.paymentStatus}</span>
   </div>
   <div class="pay-row">
-    <span style="color:#555">Approval</span>
+    <span>Approval</span>
     <span class="sbadge s-${approvalStatus}">${approvalStatus.replace(/_/g, ' ')}</span>
   </div>
 
@@ -1170,7 +1170,7 @@ export function buildExpenseReceiptHtml(
 
   <div class="footer">
     <div class="thanks">Thank you!</div>
-    <div style="font-size:8pt;color:#555;margin-top:4px">${receiptRef}</div>
+    <div style="font-size:8pt;font-weight:900;margin-top:4px">${receiptRef}</div>
     <div class="powered">Powered by SERVV</div>
   </div>
 
