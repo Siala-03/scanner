@@ -387,8 +387,8 @@ export function buildReceiptHtml(receipt: ReceiptData, printerWidth: '58mm' | '8
   <title>Receipt #${orderNumber}</title>
   <style>
     @page { size: ${printerWidth} auto; margin: 0 ${printerWidth === '58mm' ? '5mm' : '4mm'}; }
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; font-weight: 900 !important; -webkit-text-stroke: 0.3px #000; }
-    body { font-family: 'Arial Black', Arial, 'Helvetica Neue', Helvetica, sans-serif; font-size: ${printerWidth === '58mm' ? '7.5pt' : '9pt'}; font-weight: 900 !important; color: #000; line-height: 1.4; word-break: break-word; overflow-wrap: break-word; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; font-weight: 900 !important; }
+    body { font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif; font-size: ${printerWidth === '58mm' ? '7.5pt' : '9pt'}; color: #000; font-weight: 900 !important; line-height: 1.4; word-break: break-word; overflow-wrap: break-word; }
 
     @media screen {
       body { background: #c8c8c8; display: flex; flex-direction: column; align-items: center; padding: 20px 12px 40px; }
@@ -1059,8 +1059,8 @@ export function buildExpenseReceiptHtml(
   <title>Expense Receipt #${receiptRef}</title>
   <style>
     @page { size: ${printerWidth} auto; margin: 0 ${printerWidth === '58mm' ? '5mm' : '4mm'}; }
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; font-weight: 900 !important; -webkit-text-stroke: 0.3px #000; }
-    body { font-family: 'Arial Black', Arial, 'Helvetica Neue', Helvetica, sans-serif; font-size: ${printerWidth === '58mm' ? '7.5pt' : '9pt'}; font-weight: 900 !important; color: #000; line-height: 1.4; word-break: break-word; overflow-wrap: break-word; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; font-weight: 900 !important; }
+    body { font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif; font-size: ${printerWidth === '58mm' ? '7.5pt' : '9pt'}; color: #000; font-weight: 900 !important; line-height: 1.4; word-break: break-word; overflow-wrap: break-word; }
 
     @media screen {
       body { background: #c8c8c8; display: flex; flex-direction: column; align-items: center; padding: 20px 12px 40px; }
