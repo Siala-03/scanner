@@ -399,7 +399,7 @@ export function buildReceiptHtml(receipt: ReceiptData, printerWidth: '58mm' | '8
       .paper { padding: ${printerWidth === '58mm' ? '2mm 1mm 10mm' : '3mm 2mm 14mm'}; }
       .footer { page-break-inside: avoid; }
       .no-print { display: none !important; }
-      * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      * { -webkit-print-color-adjust: exact; print-color-adjust: exact; font-weight: 900 !important; }
     }
 
     .hdr { text-align: center; padding-bottom: 6px; }
@@ -414,7 +414,7 @@ export function buildReceiptHtml(receipt: ReceiptData, printerWidth: '58mm' | '8
     .meta { width: 100%; border-collapse: collapse; font-size: ${printerWidth === '58mm' ? '7pt' : '8pt'}; }
     .meta td { padding: 1px 0; vertical-align: top; word-break: break-word; overflow-wrap: break-word; overflow: hidden; }
     .meta td:first-child { color: #000; width: 38%; }
-    .meta td:last-child  { font-weight: 900; text-align: right; width: 62%; word-break: break-word; overflow-wrap: break-word; }
+    .meta td:last-child  { font-weight: 900; text-align: left; width: 62%; word-break: break-word; overflow-wrap: break-word; }
 
     .items { width: 100%; border-collapse: collapse; font-size: ${printerWidth === '58mm' ? '7.5pt' : '9pt'}; table-layout: fixed; }
     .items th { font-size: ${printerWidth === '58mm' ? '6.5pt' : '7.5pt'}; font-weight: 900; letter-spacing: 0.5px; text-transform: uppercase; color: #000; padding: 0 0 3px; border-bottom: 2px solid #000; text-align: left; }
@@ -641,7 +641,7 @@ export function buildChitHtml(data: ChitData, printerWidth: '58mm' | '80mm' = ge
       html, body { background: #fff; display: block; }
       .paper { padding: ${printerWidth === '58mm' ? '2mm 1mm 10mm' : '3mm 2mm 14mm'}; }
       .no-print { display: none !important; }
-      * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      * { -webkit-print-color-adjust: exact; print-color-adjust: exact; font-weight: 900 !important; }
     }
 
     .hdr  { text-align: center; padding-bottom: 5px; }
@@ -660,7 +660,7 @@ export function buildChitHtml(data: ChitData, printerWidth: '58mm' | '80mm' = ge
     .meta { width: 100%; border-collapse: collapse; font-size: ${printerWidth === '58mm' ? '7pt' : '8.5pt'}; margin: 3px 0; }
     .meta td { padding: 1px 0; vertical-align: top; word-break: break-word; overflow-wrap: break-word; overflow: hidden; }
     .meta td:first-child { color: #000; width: 38%; }
-    .meta td:last-child  { font-weight: 900; text-align: right; width: 62%; word-break: break-word; overflow-wrap: break-word; }
+    .meta td:last-child  { font-weight: 900; text-align: left; width: 62%; word-break: break-word; overflow-wrap: break-word; }
 
     .items { width: 100%; border-collapse: collapse; font-size: ${printerWidth === '58mm' ? '7.5pt' : '9.5pt'}; table-layout: fixed; }
     .items td { padding: 3px 0; vertical-align: top; border-bottom: 1px dotted #000; overflow: hidden; }
@@ -827,7 +827,7 @@ export function buildKitchenTicketHtml(ticket: KitchenTicketData, printerWidth: 
       html, body { background: #fff; display: block; }
       .paper { padding: ${printerWidth === '58mm' ? '2mm 1mm 10mm' : '3mm 2mm 14mm'}; }
       .no-print { display: none !important; }
-      * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      * { -webkit-print-color-adjust: exact; print-color-adjust: exact; font-weight: 900 !important; }
     }
 
     .hdr { text-align: center; padding-bottom: 6px; }
@@ -846,7 +846,7 @@ export function buildKitchenTicketHtml(ticket: KitchenTicketData, printerWidth: 
     .meta { width: 100%; border-collapse: collapse; font-size: ${printerWidth === '58mm' ? '7.5pt' : '9pt'}; }
     .meta td { padding: 1px 0; vertical-align: top; word-break: break-word; overflow-wrap: break-word; overflow: hidden; }
     .meta td:first-child { color: #000; width: 38%; }
-    .meta td:last-child  { font-weight: 900; text-align: right; width: 62%; word-break: break-word; overflow-wrap: break-word; }
+    .meta td:last-child  { font-weight: 900; text-align: left; width: 62%; word-break: break-word; overflow-wrap: break-word; }
 
     .urgency-row { display: flex; justify-content: space-between; align-items: center; font-size: ${printerWidth === '58mm' ? '7.5pt' : '9pt'}; margin: 3px 0; }
     .urgency-badge { padding: 1px 6px; border-radius: 3px; font-weight: 900; font-size: ${printerWidth === '58mm' ? '7pt' : '8pt'}; letter-spacing: 0.5px; }
@@ -1071,7 +1071,7 @@ export function buildExpenseReceiptHtml(
       .paper { padding: ${printerWidth === '58mm' ? '2mm 1mm 10mm' : '3mm 2mm 14mm'}; }
       .footer { page-break-inside: avoid; }
       .no-print { display: none !important; }
-      * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      * { -webkit-print-color-adjust: exact; print-color-adjust: exact; font-weight: 900 !important; }
     }
 
     .hdr { text-align: center; padding-bottom: 6px; }
@@ -1086,7 +1086,7 @@ export function buildExpenseReceiptHtml(
     .meta { width: 100%; border-collapse: collapse; font-size: ${printerWidth === '58mm' ? '7pt' : '8.5pt'}; }
     .meta td { padding: 1px 0; vertical-align: top; word-break: break-word; overflow-wrap: break-word; overflow: hidden; }
     .meta td:first-child { color: #000; width: 40%; }
-    .meta td:last-child  { font-weight: 900; text-align: right; width: 60%; word-break: break-word; overflow-wrap: break-word; }
+    .meta td:last-child  { font-weight: 900; text-align: left; width: 60%; word-break: break-word; overflow-wrap: break-word; }
 
     .desc-lbl { font-size: ${printerWidth === '58mm' ? '6.5pt' : '8pt'}; font-weight: 900; letter-spacing: 1px; text-transform: uppercase; color: #000; margin-bottom: 2px; }
     .desc-box { font-size: ${printerWidth === '58mm' ? '7pt' : '9pt'}; line-height: 1.4; color: #000; border-top: 1px dotted #000; border-bottom: 1px dotted #000; padding: 4px 0; margin: 2px 0; }
