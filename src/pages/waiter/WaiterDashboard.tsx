@@ -101,13 +101,19 @@ interface WaiterDashboardProps {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function timeAgo(date: Date | string): string {
-  const ms = Date.now() - new Date(date).getTime();
+  const d = new Date(date);
+  if (Number.isNaN(d.getTime())) return '—';
+  const ms = Date.now() - d.getTime();
   const minutes = Math.floor(ms / 60000);
   if (minutes < 1) return 'just now';
-  if (minutes === 1) return '1 min ago';
-  if (minutes < 60) return `${minutes} min ago`;
-  const hours = Math.floor(minutes / 60);
-  return `${hours}h ago`;
+  if (minutes < 60) return `${minutes}m ago`;
+  // Show actual time for orders older than 1 hour — more useful than "Xh ago"
+  const today = new Date();
+  const isToday = d.getDate() === today.getDate() && d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear();
+  const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  if (isToday) return timeStr;
+  const dateStr = d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+  return `${dateStr} ${timeStr}`;
 }
 
 function statusColor(status: string): string {
