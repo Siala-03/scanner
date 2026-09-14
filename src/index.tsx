@@ -1,5 +1,5 @@
 import "./index.css";
-import React from "react";
+import React, { Suspense } from "react";
 import { render } from "react-dom";
 import { App } from "./App";
 import { MenuProvider } from "./contexts/MenuContext";
@@ -54,7 +54,13 @@ async function bootstrap() {
       <ThemeProvider>
         <MenuProvider>
           <OrdersProvider>
-            <App />
+            <Suspense fallback={
+              <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+                <div className="text-slate-400 animate-pulse text-sm">Loading...</div>
+              </div>
+            }>
+              <App />
+            </Suspense>
           </OrdersProvider>
         </MenuProvider>
       </ThemeProvider>

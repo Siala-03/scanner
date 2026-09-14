@@ -1,4 +1,4 @@
-import { createContext, useContext, ReactNode } from 'react';
+import { createContext, useContext, useMemo, ReactNode } from 'react';
 import { useOrders } from '../hooks/useOrders';
 
 // Derive the type directly from the hook — stays in sync automatically with no manual upkeep
@@ -22,7 +22,21 @@ const stub = {
 const OrdersContext = createContext<UseOrdersReturn>(stub);
 
 export function OrdersProvider({ children }: { children: ReactNode }) {
-  const value = useOrders();
+  const hook = useOrders();
+  // Memoize so the context value reference is stable across renders where
+  // only internal hook state (not orders/functions) changed.
+  const value = useMemo(() => hook, [
+    hook.orders,
+    hook.addOrder,
+    hook.updateOrderStatus,
+    hook.getOrdersByTable,
+    hook.getOrdersByWaiter,
+    hook.getPendingOrders,
+    hook.getActiveOrders,
+    hook.getOrderById,
+    hook.getTodaysOrders,
+    hook.getTodaysRevenue,
+  ]);
   return <OrdersContext.Provider value={value}>{children}</OrdersContext.Provider>;
 }
 

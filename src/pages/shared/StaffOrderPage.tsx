@@ -203,16 +203,21 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
 
   useEffect(() => {
     loadOccupancy();
-    // Poll every 5 seconds so waiter-placed orders appear as occupied quickly
-    const poll = setInterval(loadOccupancy, 5000);
 
-    // Realtime subscription for instant updates
+    // Skip the poll if Realtime fired recently — it already triggered a reload.
+    let lastRealtimeEvent = 0;
+    const poll = setInterval(() => {
+      if (Date.now() - lastRealtimeEvent < 10_000) return;
+      loadOccupancy();
+    }, 30_000);
+
     const restaurantId = localStorage.getItem('restaurantId');
     let channel: ReturnType<typeof supabase.channel> | null = null;
     if (restaurantId) {
       channel = supabase
         .channel(`stafforder-occupancy-${restaurantId}`)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `restaurant_id=eq.${restaurantId}` }, () => {
+          lastRealtimeEvent = Date.now();
           loadOccupancy();
         })
         .subscribe();
