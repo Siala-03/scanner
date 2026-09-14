@@ -405,7 +405,7 @@ export function WaiterOrderEntry({
                 <p>No menu items found</p>
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-2.5 sm:gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
                 {filteredItems.map((item) => {
                   const outOfStock = !item.isAvailable;
                   return (
@@ -414,47 +414,42 @@ export function WaiterOrderEntry({
                       layout
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
-                      whileHover={outOfStock ? {} : { y: -2 }}
+                      whileHover={outOfStock ? {} : { scale: 1.02 }}
+                      whileTap={outOfStock ? {} : { scale: 0.98 }}
                       disabled={outOfStock}
-                      className={`relative flex flex-col items-start rounded-2xl border p-3 text-left transition-colors ${
+                      className={`relative flex flex-col justify-between rounded-2xl border p-4 text-left transition-all min-h-[7rem] ${
                         outOfStock
-                          ? 'border-slate-800 bg-slate-900/40 opacity-60 cursor-not-allowed'
-                          : 'border-slate-700 bg-slate-900/90 hover:border-amber-500/50 hover:bg-slate-800'
+                          ? 'border-slate-800 bg-slate-900/40 opacity-50 cursor-not-allowed'
+                          : 'border-slate-700 bg-slate-900 hover:border-amber-500/60 hover:bg-slate-800 active:bg-slate-700'
                       }`}
                       onClick={() => !outOfStock && addToCart(item, 1)}
                     >
-                      <div className="mb-1 flex flex-wrap items-center gap-1.5">
-                        <Badge variant="secondary" size="sm" className="bg-slate-700 text-slate-200">
-                          {item.category}
-                        </Badge>
-                        {outOfStock && (
-                          <Badge variant="secondary" size="sm" className="bg-red-500/20 text-red-400 border border-red-500/30">
-                            Out of Stock
-                          </Badge>
+                      {/* Name + out-of-stock tag */}
+                      <div>
+                        <h3 className={`font-bold text-lg leading-snug line-clamp-2 ${outOfStock ? 'text-slate-500' : 'text-white'}`}>
+                          {item.name}
+                        </h3>
+                        {item.description ? (
+                          <p className="text-sm text-slate-400 line-clamp-1 mt-0.5">{item.description}</p>
+                        ) : null}
+                      </div>
+
+                      {/* Price row */}
+                      <div className="mt-3 flex items-center justify-between gap-2">
+                        <span className={`font-extrabold text-xl ${outOfStock ? 'text-slate-600' : 'text-amber-400'}`}>
+                          {formatPrice(item.price)}
+                        </span>
+                        {outOfStock ? (
+                          <span className="text-xs font-semibold uppercase tracking-wide text-red-400 bg-red-500/10 border border-red-500/30 rounded-lg px-2 py-1">
+                            Unavailable
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-1 rounded-xl bg-amber-500 px-3 py-1.5 text-sm font-bold text-slate-900">
+                            <PlusIcon className="w-4 h-4" />
+                            Add
+                          </span>
                         )}
                       </div>
-                      <h3 className={`font-semibold text-base sm:text-lg line-clamp-2 leading-tight ${outOfStock ? 'text-slate-500' : 'text-slate-100'}`}>
-                        {item.name}
-                      </h3>
-                      <p className="text-sm text-slate-400 line-clamp-2 mt-1">
-                        {item.description}
-                      </p>
-                      <div className="mt-2 flex items-center justify-between w-full gap-2">
-                        <span className={`font-semibold text-base sm:text-lg ${outOfStock ? 'text-slate-500' : 'text-amber-300'}`}>{formatPrice(item.price)}</span>
-                        {!!item.prepTime && (
-                          <span className="text-[11px] text-slate-400">{item.prepTime}m</span>
-                        )}
-                      </div>
-                      {outOfStock ? (
-                        <div className="absolute top-2 right-2 flex flex-shrink-0 items-center gap-1 rounded-xl border border-red-500/30 bg-red-500/10 px-2 py-1 text-red-400">
-                          <XIcon className="w-4 h-4" />
-                        </div>
-                      ) : (
-                        <div className="absolute top-2 right-2 flex flex-shrink-0 items-center gap-1 rounded-xl border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-amber-300">
-                          <PlusIcon className="w-4 h-4" />
-                          <span className="hidden sm:inline text-xs font-semibold">Add</span>
-                        </div>
-                      )}
                     </motion.button>
                   );
                 })}
