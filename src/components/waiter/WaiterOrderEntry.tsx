@@ -436,14 +436,10 @@ export function WaiterOrderEntry({
 
                       {/* Price row */}
                       <div className="mt-3 flex items-center justify-between gap-2">
-                        <span className={`font-extrabold text-xl ${outOfStock ? 'text-slate-600' : 'text-amber-400'}`}>
+                        <span className={`font-extrabold text-xl ${outOfStock ? 'text-slate-600 line-through' : 'text-amber-400'}`}>
                           {formatPrice(item.price)}
                         </span>
-                        {outOfStock ? (
-                          <span className="text-xs font-semibold uppercase tracking-wide text-red-400 bg-red-500/10 border border-red-500/30 rounded-lg px-2 py-1">
-                            Unavailable
-                          </span>
-                        ) : (
+                        {!outOfStock && (
                           <span className="flex items-center gap-1 rounded-xl bg-amber-500 px-3 py-1.5 text-sm font-bold text-slate-900">
                             <PlusIcon className="w-4 h-4" />
                             Add
