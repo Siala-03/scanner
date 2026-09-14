@@ -610,16 +610,13 @@ export function MenuManagement() {
                   </div>
 
                   <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-3">
-                      <span className="text-3xl">{item.emoji}</span>
-                      <div>
-                        <h3 className="font-semibold text-gray-100">
-                          {item.name}
-                        </h3>
-                        <p className="text-lg font-bold text-amber-400">
-                          {formatPrice(item.price)}
-                        </p>
-                      </div>
+                    <div>
+                      <h3 className="font-semibold text-base text-gray-100">
+                        {item.name}
+                      </h3>
+                      <p className="text-lg font-bold text-amber-400">
+                        {formatPrice(item.price)}
+                      </p>
                     </div>
                     <div className="flex gap-1">
                       {item.isPopular &&
@@ -635,7 +632,7 @@ export function MenuManagement() {
                     </div>
                   </div>
 
-                  <p className="text-sm text-slate-400 mb-4 line-clamp-2">
+                  <p className="text-base text-slate-400 mb-4 line-clamp-2">
                     {item.description}
                   </p>
 
