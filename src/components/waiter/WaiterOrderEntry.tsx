@@ -423,7 +423,6 @@ export function WaiterOrderEntry({
                       }`}
                       onClick={() => !outOfStock && addToCart(item, 1)}
                     >
-                      <span className="text-2xl sm:text-3xl mb-1">{item.emoji}</span>
                       <div className="mb-1 flex flex-wrap items-center gap-1.5">
                         <Badge variant="secondary" size="sm" className="bg-slate-700 text-slate-200">
                           {item.category}
@@ -434,14 +433,14 @@ export function WaiterOrderEntry({
                           </Badge>
                         )}
                       </div>
-                      <h3 className={`font-semibold text-sm sm:text-base line-clamp-2 leading-tight ${outOfStock ? 'text-slate-500' : 'text-slate-100'}`}>
+                      <h3 className={`font-semibold text-base sm:text-lg line-clamp-2 leading-tight ${outOfStock ? 'text-slate-500' : 'text-slate-100'}`}>
                         {item.name}
                       </h3>
-                      <p className="text-xs sm:text-sm text-slate-400 line-clamp-2 mt-1">
+                      <p className="text-sm text-slate-400 line-clamp-2 mt-1">
                         {item.description}
                       </p>
                       <div className="mt-2 flex items-center justify-between w-full gap-2">
-                        <span className={`font-semibold text-sm sm:text-base ${outOfStock ? 'text-slate-500' : 'text-amber-300'}`}>{formatPrice(item.price)}</span>
+                        <span className={`font-semibold text-base sm:text-lg ${outOfStock ? 'text-slate-500' : 'text-amber-300'}`}>{formatPrice(item.price)}</span>
                         {!!item.prepTime && (
                           <span className="text-[11px] text-slate-400">{item.prepTime}m</span>
                         )}
