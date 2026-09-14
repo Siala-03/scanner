@@ -20,6 +20,30 @@ function getRestaurantId(): string | null {
   return localStorage.getItem('restaurantId') || getRestaurantIdFromUrl() || null;
 }
 
+const MENU_CACHE_PREFIX = 'servv_menu_cache';
+
+function getMenuCacheKey(): string {
+  const rid = getRestaurantId();
+  return rid ? `${MENU_CACHE_PREFIX}_${rid}` : MENU_CACHE_PREFIX;
+}
+
+function saveMenuCache(items: MenuItem[]): void {
+  try {
+    localStorage.setItem(getMenuCacheKey(), JSON.stringify(items));
+  } catch {}
+}
+
+function loadMenuCache(): MenuItem[] | null {
+  try {
+    const raw = localStorage.getItem(getMenuCacheKey());
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) && parsed.length > 0 ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
 function isMinimartRoute(): boolean {
   if (typeof window === 'undefined') return false;
   return window.location.pathname.toLowerCase().includes('minimart');
@@ -67,14 +91,22 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
     try {
       const menu = await fetchMenu();
       if (menu.length > 0) {
-        setMenuItems(menu.map(normalizeMenuItem));
+        const normalized = menu.map(normalizeMenuItem);
+        setMenuItems(normalized);
+        saveMenuCache(normalized);
       } else {
         setMenuItems([]);
       }
       setError(null);
     } catch (err) {
-      setMenuItems([]);
-      setError(err instanceof Error ? err.message : String(err));
+      const cached = loadMenuCache();
+      if (cached) {
+        setMenuItems(cached);
+        setError(null);
+      } else {
+        setMenuItems([]);
+        setError(err instanceof Error ? err.message : String(err));
+      }
     } finally {
       setIsLoading(false);
     }
@@ -98,22 +130,33 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let isMounted = true;
 
-    // Initial load
+    // Initial load — use cached menu immediately so the UI is never blank offline
     const load = async () => {
-      setIsLoading(true);
+      const cached = loadMenuCache();
+      if (cached) {
+        setMenuItems(cached);
+        setIsLoading(false);
+      } else {
+        setIsLoading(true);
+      }
       try {
         const items = await fetchMenu();
         if (!isMounted) return;
         if (items.length > 0) {
-          setMenuItems(items.map(normalizeMenuItem));
-        } else {
+          const normalized = items.map(normalizeMenuItem);
+          setMenuItems(normalized);
+          saveMenuCache(normalized);
+        } else if (!cached) {
           setMenuItems([]);
         }
         setError(null);
       } catch (err) {
         if (!isMounted) return;
-        setMenuItems([]);
-        setError(err instanceof Error ? err.message : String(err));
+        if (!cached) {
+          setMenuItems([]);
+          setError(err instanceof Error ? err.message : String(err));
+        }
+        // If we already loaded from cache above, stay silent — menu is still visible
       } finally {
         if (isMounted) setIsLoading(false);
       }
