@@ -17,7 +17,9 @@ import {
 import { useMenu } from '../../hooks/useMenu';
 import { useTables } from '../../hooks/useTables';
 import { useStaff } from '../../hooks/useStaff';
-import { createOrder, findMergeableOpenOrder } from '../../api/orders';
+import { createOrder } from '../../api/orders';
+import { findMergeableInOrders } from '../../hooks/useOrders';
+import { useOrdersContext } from '../../contexts/OrdersContext';
 import { OpenTabModal } from '../../components/shared/OpenTabModal';
 import { supabase } from '../../lib/supabase';
 import { fetchKitchenOrders } from '../../api/orders';
@@ -101,6 +103,7 @@ function getStaffId(): string | null {
 }
 
 export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, sharedTerminalMode = false }: StaffOrderPageProps) {
+  const { orders } = useOrdersContext();
   const [step, setStep] = useState<'table-select' | 'order-entry'>('table-select');
   // null = Bar / Walk-up (no table number)
   const [selectedTable, setSelectedTable] = useState<number | null | 'bar'>('bar');
@@ -120,6 +123,7 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
   const [showReceiptNoteModal, setShowReceiptNoteModal] = useState(false);
   const [receiptNote, setReceiptNote] = useState('');
   const [showMobileCart, setShowMobileCart] = useState(false);
+  const [orderSyncError, setOrderSyncError] = useState<string | null>(null);
   const [confirmOccupied, setConfirmOccupied] = useState<number | null>(null);
   const [mergeCandidate, setMergeCandidate] = useState<Order | null>(null);
   const mergeResolveRef = useRef<((result: boolean) => void) | null>(null);
@@ -463,10 +467,7 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
     }
     isSubmittingRef.current = true;
     setIsSubmitting(true);
-
-    // Open the print window NOW — during the user gesture — before any await.
-    // After the first await the browser revokes popup permission, so this is
-    // the only place window.open() is guaranteed to succeed for auto-print.
+    setOrderSyncError(null);
 
     try {
       const checkoutCart = [...cart];
@@ -480,8 +481,9 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
       const needsKitchen = checkoutCart.some(cartItemNeedsKitchen);
       let allowMergeToOpenTab = false;
 
+      // In-memory merge lookup — no DB round trip
       if (typeof tableNum === 'number' && tableNum > 0 && tableNum !== 999) {
-        const candidate = await findMergeableOpenOrder(tableNum);
+        const candidate = findMergeableInOrders(orders, tableNum);
         if (candidate) {
           allowMergeToOpenTab = await new Promise<boolean>((resolve) => {
             setMergeCandidate(candidate);
@@ -490,7 +492,46 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
         }
       }
 
-      const created = await createOrder({
+      // Build receipt from cart immediately — no need to wait for the server
+      const nowIso = new Date().toISOString();
+      const fallbackSubtotal = checkoutCart.reduce((sum, c) => sum + c.unitPrice * c.quantity, 0);
+      const localItems = checkoutCart.map((c, index) => ({
+        id: `item-${Date.now()}-${index}`,
+        menuItem: c.menuItem,
+        menuItemId: c.menuItemId,
+        menuItemName: c.menuItemName,
+        quantity: c.quantity,
+        unitPrice: c.unitPrice,
+        totalPrice: c.unitPrice * c.quantity,
+        specialInstructions: c.notes || undefined,
+        status: 'pending',
+      }));
+      const localOrder: Order = {
+        id: `order-${Date.now()}`,
+        tableNumber: tableNum,
+        status: 'pending' as any,
+        items: localItems,
+        createdAt: nowIso,
+        updatedAt: nowIso,
+        subtotal: fallbackSubtotal,
+        tax: 0,
+        total: fallbackSubtotal,
+        notes: visibleNotes || undefined,
+        requiresKitchen: needsKitchen,
+      };
+
+      // Show success immediately — no waiting for the network
+      const label = selectedTable === 'bar' ? 'Bar / Walk-up' : `Table ${selectedTable}`;
+      setSuccessTable(label);
+      setLastPlacedOrder(localOrder);
+      setCart([]);
+      setOrderNotes('');
+      setShowMobileCart(false);
+      const idempotencyKey = submitKeyRef.current;
+      submitKeyRef.current = crypto.randomUUID();
+
+      // Submit to DB in the background — update the receipt with the confirmed order number
+      createOrder({
         tableNumber: tableNum,
         items: checkoutCart.map((c) => ({
           menuItemId: c.menuItemId,
@@ -506,83 +547,26 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
         assignedWaiterId: selectedStaffId || undefined,
         requiresKitchen: needsKitchen,
         allowMergeToOpenTab,
-        idempotencyKey: submitKeyRef.current,
-      } as any);
-
-      const nowIso = new Date().toISOString();
-      const parseCreatedItems = (raw: unknown): any[] => {
-        if (Array.isArray(raw)) return raw;
-        if (typeof raw === 'string') {
-          try {
-            const parsed = JSON.parse(raw);
-            return Array.isArray(parsed) ? parsed : [];
-          } catch {
-            return [];
-          }
-        }
-        return [];
-      };
-
-      const createdItemsRaw = parseCreatedItems((created as any)?.items);
-      const fallbackSubtotal = checkoutCart.reduce((sum, c) => sum + c.unitPrice * c.quantity, 0);
-      const printableItems = createdItemsRaw.length > 0
-        ? createdItemsRaw.map((item: any, index: number) => {
-            const quantity = Number(item.quantity ?? 0);
-            const unitPrice = Number(item.unit_price ?? item.unitPrice ?? 0);
-            return {
-              id: String(item.id ?? `item-${Date.now()}-${index}`),
-              menuItemId: item.menu_item_id ?? item.menuItemId,
-              menuItemName: item.menu_item_name ?? item.menuItemName ?? 'Item',
-              quantity,
-              unitPrice,
-              totalPrice: Number(item.total_price ?? item.totalPrice ?? quantity * unitPrice),
-              specialInstructions: item.notes ?? item.specialInstructions ?? undefined,
-              status: item.status ?? 'pending',
-            };
-          })
-        : checkoutCart.map((c, index) => ({
-            id: `item-${Date.now()}-${index}`,
-            menuItem: c.menuItem,
-            menuItemId: c.menuItemId,
-            menuItemName: c.menuItemName,
-            quantity: c.quantity,
-            unitPrice: c.unitPrice,
-            totalPrice: c.unitPrice * c.quantity,
-            specialInstructions: c.notes || undefined,
-            status: 'pending',
-          }));
-
-      const printableOrder: Order = {
-        id: String((created as any)?.id || `order-${Date.now()}`),
-        orderNumber: (created as any)?.orderNumber ?? (created as any)?.order_number,
-        tableNumber: tableNum,
-        status: String((created as any)?.status || 'pending') as any,
-        items: printableItems,
-        createdAt: (created as any)?.createdAt ?? (created as any)?.created_at ?? nowIso,
-        updatedAt: (created as any)?.updatedAt ?? (created as any)?.updated_at ?? nowIso,
-        subtotal: Number((created as any)?.subtotal ?? fallbackSubtotal),
-        tax: Number((created as any)?.tax ?? 0),
-        total: Number((created as any)?.total ?? fallbackSubtotal),
-        notes: visibleNotes || undefined,
-        requiresKitchen: Boolean((created as any)?.requires_kitchen ?? (created as any)?.requiresKitchen ?? needsKitchen),
-      };
-
-      const label = selectedTable === 'bar' ? 'Bar / Walk-up' : `Table ${selectedTable}`;
-      setSuccessTable(label);
-      setLastPlacedOrder(printableOrder);
-
-      setCart([]);
-      setOrderNotes('');
-      setShowMobileCart(false);
-      submitKeyRef.current = crypto.randomUUID();
+        idempotencyKey,
+      } as any).then((created) => {
+        // Patch the displayed order with the confirmed server ID and order number
+        setLastPlacedOrder((prev) => prev ? {
+          ...prev,
+          id: String((created as any)?.id || prev.id),
+          orderNumber: (created as any)?.orderNumber ?? (created as any)?.order_number ?? prev.orderNumber,
+          status: String((created as any)?.status || prev.status) as any,
+        } : prev);
+      }).catch((e) => {
+        console.error('Background order sync failed:', e);
+        const isTimeout = (e as any)?.code === 'TIMEOUT' || (e instanceof Error && e.message.includes('timed out'));
+        setOrderSyncError(isTimeout
+          ? 'Order timed out — it may not have saved. Check the orders list.'
+          : 'Order failed to save to server. Please check the orders list.'
+        );
+      });
     } catch (e) {
       console.error(e);
-      const isTimeout = (e as any)?.code === 'TIMEOUT' || (e instanceof Error && e.message.includes('timed out'));
-      if (isTimeout) {
-        alert('The request timed out. Your order may still have been placed — please check the orders list before trying again.');
-      } else {
-        alert('Failed to place order. Please try again.');
-      }
+      alert('Failed to place order. Please try again.');
     } finally {
       isSubmittingRef.current = false;
       setIsSubmitting(false);
@@ -956,6 +940,7 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
             staffLoading={staffLoading}
             isSubmitting={isSubmitting}
             successTable={successTable}
+            orderSyncError={orderSyncError}
             tableLabel={tableLabel}
             sharedTerminalMode={sharedTerminalMode}
             canPrintReceipt={Boolean(lastPlacedOrder)}
@@ -992,6 +977,7 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
               staffLoading={staffLoading}
               isSubmitting={isSubmitting}
               successTable={successTable}
+              orderSyncError={orderSyncError}
               tableLabel={tableLabel}
               sharedTerminalMode={sharedTerminalMode}
               canPrintReceipt={Boolean(lastPlacedOrder)}
@@ -1069,6 +1055,7 @@ function CartPanel({
   staffLoading,
   isSubmitting,
   successTable,
+  orderSyncError,
   tableLabel,
   sharedTerminalMode,
   canPrintReceipt,
@@ -1090,6 +1077,7 @@ function CartPanel({
   staffLoading: boolean;
   isSubmitting: boolean;
   successTable: string | null;
+  orderSyncError: string | null;
   tableLabel: string;
   sharedTerminalMode: boolean;
   canPrintReceipt: boolean;
@@ -1107,18 +1095,21 @@ function CartPanel({
         <CheckCircleIcon className="w-14 h-14 text-emerald-400" />
         <p className="font-bold text-lg text-white">Order placed!</p>
         <p className="text-sm text-slate-400">{successTable}</p>
+        {orderSyncError && (
+          <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2 max-w-xs">
+            ⚠️ {orderSyncError}
+          </p>
+        )}
         <div className="mt-2 w-full max-w-xs space-y-2">
           {canPrintReceipt && (
-            <>
-              <button
-                onClick={onPrintReceipt}
-                disabled={isPrintingReceipt}
-                className="w-full rounded-xl border border-emerald-500/40 bg-emerald-500/15 px-4 py-2.5 text-sm font-semibold text-emerald-300 hover:bg-emerald-500/25 disabled:opacity-50"
-              >
-                <PrinterIcon className="inline w-4 h-4 mr-1.5" />
-                {isPrintingReceipt ? 'Printing...' : 'Print Receipt'}
-              </button>
-            </>
+            <button
+              onClick={onPrintReceipt}
+              disabled={isPrintingReceipt}
+              className="w-full rounded-xl border border-emerald-500/40 bg-emerald-500/15 px-4 py-2.5 text-sm font-semibold text-emerald-300 hover:bg-emerald-500/25 disabled:opacity-50"
+            >
+              <PrinterIcon className="inline w-4 h-4 mr-1.5" />
+              {isPrintingReceipt ? 'Printing...' : 'Print Receipt'}
+            </button>
           )}
           <button
             onClick={onDone}

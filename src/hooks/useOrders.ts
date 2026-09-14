@@ -4,7 +4,6 @@ import { Order, OrderStatus, CartItem, Customer } from '../types';
 import { getEffectivePrice } from '../utils/pricing';
 import {
   fetchOrders as apiFetchOrders,
-  findMergeableOpenOrder,
 } from '../api/orders';
 import { recordTableSessionActivity } from '../utils/tableSessions';
 import * as queue from '../lib/orderQueue';
@@ -116,6 +115,27 @@ function resolveRestaurantId(): string | undefined {
 
 export type ConfirmMergeFn = (candidate: Order) => Promise<boolean>;
 
+// Statuses an order must have to be eligible for merging with a new order
+const MERGEABLE_STATUSES = new Set(['pending', 'verified', 'preparing', 'ready', 'served']);
+
+// Pure in-memory alternative to the findMergeableOpenOrder DB call.
+// Uses the orders already loaded into state — zero network cost.
+export function findMergeableInOrders(orders: Order[], tableNumber: number): Order | null {
+  const cutoff = Date.now() - 120 * 60_000;
+  return orders.find((o) => {
+    const tNum = (o as any).tableNumber ?? (o as any).table_number;
+    if (tNum !== tableNumber) return false;
+    if (!MERGEABLE_STATUSES.has(o.status)) return false;
+    const ps = ((o as any).paymentStatus ?? (o as any).payment_status ?? '').toLowerCase();
+    if (ps === 'confirmed' || ps === 'paid') return false;
+    const created = new Date(o.createdAt as any).getTime();
+    if (Number.isNaN(created) || created < cutoff) return false;
+    // Skip local-only orders that haven't synced yet
+    if ((o.id ?? '').startsWith('offline-') || (o.id ?? '').startsWith('temp-')) return false;
+    return true;
+  }) ?? null;
+}
+
 interface UseOrdersReturn {
   orders: Order[];
   addOrder: (
@@ -146,6 +166,9 @@ interface UseOrdersReturn {
 export function useOrders(): UseOrdersReturn {
   const [orders, setOrders] = useState<Order[]>([]);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  // Stable ref so addOrder can read the latest orders without being in its dep array
+  const ordersRef = useRef<Order[]>(orders);
+  useEffect(() => { ordersRef.current = orders; }, [orders]);
 
   // Read restaurantId dynamically so a login/logout that updates localStorage
   // is immediately reflected — never frozen in a useState initializer.
@@ -461,28 +484,20 @@ export function useOrders(): UseOrdersReturn {
       let allowMergeToOpenTab = false;
 
       if (Number.isInteger(tableNumber) && tableNumber > 0 && tableNumber !== 999) {
-        try {
-          const mergeCandidate = await findMergeableOpenOrder(tableNumber, currentRestaurantId);
-          if (mergeCandidate) {
-            if (confirmMerge) {
-              allowMergeToOpenTab = await confirmMerge(mergeCandidate);
-            } else {
-              const candidateNumber = String(
-                (mergeCandidate as any).orderNumber || (mergeCandidate as any).order_number || mergeCandidate.id
-              ).trim().slice(0, 7).toUpperCase();
-              allowMergeToOpenTab = window.confirm(
-                `Table ${tableNumber} has an open tab (#${candidateNumber}). Click OK to merge new items into that tab, or Cancel to create a separate order.`
-              );
-            }
-          }
-        } catch {
-          // Offline — network call failed, but the user may have explicitly chosen
-          // "Add to this order" via the confirmOccupied dialog (autoMergeRef = true).
-          // Probe confirmMerge with null so it returns the stored decision without
-          // showing a modal. If no decision was stored it returns false (new order).
-          if (confirmMerge) {
-            allowMergeToOpenTab = await confirmMerge(null as any);
-          }
+        // Use the in-memory orders list — no DB round trip needed.
+        // ordersRef is kept current by a useEffect, so this always reflects the latest state.
+        const mergeCandidate = findMergeableInOrders(ordersRef.current, tableNumber);
+        if (confirmMerge) {
+          // Pass the candidate (or null for offline probe) — confirmMerge handles all cases:
+          // pre-stored autoMerge decision, showing the modal, and the offline null probe.
+          allowMergeToOpenTab = await confirmMerge(mergeCandidate as Order);
+        } else if (mergeCandidate) {
+          const candidateNumber = String(
+            (mergeCandidate as any).orderNumber || (mergeCandidate as any).order_number || mergeCandidate.id
+          ).trim().slice(0, 7).toUpperCase();
+          allowMergeToOpenTab = window.confirm(
+            `Table ${tableNumber} has an open tab (#${candidateNumber}). Click OK to merge new items into that tab, or Cancel to create a separate order.`
+          );
         }
       }
 
