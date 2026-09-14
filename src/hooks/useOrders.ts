@@ -226,10 +226,17 @@ export function useOrders(): UseOrdersReturn {
   useEffect(() => {
     loadOrders();
 
-    // Poll every 3 seconds as a reliable fallback (works even if Realtime is not enabled)
-    const pollInterval = setInterval(() => loadOrders(), 3000);
+    // Timestamp of the last Realtime event — poll skips if one fired recently.
+    let lastRealtimeEvent = 0;
 
-    // Also subscribe to Supabase Realtime for instant updates when it IS configured
+    // Poll every 15 seconds as a fallback for missed Realtime events.
+    // If Realtime fired within the last 10 s we skip the poll — it's redundant.
+    const pollInterval = setInterval(() => {
+      if (Date.now() - lastRealtimeEvent < 10_000) return;
+      loadOrders();
+    }, 15_000);
+
+    // Subscribe to Supabase Realtime for instant updates when it IS configured.
     if (restaurantId) {
       if (channelRef.current) supabase.removeChannel(channelRef.current);
 
@@ -239,6 +246,7 @@ export function useOrders(): UseOrdersReturn {
           'postgres_changes',
           { event: '*', schema: 'public', table: 'orders', filter: `restaurant_id=eq.${restaurantId}` },
           (payload) => {
+            lastRealtimeEvent = Date.now();
             const raw = payload.new || payload.old;
             if (!raw) { loadOrders(); return; }
             const updated = normalizeOrderPayload(raw);

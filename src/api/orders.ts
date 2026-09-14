@@ -82,7 +82,10 @@ function generateShortOrderNumber(): string {
 
 export async function fetchOrders(status?: string, restaurantId?: string): Promise<Order[]> {
   const restaurant = restaurantId || getRestaurantId();
-  
+
+  // Fetch orders from the last 48 hours — keeps the payload small regardless of history size.
+  const since = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+
   // Only superadmin may fetch without a restaurant filter; everyone else gets nothing.
   if (!restaurant) {
     const role = typeof window !== 'undefined' ? localStorage.getItem('staffRole') : null;
@@ -90,8 +93,9 @@ export async function fetchOrders(status?: string, restaurantId?: string): Promi
     const { data, error } = await db
       .from('orders')
       .select('*')
+      .gte('created_at', since)
       .order('created_at', { ascending: false })
-      .limit(100000);
+      .limit(500);
     if (error) return [];
     return (data ?? []) as Order[];
   }
@@ -100,8 +104,9 @@ export async function fetchOrders(status?: string, restaurantId?: string): Promi
     .from('orders')
     .select('*')
     .eq('restaurant_id', restaurant)
+    .gte('created_at', since)
     .order('created_at', { ascending: false })
-    .limit(100000);
+    .limit(500);
 
   if (status && status !== 'all') {
     query = query.eq('status', status);

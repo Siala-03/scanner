@@ -365,7 +365,7 @@ export function KitchenDisplay({ onLogout, restaurantId, restaurantName }: { onL
 
   useEffect(() => {
     loadOrders();
-    const interval = setInterval(loadOrders, 3000);
+    const interval = setInterval(loadOrders, 10_000);
     return () => clearInterval(interval);
   }, [loadOrders]);
 
