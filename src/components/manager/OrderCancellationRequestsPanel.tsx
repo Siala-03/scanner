@@ -60,6 +60,18 @@ function OrderDetailModal({
           {/* Request meta */}
           <div className="rounded-lg border border-slate-700 bg-slate-800/60 divide-y divide-slate-700/60 text-sm">
             <div className="flex justify-between px-4 py-2.5">
+              <span className="text-slate-400">Scope</span>
+              {req.item_ids.length > 0 ? (
+                <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-0.5 text-xs font-medium text-amber-300">
+                  {req.item_ids.length} item{req.item_ids.length === 1 ? '' : 's'}
+                </span>
+              ) : (
+                <span className="rounded-full border border-red-500/30 bg-red-500/10 px-2.5 py-0.5 text-xs font-medium text-red-300">
+                  Whole order
+                </span>
+              )}
+            </div>
+            <div className="flex justify-between px-4 py-2.5">
               <span className="text-slate-400">Requested by</span>
               <span className="text-slate-100 font-medium">{req.requested_by_name || req.requested_by || 'Staff'}</span>
             </div>
@@ -117,6 +129,11 @@ function OrderDetailModal({
                   </span>
                 </div>
 
+                {req.item_ids.length > 0 && (
+                  <p className="text-xs text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2">
+                    Approving will cancel only the highlighted items below — the rest of the order is untouched.
+                  </p>
+                )}
                 <div className="rounded-lg border border-slate-700 overflow-hidden">
                   <table className="w-full text-sm">
                     <thead className="bg-slate-800/80 text-slate-400">
@@ -131,10 +148,16 @@ function OrderDetailModal({
                         const name = item.menuItem?.name ?? item.menuItemName ?? 'Unknown item';
                         const unit = item.unitPrice ?? 0;
                         const subtotal = item.totalPrice ?? unit * item.quantity;
+                        const targeted = req.item_ids.length > 0 && !!item.id && req.item_ids.includes(item.id);
                         return (
-                          <tr key={i} className="border-t border-slate-700/60 text-slate-200">
+                          <tr key={i} className={`border-t border-slate-700/60 text-slate-200 ${targeted ? 'bg-red-500/10' : ''}`}>
                             <td className="px-3 py-2">
-                              {name}
+                              <span className={targeted ? 'text-red-300' : ''}>{name}</span>
+                              {targeted && (
+                                <span className="ml-1.5 inline-flex items-center rounded-full border border-red-500/30 bg-red-500/10 px-1.5 py-0.5 text-[10px] font-medium text-red-300 align-middle">
+                                  Requested
+                                </span>
+                              )}
                               {item.specialInstructions && (
                                 <span className="block text-xs text-slate-500 mt-0.5">{item.specialInstructions}</span>
                               )}
@@ -327,6 +350,7 @@ export function OrderCancellationRequestsPanel({
               <thead className="bg-slate-900/60 text-slate-300">
                 <tr>
                   <th className="px-4 py-3 text-left font-medium">Order</th>
+                  <th className="px-4 py-3 text-left font-medium">Scope</th>
                   <th className="px-4 py-3 text-left font-medium">Requested By</th>
                   <th className="px-4 py-3 text-left font-medium">Reason</th>
                   <th className="px-4 py-3 text-left font-medium">Requested At</th>
@@ -341,6 +365,17 @@ export function OrderCancellationRequestsPanel({
                     className="border-t border-slate-700/70 text-slate-200 cursor-pointer hover:bg-slate-700/30 transition-colors"
                   >
                     <td className="px-4 py-3 font-medium">{req.order_id.slice(-8).toUpperCase()}</td>
+                    <td className="px-4 py-3">
+                      {req.item_ids.length > 0 ? (
+                        <span className="inline-flex items-center rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-300">
+                          {req.item_ids.length} item{req.item_ids.length === 1 ? '' : 's'}
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center rounded-full border border-red-500/30 bg-red-500/10 px-2 py-0.5 text-xs font-medium text-red-300">
+                          Whole order
+                        </span>
+                      )}
+                    </td>
                     <td className="px-4 py-3">{req.requested_by_name || req.requested_by || 'Staff'}</td>
                     <td className="px-4 py-3 text-slate-300 max-w-[200px] truncate">{req.reason || 'No reason provided'}</td>
                     <td className="px-4 py-3 text-slate-400">{new Date(req.requested_at).toLocaleString()}</td>

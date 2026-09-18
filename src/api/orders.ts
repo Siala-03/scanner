@@ -60,6 +60,9 @@ export interface OrderCancellationRequest {
   restaurant_id: string;
   status: 'pending' | 'approved' | 'rejected';
   reason: string | null;
+  // Item ids the request targets. Empty = whole order (legacy behavior, also
+  // used when every item on the order was selected).
+  item_ids: string[];
   requested_by: string | null;
   requested_by_name: string | null;
   requested_at: string;
@@ -805,9 +808,19 @@ export async function cancelOrder(id: string, reason?: string): Promise<void> {
   }
 }
 
+// jsonb should already deserialize to an array via supabase-js, but stay defensive
+// like the rest of this file in case a raw string ever comes back.
+function normalizeCancellationRequest(raw: any): OrderCancellationRequest {
+  let itemIds = raw?.item_ids;
+  if (typeof itemIds === 'string') {
+    try { itemIds = JSON.parse(itemIds); } catch { itemIds = []; }
+  }
+  return { ...raw, item_ids: Array.isArray(itemIds) ? itemIds : [] } as OrderCancellationRequest;
+}
+
 export async function requestOrderCancellation(
   orderId: string,
-  opts?: { reason?: string; restaurantId?: string; requestedBy?: string; requestedByName?: string }
+  opts?: { reason?: string; restaurantId?: string; requestedBy?: string; requestedByName?: string; itemIds?: string[] }
 ): Promise<OrderCancellationRequest> {
   const restaurantId = opts?.restaurantId || getRestaurantId();
   if (!restaurantId) throw new Error('No company selected');
@@ -821,7 +834,7 @@ export async function requestOrderCancellation(
     .maybeSingle();
 
   if (existingError) throw existingError;
-  if (existingPending) return existingPending as OrderCancellationRequest;
+  if (existingPending) return normalizeCancellationRequest(existingPending);
 
   const now = new Date().toISOString();
   const payload = {
@@ -830,6 +843,7 @@ export async function requestOrderCancellation(
     restaurant_id: restaurantId,
     status: 'pending' as const,
     reason: opts?.reason?.trim() || null,
+    item_ids: opts?.itemIds ?? [],
     requested_by: opts?.requestedBy || getStaffId(),
     requested_by_name: opts?.requestedByName || getStaffName(),
     requested_at: now,
@@ -847,7 +861,7 @@ export async function requestOrderCancellation(
     .single();
 
   if (error) throw error;
-  return data as OrderCancellationRequest;
+  return normalizeCancellationRequest(data);
 }
 
 export async function fetchCancellationRequestByOrderId(
@@ -861,7 +875,7 @@ export async function fetchCancellationRequestByOrderId(
     .limit(1)
     .maybeSingle();
   if (error) { console.error('fetchCancellationRequestByOrderId error:', error); return null; }
-  return data as OrderCancellationRequest | null;
+  return data ? normalizeCancellationRequest(data) : null;
 }
 
 export async function fetchOrderCancellationRequests(
@@ -881,26 +895,113 @@ export async function fetchOrderCancellationRequests(
 
   const { data, error } = await query;
   if (error) throw error;
-  return (data || []) as OrderCancellationRequest[];
+  return (data || []).map(normalizeCancellationRequest);
+}
+
+/**
+ * Cancel specific items on an order rather than the whole order. Items are kept
+ * in place with status: 'cancelled' (not deleted) so receipts/kitchen history
+ * still show what was voided and why; subtotal/total are recalculated from the
+ * remaining live items. If every item ends up cancelled, the whole order is
+ * cancelled instead via cancelOrder so it doesn't linger as an "active" order
+ * with nothing left on it.
+ */
+export async function cancelOrderItems(orderId: string, itemIds: string[], reason?: string): Promise<void> {
+  const restaurantId = getRestaurantId();
+  if (!restaurantId) throw new Error('No company selected');
+  if (!itemIds.length) throw new Error('No items specified for cancellation');
+
+  const { data: order, error: fetchErr } = await db
+    .from('orders')
+    .select('*')
+    .eq('id', orderId)
+    .eq('restaurant_id', restaurantId)
+    .single();
+
+  if (fetchErr) throw fetchErr;
+  if (!order) throw new Error('Order not found');
+
+  const rawItems = typeof (order as any).items === 'string'
+    ? (() => { try { return JSON.parse((order as any).items); } catch { return []; } })()
+    : ((order as any).items ?? []);
+  const items = Array.isArray(rawItems) ? rawItems : [];
+
+  const idSet = new Set(itemIds);
+  const cancelledItems = items.filter((i: any) => idSet.has(i.id));
+  if (cancelledItems.length === 0) throw new Error('No matching items found to cancel');
+
+  const remainingItems = items.filter((i: any) => !idSet.has(i.id));
+
+  if (remainingItems.length === 0) {
+    // Every item requested — same end state as cancelling the whole order.
+    await cancelOrder(orderId, reason);
+    return;
+  }
+
+  const updatedItems = items.map((i: any) =>
+    idSet.has(i.id) ? { ...i, status: 'cancelled', cancel_reason: reason || null } : i
+  );
+  const newSubtotal = remainingItems.reduce(
+    (sum: number, i: any) => sum + Number(i.total_price ?? i.totalPrice ?? 0), 0
+  );
+  const existingTax = Number((order as any).tax ?? 0);
+  const newTotal = newSubtotal + existingTax;
+
+  const { error: updateErr } = await db
+    .from('orders')
+    .update({
+      items: updatedItems,
+      subtotal: newSubtotal,
+      total: newTotal,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', orderId)
+    .eq('restaurant_id', restaurantId);
+
+  if (updateErr) throw updateErr;
+
+  const restoreList = cancelledItems
+    .map((item: any) => ({
+      menuItemId: item.menuItemId ?? item.menu_item_id ?? '',
+      quantity: Number(item.quantity) || 0,
+      menuItemName: item.menuItemName ?? item.menu_item_name,
+    }))
+    .filter((i) => i.menuItemId && i.quantity > 0);
+
+  if (restoreList.length > 0) {
+    try {
+      await restoreInventoryForOrder(restoreList, {
+        reference: (order as any).order_number ?? orderId,
+        reason: reason ?? 'Item cancelled',
+      });
+    } catch (err) {
+      console.warn('[cancelOrderItems] Inventory restore failed:', err);
+    }
+  }
 }
 
 export async function approveOrderCancellationRequest(
   requestId: string,
   opts?: { reviewNotes?: string; reviewedBy?: string; reviewedByName?: string }
 ): Promise<OrderCancellationRequest> {
-  const { data: request, error: requestError } = await db
+  const { data: rawRequest, error: requestError } = await db
     .from('order_cancellation_requests')
     .select('*')
     .eq('id', requestId)
     .single();
 
   if (requestError) throw requestError;
-  if (!request) throw new Error('Cancellation request not found');
+  if (!rawRequest) throw new Error('Cancellation request not found');
+  const request = normalizeCancellationRequest(rawRequest);
 
-  if (request.status === 'approved') return request as OrderCancellationRequest;
+  if (request.status === 'approved') return request;
   if (request.status === 'rejected') throw new Error('Request is already rejected');
 
-  await cancelOrder(request.order_id as string, request.reason ?? undefined);
+  if (request.item_ids.length > 0) {
+    await cancelOrderItems(request.order_id, request.item_ids, request.reason ?? undefined);
+  } else {
+    await cancelOrder(request.order_id, request.reason ?? undefined);
+  }
 
   const now = new Date().toISOString();
   const { data, error } = await db
@@ -918,7 +1019,7 @@ export async function approveOrderCancellationRequest(
     .single();
 
   if (error) throw error;
-  return data as OrderCancellationRequest;
+  return normalizeCancellationRequest(data);
 }
 
 export async function rejectOrderCancellationRequest(
@@ -942,7 +1043,7 @@ export async function rejectOrderCancellationRequest(
     .single();
 
   if (error) throw error;
-  return data as OrderCancellationRequest;
+  return normalizeCancellationRequest(data);
 }
 
 export async function seedTestOrders(): Promise<{ message: string; count: number }> {

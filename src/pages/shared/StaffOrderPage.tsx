@@ -135,9 +135,11 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
   const [existingOrderForEntry, setExistingOrderForEntry] = useState<{ id: string; items: Order['items'] } | null>(null);
   // Pre-made merge decision from the occupied-table dialog — null means "ask via OpenTabModal at submit time"
   const autoMergeRef = useRef<boolean | null>(null);
-  // Cancellation-request UI state for the occupied-table dialog
+  // Cancellation-request UI state for the occupied-table dialog — item-level:
+  // the waiter checks off specific items (with a per-round "select all" shortcut)
+  // rather than being forced to cancel an entire round or the whole order.
   const [cancelRoundMode, setCancelRoundMode] = useState(false);
-  const [selectedCancelRound, setSelectedCancelRound] = useState<number | null>(null);
+  const [selectedCancelItemIds, setSelectedCancelItemIds] = useState<Set<string>>(new Set());
   const [cancelReason, setCancelReason] = useState('');
   const [submittingCancel, setSubmittingCancel] = useState(false);
   const [cancelRequestedOrderIds, setCancelRequestedOrderIds] = useState<Set<string>>(new Set());
@@ -293,7 +295,7 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
     setConfirmOccupied(null);
     setExistingOrderForEntry(existingOrder);
     setCancelRoundMode(false);
-    setSelectedCancelRound(null);
+    setSelectedCancelItemIds(new Set());
     setCancelReason('');
     // Rotate the key on every new table selection so a stale key from a
     // previously failed-but-actually-created order can never be reused
@@ -823,23 +825,19 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
           const alreadyRequested = cancelRequestedOrderIds.has(activeOrder.id);
 
           const submitCancelRequest = async () => {
-            const round = rounds.length === 1 ? rounds[0] : selectedCancelRound;
-            if (rounds.length > 1 && round === null) return;
-            if (!cancelReason.trim()) return;
+            if (selectedCancelItemIds.size === 0 || !cancelReason.trim()) return;
             setSubmittingCancel(true);
             try {
-              const reasonText = rounds.length > 1
-                ? `Round ${round} cancellation: ${cancelReason.trim()}`
-                : cancelReason.trim();
               await requestOrderCancellation(activeOrder.id, {
-                reason: reasonText,
+                reason: cancelReason.trim(),
+                itemIds: Array.from(selectedCancelItemIds),
                 requestedBy: selectedStaffId || getStaffId() || undefined,
                 requestedByName: selectedStaffName || resolveStaffName(),
               });
               setCancelRequestedOrderIds((prev) => new Set(prev).add(activeOrder.id));
               setCancelRoundMode(false);
               setCancelReason('');
-              setSelectedCancelRound(null);
+              setSelectedCancelItemIds(new Set());
             } catch (e) {
               console.error(e);
               alert('Failed to submit cancellation request. Please try again.');
@@ -907,7 +905,7 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
                         </div>
                       ) : (
                         <button
-                          onClick={() => { setCancelRoundMode(true); if (rounds.length === 1) setSelectedCancelRound(rounds[0]); }}
+                          onClick={() => setCancelRoundMode(true)}
                           className="w-full rounded-xl border border-red-500/30 bg-red-500/10 py-2.5 text-sm font-medium text-red-300 transition-colors hover:bg-red-500/20"
                         >
                           Request Cancellation
@@ -922,59 +920,84 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
                     </div>
                   </>
                 ) : (
-                  /* Cancellation request form */
-                  <div className="space-y-3 px-5 pb-5 pt-4">
-                    <p className="text-sm font-semibold text-red-300">Request Cancellation</p>
+                  /* Cancellation request form — pick specific items, with a per-round
+                     "select all" shortcut so cancelling a whole batch is still one tap */
+                  <div className="max-h-[28rem] space-y-3 overflow-y-auto px-5 pb-5 pt-4">
+                    <p className="text-sm font-semibold text-red-300">Select items to cancel</p>
 
-                    {rounds.length > 1 && (
-                      <div className="flex flex-wrap gap-2">
-                        {rounds.map((r) => (
-                          <button
-                            key={r}
-                            onClick={() => setSelectedCancelRound(r)}
-                            className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors ${selectedCancelRound === r ? 'border-red-400 bg-red-500/30 text-red-200' : 'border-slate-600 bg-slate-800 text-slate-300 hover:border-red-500/50'}`}
-                          >
-                            Round {r}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-
-                    {selectedCancelRound !== null && rounds.length > 1 && (() => {
-                      const roundItems = (activeOrder.items || []).filter((i: any) => (i.round ?? 1) === selectedCancelRound);
-                      return roundItems.length > 0 ? (
-                        <div className="space-y-1 rounded-lg border border-slate-700 bg-slate-900/60 px-3 py-2">
-                          <p className="mb-1 text-xs font-medium text-slate-400">Round {selectedCancelRound} items:</p>
-                          {roundItems.map((i: any, idx: number) => (
-                            <div key={idx} className="flex justify-between text-xs text-slate-300">
-                              <span>{i.quantity}× {i.menuItemName || 'Item'}</span>
-                              <span className="text-slate-500">{formatPrice((i.unitPrice || 0) * i.quantity)}</span>
-                            </div>
-                          ))}
+                    {rounds.map((r) => {
+                      const roundItems = (activeOrder.items || []).filter((i: any) => (i.round ?? 1) === r);
+                      if (roundItems.length === 0) return null;
+                      const roundItemIds = roundItems.map((i: any) => i.id).filter(Boolean);
+                      const allSelected = roundItemIds.length > 0 && roundItemIds.every((id: string) => selectedCancelItemIds.has(id));
+                      return (
+                        <div key={r} className="overflow-hidden rounded-lg border border-slate-700 bg-slate-900/60">
+                          {rounds.length > 1 && (
+                            <button
+                              onClick={() => setSelectedCancelItemIds((prev) => {
+                                const next = new Set(prev);
+                                roundItemIds.forEach((id: string) => allSelected ? next.delete(id) : next.add(id));
+                                return next;
+                              })}
+                              className="flex w-full items-center justify-between border-b border-slate-700/60 bg-slate-800/60 px-3 py-1.5 text-left transition-colors hover:bg-slate-800"
+                            >
+                              <span className="text-xs font-semibold text-slate-300">Round {r}</span>
+                              <span className="text-[11px] font-medium text-amber-300">{allSelected ? 'Deselect all' : 'Select all'}</span>
+                            </button>
+                          )}
+                          <div className="divide-y divide-slate-800">
+                            {roundItems.map((item: any) => {
+                              const checked = item.id ? selectedCancelItemIds.has(item.id) : false;
+                              return (
+                                <label key={item.id ?? item.menuItemName} className="flex cursor-pointer items-center gap-2.5 px-3 py-2 transition-colors hover:bg-slate-800/40">
+                                  <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    disabled={!item.id}
+                                    onChange={() => {
+                                      if (!item.id) return;
+                                      setSelectedCancelItemIds((prev) => {
+                                        const next = new Set(prev);
+                                        if (checked) next.delete(item.id); else next.add(item.id);
+                                        return next;
+                                      });
+                                    }}
+                                    className="h-4 w-4 rounded border-slate-600 bg-slate-800 text-red-500 focus:ring-red-500/40"
+                                  />
+                                  <span className="flex-1 truncate text-sm text-slate-200">{item.quantity}× {item.menuItemName || 'Item'}</span>
+                                  <span className="shrink-0 text-xs font-medium text-slate-400">{formatPrice((item.unitPrice || 0) * item.quantity)}</span>
+                                </label>
+                              );
+                            })}
+                          </div>
                         </div>
-                      ) : null;
-                    })()}
+                      );
+                    })}
 
                     <textarea
                       value={cancelReason}
                       onChange={(e) => setCancelReason(e.target.value)}
-                      placeholder="Reason for cancelling this order…"
+                      placeholder="Reason for cancelling these items…"
                       rows={2}
                       className="w-full resize-none rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-red-500/60"
                     />
                     <div className="flex gap-2">
                       <button
-                        onClick={() => { setCancelRoundMode(false); setCancelReason(''); setSelectedCancelRound(null); }}
+                        onClick={() => { setCancelRoundMode(false); setCancelReason(''); setSelectedCancelItemIds(new Set()); }}
                         className="flex-1 rounded-lg bg-slate-700 py-2 text-sm text-slate-300 transition-colors hover:bg-slate-600"
                       >
                         Back
                       </button>
                       <button
-                        disabled={!cancelReason.trim() || (rounds.length > 1 && selectedCancelRound === null) || submittingCancel}
+                        disabled={selectedCancelItemIds.size === 0 || !cancelReason.trim() || submittingCancel}
                         onClick={submitCancelRequest}
                         className="flex-1 rounded-lg bg-red-600 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-40"
                       >
-                        {submittingCancel ? 'Sending…' : 'Submit Request'}
+                        {submittingCancel
+                          ? 'Sending…'
+                          : selectedCancelItemIds.size === 0
+                            ? 'Select items to cancel'
+                            : `Cancel ${selectedCancelItemIds.size} item${selectedCancelItemIds.size === 1 ? '' : 's'}`}
                       </button>
                     </div>
                   </div>

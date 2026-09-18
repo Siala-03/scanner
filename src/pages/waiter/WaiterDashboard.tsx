@@ -533,7 +533,7 @@ function ActiveOrderRow({
   onPrintReceipt,
   onShare,
   pendingCancel = false,
-  onRequestCancelRound,
+  onRequestCancelItems,
 }: {
   order: Order;
   onMarkReady?: (id: string) => void;
@@ -541,11 +541,13 @@ function ActiveOrderRow({
   onPrintReceipt?: (order: Order) => void;
   onShare?: (order: Order) => void;
   pendingCancel?: boolean;
-  onRequestCancelRound?: (orderId: string, round: number, reason: string) => Promise<void>;
+  onRequestCancelItems?: (orderId: string, itemIds: string[], reason: string) => Promise<void>;
 }) {
   const [expanded, setExpanded] = useState(false);
+  // Item-level cancellation: the waiter checks off specific items (with a
+  // per-round "select all" shortcut) rather than voiding a whole round/order.
   const [cancelRoundMode, setCancelRoundMode] = useState(false);
-  const [selectedRound, setSelectedRound] = useState<number | null>(null);
+  const [selectedCancelItemIds, setSelectedCancelItemIds] = useState<Set<string>>(new Set());
   const [cancelReason, setCancelReason] = useState('');
   const [submittingCancel, setSubmittingCancel] = useState(false);
 
@@ -701,86 +703,107 @@ function ActiveOrderRow({
                 )}
               </div>
 
-              {/* Cancel Round section */}
-              {onRequestCancelRound && (
+              {/* Cancel Items section — item-level, with a per-round "select all" shortcut */}
+              {onRequestCancelItems && (
                 pendingCancel ? (
                   <div className="flex items-center gap-2.5 px-4 py-3 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-300 text-sm font-medium">
                     <ClockIcon className="w-4 h-4 flex-shrink-0" />
-                    <span>Round cancellation request sent — awaiting manager approval</span>
+                    <span>Cancellation request sent — awaiting manager approval</span>
                   </div>
                 ) : cancelRoundMode ? (
                   <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-4 space-y-3">
-                    <p className="text-sm font-semibold text-red-300">Request Round Cancellation</p>
+                    <p className="text-sm font-semibold text-red-300">Select items to cancel</p>
 
-                    {/* Round selector */}
-                    {rounds.length > 1 && (
-                      <div className="flex flex-wrap gap-2">
-                        {rounds.map((r) => (
-                          <button
-                            key={r}
-                            onClick={() => setSelectedRound(r)}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${selectedRound === r ? 'bg-red-500/30 border-red-400 text-red-200' : 'bg-slate-800 border-slate-600 text-slate-300 hover:border-red-500/50'}`}
-                          >
-                            Round {r}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Items in the selected round */}
-                    {selectedRound !== null && (() => {
-                      const roundItems = (order.items || []).filter((i: any) => (i.round ?? 1) === selectedRound);
-                      return roundItems.length > 0 ? (
-                        <div className="rounded-lg bg-slate-900/60 border border-slate-700 px-3 py-2 space-y-1">
-                          <p className="text-xs text-slate-400 font-medium mb-1">Round {selectedRound} items:</p>
-                          {roundItems.map((i: any, idx: number) => (
-                            <div key={idx} className="flex justify-between text-xs text-slate-300">
-                              <span>{i.quantity}× {i.menuItem?.name ?? i.menuItemName ?? 'Unknown'}</span>
-                              <span className="text-slate-500">{formatPrice((i.unitPrice ?? 0) * i.quantity)}</span>
-                            </div>
-                          ))}
+                    {rounds.map((r) => {
+                      const roundItems = (order.items || []).filter((i: any) => (i.round ?? 1) === r);
+                      if (roundItems.length === 0) return null;
+                      const roundItemIds = roundItems.map((i: any) => i.id).filter(Boolean);
+                      const allSelected = roundItemIds.length > 0 && roundItemIds.every((id: string) => selectedCancelItemIds.has(id));
+                      return (
+                        <div key={r} className="overflow-hidden rounded-lg border border-slate-700 bg-slate-900/60">
+                          {rounds.length > 1 && (
+                            <button
+                              onClick={() => setSelectedCancelItemIds((prev) => {
+                                const next = new Set(prev);
+                                roundItemIds.forEach((id: string) => allSelected ? next.delete(id) : next.add(id));
+                                return next;
+                              })}
+                              className="flex w-full items-center justify-between border-b border-slate-700/60 bg-slate-800/60 px-3 py-1.5 text-left transition-colors hover:bg-slate-800"
+                            >
+                              <span className="text-xs font-semibold text-slate-300">Round {r}</span>
+                              <span className="text-[11px] font-medium text-amber-300">{allSelected ? 'Deselect all' : 'Select all'}</span>
+                            </button>
+                          )}
+                          <div className="divide-y divide-slate-800">
+                            {roundItems.map((i: any) => {
+                              const checked = i.id ? selectedCancelItemIds.has(i.id) : false;
+                              return (
+                                <label key={i.id ?? i.menuItemName} className="flex cursor-pointer items-center gap-2.5 px-3 py-2 transition-colors hover:bg-slate-800/40">
+                                  <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    disabled={!i.id}
+                                    onChange={() => {
+                                      if (!i.id) return;
+                                      setSelectedCancelItemIds((prev) => {
+                                        const next = new Set(prev);
+                                        if (checked) next.delete(i.id); else next.add(i.id);
+                                        return next;
+                                      });
+                                    }}
+                                    className="h-4 w-4 rounded border-slate-600 bg-slate-800 text-red-500 focus:ring-red-500/40"
+                                  />
+                                  <span className="flex-1 truncate text-xs text-slate-300">{i.quantity}× {i.menuItem?.name ?? i.menuItemName ?? 'Unknown'}</span>
+                                  <span className="shrink-0 text-xs text-slate-500">{formatPrice((i.unitPrice ?? 0) * i.quantity)}</span>
+                                </label>
+                              );
+                            })}
+                          </div>
                         </div>
-                      ) : null;
-                    })()}
+                      );
+                    })}
 
                     <textarea
                       value={cancelReason}
                       onChange={(e) => setCancelReason(e.target.value)}
-                      placeholder="Reason for cancelling this round…"
+                      placeholder="Reason for cancelling these items…"
                       rows={2}
                       className="w-full rounded-lg bg-slate-900 border border-slate-600 text-sm text-slate-200 placeholder-slate-500 px-3 py-2 resize-none focus:outline-none focus:border-red-500/60"
                     />
                     <div className="flex gap-2">
                       <button
-                        onClick={() => { setCancelRoundMode(false); setCancelReason(''); setSelectedRound(null); }}
+                        onClick={() => { setCancelRoundMode(false); setCancelReason(''); setSelectedCancelItemIds(new Set()); }}
                         className="flex-1 py-2 rounded-lg bg-slate-700 text-slate-300 text-sm hover:bg-slate-600 transition-colors"
                       >
                         Cancel
                       </button>
                       <button
-                        disabled={!cancelReason.trim() || (rounds.length > 1 && selectedRound === null) || submittingCancel}
+                        disabled={selectedCancelItemIds.size === 0 || !cancelReason.trim() || submittingCancel}
                         onClick={async () => {
-                          const round = rounds.length === 1 ? rounds[0] : selectedRound!;
                           setSubmittingCancel(true);
-                          await onRequestCancelRound(order.id, round, cancelReason.trim());
+                          await onRequestCancelItems(order.id, Array.from(selectedCancelItemIds), cancelReason.trim());
                           setSubmittingCancel(false);
                           setCancelRoundMode(false);
                           setCancelReason('');
-                          setSelectedRound(null);
+                          setSelectedCancelItemIds(new Set());
                         }}
                         className="flex-1 py-2 rounded-lg bg-red-600 text-white text-sm font-semibold hover:bg-red-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                       >
-                        {submittingCancel ? 'Sending…' : 'Submit Request'}
+                        {submittingCancel
+                          ? 'Sending…'
+                          : selectedCancelItemIds.size === 0
+                            ? 'Select items to cancel'
+                            : `Cancel ${selectedCancelItemIds.size} item${selectedCancelItemIds.size === 1 ? '' : 's'}`}
                       </button>
                     </div>
                   </div>
                 ) : (
                   <button
-                    onClick={() => { setCancelRoundMode(true); if (rounds.length === 1) setSelectedRound(rounds[0]); }}
+                    onClick={() => setCancelRoundMode(true)}
                     className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border border-red-500/30 bg-red-500/10 text-red-300 hover:bg-red-500/20 text-sm font-medium transition-colors"
                   >
                     <XCircleIcon className="w-4 h-4" />
-                    Request Round Cancellation
+                    Request Cancellation
                   </button>
                 )
               )}
@@ -1330,9 +1353,10 @@ export function WaiterDashboard({
     }
   };
 
-  const handleCancelRound = async (orderId: string, round: number, reason: string) => {
+  const handleCancelItems = async (orderId: string, itemIds: string[], reason: string) => {
     await requestOrderCancellation(orderId, {
-      reason: `Round ${round} cancellation: ${reason}`,
+      reason,
+      itemIds,
       requestedBy: String(waiter.id),
       requestedByName: waiterName,
     });
@@ -1638,7 +1662,7 @@ export function WaiterDashboard({
                   ) : (
                     <AnimatePresence>
                       {kitchenOrders.map((order) => (
-                        <ActiveOrderRow key={order.id} order={order} onMarkReady={handleMarkReady} onPrintReceipt={handlePrintReceipt} pendingCancel={pendingCancelRequests.has(order.id)} onRequestCancelRound={handleCancelRound} />
+                        <ActiveOrderRow key={order.id} order={order} onMarkReady={handleMarkReady} onPrintReceipt={handlePrintReceipt} pendingCancel={pendingCancelRequests.has(order.id)} onRequestCancelItems={handleCancelItems} />
                       ))}
                     </AnimatePresence>
                   )}
@@ -1664,7 +1688,7 @@ export function WaiterDashboard({
                   ) : (
                     <AnimatePresence>
                       {readyOrders.map((order) => (
-                        <ActiveOrderRow key={order.id} order={order} onMarkServed={handleMarkServed} onPrintReceipt={handlePrintReceipt} pendingCancel={pendingCancelRequests.has(order.id)} onRequestCancelRound={handleCancelRound} />
+                        <ActiveOrderRow key={order.id} order={order} onMarkServed={handleMarkServed} onPrintReceipt={handlePrintReceipt} pendingCancel={pendingCancelRequests.has(order.id)} onRequestCancelItems={handleCancelItems} />
                       ))}
                     </AnimatePresence>
                   )}
@@ -1684,7 +1708,7 @@ export function WaiterDashboard({
                   ) : (
                     <AnimatePresence>
                       {servedOrders.map((order) => (
-                        <ActiveOrderRow key={order.id} order={order} onPrintReceipt={handlePrintReceipt} onShare={handleShare} pendingCancel={pendingCancelRequests.has(order.id)} onRequestCancelRound={handleCancelRound} />
+                        <ActiveOrderRow key={order.id} order={order} onPrintReceipt={handlePrintReceipt} onShare={handleShare} pendingCancel={pendingCancelRequests.has(order.id)} onRequestCancelItems={handleCancelItems} />
                       ))}
                     </AnimatePresence>
                   )}
