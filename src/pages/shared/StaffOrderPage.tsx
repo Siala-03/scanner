@@ -55,6 +55,10 @@ interface StaffOrderPageProps {
   };
   staffName?: string;
   sharedTerminalMode?: boolean;
+  // Fired whenever a waiter is checked in/out of the shared terminal (a name is
+  // selected, or "Switch Waiter" clears it) — lets the host page (e.g. the
+  // supervisor nav) hide unrelated tabs while a waiter is actively using it.
+  onActiveSessionChange?: (active: boolean) => void;
 }
 
 interface StaffOption {
@@ -112,7 +116,7 @@ function getStaffId(): string | null {
   }
 }
 
-export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, sharedTerminalMode = false }: StaffOrderPageProps) {
+export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, sharedTerminalMode = false, onActiveSessionChange }: StaffOrderPageProps) {
   const { orders, updateOrderStatus } = useOrdersContext();
   const [step, setStep] = useState<'table-select' | 'order-entry'>('table-select');
   // null = Bar / Walk-up (no table number)
@@ -124,6 +128,16 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
   const [cart, setCart] = useState<CartEntry[]>([]);
   const [orderNotes, setOrderNotes] = useState('');
   const [selectedStaffId, setSelectedStaffId] = useState('');
+
+  // Notify the host (e.g. supervisor nav) whenever a waiter checks in/out here.
+  useEffect(() => {
+    if (sharedTerminalMode) onActiveSessionChange?.(Boolean(selectedStaffId));
+  }, [sharedTerminalMode, selectedStaffId, onActiveSessionChange]);
+
+  // Safety net: if this component unmounts while a waiter session was still
+  // "active" (e.g. the host navigates away some other way), clear the flag so
+  // the host's hidden nav doesn't stay stuck hidden with nothing to unhide it.
+  useEffect(() => () => { if (sharedTerminalMode) onActiveSessionChange?.(false); }, [sharedTerminalMode, onActiveSessionChange]);
   const [activeCategory, setActiveCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
