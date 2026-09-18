@@ -9,7 +9,6 @@ import {
   RefreshCwIcon,
   CheckCircleIcon,
   XIcon,
-  UtensilsIcon,
   PrinterIcon,
   ReceiptTextIcon,
   ClockIcon,
@@ -17,8 +16,8 @@ import {
 import { useMenu } from '../../hooks/useMenu';
 import { useTables } from '../../hooks/useTables';
 import { useStaff } from '../../hooks/useStaff';
-import { createOrder } from '../../api/orders';
-import { findMergeableInOrders } from '../../hooks/useOrders';
+import { createOrder, requestOrderCancellation } from '../../api/orders';
+import { findMergeableInOrders, normalizeOrderPayload } from '../../hooks/useOrders';
 import { useOrdersContext } from '../../contexts/OrdersContext';
 import { OpenTabModal } from '../../components/shared/OpenTabModal';
 import { supabase } from '../../lib/supabase';
@@ -26,6 +25,7 @@ import { fetchKitchenOrders } from '../../api/orders';
 import { formatPrice } from '../../utils/currency';
 import { buildReceiptHtml, orderToReceiptData, printReceipt } from '../../utils/receipt';
 import { markBillPresented, isBillPresented } from '../../utils/billTracking';
+import { markTableSessionPendingCloseFromReceipt } from '../../utils/tableSessions';
 import type { ReceiptData } from '../../utils/receipt';
 import { printOrderReceipt as printThermal } from '../../utils/sunmiPrinter';
 import { Modal } from '../../components/ui/Modal';
@@ -124,11 +124,23 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
   const [receiptNote, setReceiptNote] = useState('');
   const [showMobileCart, setShowMobileCart] = useState(false);
   const [orderSyncError, setOrderSyncError] = useState<string | null>(null);
-  const [confirmOccupied, setConfirmOccupied] = useState<number | null>(null);
+  // Occupied-table dialog — carries the existing order so it can be previewed
+  // (items + total) and, if requested, cancelled — mirrors WaiterDashboard's flow.
+  const [confirmOccupied, setConfirmOccupied] = useState<{ tableNumber: number; activeOrder: Order } | null>(null);
   const [mergeCandidate, setMergeCandidate] = useState<Order | null>(null);
   const mergeResolveRef = useRef<((result: boolean) => void) | null>(null);
   const isSubmittingRef = useRef(false);
   const submitKeyRef = useRef(crypto.randomUUID());
+  // Context passed into the cart step when adding on top of an already-placed order
+  const [existingOrderForEntry, setExistingOrderForEntry] = useState<{ id: string; items: Order['items'] } | null>(null);
+  // Pre-made merge decision from the occupied-table dialog — null means "ask via OpenTabModal at submit time"
+  const autoMergeRef = useRef<boolean | null>(null);
+  // Cancellation-request UI state for the occupied-table dialog
+  const [cancelRoundMode, setCancelRoundMode] = useState(false);
+  const [selectedCancelRound, setSelectedCancelRound] = useState<number | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
+  const [submittingCancel, setSubmittingCancel] = useState(false);
+  const [cancelRequestedOrderIds, setCancelRequestedOrderIds] = useState<Set<string>>(new Set());
 
   const { tables, isLoading: tablesLoading } = useTables();
   const { menuItems, isLoading: menuLoading } = useMenu();
@@ -234,22 +246,42 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
   }, [loadOccupancy]);
 
   // ── Table selection ───────────────────────────────────────────────────────────
+  // Same eligibility predicate as WaiterDashboard's findActiveOrderForTable — lets the
+  // occupied-table dialog preview what's already on the table before deciding to merge.
+  const findActiveOrderForTable = useCallback((tNum: number): Order | null => {
+    return orders.find((o) => {
+      const ps = o.paymentStatus ?? (o as any).payment_status;
+      const tN = o.tableNumber ?? (o as any).table_number;
+      return tN === tNum &&
+        ['pending', 'verified', 'preparing', 'ready'].includes(o.status) &&
+        ps !== 'confirmed';
+    }) ?? null;
+  }, [orders]);
+
   const confirmAndSelectTable = (tableNum: number) => {
     const status = tableOccupancy[tableNum];
     if (status === 'occupied' || status === 'urgent') {
-      setConfirmOccupied(tableNum);
-    } else {
-      openOrderEntry(tableNum);
+      const activeOrder = findActiveOrderForTable(tableNum);
+      if (activeOrder) {
+        setConfirmOccupied({ tableNumber: tableNum, activeOrder });
+        return;
+      }
     }
+    autoMergeRef.current = null;
+    openOrderEntry(tableNum);
   };
 
-  const openOrderEntry = (tableNum: number | null) => {
+  const openOrderEntry = (tableNum: number | null, existingOrder: { id: string; items: Order['items'] } | null = null) => {
     setSelectedTable(tableNum === null ? 'bar' : tableNum);
     setCart([]);
     setOrderNotes('');
     setActiveCategory('all');
     setSearchQuery('');
     setConfirmOccupied(null);
+    setExistingOrderForEntry(existingOrder);
+    setCancelRoundMode(false);
+    setSelectedCancelRound(null);
+    setCancelReason('');
     // Rotate the key on every new table selection so a stale key from a
     // previously failed-but-actually-created order can never be reused
     // against a different table, which would return the wrong order.
@@ -404,6 +436,7 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
     try {
       printReceipt(buildReceiptHtml(data));
       if (lastPlacedOrder?.id) markBillPresented(lastPlacedOrder.id);
+      if (lastPlacedOrder?.tableNumber != null) void markTableSessionPendingCloseFromReceipt(lastPlacedOrder.tableNumber);
     } catch {
       alert('Could not open print window. Please allow pop-ups in your browser.');
     } finally {
@@ -438,6 +471,7 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
       );
       printReceipt(html);
       if (lastPlacedOrder?.id) markBillPresented(lastPlacedOrder.id);
+      if (lastPlacedOrder?.tableNumber != null) void markTableSessionPendingCloseFromReceipt(lastPlacedOrder.tableNumber);
       setShowReceiptNoteModal(false);
     } catch (e) {
       console.error(e);
@@ -450,6 +484,7 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
   const handleDoneAfterSuccess = () => {
     setSuccessTable(null);
     setLastPlacedOrder(null);
+    setExistingOrderForEntry(null);
     setStep('table-select');
     if (sharedTerminalMode) {
       setSelectedStaffId('');
@@ -481,8 +516,14 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
       const needsKitchen = checkoutCart.some(cartItemNeedsKitchen);
       let allowMergeToOpenTab = false;
 
-      // In-memory merge lookup — no DB round trip
-      if (typeof tableNum === 'number' && tableNum > 0 && tableNum !== 999) {
+      if (autoMergeRef.current !== null) {
+        // Already decided in the occupied-table dialog ("Add to this order" /
+        // "Start a separate order") — honor it without asking again.
+        allowMergeToOpenTab = autoMergeRef.current;
+        autoMergeRef.current = null;
+      } else if (typeof tableNum === 'number' && tableNum > 0 && tableNum !== 999) {
+        // No pre-made decision (e.g. table looked free when selected but a tab
+        // opened in the meantime) — fall back to the in-memory merge lookup + modal.
         const candidate = findMergeableInOrders(orders, tableNum);
         if (candidate) {
           allowMergeToOpenTab = await new Promise<boolean>((resolve) => {
@@ -549,13 +590,21 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
         allowMergeToOpenTab,
         idempotencyKey,
       } as any).then((created) => {
-        // Patch the displayed order with the confirmed server ID and order number
-        setLastPlacedOrder((prev) => prev ? {
-          ...prev,
-          id: String((created as any)?.id || prev.id),
-          orderNumber: (created as any)?.orderNumber ?? (created as any)?.order_number ?? prev.orderNumber,
-          status: String((created as any)?.status || prev.status) as any,
-        } : prev);
+        // Normalize the server row back into an Order — when this submission merged
+        // into an existing tab, `created.items` is the FULL merged list (all rounds),
+        // so this is what makes "Print Receipt" show the cumulative table bill instead
+        // of just the items from this one round.
+        const normalized = normalizeOrderPayload(created);
+        setLastPlacedOrder((prev) => {
+          if (!prev) return prev;
+          if (normalized) return { ...normalized, id: normalized.id || prev.id };
+          return {
+            ...prev,
+            id: String((created as any)?.id || prev.id),
+            orderNumber: (created as any)?.orderNumber ?? (created as any)?.order_number ?? prev.orderNumber,
+            status: String((created as any)?.status || prev.status) as any,
+          };
+        });
       }).catch((e) => {
         console.error('Background order sync failed:', e);
         const isTimeout = (e as any)?.code === 'TIMEOUT' || (e instanceof Error && e.message.includes('timed out'));
@@ -691,7 +740,7 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
 
           {/* Bar / Walk-up */}
           <button
-            onClick={() => openOrderEntry(null)}
+            onClick={() => { autoMergeRef.current = null; openOrderEntry(null); }}
             className="mb-6 w-full rounded-xl border-2 border-dashed border-amber-500/50 bg-amber-500/10 py-4 text-amber-300 font-semibold text-base hover:bg-amber-500/20 hover:border-amber-400 transition-colors"
           >
             Bar / Walk-up (no table)
@@ -744,39 +793,174 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
           )}
         </div>
 
-        {/* Occupied confirmation dialog */}
-        {confirmOccupied !== null && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-            <div className="w-full max-w-sm rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-2xl">
-              <div className="mb-4 flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-500/20">
-                  <UtensilsIcon className="w-5 h-5 text-amber-400" />
+        {/* Occupied-table dialog — previews the existing order and lets the waiter
+            add to it, start a separate order, or request its cancellation */}
+        {confirmOccupied !== null && (() => {
+          const { tableNumber, activeOrder } = confirmOccupied;
+          const rounds = [...new Set((activeOrder.items || []).map((i: any) => i.round ?? 1))].sort((a, b) => a - b) as number[];
+          const alreadyRequested = cancelRequestedOrderIds.has(activeOrder.id);
+
+          const submitCancelRequest = async () => {
+            const round = rounds.length === 1 ? rounds[0] : selectedCancelRound;
+            if (rounds.length > 1 && round === null) return;
+            if (!cancelReason.trim()) return;
+            setSubmittingCancel(true);
+            try {
+              const reasonText = rounds.length > 1
+                ? `Round ${round} cancellation: ${cancelReason.trim()}`
+                : cancelReason.trim();
+              await requestOrderCancellation(activeOrder.id, {
+                reason: reasonText,
+                requestedBy: selectedStaffId || getStaffId() || undefined,
+                requestedByName: selectedStaffName || resolveStaffName(),
+              });
+              setCancelRequestedOrderIds((prev) => new Set(prev).add(activeOrder.id));
+              setCancelRoundMode(false);
+              setCancelReason('');
+              setSelectedCancelRound(null);
+            } catch (e) {
+              console.error(e);
+              alert('Failed to submit cancellation request. Please try again.');
+            } finally {
+              setSubmittingCancel(false);
+            }
+          };
+
+          return (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+              <div className="w-full max-w-sm rounded-2xl border border-slate-600 bg-slate-900 shadow-2xl overflow-hidden">
+                {/* Header */}
+                <div className="px-5 pt-5 pb-4 border-b border-slate-700">
+                  <div className="mb-0.5 flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
+                    <p className="text-xs font-semibold uppercase tracking-wide text-amber-400">Active Order</p>
+                  </div>
+                  <h3 className="text-lg font-bold text-white">Table {tableNumber}</h3>
                 </div>
-                <div>
-                  <h3 className="font-semibold text-white">Table {confirmOccupied} is occupied</h3>
-                  <p className="text-sm text-slate-400">This table already has active orders.</p>
-                </div>
-              </div>
-              <p className="mb-6 text-sm text-slate-300">
-                Do you want to add a new order to Table {confirmOccupied}?
-              </p>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setConfirmOccupied(null)}
-                  className="flex-1 rounded-lg border border-slate-600 bg-slate-800 py-2.5 text-sm font-semibold text-slate-300 hover:bg-slate-700 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => openOrderEntry(confirmOccupied)}
-                  className="flex-1 rounded-lg bg-amber-500 py-2.5 text-sm font-semibold text-slate-900 hover:bg-amber-400 transition-colors"
-                >
-                  Add Order
-                </button>
+
+                {!cancelRoundMode ? (
+                  <>
+                    {/* Existing items */}
+                    <div className="max-h-52 overflow-y-auto px-5 py-3">
+                      <p className="mb-2 text-xs font-medium text-slate-500">Items currently on this table:</p>
+                      <div className="space-y-1.5">
+                        {activeOrder.items.map((item, i) => (
+                          <div key={i} className="flex items-center justify-between gap-3 text-sm">
+                            <span className="flex-1 truncate text-slate-200">{item.menuItemName || 'Item'}</span>
+                            <span className="shrink-0 text-slate-500">×{item.quantity}</span>
+                            <span className="shrink-0 font-medium text-slate-400">{formatPrice((item.unitPrice || 0) * item.quantity)}</span>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="mt-3 flex justify-between border-t border-slate-700/60 pt-2 text-sm font-semibold">
+                        <span className="text-slate-400">Order total</span>
+                        <span className="text-white">{formatPrice(activeOrder.total)}</span>
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="space-y-2 px-5 pb-5 pt-3">
+                      <button
+                        onClick={() => {
+                          autoMergeRef.current = true;
+                          openOrderEntry(tableNumber, { id: activeOrder.id, items: activeOrder.items });
+                        }}
+                        className="w-full rounded-xl bg-amber-500 py-3 text-sm font-bold text-slate-950 transition-colors hover:bg-amber-400"
+                      >
+                        Add to this order
+                      </button>
+                      <button
+                        onClick={() => {
+                          autoMergeRef.current = false;
+                          openOrderEntry(tableNumber);
+                        }}
+                        className="w-full rounded-xl bg-slate-700 py-2.5 text-sm font-semibold text-slate-200 transition-colors hover:bg-slate-600"
+                      >
+                        Start a separate order
+                      </button>
+                      {alreadyRequested ? (
+                        <div className="flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-xs font-medium text-amber-300">
+                          <ClockIcon className="h-3.5 w-3.5 shrink-0" />
+                          Cancellation requested — awaiting manager approval
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => { setCancelRoundMode(true); if (rounds.length === 1) setSelectedCancelRound(rounds[0]); }}
+                          className="w-full rounded-xl border border-red-500/30 bg-red-500/10 py-2.5 text-sm font-medium text-red-300 transition-colors hover:bg-red-500/20"
+                        >
+                          Request Cancellation
+                        </button>
+                      )}
+                      <button
+                        onClick={() => setConfirmOccupied(null)}
+                        className="w-full py-2 text-sm text-slate-500 transition-colors hover:text-slate-300"
+                      >
+                        Dismiss
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  /* Cancellation request form */
+                  <div className="space-y-3 px-5 pb-5 pt-4">
+                    <p className="text-sm font-semibold text-red-300">Request Cancellation</p>
+
+                    {rounds.length > 1 && (
+                      <div className="flex flex-wrap gap-2">
+                        {rounds.map((r) => (
+                          <button
+                            key={r}
+                            onClick={() => setSelectedCancelRound(r)}
+                            className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors ${selectedCancelRound === r ? 'border-red-400 bg-red-500/30 text-red-200' : 'border-slate-600 bg-slate-800 text-slate-300 hover:border-red-500/50'}`}
+                          >
+                            Round {r}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    {selectedCancelRound !== null && rounds.length > 1 && (() => {
+                      const roundItems = (activeOrder.items || []).filter((i: any) => (i.round ?? 1) === selectedCancelRound);
+                      return roundItems.length > 0 ? (
+                        <div className="space-y-1 rounded-lg border border-slate-700 bg-slate-900/60 px-3 py-2">
+                          <p className="mb-1 text-xs font-medium text-slate-400">Round {selectedCancelRound} items:</p>
+                          {roundItems.map((i: any, idx: number) => (
+                            <div key={idx} className="flex justify-between text-xs text-slate-300">
+                              <span>{i.quantity}× {i.menuItemName || 'Item'}</span>
+                              <span className="text-slate-500">{formatPrice((i.unitPrice || 0) * i.quantity)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : null;
+                    })()}
+
+                    <textarea
+                      value={cancelReason}
+                      onChange={(e) => setCancelReason(e.target.value)}
+                      placeholder="Reason for cancelling this order…"
+                      rows={2}
+                      className="w-full resize-none rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-red-500/60"
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => { setCancelRoundMode(false); setCancelReason(''); setSelectedCancelRound(null); }}
+                        className="flex-1 rounded-lg bg-slate-700 py-2 text-sm text-slate-300 transition-colors hover:bg-slate-600"
+                      >
+                        Back
+                      </button>
+                      <button
+                        disabled={!cancelReason.trim() || (rounds.length > 1 && selectedCancelRound === null) || submittingCancel}
+                        onClick={submitCancelRequest}
+                        className="flex-1 rounded-lg bg-red-600 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        {submittingCancel ? 'Sending…' : 'Submit Request'}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
       </div>
     );
   }
@@ -790,7 +974,7 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
         <div className="max-w-6xl mx-auto flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <button
-              onClick={() => { setStep('table-select'); setCart([]); }}
+              onClick={() => { autoMergeRef.current = null; setExistingOrderForEntry(null); setStep('table-select'); setCart([]); }}
               className="flex items-center gap-1.5 rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 text-sm text-slate-300 hover:bg-slate-700 transition-colors"
             >
               <ChevronLeftIcon className="w-4 h-4" />
@@ -803,7 +987,11 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
               )}
               {tableOccupancyStatus && (
                 <p className={`text-xs ${tableOccupancyStatus === 'urgent' ? 'text-red-400' : 'text-amber-400'}`}>
-                  {tableOccupancyStatus === 'urgent' ? 'Urgent — orders waiting >15 min' : 'Table occupied — adding to existing orders'}
+                  {tableOccupancyStatus === 'urgent'
+                    ? 'Urgent — orders waiting >15 min'
+                    : existingOrderForEntry
+                      ? 'Adding to the existing order'
+                      : 'Table occupied — starting a separate order'}
                 </p>
               )}
             </div>
@@ -945,6 +1133,7 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
             sharedTerminalMode={sharedTerminalMode}
             canPrintReceipt={Boolean(lastPlacedOrder)}
             isPrintingReceipt={isPrintingReceipt}
+            existingOrder={existingOrderForEntry}
             onUpdateQty={updateQty}
             onNotesChange={setOrderNotes}
             onSelectedStaffIdChange={setSelectedStaffId}
@@ -982,6 +1171,7 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
               sharedTerminalMode={sharedTerminalMode}
               canPrintReceipt={Boolean(lastPlacedOrder)}
               isPrintingReceipt={isPrintingReceipt}
+              existingOrder={existingOrderForEntry}
               onUpdateQty={updateQty}
               onNotesChange={setOrderNotes}
               onSelectedStaffIdChange={setSelectedStaffId}
@@ -1060,6 +1250,7 @@ function CartPanel({
   sharedTerminalMode,
   canPrintReceipt,
   isPrintingReceipt,
+  existingOrder,
   onUpdateQty,
   onNotesChange,
   onSelectedStaffIdChange,
@@ -1082,6 +1273,7 @@ function CartPanel({
   sharedTerminalMode: boolean;
   canPrintReceipt: boolean;
   isPrintingReceipt: boolean;
+  existingOrder: { id: string; items: Order['items'] } | null;
   onUpdateQty: (id: string, delta: number) => void;
   onNotesChange: (v: string) => void;
   onSelectedStaffIdChange: (v: string) => void;
@@ -1124,11 +1316,32 @@ function CartPanel({
 
   return (
     <div className="flex flex-col gap-3 sticky top-20">
+      {existingOrder && (
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-amber-400">Already on table</p>
+          <div className="max-h-40 space-y-1.5 overflow-y-auto pr-1">
+            {existingOrder.items.map((item, i) => (
+              <div key={i} className="flex items-center justify-between gap-2 text-xs">
+                <span className="flex-1 truncate text-slate-300">{item.menuItemName || 'Item'}</span>
+                <span className="shrink-0 text-slate-500">×{item.quantity}</span>
+                <span className="shrink-0 font-medium text-slate-400">{formatPrice((item.unitPrice || 0) * item.quantity)}</span>
+              </div>
+            ))}
+          </div>
+          <div className="mt-2 flex justify-between border-t border-amber-500/20 pt-2 text-xs font-semibold">
+            <span className="text-slate-400">Subtotal so far</span>
+            <span className="text-amber-300">
+              {formatPrice(existingOrder.items.reduce((s, i) => s + (i.unitPrice || 0) * i.quantity, 0))}
+            </span>
+          </div>
+        </div>
+      )}
+
       <div className="rounded-xl border border-slate-700 bg-slate-900 p-4">
         <div className="mb-3 flex items-center justify-between">
           <h3 className="font-bold text-white">
             <ShoppingCartIcon className="inline w-4 h-4 mr-1.5 text-amber-400" />
-            Cart
+            {existingOrder ? 'New Items' : 'Cart'}
           </h3>
           {cartCount > 0 && (
             <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-xs font-bold text-amber-300">
@@ -1237,10 +1450,12 @@ function CartPanel({
         className="w-full rounded-xl bg-amber-500 py-3.5 font-bold text-slate-900 hover:bg-amber-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {isSubmitting
-          ? 'Placing order...'
+          ? (existingOrder ? 'Adding items...' : 'Placing order...')
           : cart.length === 0
             ? 'Add items to order'
-            : `Place Order — ${formatPrice(cartTotal)}`}
+            : existingOrder
+              ? `Add Items to Order — ${formatPrice(cartTotal)}`
+              : `Place Order — ${formatPrice(cartTotal)}`}
       </button>
       <p className="text-center text-xs text-slate-500">{tableLabel}</p>
     </div>

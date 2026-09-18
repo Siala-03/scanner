@@ -11,7 +11,10 @@ import * as queue from '../lib/orderQueue';
 // Auth is anon-key-only (custom staff auth, not Supabase Auth).
 // The SW uses the anon key directly for background sync.
 
-const normalizeOrderPayload = (rawOrder: any): Order | undefined => {
+// Exported so callers that talk to api/orders.ts directly (bypassing addOrder/the
+// offline queue — e.g. the shared-terminal StaffOrderPage) can turn a raw DB row
+// (snake_case columns) back into the camelCase Order shape the rest of the UI expects.
+export const normalizeOrderPayload = (rawOrder: any): Order | undefined => {
   if (!rawOrder) return undefined;
   const itemsRaw = typeof rawOrder.items === 'string' ? JSON.parse(rawOrder.items) : rawOrder.items;
   const items = Array.isArray(itemsRaw) ? itemsRaw : [];
