@@ -91,6 +91,16 @@ function categoryLabel(cat: string): string {
   return CATEGORY_LABELS[cat] ?? cat.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+function timeAgoLabel(date: Date | string): string {
+  const d = new Date(date);
+  if (Number.isNaN(d.getTime())) return '—';
+  const minutes = Math.floor((Date.now() - d.getTime()) / 60000);
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  return `${hours}h ${minutes % 60}m ago`;
+}
+
 function getStaffId(): string | null {
   const direct = localStorage.getItem('staffId');
   if (direct) return direct;
@@ -143,6 +153,8 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
   const [cancelReason, setCancelReason] = useState('');
   const [submittingCancel, setSubmittingCancel] = useState(false);
   const [cancelRequestedOrderIds, setCancelRequestedOrderIds] = useState<Set<string>>(new Set());
+  const [showRecentOrders, setShowRecentOrders] = useState(false);
+  const [printingRecentOrderId, setPrintingRecentOrderId] = useState<string | null>(null);
 
   const { tables, isLoading: tablesLoading } = useTables();
   const { menuItems, isLoading: menuLoading } = useMenu();
@@ -259,6 +271,59 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
         ps !== 'confirmed';
     }) ?? null;
   }, [orders]);
+
+  // Recent orders — lets any waiter on this shared terminal reprint a receipt,
+  // jump back into an order to add more / request cancellation, without needing
+  // the separate supervisor-only Order History page.
+  const RECENT_ORDERS_WINDOW_MS = 6 * 60 * 60 * 1000;
+  const recentOrders = useMemo(() => {
+    const cutoff = Date.now() - RECENT_ORDERS_WINDOW_MS;
+    return [...orders]
+      .filter((o) => {
+        // Skip local-only orders that haven't synced yet — 'order-' IS the real
+        // server-generated id prefix (see createOrder in api/orders.ts), so it stays.
+        if ((o.id ?? '').startsWith('offline-') || (o.id ?? '').startsWith('temp-')) return false;
+        const created = new Date(o.createdAt as any).getTime();
+        return !Number.isNaN(created) && created >= cutoff;
+      })
+      .sort((a, b) => new Date(b.createdAt as any).getTime() - new Date(a.createdAt as any).getTime());
+  }, [orders]);
+
+  const staffNameById = useCallback((id?: string) => {
+    if (!id) return null;
+    return staffOptions.find((s) => s.id === id)?.name ?? null;
+  }, [staffOptions]);
+
+  const printReceiptForOrder = async (order: Order) => {
+    setPrintingRecentOrderId(order.id);
+    try {
+      const data = orderToReceiptData(order, {
+        restaurantName: restaurantName || 'Company',
+        restaurantAddress: restaurantInfo?.address || '',
+        restaurantPhone: restaurantInfo?.phone || '',
+        restaurantEmail: restaurantInfo?.email || '',
+        restaurantLogo: restaurantInfo?.logo,
+        restaurantCity: restaurantInfo?.city,
+        restaurantCountry: restaurantInfo?.country,
+        restaurantMomoCode: restaurantInfo?.momoCode,
+        taxRate: 0,
+        serverName: staffNameById(order.assignedWaiterId) || resolveStaffName(),
+        orderType: order.tableNumber == null || order.tableNumber === 999 ? 'takeout' : 'dine-in',
+        paymentStatus: (order as any).paymentStatus === 'confirmed' || (order as any).payment_status === 'confirmed' ? 'paid' : 'pending',
+        payments: [{ method: 'Pending', amount: 0 }],
+      });
+      printReceipt(buildReceiptHtml(data));
+      markBillPresented(order.id);
+      if (order.tableNumber != null && order.tableNumber !== 999) {
+        void markTableSessionPendingCloseFromReceipt(order.tableNumber);
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Could not open print window. Please allow pop-ups in your browser.');
+    } finally {
+      setPrintingRecentOrderId(null);
+    }
+  };
 
   const confirmAndSelectTable = async (tableNum: number) => {
     const status = tableOccupancy[tableNum];
@@ -745,6 +810,13 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
                 </button>
               )}
               <button
+                onClick={() => setShowRecentOrders(true)}
+                className="flex items-center gap-2 rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 text-sm text-slate-300 hover:bg-slate-700 transition-colors"
+              >
+                <ReceiptTextIcon className="w-4 h-4" />
+                Recent Orders
+              </button>
+              <button
                 onClick={loadOccupancy}
                 disabled={occupancyLoading}
                 className="flex items-center gap-2 rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 text-sm text-slate-300 hover:bg-slate-700 transition-colors disabled:opacity-50"
@@ -1006,6 +1078,84 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
             </div>
           );
         })()}
+
+        {/* Recent Orders — reprint a receipt, or jump into an existing order to
+            add more / request cancellation (reuses the occupied-table dialog) */}
+        {showRecentOrders && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+            <div className="flex w-full max-w-lg max-h-[85vh] flex-col overflow-hidden rounded-2xl border border-slate-600 bg-slate-900 shadow-2xl">
+              <div className="flex items-center justify-between border-b border-slate-700 px-5 py-4">
+                <div>
+                  <h3 className="text-lg font-bold text-white">Recent Orders</h3>
+                  <p className="text-xs text-slate-400">Last 6 hours</p>
+                </div>
+                <button onClick={() => setShowRecentOrders(false)} className="text-slate-400 hover:text-slate-200">
+                  <XIcon className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto px-5 py-3">
+                {recentOrders.length === 0 ? (
+                  <p className="py-10 text-center text-sm text-slate-500">No orders in the last 6 hours</p>
+                ) : (
+                  <div className="space-y-2">
+                    {recentOrders.map((order) => {
+                      const label = order.tableNumber == null || order.tableNumber === 999
+                        ? 'Bar / Walk-up'
+                        : `Table ${order.tableNumber}`;
+                      const waiterName = staffNameById(order.assignedWaiterId);
+                      const isCancelled = order.status === 'cancelled';
+                      const canOpen = !isCancelled && order.tableNumber != null && order.tableNumber !== 999;
+                      return (
+                        <div key={order.id} className="rounded-xl border border-slate-700 bg-slate-800/70 px-4 py-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <p className="font-semibold text-white">{label}</p>
+                                <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase ${
+                                  isCancelled
+                                    ? 'border-red-500/30 bg-red-500/10 text-red-300'
+                                    : 'border-slate-600 bg-slate-900 text-slate-300'
+                                }`}>
+                                  {order.status}
+                                </span>
+                              </div>
+                              <p className="mt-0.5 text-xs text-slate-400">
+                                {waiterName ? `${waiterName} · ` : ''}{timeAgoLabel(order.createdAt)} · {order.items.length} item{order.items.length === 1 ? '' : 's'}
+                              </p>
+                            </div>
+                            <p className="shrink-0 font-bold text-amber-300">{formatPrice(order.total)}</p>
+                          </div>
+                          <div className="mt-2.5 flex gap-2">
+                            <button
+                              onClick={() => void printReceiptForOrder(order)}
+                              disabled={printingRecentOrderId === order.id}
+                              className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-slate-600 bg-slate-900 py-2 text-xs font-semibold text-slate-200 transition-colors hover:bg-slate-700 disabled:opacity-50"
+                            >
+                              <PrinterIcon className="h-3.5 w-3.5" />
+                              {printingRecentOrderId === order.id ? 'Printing…' : 'Print Receipt'}
+                            </button>
+                            {canOpen && (
+                              <button
+                                onClick={() => {
+                                  setConfirmOccupied({ tableNumber: order.tableNumber as number, activeOrder: order });
+                                  setShowRecentOrders(false);
+                                }}
+                                className="flex-1 rounded-lg border border-amber-500/30 bg-amber-500/10 py-2 text-xs font-semibold text-amber-300 transition-colors hover:bg-amber-500/20"
+                              >
+                                View / Add / Cancel
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
