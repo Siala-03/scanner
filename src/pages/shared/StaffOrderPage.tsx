@@ -113,7 +113,7 @@ function getStaffId(): string | null {
 }
 
 export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, sharedTerminalMode = false }: StaffOrderPageProps) {
-  const { orders } = useOrdersContext();
+  const { orders, updateOrderStatus } = useOrdersContext();
   const [step, setStep] = useState<'table-select' | 'order-entry'>('table-select');
   // null = Bar / Walk-up (no table number)
   const [selectedTable, setSelectedTable] = useState<number | null | 'bar'>('bar');
@@ -155,6 +155,7 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
   const [cancelRequestedOrderIds, setCancelRequestedOrderIds] = useState<Set<string>>(new Set());
   const [showRecentOrders, setShowRecentOrders] = useState(false);
   const [printingRecentOrderId, setPrintingRecentOrderId] = useState<string | null>(null);
+  const [markingServedId, setMarkingServedId] = useState<string | null>(null);
 
   const { tables, isLoading: tablesLoading } = useTables();
   const { menuItems, isLoading: menuLoading } = useMenu();
@@ -323,6 +324,23 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
       alert('Could not open print window. Please allow pop-ups in your browser.');
     } finally {
       setPrintingRecentOrderId(null);
+    }
+  };
+
+  // Orders placed from this shared terminal never move past 'pending' on their
+  // own (there's no kitchen/waiter flow here to progress them) — without this,
+  // the only way to free the table was via the Payments tab elsewhere. Marking
+  // served here clears the table immediately (see loadOccupancy above).
+  const markOrderServed = async (order: Order) => {
+    setMarkingServedId(order.id);
+    try {
+      await updateOrderStatus(order.id, 'served');
+      void loadOccupancy();
+    } catch (e) {
+      console.error(e);
+      alert('Failed to mark order as served. Please try again.');
+    } finally {
+      setMarkingServedId(null);
     }
   };
 
@@ -971,6 +989,15 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
                       >
                         Start a separate order
                       </button>
+                      {activeOrder.status !== 'served' && (
+                        <button
+                          onClick={() => void markOrderServed(activeOrder).then(() => setConfirmOccupied(null))}
+                          disabled={markingServedId === activeOrder.id}
+                          className="w-full rounded-xl border border-emerald-500/30 bg-emerald-500/10 py-2.5 text-sm font-semibold text-emerald-300 transition-colors hover:bg-emerald-500/20 disabled:opacity-50"
+                        >
+                          {markingServedId === activeOrder.id ? 'Marking served…' : 'Mark Served (clears table)'}
+                        </button>
+                      )}
                       {alreadyRequested ? (
                         <div className="flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-xs font-medium text-amber-300">
                           <ClockIcon className="h-3.5 w-3.5 shrink-0" />
