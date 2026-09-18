@@ -129,6 +129,13 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successTable, setSuccessTable] = useState<string | null>(null);
   const [lastPlacedOrder, setLastPlacedOrder] = useState<Order | null>(null);
+  // Mirrors lastPlacedOrder synchronously (state updates from a .then() callback
+  // aren't visible to a closure created at an earlier render) — printing awaits
+  // orderSyncPromiseRef then reads this, so a receipt printed the instant the
+  // success screen appears still reflects the merged/cumulative order, not the
+  // locally-synthesized one-round placeholder.
+  const lastPlacedOrderRef = useRef<Order | null>(null);
+  const orderSyncPromiseRef = useRef<Promise<void> | null>(null);
   const [isPrintingReceipt, setIsPrintingReceipt] = useState(false);
   const [showReceiptNoteModal, setShowReceiptNoteModal] = useState(false);
   const [receiptNote, setReceiptNote] = useState('');
@@ -509,33 +516,35 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
     void handlePrintSmart();
   };
 
-  const buildCurrentReceiptData = (): ReceiptData | null => {
-    if (!lastPlacedOrder) return null;
-    return orderToReceiptData(lastPlacedOrder, {
-      restaurantName: restaurantName || 'Company',
-      restaurantAddress: restaurantInfo?.address || '',
-      restaurantPhone: restaurantInfo?.phone || '',
-      restaurantEmail: restaurantInfo?.email || '',
-      restaurantLogo: restaurantInfo?.logo,
-      restaurantCity: restaurantInfo?.city,
-      restaurantCountry: restaurantInfo?.country,
-      restaurantMomoCode: restaurantInfo?.momoCode,
-      taxRate: 0,
-      serverName: selectedStaffName || resolveStaffName(),
-      orderType: lastPlacedOrder.tableNumber == null ? 'takeout' : 'dine-in',
-      paymentStatus: 'pending',
-      payments: [{ method: 'Pending', amount: 0 }],
-    });
-  };
+  const buildReceiptDataFor = (order: Order, notesOverride?: string): ReceiptData => orderToReceiptData(order, {
+    restaurantName: restaurantName || 'Company',
+    restaurantAddress: restaurantInfo?.address || '',
+    restaurantPhone: restaurantInfo?.phone || '',
+    restaurantEmail: restaurantInfo?.email || '',
+    restaurantLogo: restaurantInfo?.logo,
+    restaurantCity: restaurantInfo?.city,
+    restaurantCountry: restaurantInfo?.country,
+    restaurantMomoCode: restaurantInfo?.momoCode,
+    taxRate: 0,
+    serverName: selectedStaffName || resolveStaffName(),
+    orderType: order.tableNumber == null ? 'takeout' : 'dine-in',
+    paymentStatus: 'pending',
+    payments: [{ method: 'Pending', amount: 0 }],
+    notes: notesOverride,
+  });
 
   const handlePrintSmart = async () => {
-    const data = buildCurrentReceiptData();
-    if (!data) return;
     setIsPrintingReceipt(true);
     try {
-      printReceipt(buildReceiptHtml(data));
-      if (lastPlacedOrder?.id) markBillPresented(lastPlacedOrder.id);
-      if (lastPlacedOrder?.tableNumber != null) void markTableSessionPendingCloseFromReceipt(lastPlacedOrder.tableNumber);
+      // If the order was just placed (possibly merged into an existing tab),
+      // wait for that background sync so the receipt reflects the full,
+      // cumulative table bill instead of only this round's items.
+      if (orderSyncPromiseRef.current) await orderSyncPromiseRef.current;
+      const order = lastPlacedOrderRef.current;
+      if (!order) return;
+      printReceipt(buildReceiptHtml(buildReceiptDataFor(order)));
+      markBillPresented(order.id);
+      if (order.tableNumber != null) void markTableSessionPendingCloseFromReceipt(order.tableNumber);
     } catch {
       alert('Could not open print window. Please allow pop-ups in your browser.');
     } finally {
@@ -543,34 +552,18 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
     }
   };
 
-  const confirmPrintLastReceipt = () => {
-    if (!lastPlacedOrder || isPrintingReceipt) return;
+  const confirmPrintLastReceipt = async () => {
+    if (isPrintingReceipt) return;
     setIsPrintingReceipt(true);
     try {
-      const combinedNotes = [lastPlacedOrder.notes?.trim() || '', receiptNote.trim()]
-        .filter(Boolean)
-        .join('\n');
-      const html = buildReceiptHtml(
-        orderToReceiptData(lastPlacedOrder, {
-          restaurantName: restaurantName || 'Company',
-          restaurantAddress: restaurantInfo?.address || '',
-          restaurantPhone: restaurantInfo?.phone || '',
-          restaurantEmail: restaurantInfo?.email || '',
-          restaurantLogo: restaurantInfo?.logo,
-          restaurantCity: restaurantInfo?.city,
-          restaurantCountry: restaurantInfo?.country,
-          restaurantMomoCode: restaurantInfo?.momoCode,
-          taxRate: 0,
-          serverName: selectedStaffName || resolveStaffName(),
-          orderType: lastPlacedOrder.tableNumber == null ? 'takeout' : 'dine-in',
-          paymentStatus: 'pending',
-          payments: [{ method: 'Pending', amount: 0 }],
-          notes: combinedNotes || undefined,
-        })
-      );
+      if (orderSyncPromiseRef.current) await orderSyncPromiseRef.current;
+      const order = lastPlacedOrderRef.current;
+      if (!order) return;
+      const combinedNotes = [order.notes?.trim() || '', receiptNote.trim()].filter(Boolean).join('\n');
+      const html = buildReceiptHtml(buildReceiptDataFor(order, combinedNotes || undefined));
       printReceipt(html);
-      if (lastPlacedOrder?.id) markBillPresented(lastPlacedOrder.id);
-      if (lastPlacedOrder?.tableNumber != null) void markTableSessionPendingCloseFromReceipt(lastPlacedOrder.tableNumber);
+      markBillPresented(order.id);
+      if (order.tableNumber != null) void markTableSessionPendingCloseFromReceipt(order.tableNumber);
       setShowReceiptNoteModal(false);
     } catch (e) {
       console.error(e);
@@ -583,6 +576,8 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
   const handleDoneAfterSuccess = () => {
     setSuccessTable(null);
     setLastPlacedOrder(null);
+    lastPlacedOrderRef.current = null;
+    orderSyncPromiseRef.current = null;
     setExistingOrderForEntry(null);
     setStep('table-select');
     if (sharedTerminalMode) {
@@ -673,14 +668,17 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
       const label = selectedTable === 'bar' ? 'Bar / Walk-up' : `Table ${selectedTable}`;
       setSuccessTable(label);
       setLastPlacedOrder(localOrder);
+      lastPlacedOrderRef.current = localOrder;
       setCart([]);
       setOrderNotes('');
       setShowMobileCart(false);
       const idempotencyKey = submitKeyRef.current;
       submitKeyRef.current = crypto.randomUUID();
 
-      // Submit to DB in the background — update the receipt with the confirmed order number
-      createOrder({
+      // Submit to DB in the background — update the receipt with the confirmed order number.
+      // Tracked in orderSyncPromiseRef so a print triggered before this settles can await it
+      // first, rather than printing the local one-round placeholder.
+      orderSyncPromiseRef.current = createOrder({
         tableNumber: tableNum,
         items: checkoutCart.map((c) => ({
           menuItemId: c.menuItemId,
@@ -704,14 +702,18 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
         // of just the items from this one round.
         const normalized = normalizeOrderPayload(created);
         setLastPlacedOrder((prev) => {
-          if (!prev) return prev;
-          if (normalized) return { ...normalized, id: normalized.id || prev.id };
-          return {
-            ...prev,
-            id: String((created as any)?.id || prev.id),
-            orderNumber: (created as any)?.orderNumber ?? (created as any)?.order_number ?? prev.orderNumber,
-            status: String((created as any)?.status || prev.status) as any,
-          };
+          const next: Order | null = !prev
+            ? prev
+            : normalized
+              ? { ...normalized, id: normalized.id || prev.id }
+              : {
+                  ...prev,
+                  id: String((created as any)?.id || prev.id),
+                  orderNumber: (created as any)?.orderNumber ?? (created as any)?.order_number ?? prev.orderNumber,
+                  status: String((created as any)?.status || prev.status) as any,
+                };
+          lastPlacedOrderRef.current = next;
+          return next;
         });
       }).catch((e) => {
         console.error('Background order sync failed:', e);
