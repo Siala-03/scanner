@@ -16,7 +16,7 @@ import {
 import { useMenu } from '../../hooks/useMenu';
 import { useTables } from '../../hooks/useTables';
 import { useStaff } from '../../hooks/useStaff';
-import { createOrder, requestOrderCancellation } from '../../api/orders';
+import { createOrder, requestOrderCancellation, findMergeableOpenOrder } from '../../api/orders';
 import { findMergeableInOrders, normalizeOrderPayload } from '../../hooks/useOrders';
 import { useOrdersContext } from '../../contexts/OrdersContext';
 import { OpenTabModal } from '../../components/shared/OpenTabModal';
@@ -258,10 +258,23 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
     }) ?? null;
   }, [orders]);
 
-  const confirmAndSelectTable = (tableNum: number) => {
+  const confirmAndSelectTable = async (tableNum: number) => {
     const status = tableOccupancy[tableNum];
     if (status === 'occupied' || status === 'urgent') {
-      const activeOrder = findActiveOrderForTable(tableNum);
+      // The in-memory orders context can lag behind the DB (missed realtime event,
+      // stale poll) — fall back to a live lookup before concluding there's nothing
+      // to merge into. This is the same query createOrder itself uses server-side.
+      let activeOrder = findActiveOrderForTable(tableNum);
+      if (!activeOrder) {
+        try {
+          // findMergeableOpenOrder returns a raw DB row (snake_case columns) —
+          // normalize it so item names/prices render correctly in the dialog below.
+          const raw = await findMergeableOpenOrder(tableNum);
+          activeOrder = raw ? (normalizeOrderPayload(raw) ?? null) : null;
+        } catch {
+          activeOrder = null;
+        }
+      }
       if (activeOrder) {
         setConfirmOccupied({ tableNumber: tableNum, activeOrder });
         return;
@@ -523,8 +536,17 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
         autoMergeRef.current = null;
       } else if (typeof tableNum === 'number' && tableNum > 0 && tableNum !== 999) {
         // No pre-made decision (e.g. table looked free when selected but a tab
-        // opened in the meantime) — fall back to the in-memory merge lookup + modal.
-        const candidate = findMergeableInOrders(orders, tableNum);
+        // opened in the meantime) — fall back to the in-memory merge lookup, and
+        // if that misses (stale/lagging context), a live DB lookup before the modal.
+        let candidate = findMergeableInOrders(orders, tableNum);
+        if (!candidate) {
+          try {
+            const raw = await findMergeableOpenOrder(tableNum);
+            candidate = raw ? (normalizeOrderPayload(raw) ?? null) : null;
+          } catch {
+            candidate = null;
+          }
+        }
         if (candidate) {
           allowMergeToOpenTab = await new Promise<boolean>((resolve) => {
             setMergeCandidate(candidate);
@@ -647,14 +669,8 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
   if (sharedTerminalMode && !selectedStaffId) {
     return (
       <div className="min-h-screen bg-slate-950 p-4 md:p-6">
-        <div className="mx-auto max-w-3xl rounded-3xl border border-slate-800 bg-slate-900/95 p-6 md:p-8 shadow-2xl">
-          <div className="mb-6">
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-amber-400">Shared Terminal</p>
-            <h1 className="mt-2 text-3xl font-bold text-white">Select waiter to start taking orders</h1>
-            <p className="mt-2 text-sm text-slate-400">
-              Use this counter device as a shared waiter terminal. Orders will be saved under the selected waiter and the session resets after each completed order.
-            </p>
-          </div>
+        <div className="mx-auto max-w-4xl rounded-3xl border border-slate-800 bg-slate-900/95 p-6 md:p-8 shadow-2xl">
+          <h1 className="mb-6 text-2xl font-bold text-white">Select Waiter</h1>
 
           {staffLoading ? (
             <div className="rounded-2xl border border-slate-800 bg-slate-950/70 px-4 py-8 text-center text-slate-400">Loading waiters...</div>
@@ -663,24 +679,30 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
               No waiter accounts are available. Add waiter staff records before using the shared terminal.
             </div>
           ) : (
-            <div className="grid gap-3 sm:grid-cols-2">
-              {staffOptions.map((option) => (
-                <button
-                  key={option.id}
-                  onClick={() => setSelectedStaffId(option.id)}
-                  className="rounded-2xl border border-slate-700 bg-slate-800 px-4 py-5 text-left transition-colors hover:border-amber-500 hover:bg-slate-800/90"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-lg font-semibold text-white">{option.name}</p>
-                      <p className="mt-1 text-xs uppercase tracking-[0.18em] text-slate-400">{option.role || 'waiter'}</p>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {staffOptions.map((option) => {
+                const initials = option.name
+                  .split(/\s+/)
+                  .filter(Boolean)
+                  .slice(0, 2)
+                  .map((part) => part[0]?.toUpperCase())
+                  .join('') || '?';
+                return (
+                  <button
+                    key={option.id}
+                    onClick={() => setSelectedStaffId(option.id)}
+                    className="group flex items-center gap-4 rounded-2xl border border-slate-700 bg-slate-800 px-5 py-6 text-left transition-colors hover:border-amber-500 hover:bg-slate-800/90"
+                  >
+                    <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-full bg-amber-500/15 text-xl font-bold text-amber-300 transition-colors group-hover:bg-amber-500/25">
+                      {initials}
                     </div>
-                    <div className="rounded-full bg-amber-500/15 px-3 py-1 text-xs font-semibold text-amber-300">
-                      Start session
+                    <div className="min-w-0">
+                      <p className="truncate text-xl font-bold text-white">{option.name}</p>
+                      <p className="mt-0.5 text-xs uppercase tracking-[0.18em] text-slate-400">{option.role || 'waiter'}</p>
                     </div>
-                  </div>
-                </button>
-              ))}
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>
@@ -1066,19 +1088,16 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
                         : 'border-slate-700 bg-slate-800 hover:border-slate-600'
                     }`}
                   >
-                    {item.emoji && (
-                      <span className="text-2xl flex-shrink-0">{item.emoji}</span>
-                    )}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5">
-                        <p className={`truncate text-sm font-semibold ${outOfStock ? 'text-slate-500' : 'text-white'}`}>{item.name}</p>
+                        <p className={`truncate text-base font-semibold ${outOfStock ? 'text-slate-500' : 'text-white'}`}>{item.name}</p>
                         {outOfStock && (
                           <span className="flex-shrink-0 text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 border border-red-500/30">
                             Out of Stock
                           </span>
                         )}
                       </div>
-                      <p className={`text-xs font-medium ${outOfStock ? 'text-slate-500' : 'text-amber-400'}`}>{formatPrice(item.price)}</p>
+                      <p className={`text-sm font-semibold ${outOfStock ? 'text-slate-500' : 'text-amber-400'}`}>{formatPrice(item.price)}</p>
                     </div>
                     <div className="flex items-center gap-1.5 flex-shrink-0">
                       {outOfStock ? (
