@@ -1308,35 +1308,46 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
                 return (
                   <div
                     key={item.id}
-                    className={`flex items-center gap-3 rounded-2xl border p-3.5 transition-colors ${
+                    role={outOfStock ? undefined : 'button'}
+                    tabIndex={outOfStock ? undefined : 0}
+                    onClick={() => !outOfStock && addToCart(item)}
+                    onKeyDown={(e) => { if (!outOfStock && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); addToCart(item); } }}
+                    className={`relative flex min-h-[5.5rem] flex-col justify-between gap-2 rounded-2xl border-2 p-4 transition-all ${
                       outOfStock
-                        ? 'border-slate-800 bg-slate-800/50 opacity-60'
-                        : 'border-slate-700 bg-slate-800 hover:border-slate-600'
+                        ? 'cursor-not-allowed border-slate-800 bg-slate-800/50 opacity-60'
+                        : qty > 0
+                          ? 'cursor-pointer border-amber-500/70 bg-slate-800'
+                          : 'cursor-pointer border-slate-700 bg-slate-800 hover:border-slate-600'
                     }`}
                   >
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5">
-                        <p className={`truncate text-base font-semibold ${outOfStock ? 'text-slate-500' : 'text-white'}`}>{item.name}</p>
-                        {outOfStock && (
-                          <span className="flex-shrink-0 text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 border border-red-500/30">
-                            Out of Stock
-                          </span>
-                        )}
-                      </div>
-                      <p className={`text-sm font-semibold ${outOfStock ? 'text-slate-500' : 'text-amber-400'}`}>{formatPrice(item.price)}</p>
+                    {qty > 0 && (
+                      <span className="absolute -top-2 -right-2 flex h-7 w-7 items-center justify-center rounded-full bg-amber-500 text-sm font-bold text-slate-900 shadow-lg">
+                        {qty}
+                      </span>
+                    )}
+
+                    <div>
+                      <p className={`text-lg font-bold leading-snug ${outOfStock ? 'text-slate-500' : 'text-white'}`}>{item.name}</p>
+                      {outOfStock && (
+                        <span className="mt-1 inline-block text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 border border-red-500/30">
+                          Out of Stock
+                        </span>
+                      )}
                     </div>
-                    <div className="flex flex-shrink-0 items-center">
-                      {outOfStock ? (
-                        <span className="text-xs italic text-slate-600">Unavailable</span>
-                      ) : qty > 0 ? (
-                        <div className="flex items-center gap-1 rounded-full border border-slate-700 bg-slate-900 p-1">
+
+                    <div className="flex items-center justify-between">
+                      <p className={`text-base font-bold ${outOfStock ? 'text-slate-500' : 'text-amber-400'}`}>{formatPrice(item.price)}</p>
+                      {!outOfStock && qty > 0 && (
+                        <div
+                          className="flex items-center gap-1 rounded-full border border-slate-700 bg-slate-900 p-1"
+                          onClick={(e) => e.stopPropagation()}
+                        >
                           <button
                             onClick={() => updateQty(item.id, -1)}
                             className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-700 text-white transition-colors hover:bg-slate-600"
                           >
                             <MinusIcon className="w-3.5 h-3.5" />
                           </button>
-                          <span className="w-6 text-center text-sm font-bold text-white">{qty}</span>
                           <button
                             onClick={() => addToCart(item)}
                             className="flex h-7 w-7 items-center justify-center rounded-full bg-amber-500 text-slate-900 transition-colors hover:bg-amber-400"
@@ -1344,13 +1355,6 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
                             <PlusIcon className="w-3.5 h-3.5" />
                           </button>
                         </div>
-                      ) : (
-                        <button
-                          onClick={() => addToCart(item)}
-                          className="flex h-9 w-9 items-center justify-center rounded-full bg-amber-500 text-slate-900 transition-colors hover:bg-amber-400"
-                        >
-                          <PlusIcon className="w-4 h-4" />
-                        </button>
                       )}
                     </div>
                   </div>
