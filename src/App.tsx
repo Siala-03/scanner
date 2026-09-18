@@ -59,6 +59,9 @@ const ReportsPage              = lazy(() => import('./pages/manager/ReportsPage'
 type UserRole = 'customer' | 'waiter' | 'cashier' | 'supervisor' | 'manager' | 'kitchen' | 'superadmin' | 'supplier' | null;
 type ManagerPage = 'dashboard' | 'menu' | 'staff' | 'analytics' | 'performance' | 'qrcodes' | 'inventory' | 'history' | 'expenses' | 'payment-cancellations' | 'credit' | 'loyalty' | 'promotions' | 'reservations' | 'scheduling' | 'reviews' | 'settings' | 'ebm' | 'reports';
 type SupervisorPage = 'dashboard' | 'revenue' | 'staff' | 'qrcodes' | 'inventory' | 'history' | 'expenses' | 'online-orders' | 'payments' | 'attendance' | 'take-order';
+// Dashboard and Revenue tabs are temporarily hidden from the supervisor nav (below) -
+// this is the landing/fallback page while that's the case. Revert both together.
+const SUPERVISOR_HOME: SupervisorPage = 'staff';
 
 const MANAGER_NAV_GROUPS: Array<{
   id: string;
@@ -129,7 +132,7 @@ export function App() {
   const [managerPage, setManagerPage] = useState<ManagerPage>('dashboard');
   const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());
   const [supervisorPage, setSupervisorPage] =
-  useState<SupervisorPage>('dashboard');
+  useState<SupervisorPage>(SUPERVISOR_HOME);
   // True while a waiter is checked in on the Take Order shared terminal — hides
   // the other supervisor tabs so they can't wander into Payments/Expenses/Staff/etc.
   const [waiterSessionActive, setWaiterSessionActive] = useState(false);
@@ -387,7 +390,7 @@ export function App() {
       setOutletTypeResolved(true);
       setTableNumber(null);
       setManagerPage('dashboard');
-      setSupervisorPage('dashboard');
+      setSupervisorPage(SUPERVISOR_HOME);
       setIsScanning(false);
       setDetectedTable(null);
       window.dispatchEvent(new Event('restaurantIdChanged'));
@@ -415,7 +418,7 @@ export function App() {
     setOutletTypeResolved(true);
     setTableNumber(null);
     setManagerPage('dashboard');
-    setSupervisorPage('dashboard');
+    setSupervisorPage(SUPERVISOR_HOME);
     setIsScanning(false);
     setDetectedTable(null);
     window.dispatchEvent(new Event('restaurantIdChanged'));
@@ -835,20 +838,7 @@ export function App() {
             </div>
           ) : (
           <div className="max-w-6xl mx-auto flex gap-2 py-4 overflow-x-auto">
-            <Button
-              variant={supervisorPage === 'dashboard' ? 'primary' : 'ghost'}
-              size="sm"
-              onClick={() => setSupervisorPage('dashboard')}
-            >
-              Dashboard
-            </Button>
-            <Button
-              variant={supervisorPage === 'revenue' ? 'primary' : 'ghost'}
-              size="sm"
-              onClick={() => setSupervisorPage('revenue')}
-            >
-              Revenue
-            </Button>
+            {/* Dashboard and Revenue tabs temporarily hidden — see SUPERVISOR_HOME comment above */}
             <Button
               variant={supervisorPage === 'staff' ? 'primary' : 'ghost'}
               size="sm"
@@ -936,7 +926,7 @@ export function App() {
           />
         )}
         {supervisorPage === 'revenue' && <RevenueReports />}
-        {supervisorPage === 'staff' && <StaffPerformance onBack={() => setSupervisorPage('dashboard')} />}
+        {supervisorPage === 'staff' && <StaffPerformance onBack={() => setSupervisorPage(SUPERVISOR_HOME)} />}
         {supervisorPage === 'qrcodes' && (
           <QRCodeGenerator
             tables={tables}
@@ -948,7 +938,7 @@ export function App() {
         {supervisorPage === 'inventory' && <InventoryManagement role="supervisor" />}
         {supervisorPage === 'history' && (
           <OrderHistoryPage
-            onBack={() => setSupervisorPage('dashboard')}
+            onBack={() => setSupervisorPage(SUPERVISOR_HOME)}
             existingOrders={orders}
             restaurantName={restaurantName}
             receiptSettings={receiptSettings}
