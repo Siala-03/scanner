@@ -274,20 +274,21 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
 
   // Recent orders — lets any waiter on this shared terminal reprint a receipt,
   // jump back into an order to add more / request cancellation, without needing
-  // the separate supervisor-only Order History page.
-  const RECENT_ORDERS_WINDOW_MS = 6 * 60 * 60 * 1000;
+  // the separate supervisor-only Order History page. Scoped to the currently
+  // selected waiter — each waiter sees their own last 10, not the whole restaurant's.
+  const RECENT_ORDERS_LIMIT = 10;
   const recentOrders = useMemo(() => {
-    const cutoff = Date.now() - RECENT_ORDERS_WINDOW_MS;
+    if (!selectedStaffId) return [];
     return [...orders]
       .filter((o) => {
         // Skip local-only orders that haven't synced yet — 'order-' IS the real
         // server-generated id prefix (see createOrder in api/orders.ts), so it stays.
         if ((o.id ?? '').startsWith('offline-') || (o.id ?? '').startsWith('temp-')) return false;
-        const created = new Date(o.createdAt as any).getTime();
-        return !Number.isNaN(created) && created >= cutoff;
+        return o.assignedWaiterId === selectedStaffId;
       })
-      .sort((a, b) => new Date(b.createdAt as any).getTime() - new Date(a.createdAt as any).getTime());
-  }, [orders]);
+      .sort((a, b) => new Date(b.createdAt as any).getTime() - new Date(a.createdAt as any).getTime())
+      .slice(0, RECENT_ORDERS_LIMIT);
+  }, [orders, selectedStaffId]);
 
   const staffNameById = useCallback((id?: string) => {
     if (!id) return null;
@@ -1087,7 +1088,9 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
               <div className="flex items-center justify-between border-b border-slate-700 px-5 py-4">
                 <div>
                   <h3 className="text-lg font-bold text-white">Recent Orders</h3>
-                  <p className="text-xs text-slate-400">Last 6 hours</p>
+                  <p className="text-xs text-slate-400">
+                    {selectedStaffName ? `Last ${RECENT_ORDERS_LIMIT} by ${selectedStaffName}` : 'Select a waiter first'}
+                  </p>
                 </div>
                 <button onClick={() => setShowRecentOrders(false)} className="text-slate-400 hover:text-slate-200">
                   <XIcon className="w-5 h-5" />
@@ -1096,14 +1099,13 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
 
               <div className="flex-1 overflow-y-auto px-5 py-3">
                 {recentOrders.length === 0 ? (
-                  <p className="py-10 text-center text-sm text-slate-500">No orders in the last 6 hours</p>
+                  <p className="py-10 text-center text-sm text-slate-500">No recent orders for this waiter</p>
                 ) : (
                   <div className="space-y-2">
                     {recentOrders.map((order) => {
                       const label = order.tableNumber == null || order.tableNumber === 999
                         ? 'Bar / Walk-up'
                         : `Table ${order.tableNumber}`;
-                      const waiterName = staffNameById(order.assignedWaiterId);
                       const isCancelled = order.status === 'cancelled';
                       const canOpen = !isCancelled && order.tableNumber != null && order.tableNumber !== 999;
                       return (
@@ -1121,7 +1123,7 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
                                 </span>
                               </div>
                               <p className="mt-0.5 text-xs text-slate-400">
-                                {waiterName ? `${waiterName} · ` : ''}{timeAgoLabel(order.createdAt)} · {order.items.length} item{order.items.length === 1 ? '' : 's'}
+                                {timeAgoLabel(order.createdAt)} · {order.items.length} item{order.items.length === 1 ? '' : 's'}
                               </p>
                             </div>
                             <p className="shrink-0 font-bold text-amber-300">{formatPrice(order.total)}</p>
@@ -1206,32 +1208,36 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
             {formatPrice(cartTotal)}
           </button>
         </div>
-      </div>
 
-      <div className="max-w-6xl mx-auto flex gap-0 md:gap-6 p-0 md:p-4">
-
-        {/* ── Menu panel ── */}
-        <div className="flex-1 min-w-0 p-4 md:p-0">
-
-          {/* Search */}
-          <div className="relative mb-4">
+        {/* Search + category tabs — part of the sticky header so filtering stays
+            reachable without scrolling back up through the menu grid */}
+        <div className="max-w-6xl mx-auto px-4 pb-3 md:px-4">
+          <div className="relative mb-3">
             <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search menu..."
-              className="w-full rounded-xl border border-slate-700 bg-slate-800 py-2.5 pl-9 pr-4 text-sm text-white placeholder-slate-500 focus:border-amber-500 focus:outline-none"
+              className="w-full rounded-xl border border-slate-700 bg-slate-800 py-2.5 pl-9 pr-9 text-sm text-white placeholder-slate-500 focus:border-amber-500 focus:outline-none"
             />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+                aria-label="Clear search"
+              >
+                <XIcon className="w-4 h-4" />
+              </button>
+            )}
           </div>
 
-          {/* Category tabs */}
-          <div className="mb-4 flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
             {categories.map((cat) => (
               <button
                 key={cat}
                 onClick={() => setActiveCategory(cat)}
-                className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+                className={`shrink-0 rounded-full px-4 py-2 text-xs font-semibold transition-colors ${
                   activeCategory === cat
                     ? 'bg-amber-500 text-slate-900'
                     : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white'
@@ -1241,27 +1247,45 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
               </button>
             ))}
           </div>
+        </div>
+      </div>
+
+      <div className="max-w-6xl mx-auto flex gap-0 md:gap-6 p-0 md:p-4">
+
+        {/* ── Menu panel ── */}
+        <div className="flex-1 min-w-0 p-4 md:p-0">
 
           {/* Menu items */}
           {menuLoading ? (
-            <div className="py-16 text-center text-slate-500">Loading menu...</div>
+            <div className="flex flex-col items-center gap-2 py-20 text-slate-500">
+              <div className="h-6 w-6 animate-spin rounded-full border-2 border-slate-700 border-t-amber-400" />
+              <p className="text-sm">Loading menu...</p>
+            </div>
           ) : filteredItems.length === 0 ? (
-            <div className="py-16 text-center text-slate-500">No items found</div>
+            <div className="flex flex-col items-center gap-2 py-20 text-center text-slate-500">
+              <SearchIcon className="h-8 w-8 text-slate-700" />
+              <p className="text-sm">No items found</p>
+              {searchQuery && (
+                <button onClick={() => setSearchQuery('')} className="text-xs font-semibold text-amber-400 hover:text-amber-300">
+                  Clear search
+                </button>
+              )}
+            </div>
           ) : (
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {filteredItems.map((item) => {
                 const qty = getCartQty(item.id);
                 const outOfStock = !item.isAvailable;
                 return (
                   <div
                     key={item.id}
-                    className={`flex items-center gap-3 rounded-xl border p-3 transition-colors ${
+                    className={`flex items-center gap-3 rounded-2xl border p-3.5 transition-colors ${
                       outOfStock
                         ? 'border-slate-800 bg-slate-800/50 opacity-60'
                         : 'border-slate-700 bg-slate-800 hover:border-slate-600'
                     }`}
                   >
-                    <div className="flex-1 min-w-0">
+                    <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5">
                         <p className={`truncate text-base font-semibold ${outOfStock ? 'text-slate-500' : 'text-white'}`}>{item.name}</p>
                         {outOfStock && (
@@ -1272,29 +1296,29 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
                       </div>
                       <p className={`text-sm font-semibold ${outOfStock ? 'text-slate-500' : 'text-amber-400'}`}>{formatPrice(item.price)}</p>
                     </div>
-                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <div className="flex flex-shrink-0 items-center">
                       {outOfStock ? (
-                        <span className="text-xs text-slate-600 italic">Unavailable</span>
+                        <span className="text-xs italic text-slate-600">Unavailable</span>
                       ) : qty > 0 ? (
-                        <>
+                        <div className="flex items-center gap-1 rounded-full border border-slate-700 bg-slate-900 p-1">
                           <button
                             onClick={() => updateQty(item.id, -1)}
-                            className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-700 text-white hover:bg-slate-600 transition-colors"
+                            className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-700 text-white transition-colors hover:bg-slate-600"
                           >
                             <MinusIcon className="w-3.5 h-3.5" />
                           </button>
                           <span className="w-6 text-center text-sm font-bold text-white">{qty}</span>
                           <button
                             onClick={() => addToCart(item)}
-                            className="flex h-7 w-7 items-center justify-center rounded-full bg-amber-500 text-slate-900 hover:bg-amber-400 transition-colors"
+                            className="flex h-7 w-7 items-center justify-center rounded-full bg-amber-500 text-slate-900 transition-colors hover:bg-amber-400"
                           >
                             <PlusIcon className="w-3.5 h-3.5" />
                           </button>
-                        </>
+                        </div>
                       ) : (
                         <button
                           onClick={() => addToCart(item)}
-                          className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-500 text-slate-900 hover:bg-amber-400 transition-colors"
+                          className="flex h-9 w-9 items-center justify-center rounded-full bg-amber-500 text-slate-900 transition-colors hover:bg-amber-400"
                         >
                           <PlusIcon className="w-4 h-4" />
                         </button>
@@ -1473,6 +1497,8 @@ function CartPanel({
   onPrintReceipt: () => void;
   onDone: () => void;
 }) {
+  const [showNotes, setShowNotes] = useState(false);
+
   if (successTable) {
     return (
       <div className="flex flex-col items-center justify-center py-12 gap-3 text-center">
@@ -1624,16 +1650,29 @@ function CartPanel({
           </>
         )}
 
-        <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-400">
-          Order Notes
-        </label>
-        <textarea
-          value={orderNotes}
-          onChange={(e) => onNotesChange(e.target.value)}
-          placeholder="Allergies, special requests..."
-          rows={3}
-          className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white placeholder-slate-500 focus:border-amber-500 focus:outline-none resize-none"
-        />
+        {showNotes || orderNotes ? (
+          <>
+            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-400">
+              Order Notes
+            </label>
+            <textarea
+              value={orderNotes}
+              onChange={(e) => onNotesChange(e.target.value)}
+              placeholder="Allergies, special requests..."
+              rows={3}
+              autoFocus={showNotes}
+              className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white placeholder-slate-500 focus:border-amber-500 focus:outline-none resize-none"
+            />
+          </>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setShowNotes(true)}
+            className="text-xs font-medium text-slate-500 hover:text-amber-400 transition-colors"
+          >
+            + Add a note (allergies, special requests)
+          </button>
+        )}
       </div>
 
       <button
