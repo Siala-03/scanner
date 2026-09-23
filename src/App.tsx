@@ -1,5 +1,17 @@
 
-import { lazy, useCallback, useState, useEffect, useRef } from 'react';
+import React, { lazy, useCallback, useState, useEffect, useRef } from 'react';
+
+// Auto-reload on stale chunk (happens after a redeploy invalidates old hash filenames)
+function lazyWithReload<T extends React.ComponentType<any>>(
+  factory: () => Promise<{ default: T }>
+): React.LazyExoticComponent<T> {
+  return lazy(() =>
+    factory().catch(() => {
+      window.location.reload();
+      return new Promise<{ default: T }>(() => {});
+    })
+  );
+}
 import { saveOfflineProfile } from './utils/offlineAuth';
 import { motion } from 'framer-motion';
 import { ArrowLeftIcon, QrCodeIcon, LogOutIcon, ChevronDownIcon, LockIcon } from 'lucide-react';
@@ -20,41 +32,41 @@ import type { RestaurantReceiptSettings } from './api/restaurants';
 import { usePullToRefresh } from './hooks/usePullToRefresh';
 
 // ── Lazy-loaded pages — each role only downloads its own bundle ───────────────
-const CustomerApp              = lazy(() => import('./pages/customer/CustomerApp').then(m => ({ default: m.CustomerApp })));
-const WaiterDashboard          = lazy(() => import('./pages/waiter/WaiterDashboard').then(m => ({ default: m.WaiterDashboard })));
-const KitchenDisplay           = lazy(() => import('./pages/kitchen/KitchenDisplay').then(m => ({ default: m.KitchenDisplay })));
-const SuperAdminDashboard      = lazy(() => import('./pages/superadmin/SuperAdminDashboard').then(m => ({ default: m.SuperAdminDashboard })));
-const MinimartApp              = lazy(() => import('./pages/minimart/MinimartApp').then(m => ({ default: m.MinimartApp })));
-const SupplierLoginPage        = lazy(() => import('./pages/supplier/SupplierLoginPage').then(m => ({ default: m.SupplierLoginPage })));
-const SupplierDashboard        = lazy(() => import('./pages/supplier/SupplierDashboard').then(m => ({ default: m.SupplierDashboard })));
+const CustomerApp              = lazyWithReload(() => import('./pages/customer/CustomerApp').then(m => ({ default: m.CustomerApp })));
+const WaiterDashboard          = lazyWithReload(() => import('./pages/waiter/WaiterDashboard').then(m => ({ default: m.WaiterDashboard })));
+const KitchenDisplay           = lazyWithReload(() => import('./pages/kitchen/KitchenDisplay').then(m => ({ default: m.KitchenDisplay })));
+const SuperAdminDashboard      = lazyWithReload(() => import('./pages/superadmin/SuperAdminDashboard').then(m => ({ default: m.SuperAdminDashboard })));
+const MinimartApp              = lazyWithReload(() => import('./pages/minimart/MinimartApp').then(m => ({ default: m.MinimartApp })));
+const SupplierLoginPage        = lazyWithReload(() => import('./pages/supplier/SupplierLoginPage').then(m => ({ default: m.SupplierLoginPage })));
+const SupplierDashboard        = lazyWithReload(() => import('./pages/supplier/SupplierDashboard').then(m => ({ default: m.SupplierDashboard })));
 // Supervisor pages
-const SupervisorDashboard      = lazy(() => import('./pages/supervisor/SupervisorDashboard').then(m => ({ default: m.SupervisorDashboard })));
-const RevenueReports           = lazy(() => import('./pages/supervisor/RevenueReports').then(m => ({ default: m.RevenueReports })));
-const StaffPerformance         = lazy(() => import('./pages/supervisor/StaffPerformance').then(m => ({ default: m.StaffPerformance })));
-const OrderHistoryPage         = lazy(() => import('./pages/supervisor/OrderHistoryPage').then(m => ({ default: m.OrderHistoryPage })));
-const OnlineOrdersPage         = lazy(() => import('./pages/supervisor/OnlineOrdersPage').then(m => ({ default: m.OnlineOrdersPage })));
-const PaymentApprovalPanel     = lazy(() => import('./components/supervisor/PaymentApprovalPanel').then(m => ({ default: m.PaymentApprovalPanel })));
-const AttendancePanel          = lazy(() => import('./components/supervisor/AttendancePanel').then(m => ({ default: m.AttendancePanel })));
-const SupervisorExpenseManagement = lazy(() => import('./components/supervisor/ExpenseManagement'));
+const SupervisorDashboard      = lazyWithReload(() => import('./pages/supervisor/SupervisorDashboard').then(m => ({ default: m.SupervisorDashboard })));
+const RevenueReports           = lazyWithReload(() => import('./pages/supervisor/RevenueReports').then(m => ({ default: m.RevenueReports })));
+const StaffPerformance         = lazyWithReload(() => import('./pages/supervisor/StaffPerformance').then(m => ({ default: m.StaffPerformance })));
+const OrderHistoryPage         = lazyWithReload(() => import('./pages/supervisor/OrderHistoryPage').then(m => ({ default: m.OrderHistoryPage })));
+const OnlineOrdersPage         = lazyWithReload(() => import('./pages/supervisor/OnlineOrdersPage').then(m => ({ default: m.OnlineOrdersPage })));
+const PaymentApprovalPanel     = lazyWithReload(() => import('./components/supervisor/PaymentApprovalPanel').then(m => ({ default: m.PaymentApprovalPanel })));
+const AttendancePanel          = lazyWithReload(() => import('./components/supervisor/AttendancePanel').then(m => ({ default: m.AttendancePanel })));
+const SupervisorExpenseManagement = lazyWithReload(() => import('./components/supervisor/ExpenseManagement'));
 // Manager pages
-const ManagerDashboard         = lazy(() => import('./pages/manager/ManagerDashboard').then(m => ({ default: m.ManagerDashboard })));
-const MenuManagement           = lazy(() => import('./pages/manager/MenuManagement').then(m => ({ default: m.MenuManagement })));
-const StaffManagement          = lazy(() => import('./pages/manager/StaffManagement').then(m => ({ default: m.StaffManagement })));
-const AnalyticsPage            = lazy(() => import('./pages/manager/AnalyticsPage').then(m => ({ default: m.AnalyticsPage })));
-const QRCodeGenerator          = lazy(() => import('./pages/manager/QRCodeGenerator').then(m => ({ default: m.QRCodeGenerator })));
-const CreditManagement         = lazy(() => import('./pages/manager/CreditManagement'));
-const LoyaltyManagement        = lazy(() => import('./pages/manager/LoyaltyManagement').then(m => ({ default: m.LoyaltyManagement })));
-const PromotionsManagement     = lazy(() => import('./pages/manager/PromotionsManagement').then(m => ({ default: m.PromotionsManagement })));
-const ReservationsPage         = lazy(() => import('./pages/manager/ReservationsPage').then(m => ({ default: m.ReservationsPage })));
-const SchedulingPage           = lazy(() => import('./pages/manager/SchedulingPage').then(m => ({ default: m.SchedulingPage })));
-const ReviewsPage              = lazy(() => import('./pages/manager/ReviewsPage').then(m => ({ default: m.ReviewsPage })));
-const ExpenseApproval          = lazy(() => import('./components/manager/ExpenseApproval'));
-const OrderCancellationRequestsPanel = lazy(() => import('./components/manager/OrderCancellationRequestsPanel').then(m => ({ default: m.OrderCancellationRequestsPanel })));
-const InventoryManagement      = lazy(() => import('./pages/shared/InventoryManagement').then(m => ({ default: m.InventoryManagement })));
-const StaffOrderPage           = lazy(() => import('./pages/shared/StaffOrderPage').then(m => ({ default: m.StaffOrderPage })));
-const RestaurantSettings       = lazy(() => import('./pages/manager/RestaurantSettings').then(m => ({ default: m.RestaurantSettings })));
-const EbmSettings              = lazy(() => import('./pages/manager/EbmSettings').then(m => ({ default: m.EbmSettings })));
-const ReportsPage              = lazy(() => import('./pages/manager/ReportsPage').then(m => ({ default: m.ReportsPage })));
+const ManagerDashboard         = lazyWithReload(() => import('./pages/manager/ManagerDashboard').then(m => ({ default: m.ManagerDashboard })));
+const MenuManagement           = lazyWithReload(() => import('./pages/manager/MenuManagement').then(m => ({ default: m.MenuManagement })));
+const StaffManagement          = lazyWithReload(() => import('./pages/manager/StaffManagement').then(m => ({ default: m.StaffManagement })));
+const AnalyticsPage            = lazyWithReload(() => import('./pages/manager/AnalyticsPage').then(m => ({ default: m.AnalyticsPage })));
+const QRCodeGenerator          = lazyWithReload(() => import('./pages/manager/QRCodeGenerator').then(m => ({ default: m.QRCodeGenerator })));
+const CreditManagement         = lazyWithReload(() => import('./pages/manager/CreditManagement'));
+const LoyaltyManagement        = lazyWithReload(() => import('./pages/manager/LoyaltyManagement').then(m => ({ default: m.LoyaltyManagement })));
+const PromotionsManagement     = lazyWithReload(() => import('./pages/manager/PromotionsManagement').then(m => ({ default: m.PromotionsManagement })));
+const ReservationsPage         = lazyWithReload(() => import('./pages/manager/ReservationsPage').then(m => ({ default: m.ReservationsPage })));
+const SchedulingPage           = lazyWithReload(() => import('./pages/manager/SchedulingPage').then(m => ({ default: m.SchedulingPage })));
+const ReviewsPage              = lazyWithReload(() => import('./pages/manager/ReviewsPage').then(m => ({ default: m.ReviewsPage })));
+const ExpenseApproval          = lazyWithReload(() => import('./components/manager/ExpenseApproval'));
+const OrderCancellationRequestsPanel = lazyWithReload(() => import('./components/manager/OrderCancellationRequestsPanel').then(m => ({ default: m.OrderCancellationRequestsPanel })));
+const InventoryManagement      = lazyWithReload(() => import('./pages/shared/InventoryManagement').then(m => ({ default: m.InventoryManagement })));
+const StaffOrderPage           = lazyWithReload(() => import('./pages/shared/StaffOrderPage').then(m => ({ default: m.StaffOrderPage })));
+const RestaurantSettings       = lazyWithReload(() => import('./pages/manager/RestaurantSettings').then(m => ({ default: m.RestaurantSettings })));
+const EbmSettings              = lazyWithReload(() => import('./pages/manager/EbmSettings').then(m => ({ default: m.EbmSettings })));
+const ReportsPage              = lazyWithReload(() => import('./pages/manager/ReportsPage').then(m => ({ default: m.ReportsPage })));
 
 type UserRole = 'customer' | 'waiter' | 'cashier' | 'supervisor' | 'manager' | 'kitchen' | 'superadmin' | 'supplier' | null;
 type ManagerPage = 'dashboard' | 'menu' | 'staff' | 'analytics' | 'performance' | 'qrcodes' | 'inventory' | 'history' | 'expenses' | 'payment-cancellations' | 'credit' | 'loyalty' | 'promotions' | 'reservations' | 'scheduling' | 'reviews' | 'settings' | 'ebm' | 'reports';
