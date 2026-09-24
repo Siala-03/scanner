@@ -34,6 +34,7 @@ interface OrderDetailModalProps {
   onMarkReady?: (orderId: string) => void;
   onMarkServed?: (orderId: string) => void;
   onPrintReceipt?: (order: Order) => void;
+  onPrintKOT?: (order: Order) => void;
   cancellationDetails?: CancellationDetails | null;
 }
 export function OrderDetailModal({
@@ -46,6 +47,7 @@ export function OrderDetailModal({
   onMarkReady,
   onMarkServed,
   onPrintReceipt,
+  onPrintKOT,
   cancellationDetails,
 }: OrderDetailModalProps) {
   if (!order) return null;
@@ -203,8 +205,13 @@ export function OrderDetailModal({
           </div>
         </div>
 
-        {/* Print receipt (redirect to POS) */}
-        <div className="flex justify-end">
+        {/* Print buttons */}
+        <div className="flex gap-2 justify-end flex-wrap">
+          {onPrintKOT && order.requiresKitchen !== false && (
+            <Button variant="secondary" onClick={() => onPrintKOT(order)}>
+              Print KOT
+            </Button>
+          )}
           <Button
             variant="secondary"
             onClick={() => {

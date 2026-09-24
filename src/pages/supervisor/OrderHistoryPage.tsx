@@ -9,7 +9,7 @@ import { fetchOrders, cancelOrder, fetchCancellationRequestByOrderId, fetchOrder
 import type { CancellationDetails } from '../../components/waiter/OrderDetailModal';
 import { VoidReasonModal } from '../../components/shared/VoidReasonModal';
 import type { RestaurantReceiptSettings } from '../../api/restaurants';
-import { buildReceiptHtml, orderToReceiptData, printReceipt } from '../../utils/receipt';
+import { buildReceiptHtml, orderToReceiptData, printReceipt, buildKitchenTicketHtml, printKitchenTicket } from '../../utils/receipt';
 import { downloadCsv, buildOrdersCsv } from '../../utils/csv';
 
 // Type alias to handle both API and local Order types
@@ -181,6 +181,32 @@ export function OrderHistoryPage({ onBack, existingOrders, restaurantName = '', 
     } finally {
       setIsVoiding(false);
     }
+  };
+
+  const handlePrintKOT = (order: Order) => {
+    const rawItems = Array.isArray(order.items) ? order.items : [];
+    const kotItems = rawItems
+      .filter((item: any) => (item.menuItem?.requiresKitchen ?? item.requiresKitchen) !== false)
+      .map((item: any) => ({
+        quantity: item.quantity,
+        name: item.menuItem?.name ?? item.menuItemName ?? 'Item',
+        notes: item.specialInstructions,
+      }));
+
+    const html = buildKitchenTicketHtml({
+      restaurantName: restaurantName || 'Kitchen',
+      orderNumber: order.orderNumber ?? order.id,
+      tableNumber: order.tableNumber,
+      status: order.status,
+      createdAt: order.createdAt,
+      items: kotItems.length > 0 ? kotItems : rawItems.map((item: any) => ({
+        quantity: item.quantity,
+        name: item.menuItem?.name ?? item.menuItemName ?? 'Item',
+        notes: item.specialInstructions,
+      })),
+      notes: order.notes ?? order.specialInstructions,
+    });
+    printKitchenTicket(html);
   };
 
   const handlePrintReceipt = (order: Order) => {
@@ -371,6 +397,7 @@ export function OrderHistoryPage({ onBack, existingOrders, restaurantName = '', 
         onMarkReady={(id) => handleUpdateOrderStatus(id, 'ready')}
         onMarkServed={(id) => handleUpdateOrderStatus(id, 'served')}
         onPrintReceipt={handlePrintReceipt}
+        onPrintKOT={handlePrintKOT}
         cancellationDetails={cancellationDetails}
       />
 
