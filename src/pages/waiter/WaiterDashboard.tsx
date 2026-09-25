@@ -33,7 +33,7 @@ import { QRScanner } from '../../components/waiter/QRScanner';
 import { WaiterOrderEntry } from '../../components/waiter/WaiterOrderEntry';
 import { loadReviews } from '../../utils/reviewsStorage';
 import { useStaffKPIs } from '../../hooks/useKPIs';
-import { orderToReceiptData, buildReceiptHtml, printReceipt } from '../../utils/receipt';
+import { orderToReceiptData, buildReceiptHtml, printReceipt, buildKitchenTicketHtml, printKitchenTicket } from '../../utils/receipt';
 import { markBillPresented, isBillPresented } from '../../utils/billTracking';
 import { ReceiptShareModal } from '../../components/ui/ReceiptShareModal';
 import { supabase } from '../../lib/supabase';
@@ -531,6 +531,7 @@ function ActiveOrderRow({
   onMarkReady,
   onMarkServed,
   onPrintReceipt,
+  onPrintKOT,
   onShare,
   pendingCancel = false,
   onRequestCancelItems,
@@ -539,6 +540,7 @@ function ActiveOrderRow({
   onMarkReady?: (id: string) => void;
   onMarkServed?: (id: string) => void;
   onPrintReceipt?: (order: Order) => void;
+  onPrintKOT?: (order: Order) => void;
   onShare?: (order: Order) => void;
   pendingCancel?: boolean;
   onRequestCancelItems?: (orderId: string, itemIds: string[], reason: string) => Promise<void>;
@@ -633,6 +635,15 @@ function ActiveOrderRow({
                 Mark Served
               </button>
             )}
+            {onPrintKOT && order.requiresKitchen !== false && (
+              <button
+                onClick={() => onPrintKOT(order)}
+                className="px-3 py-1.5 rounded-lg bg-orange-500/20 text-orange-300 hover:bg-orange-500/30 text-xs font-medium border border-orange-500/30 transition-colors flex items-center gap-1"
+              >
+                <PrinterIcon className="w-3 h-3" />
+                KOT
+              </button>
+            )}
             {onPrintReceipt && (
               <button
                 onClick={() => onPrintReceipt(order)}
@@ -690,6 +701,15 @@ function ActiveOrderRow({
                     className="w-full px-3 py-2.5 rounded-xl bg-amber-500 text-slate-950 hover:bg-amber-400 text-sm font-semibold transition-colors"
                   >
                     Mark Served
+                  </button>
+                )}
+                {onPrintKOT && order.requiresKitchen !== false && (
+                  <button
+                    onClick={() => onPrintKOT(order)}
+                    className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-orange-500/20 text-orange-300 hover:bg-orange-500/30 text-sm border border-orange-500/30 transition-colors"
+                  >
+                    <PrinterIcon className="w-4 h-4" />
+                    Print KOT
                   </button>
                 )}
                 {onPrintReceipt && (
@@ -1353,6 +1373,28 @@ export function WaiterDashboard({
     }
   };
 
+  const handlePrintKOT = (order: Order) => {
+    const kotItems = (order.items || []).map((item) => ({
+      quantity: item.quantity,
+      name: item.menuItem?.name ?? item.menuItemName ?? 'Item',
+      notes: item.specialInstructions,
+    }));
+    try {
+      const html = buildKitchenTicketHtml({
+        restaurantName: restaurantName || 'Kitchen',
+        orderNumber: order.orderNumber ?? order.id,
+        tableNumber: order.tableNumber,
+        status: order.status,
+        createdAt: order.createdAt,
+        items: kotItems,
+        notes: order.notes ?? order.specialInstructions,
+      });
+      printKitchenTicket(html);
+    } catch {
+      alert('Could not open print window. Please allow pop-ups in your browser.');
+    }
+  };
+
   const handleCancelItems = async (orderId: string, itemIds: string[], reason: string) => {
     await requestOrderCancellation(orderId, {
       reason,
@@ -1662,7 +1704,7 @@ export function WaiterDashboard({
                   ) : (
                     <AnimatePresence>
                       {kitchenOrders.map((order) => (
-                        <ActiveOrderRow key={order.id} order={order} onMarkReady={handleMarkReady} onPrintReceipt={handlePrintReceipt} pendingCancel={pendingCancelRequests.has(order.id)} onRequestCancelItems={handleCancelItems} />
+                        <ActiveOrderRow key={order.id} order={order} onMarkReady={handleMarkReady} onPrintReceipt={handlePrintReceipt} onPrintKOT={handlePrintKOT} pendingCancel={pendingCancelRequests.has(order.id)} onRequestCancelItems={handleCancelItems} />
                       ))}
                     </AnimatePresence>
                   )}
@@ -1688,7 +1730,7 @@ export function WaiterDashboard({
                   ) : (
                     <AnimatePresence>
                       {readyOrders.map((order) => (
-                        <ActiveOrderRow key={order.id} order={order} onMarkServed={handleMarkServed} onPrintReceipt={handlePrintReceipt} pendingCancel={pendingCancelRequests.has(order.id)} onRequestCancelItems={handleCancelItems} />
+                        <ActiveOrderRow key={order.id} order={order} onMarkServed={handleMarkServed} onPrintReceipt={handlePrintReceipt} onPrintKOT={handlePrintKOT} pendingCancel={pendingCancelRequests.has(order.id)} onRequestCancelItems={handleCancelItems} />
                       ))}
                     </AnimatePresence>
                   )}
@@ -1708,7 +1750,7 @@ export function WaiterDashboard({
                   ) : (
                     <AnimatePresence>
                       {servedOrders.map((order) => (
-                        <ActiveOrderRow key={order.id} order={order} onPrintReceipt={handlePrintReceipt} onShare={handleShare} pendingCancel={pendingCancelRequests.has(order.id)} onRequestCancelItems={handleCancelItems} />
+                        <ActiveOrderRow key={order.id} order={order} onPrintReceipt={handlePrintReceipt} onPrintKOT={handlePrintKOT} onShare={handleShare} pendingCancel={pendingCancelRequests.has(order.id)} onRequestCancelItems={handleCancelItems} />
                       ))}
                     </AnimatePresence>
                   )}

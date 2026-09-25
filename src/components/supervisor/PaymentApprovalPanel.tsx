@@ -12,7 +12,7 @@ import { supabase } from '../../lib/supabase';
 import { enqueuePayment } from '../../lib/orderQueue';
 import { flushPendingPayments } from '../../utils/offlineSync';
 import { OfflineBanner } from '../ui/OfflineBanner';
-import { orderToReceiptData, buildReceiptHtml, printReceipt } from '../../utils/receipt';
+import { orderToReceiptData, buildReceiptHtml, printReceipt, buildKitchenTicketHtml, printKitchenTicket } from '../../utils/receipt';
 import { PrinterIcon } from 'lucide-react';
 
 interface Order {
@@ -272,6 +272,29 @@ export function PaymentApprovalPanel({ restaurantId, restaurantName, restaurantI
       alert('Failed to send cancellation request. Please try again.');
     } finally {
       setCancelling(null);
+    }
+  };
+
+  const handlePrintKOT = (order: Order) => {
+    const rawItems = Array.isArray(order.items) ? order.items : [];
+    const kotItems = rawItems.map((item: any) => ({
+      quantity: item.quantity,
+      name: item.menuItemName ?? item.menu_item_name ?? 'Item',
+      notes: item.specialInstructions ?? item.special_instructions,
+    }));
+    try {
+      const html = buildKitchenTicketHtml({
+        restaurantName: restaurantName || 'Kitchen',
+        orderNumber: order.orderNumber ?? order.id,
+        tableNumber: (order as any).tableNumber ?? (order as any).table_number,
+        status: order.status,
+        createdAt: (order as any).createdAt ?? (order as any).created_at,
+        items: kotItems,
+        notes: (order as any).notes ?? (order as any).specialInstructions,
+      });
+      printKitchenTicket(html);
+    } catch {
+      alert('Could not open print window. Please allow pop-ups.');
     }
   };
 
@@ -652,12 +675,22 @@ export function PaymentApprovalPanel({ restaurantId, restaurantName, restaurantI
                   </div>
                 ) : (
                   <>
-                    <button
-                      onClick={() => handlePrintFullBill(order)}
-                      className="w-full py-2 mb-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm font-medium transition-colors flex items-center justify-center gap-2"
-                    >
-                      <PrinterIcon className="w-3.5 h-3.5" /> Print Full Bill
-                    </button>
+                    <div className="flex gap-2 mb-2">
+                      {(order as any).requiresKitchen !== false && (
+                        <button
+                          onClick={() => handlePrintKOT(order)}
+                          className="flex-1 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                        >
+                          <PrinterIcon className="w-3.5 h-3.5" /> Print KOT
+                        </button>
+                      )}
+                      <button
+                        onClick={() => handlePrintFullBill(order)}
+                        className="flex-1 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                      >
+                        <PrinterIcon className="w-3.5 h-3.5" /> Full Bill
+                      </button>
+                    </div>
                     <button
                       onClick={() => handleConfirm(order)}
                       disabled={busy || cancelling === order.id || !canConfirm}
