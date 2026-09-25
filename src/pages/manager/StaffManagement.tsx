@@ -13,6 +13,7 @@ import { useStaff } from '../../hooks/useStaff';
 import { useTables } from '../../hooks/useTables';
 import { signUpStaff } from '../../api/auth';
 import { updateStaffAssignments, updateStaffStatus, updateStaffRole, deleteStaff, updateStaffCredentials, fetchStaffCredentialsUsername } from '../../api/staff';
+import { saveStaffPin, hasStaffPin, clearStaffPin } from '../../utils/staffPin';
 import { useKPIs } from '../../hooks/useKPIs';
 import { createKPI, updateKPI, deleteKPI } from '../../api/kpis';
 import { fetchOrdersByDateRange } from '../../api/orders';
@@ -54,6 +55,8 @@ export function StaffManagement({ onShowPerformance }: StaffManagementProps) {
   const [assignmentSelection, setAssignmentSelection] = useState<number[]>([]);
   const [newUsername, setNewUsername] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [newPin, setNewPin] = useState('');
+  const [pinAlreadySet, setPinAlreadySet] = useState(false);
   const [generatedCredentials, setGeneratedCredentials] = useState<{ staffName: string; username: string; password: string } | null>(null);
   const [isCreatingStaff, setIsCreatingStaff] = useState(false);
   const [addStaffError, setAddStaffError] = useState<string | null>(null);
@@ -178,6 +181,8 @@ export function StaffManagement({ onShowPerformance }: StaffManagementProps) {
     setSelectedStaffForCreds(staffMember);
     setNewUsername('');
     setNewPassword('');
+    setNewPin('');
+    setPinAlreadySet(hasStaffPin(staffMember.id));
     setCredSaveError(null);
     setIsCredentialModalOpen(true);
     try {
@@ -193,11 +198,19 @@ export function StaffManagement({ onShowPerformance }: StaffManagementProps) {
   const handleSaveCredentials = async () => {
     const trimmedUsername = newUsername.trim();
     const trimmedPassword = newPassword.trim();
+    const trimmedPin = newPin.trim();
     if (!selectedStaffForCreds || !trimmedUsername || !trimmedPassword) return;
+    if (trimmedPin && (trimmedPin.length !== 4 || !/^\d{4}$/.test(trimmedPin))) {
+      setCredSaveError('PIN must be exactly 4 digits.');
+      return;
+    }
     setIsSavingCreds(true);
     setCredSaveError(null);
     try {
       await updateStaffCredentials(selectedStaffForCreds.id, trimmedUsername, trimmedPassword);
+      if (trimmedPin) {
+        await saveStaffPin(selectedStaffForCreds.id, trimmedPin);
+      }
       setIsCredentialModalOpen(false);
     } catch (err: any) {
       setCredSaveError(err?.message || 'Failed to update credentials. Please try again.');
@@ -734,6 +747,32 @@ export function StaffManagement({ onShowPerformance }: StaffManagementProps) {
               onChange={(e) => setNewPassword(e.target.value)}
               placeholder="Enter new password" />
 
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                4-Digit PIN <span className="text-slate-400 font-normal">(shared terminal lock)</span>
+              </label>
+              <input
+                type="password"
+                inputMode="numeric"
+                maxLength={4}
+                value={newPin}
+                onChange={(e) => setNewPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                placeholder={pinAlreadySet ? '●●●● (leave blank to keep)' : 'e.g. 1234'}
+                className="w-full px-3 py-2.5 rounded-lg border border-slate-300 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 text-sm"
+              />
+              {pinAlreadySet && (
+                <div className="flex items-center justify-between mt-1.5">
+                  <p className="text-xs text-slate-500">A PIN is already set for this staff member.</p>
+                  <button
+                    type="button"
+                    onClick={() => { if (selectedStaffForCreds) { clearStaffPin(selectedStaffForCreds.id); setPinAlreadySet(false); } }}
+                    className="text-xs text-red-500 hover:underline"
+                  >
+                    Remove PIN
+                  </button>
+                </div>
+              )}
+            </div>
 
             {credSaveError && (
               <div className="rounded-md bg-red-500/15 border border-red-500 text-red-600 px-3 py-2 text-sm">

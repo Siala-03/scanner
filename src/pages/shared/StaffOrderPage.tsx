@@ -20,6 +20,8 @@ import { createOrder, requestOrderCancellation, findMergeableOpenOrder } from '.
 import { findMergeableInOrders, normalizeOrderPayload } from '../../hooks/useOrders';
 import { useOrdersContext } from '../../contexts/OrdersContext';
 import { OpenTabModal } from '../../components/shared/OpenTabModal';
+import { StaffPinModal } from '../../components/shared/StaffPinModal';
+import { hasStaffPin } from '../../utils/staffPin';
 import { supabase } from '../../lib/supabase';
 import { fetchKitchenOrders } from '../../api/orders';
 import { formatPrice } from '../../utils/currency';
@@ -128,6 +130,7 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
   const [cart, setCart] = useState<CartEntry[]>([]);
   const [orderNotes, setOrderNotes] = useState('');
   const [selectedStaffId, setSelectedStaffId] = useState('');
+  const [pendingPinStaff, setPendingPinStaff] = useState<{ id: string; name: string } | null>(null);
 
   // Notify the host (e.g. supervisor nav) whenever a waiter checks in/out here.
   useEffect(() => {
@@ -770,6 +773,7 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
 
   if (sharedTerminalMode && !selectedStaffId) {
     return (
+      <>
       <div className="min-h-screen bg-slate-950 p-4 md:p-6">
         <div className="mx-auto max-w-4xl rounded-3xl border border-slate-800 bg-slate-900/95 p-6 md:p-8 shadow-2xl">
           <h1 className="mb-6 text-2xl font-bold text-white">Select Waiter</h1>
@@ -792,7 +796,13 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
                 return (
                   <button
                     key={option.id}
-                    onClick={() => setSelectedStaffId(option.id)}
+                    onClick={() => {
+                      if (hasStaffPin(option.id)) {
+                        setPendingPinStaff({ id: option.id, name: option.name });
+                      } else {
+                        setSelectedStaffId(option.id);
+                      }
+                    }}
                     className="group flex items-center gap-4 rounded-2xl border border-slate-700 bg-slate-800 px-5 py-6 text-left transition-colors hover:border-amber-500 hover:bg-slate-800/90"
                   >
                     <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-full bg-amber-500/15 text-xl font-bold text-amber-300 transition-colors group-hover:bg-amber-500/25">
@@ -802,6 +812,13 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
                       <p className="truncate text-xl font-bold text-white">{option.name}</p>
                       <p className="mt-0.5 text-xs uppercase tracking-[0.18em] text-slate-400">{option.role || 'waiter'}</p>
                     </div>
+                    {hasStaffPin(option.id) && (
+                      <div className="ml-auto shrink-0 text-slate-500">
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                        </svg>
+                      </div>
+                    )}
                   </button>
                 );
               })}
@@ -809,6 +826,19 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
           )}
         </div>
       </div>
+
+      {pendingPinStaff && (
+        <StaffPinModal
+          staffId={pendingPinStaff.id}
+          staffName={pendingPinStaff.name}
+          onSuccess={() => {
+            setSelectedStaffId(pendingPinStaff.id);
+            setPendingPinStaff(null);
+          }}
+          onCancel={() => setPendingPinStaff(null)}
+        />
+      )}
+      </>
     );
   }
 
