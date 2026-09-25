@@ -1179,7 +1179,29 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
   }, [showAddInventoryModal]);
 
   const handleInventoryExportCsv = () => {
-    exportInventoryToCsv(inventoryRows);
+    const inventoryByMenuItemId: Record<string, InventoryRecord> = inventory.reduce(
+      (map: Record<string, InventoryRecord>, rec) => {
+        const n = normalizeInventoryRecord(rec);
+        if (n.menuItemId) map[n.menuItemId] = n;
+        return map;
+      },
+      {}
+    );
+    const allRows: { item: { id: string; name: string; category?: string; price?: number }; rec?: InventoryRecord }[] = [
+      ...menuItems.map((item) => ({ item, rec: inventoryByMenuItemId[item.id] })),
+      ...inventory
+        .map(normalizeInventoryRecord)
+        .filter((rec) => !menuItemMap[rec.menuItemId])
+        .map((rec) => ({
+          item: {
+            id: rec.menuItemId || rec.id,
+            name: rec.description || rec.menuItemId || rec.id,
+            category: rec.category || 'Other',
+          },
+          rec,
+        })),
+    ];
+    exportInventoryToCsv(allRows);
     setIsExportInventoryOpen(false);
   };
 

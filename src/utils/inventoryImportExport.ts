@@ -50,10 +50,11 @@ function dl(blob: Blob, name: string) {
 
 export function exportInventoryToCsv(
   rows: {
-    item: { id: string; name: string; price?: number };
+    item: { id: string; name: string; category?: string; price?: number };
     rec?: {
       stock: number;
       description?: string;
+      category?: string;
       qtyStart?: number;
       currentQty?: number;
       cost?: number;
@@ -75,7 +76,7 @@ export function exportInventoryToCsv(
       [
         csvEsc(r.item.id),
         csvEsc(r.rec?.description ?? r.item.name),
-        csvEsc(''),
+        csvEsc(r.rec?.category ?? r.item.category ?? ''),
         csvEsc(r.rec?.expiryDate ?? ''),
         csvEsc(r.rec?.purchaseDate ?? ''),
         r.rec?.qtyStart ?? r.rec?.stock ?? 0,
@@ -85,10 +86,10 @@ export function exportInventoryToCsv(
         csvEsc(r.rec?.location ?? ''),
       ].join(',')
     ),
-  ].join('\n');
+  ].join('\r\n');
 
   dl(
-    new Blob([lines], { type: 'text/csv' }),
+    new Blob([lines], { type: 'text/csv;charset=utf-8;' }),
     `inventory-export-${new Date().toISOString().split('T')[0]}.csv`
   );
 }
