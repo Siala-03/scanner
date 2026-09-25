@@ -1375,9 +1375,9 @@ export function WaiterDashboard({
 
   const handlePrintKOT = (order: Order) => {
     const kotItems = (order.items || []).map((item) => ({
-      quantity: item.quantity,
-      name: item.menuItem?.name ?? item.menuItemName ?? 'Item',
-      notes: item.specialInstructions,
+      quantity: item.quantity ?? 1,
+      name: (item as any).menuItem?.name || (item as any).menuItemName || (item as any).menu_item_name || 'Item',
+      notes: (item as any).notes ?? item.specialInstructions ?? (item as any).special_instructions,
     }));
     try {
       const html = buildKitchenTicketHtml({
@@ -1387,7 +1387,7 @@ export function WaiterDashboard({
         status: order.status,
         createdAt: order.createdAt,
         items: kotItems,
-        notes: order.notes ?? order.specialInstructions,
+        notes: (order as any).notes ?? order.specialInstructions,
       });
       printKitchenTicket(html);
     } catch {

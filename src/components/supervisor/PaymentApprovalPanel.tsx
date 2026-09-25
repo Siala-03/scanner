@@ -276,12 +276,18 @@ export function PaymentApprovalPanel({ restaurantId, restaurantName, restaurantI
   };
 
   const handlePrintKOT = (order: Order) => {
-    const rawItems = Array.isArray(order.items) ? order.items : [];
-    const kotItems = rawItems.map((item: any) => ({
-      quantity: item.quantity,
-      name: item.menuItemName ?? item.menu_item_name ?? 'Item',
-      notes: item.specialInstructions ?? item.special_instructions,
+    const raw = Array.isArray((order as any).items)
+      ? (order as any).items
+      : typeof (order as any).items === 'string'
+        ? (() => { try { const p = JSON.parse((order as any).items); return Array.isArray(p) ? p : []; } catch { return []; } })()
+        : [];
+
+    const kotItems = raw.map((item: any) => ({
+      quantity: item.quantity ?? 1,
+      name: item.menuItem?.name || item.menuItemName || item.menu_item_name || 'Item',
+      notes: item.notes ?? item.specialInstructions ?? item.special_instructions,
     }));
+
     try {
       const html = buildKitchenTicketHtml({
         restaurantName: restaurantName || 'Kitchen',
@@ -290,7 +296,7 @@ export function PaymentApprovalPanel({ restaurantId, restaurantName, restaurantI
         status: order.status,
         createdAt: (order as any).createdAt ?? (order as any).created_at,
         items: kotItems,
-        notes: (order as any).notes ?? (order as any).specialInstructions,
+        notes: (order as any).notes ?? (order as any).specialInstructions ?? (order as any).special_instructions,
       });
       printKitchenTicket(html);
     } catch {

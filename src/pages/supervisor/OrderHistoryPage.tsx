@@ -184,29 +184,32 @@ export function OrderHistoryPage({ onBack, existingOrders, restaurantName = '', 
   };
 
   const handlePrintKOT = (order: Order) => {
-    const rawItems = Array.isArray(order.items) ? order.items : [];
-    const kotItems = rawItems
-      .filter((item: any) => (item.menuItem?.requiresKitchen ?? item.requiresKitchen) !== false)
-      .map((item: any) => ({
-        quantity: item.quantity,
-        name: item.menuItem?.name ?? item.menuItemName ?? 'Item',
-        notes: item.specialInstructions,
-      }));
+    const raw = Array.isArray(order.items)
+      ? order.items
+      : typeof order.items === 'string'
+        ? (() => { try { const p = JSON.parse(order.items as any); return Array.isArray(p) ? p : []; } catch { return []; } })()
+        : [];
 
-    const html = buildKitchenTicketHtml({
-      restaurantName: restaurantName || 'Kitchen',
-      orderNumber: order.orderNumber ?? order.id,
-      tableNumber: order.tableNumber,
-      status: order.status,
-      createdAt: order.createdAt,
-      items: kotItems.length > 0 ? kotItems : rawItems.map((item: any) => ({
-        quantity: item.quantity,
-        name: item.menuItem?.name ?? item.menuItemName ?? 'Item',
-        notes: item.specialInstructions,
-      })),
-      notes: order.notes ?? order.specialInstructions,
-    });
-    printKitchenTicket(html);
+    const kotItems = raw.map((item: any) => ({
+      quantity: item.quantity ?? 1,
+      name: item.menuItem?.name || item.menuItemName || item.menu_item_name || 'Item',
+      notes: item.notes ?? item.specialInstructions ?? item.special_instructions,
+    }));
+
+    try {
+      const html = buildKitchenTicketHtml({
+        restaurantName: restaurantName || 'Kitchen',
+        orderNumber: order.orderNumber ?? order.id,
+        tableNumber: order.tableNumber,
+        status: order.status,
+        createdAt: order.createdAt,
+        items: kotItems,
+        notes: (order as any).notes ?? order.specialInstructions,
+      });
+      printKitchenTicket(html);
+    } catch {
+      alert('Could not open print window. Please allow pop-ups.');
+    }
   };
 
   const handlePrintReceipt = (order: Order) => {
