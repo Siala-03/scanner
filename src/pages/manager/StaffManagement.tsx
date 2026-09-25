@@ -183,6 +183,7 @@ export function StaffManagement({ onShowPerformance }: StaffManagementProps) {
     setNewPassword('');
     setNewPin('');
     setPinAlreadySet(hasStaffPin(staffMember.id));
+    setPinSaveSuccess(false);
     setCredSaveError(null);
     setIsCredentialModalOpen(true);
     try {
@@ -193,29 +194,45 @@ export function StaffManagement({ onShowPerformance }: StaffManagementProps) {
     }
   };
   const [isSavingCreds, setIsSavingCreds] = useState(false);
+  const [isSavingPin, setIsSavingPin] = useState(false);
   const [credSaveError, setCredSaveError] = useState<string | null>(null);
+  const [pinSaveSuccess, setPinSaveSuccess] = useState(false);
 
   const handleSaveCredentials = async () => {
     const trimmedUsername = newUsername.trim();
     const trimmedPassword = newPassword.trim();
-    const trimmedPin = newPin.trim();
     if (!selectedStaffForCreds || !trimmedUsername || !trimmedPassword) return;
-    if (trimmedPin && (trimmedPin.length !== 4 || !/^\d{4}$/.test(trimmedPin))) {
-      setCredSaveError('PIN must be exactly 4 digits.');
-      return;
-    }
     setIsSavingCreds(true);
     setCredSaveError(null);
     try {
       await updateStaffCredentials(selectedStaffForCreds.id, trimmedUsername, trimmedPassword);
-      if (trimmedPin) {
-        await saveStaffPin(selectedStaffForCreds.id, trimmedPin);
-      }
       setIsCredentialModalOpen(false);
     } catch (err: any) {
       setCredSaveError(err?.message || 'Failed to update credentials. Please try again.');
     } finally {
       setIsSavingCreds(false);
+    }
+  };
+
+  const handleSavePin = async () => {
+    const trimmedPin = newPin.trim();
+    if (!selectedStaffForCreds || !trimmedPin) return;
+    if (trimmedPin.length !== 4 || !/^\d{4}$/.test(trimmedPin)) {
+      setCredSaveError('PIN must be exactly 4 digits (numbers only).');
+      return;
+    }
+    setIsSavingPin(true);
+    setCredSaveError(null);
+    try {
+      await saveStaffPin(selectedStaffForCreds.id, trimmedPin);
+      setPinAlreadySet(true);
+      setNewPin('');
+      setPinSaveSuccess(true);
+      setTimeout(() => setPinSaveSuccess(false), 2000);
+    } catch (err: any) {
+      setCredSaveError('Failed to save PIN.');
+    } finally {
+      setIsSavingPin(false);
     }
   };
 
@@ -739,7 +756,6 @@ export function StaffManagement({ onShowPerformance }: StaffManagementProps) {
               onChange={(e) => setNewUsername(e.target.value)}
               placeholder="e.g. john.doe" />
 
-
             <Input
               label="New Password"
               type="password"
@@ -747,45 +763,17 @@ export function StaffManagement({ onShowPerformance }: StaffManagementProps) {
               onChange={(e) => setNewPassword(e.target.value)}
               placeholder="Enter new password" />
 
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                4-Digit PIN <span className="text-slate-400 font-normal">(shared terminal lock)</span>
-              </label>
-              <input
-                type="password"
-                inputMode="numeric"
-                maxLength={4}
-                value={newPin}
-                onChange={(e) => setNewPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                placeholder={pinAlreadySet ? '●●●● (leave blank to keep)' : 'e.g. 1234'}
-                className="w-full px-3 py-2.5 rounded-lg border border-slate-300 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 text-sm"
-              />
-              {pinAlreadySet && (
-                <div className="flex items-center justify-between mt-1.5">
-                  <p className="text-xs text-slate-500">A PIN is already set for this staff member.</p>
-                  <button
-                    type="button"
-                    onClick={() => { if (selectedStaffForCreds) { clearStaffPin(selectedStaffForCreds.id); setPinAlreadySet(false); } }}
-                    className="text-xs text-red-500 hover:underline"
-                  >
-                    Remove PIN
-                  </button>
-                </div>
-              )}
-            </div>
-
             {credSaveError && (
               <div className="rounded-md bg-red-500/15 border border-red-500 text-red-600 px-3 py-2 text-sm">
                 {credSaveError}
               </div>
             )}
 
-            <div className="flex gap-3 pt-4">
+            <div className="flex gap-3 pt-2">
               <Button
                 variant="secondary"
                 fullWidth
                 onClick={() => { setIsCredentialModalOpen(false); setCredSaveError(null); }}>
-
                 Cancel
               </Button>
               <Button
@@ -793,9 +781,49 @@ export function StaffManagement({ onShowPerformance }: StaffManagementProps) {
                 fullWidth
                 onClick={handleSaveCredentials}
                 disabled={!newUsername || !newPassword || isSavingCreds}>
-
                 {isSavingCreds ? 'Saving…' : 'Save Credentials'}
               </Button>
+            </div>
+
+            {/* PIN section — independent of credentials */}
+            <div className="border-t border-slate-200 pt-4 mt-2">
+              <p className="text-sm font-semibold text-slate-700 mb-3">
+                Shared Terminal PIN
+                <span className="ml-1.5 text-xs font-normal text-slate-400">4 digits, required on shared tablet</span>
+              </p>
+              <div className="flex gap-2 items-end">
+                <div className="flex-1">
+                  <input
+                    type="password"
+                    inputMode="numeric"
+                    maxLength={4}
+                    value={newPin}
+                    onChange={(e) => { setNewPin(e.target.value.replace(/\D/g, '').slice(0, 4)); setCredSaveError(null); }}
+                    placeholder={pinAlreadySet ? 'Enter new PIN to replace' : 'e.g. 1234'}
+                    className="w-full px-3 py-2.5 rounded-lg border border-slate-300 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 text-sm tracking-widest"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={handleSavePin}
+                  disabled={newPin.length !== 4 || isSavingPin}
+                  className="px-4 py-2.5 rounded-lg bg-amber-500 hover:bg-amber-400 disabled:opacity-40 disabled:cursor-not-allowed text-slate-900 font-semibold text-sm transition-colors"
+                >
+                  {isSavingPin ? '…' : pinSaveSuccess ? '✓ Saved' : 'Set PIN'}
+                </button>
+              </div>
+              {pinAlreadySet && (
+                <div className="flex items-center justify-between mt-2">
+                  <p className="text-xs text-slate-500">A PIN is already set.</p>
+                  <button
+                    type="button"
+                    onClick={() => { if (selectedStaffForCreds) { clearStaffPin(selectedStaffForCreds.id); setPinAlreadySet(false); setNewPin(''); } }}
+                    className="text-xs text-red-500 hover:underline"
+                  >
+                    Remove PIN
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </Modal>
