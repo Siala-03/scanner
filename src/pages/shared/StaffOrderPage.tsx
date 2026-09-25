@@ -61,6 +61,7 @@ interface StaffOrderPageProps {
   // selected, or "Switch Waiter" clears it) — lets the host page (e.g. the
   // supervisor nav) hide unrelated tabs while a waiter is actively using it.
   onActiveSessionChange?: (active: boolean) => void;
+  onBack?: () => void;
 }
 
 interface StaffOption {
@@ -118,7 +119,7 @@ function getStaffId(): string | null {
   }
 }
 
-export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, sharedTerminalMode = false, onActiveSessionChange }: StaffOrderPageProps) {
+export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, sharedTerminalMode = false, onActiveSessionChange, onBack }: StaffOrderPageProps) {
   const { orders, updateOrderStatus } = useOrdersContext();
   const [step, setStep] = useState<'table-select' | 'order-entry'>('table-select');
   // null = Bar / Walk-up (no table number)
@@ -776,7 +777,18 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
       <>
       <div className="min-h-screen bg-slate-950 p-4 md:p-6">
         <div className="mx-auto max-w-4xl rounded-3xl border border-slate-800 bg-slate-900/95 p-6 md:p-8 shadow-2xl">
-          <h1 className="mb-6 text-2xl font-bold text-white">Select Waiter</h1>
+          <div className="flex items-center gap-3 mb-6">
+            {onBack && (
+              <button
+                onClick={onBack}
+                className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
+                aria-label="Back"
+              >
+                <ChevronLeftIcon className="w-5 h-5" />
+              </button>
+            )}
+            <h1 className="text-2xl font-bold text-white">Select Waiter</h1>
+          </div>
 
           {staffLoading ? (
             <div className="rounded-2xl border border-slate-800 bg-slate-950/70 px-4 py-8 text-center text-slate-400">Loading waiters...</div>

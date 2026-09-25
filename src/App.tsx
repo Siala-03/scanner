@@ -965,6 +965,7 @@ export function App() {
             staffName={authUser.name}
             sharedTerminalMode
             onActiveSessionChange={setWaiterSessionActive}
+            onBack={() => setSupervisorPage(SUPERVISOR_HOME)}
           />
         )}
         {supervisorPage === 'payments' && (
