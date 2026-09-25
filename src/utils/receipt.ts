@@ -579,8 +579,6 @@ export function buildReceiptHtml(receipt: ReceiptData, printerWidth: '58mm' | '8
 // BAR CHIT / DOCKET GENERATION (disabled — not used by current clients)
 // ============================================
 
-/* eslint-disable */
-/*
 export interface ChitData {
   restaurantName?: string;
   restaurantLogo?: string;
@@ -748,8 +746,6 @@ export function buildChitHtml(data: ChitData, printerWidth: '58mm' | '80mm' = ge
 </body>
 </html>`;
 }
-*/
-/* eslint-enable */
 
 // ============================================
 // KITCHEN TICKET GENERATION

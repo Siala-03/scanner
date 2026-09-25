@@ -25,7 +25,7 @@ import { hasStaffPin } from '../../utils/staffPin';
 import { supabase } from '../../lib/supabase';
 import { fetchKitchenOrders } from '../../api/orders';
 import { formatPrice } from '../../utils/currency';
-import { buildReceiptHtml, orderToReceiptData, printReceipt } from '../../utils/receipt';
+import { buildReceiptHtml, buildChitHtml, orderToReceiptData, printReceipt } from '../../utils/receipt';
 import { markBillPresented, isBillPresented } from '../../utils/billTracking';
 import { markTableSessionPendingCloseFromReceipt } from '../../utils/tableSessions';
 import type { ReceiptData } from '../../utils/receipt';
@@ -298,11 +298,9 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
     }) ?? null;
   }, [orders]);
 
-  // Recent orders — lets any waiter on this shared terminal reprint a receipt,
-  // jump back into an order to add more / request cancellation, without needing
-  // the separate supervisor-only Order History page. Scoped to the currently
-  // selected waiter — each waiter sees their own last 10, not the whole restaurant's.
-  const RECENT_ORDERS_LIMIT = 10;
+  // Recent orders — lets any waiter on this shared terminal reprint a receipt or
+  // bar chit, jump back into an order, without needing the supervisor Order History.
+  // Scoped to the currently selected waiter and shows all their orders.
   const recentOrders = useMemo(() => {
     if (!selectedStaffId) return [];
     return [...orders]
@@ -312,8 +310,7 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
         if ((o.id ?? '').startsWith('offline-') || (o.id ?? '').startsWith('temp-')) return false;
         return o.assignedWaiterId === selectedStaffId;
       })
-      .sort((a, b) => new Date(b.createdAt as any).getTime() - new Date(a.createdAt as any).getTime())
-      .slice(0, RECENT_ORDERS_LIMIT);
+      .sort((a, b) => new Date(b.createdAt as any).getTime() - new Date(a.createdAt as any).getTime());
   }, [orders, selectedStaffId]);
 
   const staffNameById = useCallback((id?: string) => {
@@ -497,10 +494,8 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
     return 'Supervisor';
   };
 
-  /* Bar chit disabled — not used by current clients
-  const handleReprintChit = () => {
-    if (!lastPlacedOrder) return;
-    const label = lastPlacedOrder.tableNumber != null ? `Table ${lastPlacedOrder.tableNumber}` : 'Bar / Walk-up';
+  const printChitForOrder = (order: Order) => {
+    const label = order.tableNumber != null ? `Table ${order.tableNumber}` : 'Bar / Walk-up';
     try {
       printReceipt(buildChitHtml({
         restaurantName: restaurantName,
@@ -511,23 +506,22 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
         restaurantCity: restaurantInfo?.city,
         restaurantCountry: restaurantInfo?.country,
         restaurantMomoCode: restaurantInfo?.momoCode,
-        orderNumber: lastPlacedOrder.orderNumber ?? lastPlacedOrder.id,
+        orderNumber: order.orderNumber ?? order.id,
         tableLabel: label,
-        waiterName: selectedStaffName || resolveStaffName() || undefined,
-        items: lastPlacedOrder.items.map((item: any) => ({
+        waiterName: staffNameById(order.assignedWaiterId) || resolveStaffName() || undefined,
+        items: order.items.map((item: any) => ({
           quantity: item.quantity,
-          name: item.menuItemName ?? item.menuItem?.name ?? 'Item',
-          notes: item.specialInstructions || undefined,
-          totalPrice: item.totalPrice,
+          name: item.menuItemName ?? item.menu_item_name ?? item.menuItem?.name ?? 'Item',
+          notes: item.specialInstructions || item.special_instructions || undefined,
+          totalPrice: item.totalPrice ?? item.total_price,
         })),
-        total: lastPlacedOrder.total,
-        notes: lastPlacedOrder.notes?.trim() || undefined,
+        total: order.total,
+        notes: (order as any).notes?.trim() || undefined,
       }));
     } catch {
       alert('Could not open print window. Please allow pop-ups in your browser.');
     }
   };
-  */
 
   const handlePrintLastReceipt = () => {
     if (!lastPlacedOrder || isPrintingReceipt) return;
@@ -1174,7 +1168,7 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
                 <div>
                   <h3 className="text-lg font-bold text-white">Recent Orders</h3>
                   <p className="text-xs text-slate-400">
-                    {selectedStaffName ? `Last ${RECENT_ORDERS_LIMIT} by ${selectedStaffName}` : 'Select a waiter first'}
+                    {selectedStaffName ? `All orders by ${selectedStaffName}` : 'Select a waiter first'}
                   </p>
                 </div>
                 <button onClick={() => setShowRecentOrders(false)} className="text-slate-400 hover:text-slate-200">
@@ -1213,14 +1207,21 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
                             </div>
                             <p className="shrink-0 font-bold text-amber-300">{formatPrice(order.total)}</p>
                           </div>
-                          <div className="mt-2.5 flex gap-2">
+                          <div className="mt-2.5 flex flex-wrap gap-2">
                             <button
                               onClick={() => void printReceiptForOrder(order)}
                               disabled={printingRecentOrderId === order.id}
                               className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-slate-600 bg-slate-900 py-2 text-xs font-semibold text-slate-200 transition-colors hover:bg-slate-700 disabled:opacity-50"
                             >
                               <PrinterIcon className="h-3.5 w-3.5" />
-                              {printingRecentOrderId === order.id ? 'Printing…' : 'Print Receipt'}
+                              {printingRecentOrderId === order.id ? 'Printing…' : 'Receipt'}
+                            </button>
+                            <button
+                              onClick={() => printChitForOrder(order)}
+                              className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-slate-600 bg-slate-900 py-2 text-xs font-semibold text-slate-200 transition-colors hover:bg-slate-700"
+                            >
+                              <PrinterIcon className="h-3.5 w-3.5" />
+                              Bar Chit
                             </button>
                             {canOpen && (
                               <button
@@ -1228,7 +1229,7 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
                                   setConfirmOccupied({ tableNumber: order.tableNumber as number, activeOrder: order });
                                   setShowRecentOrders(false);
                                 }}
-                                className="flex-1 rounded-lg border border-amber-500/30 bg-amber-500/10 py-2 text-xs font-semibold text-amber-300 transition-colors hover:bg-amber-500/20"
+                                className="w-full rounded-lg border border-amber-500/30 bg-amber-500/10 py-2 text-xs font-semibold text-amber-300 transition-colors hover:bg-amber-500/20"
                               >
                                 View / Add / Cancel
                               </button>
