@@ -1,17 +1,17 @@
 import { useState, useEffect, useCallback } from 'react';
 import { XIcon, DeleteIcon } from 'lucide-react';
-import { verifyStaffPin } from '../../utils/staffPin';
+import { verifyPinAgainstHash } from '../../utils/staffPin';
 
 interface StaffPinModalProps {
-  staffId: string;
   staffName: string;
+  pinHash: string; // SHA-256 hash fetched from server
   onSuccess: () => void;
   onCancel: () => void;
 }
 
 const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'del'];
 
-export function StaffPinModal({ staffId, staffName, onSuccess, onCancel }: StaffPinModalProps) {
+export function StaffPinModal({ staffName, pinHash, onSuccess, onCancel }: StaffPinModalProps) {
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const [shake, setShake] = useState(false);
@@ -27,7 +27,7 @@ export function StaffPinModal({ staffId, staffName, onSuccess, onCancel }: Staff
   const submit = useCallback(async (digits: string) => {
     if (digits.length < 4 || verifying) return;
     setVerifying(true);
-    const ok = await verifyStaffPin(staffId, digits);
+    const ok = await verifyPinAgainstHash(digits, pinHash);
     setVerifying(false);
     if (ok) {
       onSuccess();
@@ -37,7 +37,7 @@ export function StaffPinModal({ staffId, staffName, onSuccess, onCancel }: Staff
       setPin('');
       setTimeout(() => setShake(false), 500);
     }
-  }, [staffId, verifying, onSuccess]);
+  }, [pinHash, verifying, onSuccess]);
 
   const handleKey = useCallback((key: string) => {
     if (key === 'del') {

@@ -21,7 +21,7 @@ import { findMergeableInOrders, normalizeOrderPayload } from '../../hooks/useOrd
 import { useOrdersContext } from '../../contexts/OrdersContext';
 import { OpenTabModal } from '../../components/shared/OpenTabModal';
 import { StaffPinModal } from '../../components/shared/StaffPinModal';
-import { hasStaffPin } from '../../utils/staffPin';
+import { fetchPinHashes } from '../../utils/staffPin';
 import { supabase } from '../../lib/supabase';
 import { fetchKitchenOrders } from '../../api/orders';
 import { formatPrice } from '../../utils/currency';
@@ -54,6 +54,7 @@ interface StaffOrderPageProps {
     phone?: string;
     email?: string;
     momoCode?: string;
+    barChitEnabled?: boolean;
   };
   staffName?: string;
   sharedTerminalMode?: boolean;
@@ -132,6 +133,8 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
   const [orderNotes, setOrderNotes] = useState('');
   const [selectedStaffId, setSelectedStaffId] = useState('');
   const [pendingPinStaff, setPendingPinStaff] = useState<{ id: string; name: string } | null>(null);
+  // Map of staffId → SHA-256 pin hash, fetched from server when in shared terminal mode
+  const [pinHashes, setPinHashes] = useState<Record<string, string>>({});
 
   // Notify the host (e.g. supervisor nav) whenever a waiter checks in/out here.
   useEffect(() => {
@@ -142,6 +145,13 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
   // "active" (e.g. the host navigates away some other way), clear the flag so
   // the host's hidden nav doesn't stay stuck hidden with nothing to unhide it.
   useEffect(() => () => { if (sharedTerminalMode) onActiveSessionChange?.(false); }, [sharedTerminalMode, onActiveSessionChange]);
+
+  // Fetch PIN hashes from server so we know which waiters require a PIN
+  useEffect(() => {
+    if (!sharedTerminalMode) return;
+    fetchPinHashes().then(setPinHashes).catch(() => {});
+  }, [sharedTerminalMode]);
+
   const [activeCategory, setActiveCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -803,7 +813,7 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
                   <button
                     key={option.id}
                     onClick={() => {
-                      if (hasStaffPin(option.id)) {
+                      if (pinHashes[option.id]) {
                         setPendingPinStaff({ id: option.id, name: option.name });
                       } else {
                         setSelectedStaffId(option.id);
@@ -818,7 +828,7 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
                       <p className="truncate text-xl font-bold text-white">{option.name}</p>
                       <p className="mt-0.5 text-xs uppercase tracking-[0.18em] text-slate-400">{option.role || 'waiter'}</p>
                     </div>
-                    {hasStaffPin(option.id) && (
+                    {pinHashes[option.id] && (
                       <div className="ml-auto shrink-0 text-slate-500">
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
@@ -835,8 +845,8 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
 
       {pendingPinStaff && (
         <StaffPinModal
-          staffId={pendingPinStaff.id}
           staffName={pendingPinStaff.name}
+          pinHash={pinHashes[pendingPinStaff.id] ?? ''}
           onSuccess={() => {
             setSelectedStaffId(pendingPinStaff.id);
             setPendingPinStaff(null);
@@ -1216,13 +1226,15 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
                               <PrinterIcon className="h-3.5 w-3.5" />
                               {printingRecentOrderId === order.id ? 'Printing…' : 'Receipt'}
                             </button>
-                            <button
-                              onClick={() => printChitForOrder(order)}
-                              className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-slate-600 bg-slate-900 py-2 text-xs font-semibold text-slate-200 transition-colors hover:bg-slate-700"
-                            >
-                              <PrinterIcon className="h-3.5 w-3.5" />
-                              Bar Chit
-                            </button>
+                            {restaurantInfo?.barChitEnabled !== false && (
+                              <button
+                                onClick={() => printChitForOrder(order)}
+                                className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-slate-600 bg-slate-900 py-2 text-xs font-semibold text-slate-200 transition-colors hover:bg-slate-700"
+                              >
+                                <PrinterIcon className="h-3.5 w-3.5" />
+                                Bar Chit
+                              </button>
+                            )}
                             {canOpen && (
                               <button
                                 onClick={() => {
