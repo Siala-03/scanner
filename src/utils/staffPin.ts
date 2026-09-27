@@ -1,4 +1,11 @@
-import { callEdgeFn } from '../lib/supabase';
+/**
+ * Staff PIN storage — PINs are stored as SHA-256 hashes inside the
+ * restaurant's `settings.staff_pins` JSONB column so they work across
+ * all devices without any schema migration or edge-function deployment.
+ */
+import { supabase } from '../lib/supabase';
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
 
 async function hashPin(pin: string): Promise<string> {
   const data = new TextEncoder().encode(pin);
@@ -8,76 +15,86 @@ async function hashPin(pin: string): Promise<string> {
     .join('');
 }
 
-/** Manager saves a PIN for a staff member — stored in Supabase. */
-export async function saveStaffPin(staffId: string, pin: string): Promise<void> {
-  const pinHash = await hashPin(pin);
-  await callEdgeFn('admin-staff', {
-    method: 'PATCH',
-    body: { staffId, pinHash },
-  });
+function getRestaurantId(): string | null {
+  if (typeof window === 'undefined') return null;
+  const direct = localStorage.getItem('restaurantId');
+  if (direct?.trim()) return direct;
+  try {
+    const raw = localStorage.getItem('authUser');
+    if (raw) {
+      const u = JSON.parse(raw);
+      return u?.restaurantId || u?.restaurant_id || null;
+    }
+  } catch {}
+  return null;
 }
 
-/** Manager removes the PIN for a staff member. */
+async function loadPinMap(): Promise<Record<string, string>> {
+  const restaurantId = getRestaurantId();
+  if (!restaurantId) return {};
+  const { data } = await supabase
+    .from('restaurants')
+    .select('settings')
+    .eq('id', restaurantId)
+    .single();
+  return (data?.settings as any)?.staff_pins ?? {};
+}
+
+async function savePinMap(map: Record<string, string>): Promise<void> {
+  const restaurantId = getRestaurantId();
+  if (!restaurantId) return;
+
+  // Read-merge-write to avoid clobbering other settings keys
+  const { data } = await supabase
+    .from('restaurants')
+    .select('settings')
+    .eq('id', restaurantId)
+    .single();
+
+  const existing = (data?.settings as Record<string, unknown>) ?? {};
+  await supabase
+    .from('restaurants')
+    .update({ settings: { ...existing, staff_pins: map } })
+    .eq('id', restaurantId);
+}
+
+// ── Public API ────────────────────────────────────────────────────────────────
+
+/** Manager saves a 4-digit PIN for a staff member. */
+export async function saveStaffPin(staffId: string, pin: string): Promise<void> {
+  const hash = await hashPin(pin);
+  const map = await loadPinMap();
+  map[staffId] = hash;
+  await savePinMap(map);
+}
+
+/** Manager removes a PIN. */
 export async function clearStaffPinRemote(staffId: string): Promise<void> {
-  await callEdgeFn('admin-staff', {
-    method: 'PATCH',
-    body: { staffId, pinHash: null },
-  });
+  const map = await loadPinMap();
+  delete map[staffId];
+  await savePinMap(map);
 }
 
 /**
- * Fetch a map of { [staffId]: pinHash } for the whole restaurant.
- * Used on the waiter selection screen so we know which staff have PINs
- * without making a separate request per waiter.
+ * Returns { staffId: sha256Hash } for every staff member with a PIN.
+ * Used by the waiter selection screen on mount.
  */
 export async function fetchPinHashes(): Promise<Record<string, string>> {
   try {
-    const data = await callEdgeFn('admin-staff', {
-      method: 'GET',
-      params: { action: 'pin_hashes' },
-    });
-    return (data as Record<string, string>) ?? {};
+    return await loadPinMap();
   } catch {
     return {};
   }
 }
 
-/** Verify a PIN against a known hash (hash was fetched from server). */
+/** Verify a PIN against a known hash (hash was already fetched from server). */
 export async function verifyPinAgainstHash(pin: string, storedHash: string): Promise<boolean> {
   const hash = await hashPin(pin);
   return hash === storedHash;
 }
 
-// ── Legacy localStorage shim (kept so StaffManagement still compiles) ────────
+// ── Legacy shims (keep StaffManagement compiling without changes) ─────────────
 
-const STAFF_PINS_KEY = 'servv_staff_pins';
-
-function loadPins(): Record<string, string> {
-  try {
-    const raw = localStorage.getItem(STAFF_PINS_KEY);
-    return raw ? JSON.parse(raw) : {};
-  } catch {
-    return {};
-  }
-}
-
-/** @deprecated Check pinHashes state from fetchPinHashes() instead */
-export function hasStaffPin(staffId: string): boolean {
-  return !!loadPins()[staffId];
-}
-
-/** @deprecated Use clearStaffPinRemote for cross-device support */
-export function clearStaffPin(staffId: string): void {
-  const pins = loadPins();
-  delete pins[staffId];
-  try { localStorage.setItem(STAFF_PINS_KEY, JSON.stringify(pins)); } catch {}
-}
-
-/** @deprecated Used by StaffManagement only for the "PIN already set" badge */
-export async function verifyStaffPin(staffId: string, pin: string): Promise<boolean> {
-  const pins = loadPins();
-  const stored = pins[staffId];
-  if (!stored) return false;
-  const hash = await hashPin(pin);
-  return hash === stored;
-}
+export function hasStaffPin(_staffId: string): boolean { return false; }
+export function clearStaffPin(_staffId: string): void {}
+export async function verifyStaffPin(_staffId: string, _pin: string): Promise<boolean> { return false; }

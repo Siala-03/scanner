@@ -106,31 +106,10 @@ Deno.serve(async (req) => {
     });
   }
 
-  // ── Fetch staff credentials (username only, or pin_hashes for whole restaurant) ──
+  // ── Fetch staff credentials (username only) ──────────────────────────────
   if (req.method === 'GET') {
     const url = new URL(req.url);
     const targetStaffId = url.searchParams.get('staff_id');
-    const action = url.searchParams.get('action');
-
-    // action=pin_hashes — returns { staffId: pinHashOrNull } for the restaurant
-    if (action === 'pin_hashes') {
-      const restaurantId = caller.role === 'superadmin'
-        ? url.searchParams.get('restaurant_id') || caller.restaurant_id
-        : caller.restaurant_id;
-
-      const { data: rows } = await db
-        .from('staff_credentials')
-        .select('staff_id, pin_hash')
-        .eq('restaurant_id', restaurantId);
-
-      const map: Record<string, string | null> = {};
-      for (const row of rows ?? []) {
-        if (row.pin_hash) map[row.staff_id] = row.pin_hash;
-      }
-      return new Response(JSON.stringify(map), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
 
     if (!targetStaffId) {
       return new Response(JSON.stringify({ error: 'staff_id query param is required' }), {
@@ -182,10 +161,10 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { staffId: targetStaffId, username, password, pinHash } = body;
+    const { staffId: targetStaffId, username, password } = body;
 
-    if (!targetStaffId || (!username && !password && pinHash === undefined)) {
-      return new Response(JSON.stringify({ error: 'staffId and at least one of username/password/pinHash are required' }), {
+    if (!targetStaffId || (!username && !password)) {
+      return new Response(JSON.stringify({ error: 'staffId and at least one of username/password are required' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -223,10 +202,9 @@ Deno.serve(async (req) => {
 
     if (existingCreds) {
       // Row exists — update only the fields that were provided
-      const updates: Record<string, string | null> = {};
+      const updates: Record<string, string> = {};
       if (username) updates.username = username.trim();
       if (password) updates.password_hash = password;
-      if (pinHash !== undefined) updates.pin_hash = pinHash; // null clears the PIN
 
       const { error } = await db
         .from('staff_credentials')
@@ -234,9 +212,8 @@ Deno.serve(async (req) => {
         .eq('staff_id', targetStaffId);
       upsertError = error;
     } else {
-      // No credentials row — insert one.
-      // Username+password required unless this is a PIN-only update.
-      if (!pinHash && (!username || !password)) {
+      // No credentials row — insert one (requires both username and password)
+      if (!username || !password) {
         return new Response(JSON.stringify({ error: 'Username and password are required when setting credentials for the first time' }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -246,9 +223,8 @@ Deno.serve(async (req) => {
         .from('staff_credentials')
         .insert({
           staff_id: targetStaffId,
-          username: username?.trim() ?? targetStaffId,
-          password_hash: password ?? '',
-          pin_hash: pinHash ?? null,
+          username: username.trim(),
+          password_hash: password,
           restaurant_id: targetStaff.restaurant_id,
         });
       upsertError = error;
