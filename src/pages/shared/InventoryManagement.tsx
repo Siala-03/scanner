@@ -271,6 +271,7 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
   const [newInventoryItemReorderPoint, setNewInventoryItemReorderPoint] = useState<number | null>(null);
   const [newInventoryItemReorderQty, setNewInventoryItemReorderQty] = useState<number | null>(null);
   const [newInventoryItemUnitCost, setNewInventoryItemUnitCost] = useState(0);
+  const [newInventoryItemPrice, setNewInventoryItemPrice] = useState(0);
   const [newInventoryItemUnitMeasurement, setNewInventoryItemUnitMeasurement] = useState('units');
 
   // ── Link inventory to product/menu modal state ──────────────────────────
@@ -482,6 +483,7 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
     setNewInventoryItemReorderPoint(null);
     setNewInventoryItemReorderQty(null);
     setNewInventoryItemUnitCost(0);
+    setNewInventoryItemPrice(0);
     setNewInventoryItemUnitMeasurement('units');
     setAddItemError('');
   };
@@ -513,6 +515,7 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
         reorderPoint,
         reorderQty,
         unitCost: newInventoryItemUnitCost,
+        price: newInventoryItemPrice,
         unitMeasurement: newInventoryItemUnitMeasurement,
         location: newInventoryItemLocation,
         ...(!isMenuItem
@@ -522,6 +525,12 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
             }
           : {}),
       });
+
+      // The menu item's price is what customers pay, so keep it in sync.
+      if (isMenuItem && newInventoryItemPrice > 0 && newInventoryItemPrice !== menuItemMap[selectedMenuItemId]?.price) {
+        await apiUpdateMenuItem(selectedMenuItemId, { price: newInventoryItemPrice } as any);
+        await refreshMenu();
+      }
 
       upsertInventoryRecords([created]);
       await refresh();
@@ -3130,7 +3139,7 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                   {filteredUntrackedItems.map((m) => (
                     <button
                       key={m.id}
-                      onClick={() => { setSelectedMenuItemId(m.id); setAddMenuSearch(m.name); setAddItemError(''); }}
+                      onClick={() => { setSelectedMenuItemId(m.id); setAddMenuSearch(m.name); setNewInventoryItemPrice(m.price ?? 0); setAddItemError(''); }}
                       className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left text-sm bg-slate-800 border border-slate-700 text-slate-200 hover:bg-slate-700 transition-colors"
                     >
                       <span className="text-lg">{(m as any).emoji ?? '🍽️'}</span>
@@ -3194,12 +3203,23 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                 Unit cost (RWF)
                 <input
                   type="number" min={0} step="0.01"
+                  placeholder="What you pay"
                   value={newInventoryItemUnitCost === 0 ? '' : newInventoryItemUnitCost}
                   onChange={(e) => setNewInventoryItemUnitCost(parseFloat(e.target.value || '0'))}
                   className={`mt-1 ${addItemInputClass}`}
                 />
               </label>
               <label className="block text-sm text-slate-300">
+                Selling price (RWF)
+                <input
+                  type="number" min={0} step="0.01"
+                  placeholder="What customers pay"
+                  value={newInventoryItemPrice === 0 ? '' : newInventoryItemPrice}
+                  onChange={(e) => setNewInventoryItemPrice(parseFloat(e.target.value || '0'))}
+                  className={`mt-1 ${addItemInputClass}`}
+                />
+              </label>
+              <label className="block col-span-2 text-sm text-slate-300">
                 Alert me when below
                 <input
                   type="number" min={0} step="0.01"
