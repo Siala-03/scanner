@@ -104,6 +104,11 @@ export function downloadInventoryTemplate(): void {
   dl(new Blob([csv], { type: 'text/csv' }), 'inventory-template.csv');
 }
 
+// Quantities keep up to 2 decimals (e.g. 2.5 kg).
+function roundQty(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
 function nk(k: string): string {
   return k.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
 }
@@ -178,8 +183,8 @@ function parseCsvRows(content: string): InventoryImportRow[] {
     const id = row.itemid || row.menuitemid || row.menuitemid || row.id || '';
     if (!id) continue;
 
-    const stock = Math.round(parseFloat(row.currentqty ?? row.stock ?? row.qtystart ?? '0') || 0);
-    const qtyStart = Math.round(parseFloat(row.qtystart ?? String(stock)) || stock);
+    const stock = roundQty(parseFloat(row.currentqty ?? row.stock ?? row.qtystart ?? '0') || 0);
+    const qtyStart = roundQty(parseFloat(row.qtystart ?? String(stock)) || stock);
     const rawDescription = row.description ?? row.desc ?? row.details;
     const rawCategory = row.category ?? row.cat ?? '';
 
@@ -191,9 +196,9 @@ function parseCsvRows(content: string): InventoryImportRow[] {
       purchaseDate: normaliseDate(row.purchasedate) || todayIso(),
       qtyStart,
       stock,
-      lowStockThreshold: Math.round(parseFloat(row.lowstockthreshold ?? row.threshold ?? '5') || 5),
-      reorderPoint: Math.round(parseFloat(row.reorderpoint ?? '10') || 10),
-      reorderQty: Math.round(parseFloat(row.reorderqty ?? '20') || 20),
+      lowStockThreshold: roundQty(parseFloat(row.lowstockthreshold ?? row.threshold ?? '5') || 5),
+      reorderPoint: roundQty(parseFloat(row.reorderpoint ?? '5') || 5),
+      reorderQty: roundQty(parseFloat(row.reorderqty ?? '20') || 20),
       unitCost: Math.round((parseFloat(row.cost ?? row.unitcost ?? '0') || 0) * 100) / 100,
       price: Math.round((parseFloat(row.price ?? '0') || 0) * 100) / 100,
       location: row.location ?? '',
@@ -217,8 +222,8 @@ function parseExcelRows(buffer: ArrayBuffer): InventoryImportRow[] {
       const id = String(row.menuitemid || row.itemid || row.id || '');
       if (!id) return null;
 
-      const stock = Math.round(Number(row.currentqty ?? row.stock ?? row.qtystart ?? 0));
-      const qtyStart = Math.round(Number(row.qtystart ?? stock));
+      const stock = roundQty(Number(row.currentqty ?? row.stock ?? row.qtystart ?? 0));
+      const qtyStart = roundQty(Number(row.qtystart ?? stock));
       const rawDescription = row.description ?? row.desc ?? row.details;
       const rawCategory = row.category ?? row.cat ?? '';
 
@@ -230,9 +235,9 @@ function parseExcelRows(buffer: ArrayBuffer): InventoryImportRow[] {
         purchaseDate: normaliseDate(row.purchasedate) || todayIso(),
         qtyStart,
         stock,
-        lowStockThreshold: Math.round(Number(row.lowstockthreshold ?? row.threshold ?? 5)),
-        reorderPoint: Math.round(Number(row.reorderpoint ?? 10)),
-        reorderQty: Math.round(Number(row.reorderqty ?? 20)),
+        lowStockThreshold: roundQty(Number(row.lowstockthreshold ?? row.threshold ?? 5)),
+        reorderPoint: roundQty(Number(row.reorderpoint ?? 5)),
+        reorderQty: roundQty(Number(row.reorderqty ?? 20)),
         unitCost: Math.round((Number(row.cost ?? row.unitcost ?? 0)) * 100) / 100,
         price: Math.round((Number(row.price ?? 0)) * 100) / 100,
         location: String(row.location ?? ''),
@@ -262,11 +267,11 @@ export async function importInventoryFromFile(file: File): Promise<InventoryImpo
       category: String(r.category ?? r.cat ?? ''),
       expiryDate: normaliseDate(r.expiry_date ?? r.expiryDate) || expiryIso(),
       purchaseDate: normaliseDate(r.purchase_date ?? r.purchaseDate) || todayIso(),
-      qtyStart: Math.round(Number(r.qty_start ?? r.qtyStart ?? r.current_qty ?? r.currentQty ?? r.stock ?? 0)),
-      stock: Math.round(Number(r.current_qty ?? r.currentQty ?? r.stock ?? 0)),
-      lowStockThreshold: Math.round(Number(r.low_stock_threshold ?? r.lowStockThreshold ?? 5)),
-      reorderPoint: Math.round(Number(r.reorder_point ?? r.reorderPoint ?? 10)),
-      reorderQty: Math.round(Number(r.reorder_qty ?? r.reorderQty ?? 20)),
+      qtyStart: roundQty(Number(r.qty_start ?? r.qtyStart ?? r.current_qty ?? r.currentQty ?? r.stock ?? 0)),
+      stock: roundQty(Number(r.current_qty ?? r.currentQty ?? r.stock ?? 0)),
+      lowStockThreshold: roundQty(Number(r.low_stock_threshold ?? r.lowStockThreshold ?? 5)),
+      reorderPoint: roundQty(Number(r.reorder_point ?? r.reorderPoint ?? 5)),
+      reorderQty: roundQty(Number(r.reorder_qty ?? r.reorderQty ?? 20)),
       unitCost: Math.round((Number(r.cost ?? r.unit_cost ?? r.unitCost ?? 0)) * 100) / 100,
       price: Math.round((Number(r.price ?? r.selling_price ?? r.sellingPrice ?? 0)) * 100) / 100,
       location: String(r.location ?? ''),

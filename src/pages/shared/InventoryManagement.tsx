@@ -241,9 +241,18 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
   const [isExportInventoryOpen, setIsExportInventoryOpen] = useState(false);
   const inventoryFileInputRef = useRef<HTMLInputElement>(null);
   const [showAddInventoryModal, setShowAddInventoryModal] = useState(false);
-  const [addItemMode, setAddItemMode] = useState<'menu' | 'standalone'>('menu');
+  // Add-item modal: one name box. Picking a suggestion tracks that menu item;
+  // otherwise the typed name becomes a standalone inventory item.
   const [addMenuSearch, setAddMenuSearch] = useState('');
   const [selectedMenuItemId, setSelectedMenuItemId] = useState('');
+  const [showAddMoreOptions, setShowAddMoreOptions] = useState(false);
+  const [isSavingInventoryItem, setIsSavingInventoryItem] = useState(false);
+  const [isTrackingAllMenuItems, setIsTrackingAllMenuItems] = useState(false);
+  const [addItemNotice, setAddItemNotice] = useState('');
+  const [addItemError, setAddItemError] = useState('');
+  const addItemInputClass = 'w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500';
+  // Quantities keep up to 2 decimals (e.g. 2.5 kg).
+  const toQty = (v: string) => Math.max(0, Math.round((Number(v) || 0) * 100) / 100);
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [editingLocation, setEditingLocation] = useState<typeof locations[number] | null>(null);
   const [showEditLocationModal, setShowEditLocationModal] = useState(false);
@@ -254,13 +263,13 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
     capacity: '',
     temperatureRange: '',
   });
-  const [newInventoryItemName, setNewInventoryItemName] = useState('');
   const [newInventoryItemCategory, setNewInventoryItemCategory] = useState('');
   const [newInventoryItemLocation, setNewInventoryItemLocation] = useState('');
   const [newInventoryItemStock, setNewInventoryItemStock] = useState(0);
   const [newInventoryItemLowThreshold, setNewInventoryItemLowThreshold] = useState(5);
-  const [newInventoryItemReorderPoint, setNewInventoryItemReorderPoint] = useState(10);
-  const [newInventoryItemReorderQty, setNewInventoryItemReorderQty] = useState(20);
+  // null = not edited: reorder point follows the alert level, reorder qty is 2× that.
+  const [newInventoryItemReorderPoint, setNewInventoryItemReorderPoint] = useState<number | null>(null);
+  const [newInventoryItemReorderQty, setNewInventoryItemReorderQty] = useState<number | null>(null);
   const [newInventoryItemUnitCost, setNewInventoryItemUnitCost] = useState(0);
   const [newInventoryItemUnitMeasurement, setNewInventoryItemUnitMeasurement] = useState('units');
 
@@ -464,32 +473,51 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
 
   // lowStockItems loaded from backend state via fetchLowStockItems() and setLowStockItems()
 
-  const handleCreateOtherInventoryItem = async () => {
-    // In menu mode use the real menu item ID; in standalone mode use the name as ID
-    const menuItemId =
-      addItemMode === 'menu' ? selectedMenuItemId : newInventoryItemName.trim();
+  const resetAddItemForm = () => {
+    // Location and category are kept so consecutive items land in the same place.
+    setAddMenuSearch('');
+    setSelectedMenuItemId('');
+    setNewInventoryItemStock(0);
+    setNewInventoryItemLowThreshold(5);
+    setNewInventoryItemReorderPoint(null);
+    setNewInventoryItemReorderQty(null);
+    setNewInventoryItemUnitCost(0);
+    setNewInventoryItemUnitMeasurement('units');
+    setAddItemError('');
+  };
+
+  const handleCreateOtherInventoryItem = async (keepOpen = false) => {
+    const isMenuItem = !!selectedMenuItemId;
+    const name = isMenuItem ? (menuItemMap[selectedMenuItemId]?.name ?? '') : addMenuSearch.trim();
+    // Menu items use their real ID; standalone items use their name as ID.
+    const menuItemId = isMenuItem ? selectedMenuItemId : name;
 
     if (!menuItemId) {
-      alert(
-        addItemMode === 'menu'
-          ? 'Please select a menu item'
-          : 'Please enter an item name'
-      );
+      setAddItemError('Enter an item name');
+      return;
+    }
+    if (!isMenuItem && addItemConflict) {
+      setAddItemError(addItemConflict);
       return;
     }
 
+    const reorderPoint = newInventoryItemReorderPoint ?? newInventoryItemLowThreshold;
+    const reorderQty = newInventoryItemReorderQty ?? Math.max(1, reorderPoint * 2);
+
+    setIsSavingInventoryItem(true);
+    setAddItemError('');
     try {
       const created = await apiUpdateInventoryRecord(menuItemId, {
         stock: newInventoryItemStock,
         lowStockThreshold: newInventoryItemLowThreshold,
-        reorderPoint: newInventoryItemReorderPoint,
-        reorderQty: newInventoryItemReorderQty,
+        reorderPoint,
+        reorderQty,
         unitCost: newInventoryItemUnitCost,
         unitMeasurement: newInventoryItemUnitMeasurement,
         location: newInventoryItemLocation,
-        ...(addItemMode === 'standalone'
+        ...(!isMenuItem
           ? {
-              description: newInventoryItemName.trim(),
+              description: name,
               ...(newInventoryItemCategory.trim() ? { category: newInventoryItemCategory.trim() } : {}),
             }
           : {}),
@@ -497,11 +525,54 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
 
       upsertInventoryRecords([created]);
       await refresh();
-      setShowAddInventoryModal(false);
-      alert('Inventory item added successfully');
+      if (keepOpen) {
+        resetAddItemForm();
+        setAddItemNotice(`✓ ${name} added`);
+      } else {
+        setShowAddInventoryModal(false);
+      }
     } catch (err) {
       console.error('Failed to add inventory item:', err);
-      alert(`Failed to add inventory item: ${getErrorMessage(err)}`);
+      setAddItemError(`Failed to add item: ${getErrorMessage(err)}`);
+    } finally {
+      setIsSavingInventoryItem(false);
+    }
+  };
+
+  const handleTrackAllMenuItems = async () => {
+    const items = untrackedMenuItems;
+    if (items.length === 0) return;
+    if (!window.confirm(`Start tracking all ${items.length} untracked ${isMinimartScope ? 'products' : 'menu items'} at 0 stock? You can fill in counts in the table afterwards.`)) return;
+
+    setIsTrackingAllMenuItems(true);
+    setAddItemError('');
+    const created: InventoryRecord[] = [];
+    let failed = 0;
+    try {
+      // Small batches so we don't flood Supabase with parallel requests.
+      for (let i = 0; i < items.length; i += 5) {
+        const results = await Promise.allSettled(
+          items.slice(i, i + 5).map((m) =>
+            apiUpdateInventoryRecord(m.id, {
+              stock: 0,
+              lowStockThreshold: 5,
+              reorderPoint: 5,
+              reorderQty: 10,
+              unitMeasurement: 'units',
+            })
+          )
+        );
+        results.forEach((r) => (r.status === 'fulfilled' ? created.push(r.value) : failed++));
+      }
+      if (created.length) upsertInventoryRecords(created);
+      await refresh();
+      if (failed) {
+        setAddItemError(`${created.length} items tracked, ${failed} failed. Try again to retry the rest.`);
+      } else {
+        setShowAddInventoryModal(false);
+      }
+    } finally {
+      setIsTrackingAllMenuItems(false);
     }
   };
 
@@ -512,7 +583,7 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
       menuItemId,
       stock: 0,
       lowStockThreshold: 5,
-      reorderPoint: 0,
+      reorderPoint: 5,
       reorderQty: 0,
       unitCost: 0,
       supplierId: undefined,
@@ -1154,27 +1225,46 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
 
   const filteredUntrackedItems = useMemo(() => {
     const q = addMenuSearch.trim().toLowerCase();
-    if (!q) return untrackedMenuItems;
-    return untrackedMenuItems.filter(
-      (m) => m.name.toLowerCase().includes(q) || m.category.toLowerCase().includes(q)
-    );
+    if (!q) return [];
+    return untrackedMenuItems
+      .filter((m) => m.name.toLowerCase().includes(q) || m.category.toLowerCase().includes(q))
+      .slice(0, 6);
   }, [untrackedMenuItems, addMenuSearch]);
+
+  // Lower-cased names of everything already tracked, so a standalone item can't
+  // silently overwrite an existing record (standalone IDs are the item name).
+  const trackedItemNames = useMemo(() => {
+    const names = new Set<string>();
+    inventory.map(normalizeInventoryRecord).forEach((rec) => {
+      [menuItemMap[rec.menuItemId]?.name, rec.description, rec.menuItemId].forEach((n) => {
+        if (n && n.trim()) names.add(n.trim().toLowerCase());
+      });
+    });
+    return names;
+  }, [inventory, menuItemMap]);
+
+  // Why the typed name can't be created as a new standalone item, if anything.
+  const addItemConflict = useMemo(() => {
+    const q = addMenuSearch.trim().toLowerCase();
+    if (!q || selectedMenuItemId) return '';
+    if (untrackedMenuItems.some((m) => m.name.trim().toLowerCase() === q)) {
+      return `"${addMenuSearch.trim()}" is on the ${isMinimartScope ? 'product list' : 'menu'}. Pick it from the suggestions so sales deduct stock.`;
+    }
+    if (trackedItemNames.has(q)) {
+      return `"${addMenuSearch.trim()}" is already in inventory. Edit it in the table instead.`;
+    }
+    return '';
+  }, [addMenuSearch, selectedMenuItemId, untrackedMenuItems, trackedItemNames, isMinimartScope]);
+
+  const canSaveInventoryItem =
+    !!(selectedMenuItemId || addMenuSearch.trim()) && !addItemConflict && !isSavingInventoryItem;
 
   // Reset add-item modal state when it opens
   React.useEffect(() => {
     if (showAddInventoryModal) {
-      setAddItemMode('menu');
-      setAddMenuSearch('');
-      setSelectedMenuItemId('');
-      setNewInventoryItemName('');
-      setNewInventoryItemCategory('');
-      setNewInventoryItemStock(0);
-      setNewInventoryItemLowThreshold(5);
-      setNewInventoryItemReorderPoint(10);
-      setNewInventoryItemReorderQty(20);
-      setNewInventoryItemUnitCost(0);
-      setNewInventoryItemUnitMeasurement('units');
-      setNewInventoryItemLocation('');
+      resetAddItemForm();
+      setShowAddMoreOptions(false);
+      setAddItemNotice('');
     }
   }, [showAddInventoryModal]);
 
@@ -1747,9 +1837,10 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                                 type="number"
                                 placeholder="0"
                                 value={editValues.qtyStart ?? row.rec?.qtyStart ?? row.stock}
-                                onChange={(e) => setEditValues((v) => ({ ...v, qtyStart: Math.round(parseFloat(e.target.value || '0')) }))}
+                                onChange={(e) => setEditValues((v) => ({ ...v, qtyStart: toQty(e.target.value) }))}
                                 className="w-20 px-2 py-1 rounded bg-slate-900 border border-slate-600 text-white text-xs focus:outline-none focus:ring-1 focus:ring-amber-500"
                                 min={0}
+                                step="0.01"
                               />
                             ) : (
                               row.rec?.qtyStart ?? row.stock
@@ -2782,8 +2873,9 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                       type="number"
                       placeholder="0"
                       value={(receiveQtys[i.menuItemId] ?? 0) === 0 ? '' : (receiveQtys[i.menuItemId] ?? 0)}
-                      onChange={(e) => setReceiveQtys((v) => ({ ...v, [i.menuItemId]: parseInt(e.target.value || '0', 10) }))}
+                      onChange={(e) => setReceiveQtys((v) => ({ ...v, [i.menuItemId]: toQty(e.target.value) }))}
                       min={0}
+                      step="0.01"
                       max={i.orderedQty - i.receivedQty}
                       className="w-20 px-2 py-1 rounded bg-slate-900 border border-slate-600 text-white text-sm focus:outline-none focus:ring-1 focus:ring-amber-500"
                     />
@@ -2931,9 +3023,10 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                     type="number"
                     placeholder="0"
                     value={item.orderedQty === 0 ? '' : item.orderedQty}
-                    onChange={(e) => setNewPOItems((v) => v.map((i, j) => j === idx ? { ...i, orderedQty: parseInt(e.target.value || '0', 10) } : i))}
+                    onChange={(e) => setNewPOItems((v) => v.map((i, j) => j === idx ? { ...i, orderedQty: toQty(e.target.value) } : i))}
                     className="px-2 py-2 rounded-lg bg-slate-900 border border-slate-600 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
-                    min={1}
+                    min={0}
+                    step="0.01"
                   />
                   <select
                     value={item.unit}
@@ -2999,175 +3092,160 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
         {/* Add Inventory Item Modal */}
         <Modal isOpen={showAddInventoryModal} onClose={() => setShowAddInventoryModal(false)} title="Add Inventory Item">
           <div className="space-y-4">
-            {/* Mode tabs */}
-            <div className="flex rounded-lg bg-slate-800/60 p-1 gap-1">
-              <button
-                onClick={() => { setAddItemMode('menu'); setSelectedMenuItemId(''); setNewInventoryItemName(''); }}
-                className={`flex-1 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                  addItemMode === 'menu'
-                    ? 'bg-amber-500 text-slate-900'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                From Menu
-              </button>
-              <button
-                onClick={() => { setAddItemMode('standalone'); setSelectedMenuItemId(''); }}
-                className={`flex-1 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                  addItemMode === 'standalone'
-                    ? 'bg-amber-500 text-slate-900'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                Standalone Item
-              </button>
+            {/* Name: search untracked menu items, or type a new standalone item */}
+            <div>
+              <label className="block text-sm text-slate-300">
+                Item name
+                <input
+                  autoFocus
+                  placeholder={`Search ${isMinimartScope ? 'products' : 'menu items'} or type a new item name`}
+                  value={addMenuSearch}
+                  onChange={(e) => {
+                    setAddMenuSearch(e.target.value);
+                    setSelectedMenuItemId('');
+                    setAddItemNotice('');
+                    setAddItemError('');
+                  }}
+                  className={`mt-1 ${addItemInputClass}`}
+                />
+              </label>
+
+              {selectedMenuItemId ? (
+                <div className="mt-2 flex items-center gap-3 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-sm">
+                  <span className="text-lg">{(menuItemMap[selectedMenuItemId] as any)?.emoji ?? '🍽️'}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-amber-300 truncate">{menuItemMap[selectedMenuItemId]?.name}</p>
+                    <p className="text-xs text-slate-400">Linked to {isMinimartScope ? 'product' : 'menu'} · stock auto-deducts on every sale</p>
+                  </div>
+                  <button
+                    onClick={() => { setSelectedMenuItemId(''); setAddMenuSearch(''); }}
+                    className="text-slate-400 hover:text-slate-200"
+                    aria-label="Clear selection"
+                  >
+                    <XIcon className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : addMenuSearch.trim() ? (
+                <div className="mt-2 space-y-1">
+                  {filteredUntrackedItems.map((m) => (
+                    <button
+                      key={m.id}
+                      onClick={() => { setSelectedMenuItemId(m.id); setAddMenuSearch(m.name); setAddItemError(''); }}
+                      className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left text-sm bg-slate-800 border border-slate-700 text-slate-200 hover:bg-slate-700 transition-colors"
+                    >
+                      <span className="text-lg">{(m as any).emoji ?? '🍽️'}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">{m.name}</p>
+                        <p className="text-xs text-slate-400">{m.category}</p>
+                      </div>
+                      <span className="text-xs text-amber-400 shrink-0">Track</span>
+                    </button>
+                  ))}
+                  {addItemConflict ? (
+                    <p className="text-xs text-amber-400 px-1 pt-1">{addItemConflict}</p>
+                  ) : (
+                    <p className="text-xs text-slate-500 px-1 pt-1">
+                      {filteredUntrackedItems.length > 0 ? 'Or save to create ' : 'Save to create '}
+                      <span className="text-slate-300">"{addMenuSearch.trim()}"</span> as a new item. It isn't linked to the {isMinimartScope ? 'product list' : 'menu'}, so sales won't deduct it.
+                    </p>
+                  )}
+                </div>
+              ) : untrackedMenuItems.length > 0 ? (
+                <button
+                  onClick={handleTrackAllMenuItems}
+                  disabled={isTrackingAllMenuItems}
+                  className="mt-2 text-xs text-amber-400 hover:text-amber-300 disabled:opacity-50"
+                >
+                  {isTrackingAllMenuItems
+                    ? 'Tracking…'
+                    : `Or track all ${untrackedMenuItems.length} untracked ${isMinimartScope ? 'products' : 'menu items'} at once`}
+                </button>
+              ) : null}
             </div>
 
-            {/* From Menu: pick an untracked menu item */}
-            {addItemMode === 'menu' && (
-              <div>
-                <p className="text-xs text-slate-400 mb-2">
-                  Select a menu item to track. Stock will auto-decrement on every order.
-                </p>
+            {addItemNotice && (
+              <p className="text-sm text-emerald-400">{addItemNotice}</p>
+            )}
+
+            {/* Essentials */}
+            <div className="border-t border-slate-700/40 pt-3 grid grid-cols-2 gap-3">
+              <label className="block text-sm text-slate-300">
+                Current stock
                 <input
-                  placeholder="Search menu items..."
-                  value={addMenuSearch}
-                  onChange={(e) => setAddMenuSearch(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 mb-2"
+                  type="number" min={0} step="0.01"
+                  value={newInventoryItemStock === 0 ? '' : newInventoryItemStock}
+                  onChange={(e) => setNewInventoryItemStock(toQty(e.target.value))}
+                  className={`mt-1 ${addItemInputClass}`}
                 />
-                {filteredUntrackedItems.length === 0 ? (
-                  <p className="text-center text-sm text-slate-500 py-4">
-                    {untrackedMenuItems.length === 0
-                      ? 'All menu items are already being tracked.'
-                      : 'No items match your search.'}
-                  </p>
-                ) : (
-                  <div className="max-h-48 overflow-y-auto space-y-1 pr-1">
-                    {filteredUntrackedItems.map((m) => (
-                      <button
-                        key={m.id}
-                        onClick={() => { setSelectedMenuItemId(m.id); setNewInventoryItemName(m.name); }}
-                        className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left text-sm transition-colors ${
-                          selectedMenuItemId === m.id
-                            ? 'bg-amber-500/20 border border-amber-500/40 text-amber-300'
-                            : 'bg-slate-800 border border-slate-700 text-slate-200 hover:bg-slate-700'
-                        }`}
-                      >
-                        <span className="text-lg">{(m as any).emoji ?? '🍽️'}</span>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium truncate">{m.name}</p>
-                          <p className="text-xs text-slate-400">{m.category}</p>
-                        </div>
-                        {selectedMenuItemId === m.id && (
-                          <CheckCircleIcon className="w-4 h-4 text-amber-400 shrink-0" />
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
+              </label>
+              <label className="block text-sm text-slate-300">
+                Unit
+                <select
+                  value={newInventoryItemUnitMeasurement}
+                  onChange={(e) => setNewInventoryItemUnitMeasurement(e.target.value)}
+                  className={`mt-1 ${addItemInputClass}`}
+                >
+                  {['units','kg','g','L','ml','boxes','cases','packs','bags','bottles','cans'].map((u) => (
+                    <option key={u} value={u}>{u}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="block text-sm text-slate-300">
+                Unit cost (RWF)
+                <input
+                  type="number" min={0} step="0.01"
+                  value={newInventoryItemUnitCost === 0 ? '' : newInventoryItemUnitCost}
+                  onChange={(e) => setNewInventoryItemUnitCost(parseFloat(e.target.value || '0'))}
+                  className={`mt-1 ${addItemInputClass}`}
+                />
+              </label>
+              <label className="block text-sm text-slate-300">
+                Alert me when below
+                <input
+                  type="number" min={0} step="0.01"
+                  value={newInventoryItemLowThreshold === 0 ? '' : newInventoryItemLowThreshold}
+                  onChange={(e) => setNewInventoryItemLowThreshold(toQty(e.target.value))}
+                  className={`mt-1 ${addItemInputClass}`}
+                />
+              </label>
+            </div>
 
-            {/* Standalone: freeform name */}
-            {addItemMode === 'standalone' && (
-              <div className="grid gap-3">
-                <label className="block text-sm text-slate-300">
-                  Item name
-                  <input
-                    placeholder="e.g. Paper Napkins, Cleaning Supplies"
-                    value={newInventoryItemName}
-                    onChange={(e) => setNewInventoryItemName(e.target.value)}
-                    className="mt-1 w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
-                  />
-                </label>
-                <label className="block text-sm text-slate-300">
-                  Category
-                  <input
-                    placeholder="e.g. Beverages, Snacks, Cleaning"
-                    value={newInventoryItemCategory}
-                    onChange={(e) => setNewInventoryItemCategory(e.target.value)}
-                    className="mt-1 w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
-                    list="standalone-category-suggestions"
-                  />
-                  <datalist id="standalone-category-suggestions">
-                    {inventoryCategories.filter((c) => c !== 'all').map((c) => (
-                      <option key={c} value={c} />
-                    ))}
-                  </datalist>
-                </label>
-                <p className="text-xs text-slate-500">
-                  Standalone items are not linked to the menu and won't auto-decrement on orders.
-                </p>
-              </div>
-            )}
-
-            {/* Stock fields — shared by both modes */}
-            {(addItemMode === 'standalone' || selectedMenuItemId) && (
-              <>
-                <div className="border-t border-slate-700/40 pt-3 grid grid-cols-2 gap-3">
-                  <label className="block text-sm text-slate-300">
-                    Current stock
-                    <input
-                      type="number" min={0} step="0.01"
-                      value={newInventoryItemStock === 0 ? '' : newInventoryItemStock}
-                      onChange={(e) => setNewInventoryItemStock(parseFloat(e.target.value || '0'))}
-                      className="mt-1 w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
-                    />
-                  </label>
-                  <label className="block text-sm text-slate-300">
-                    Unit cost (RWF)
-                    <input
-                      type="number" min={0} step="0.01"
-                      value={newInventoryItemUnitCost === 0 ? '' : newInventoryItemUnitCost}
-                      onChange={(e) => setNewInventoryItemUnitCost(parseFloat(e.target.value || '0'))}
-                      className="mt-1 w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
-                    />
-                  </label>
-                  <label className="block text-sm text-slate-300">
-                    Low-stock alert below
-                    <input
-                      type="number" min={0} step="0.01"
-                      value={newInventoryItemLowThreshold === 0 ? '' : newInventoryItemLowThreshold}
-                      onChange={(e) => setNewInventoryItemLowThreshold(parseFloat(e.target.value || '0'))}
-                      className="mt-1 w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
-                    />
-                  </label>
-                  <label className="block text-sm text-slate-300">
-                    Unit measurement
-                    <select
-                      value={newInventoryItemUnitMeasurement}
-                      onChange={(e) => setNewInventoryItemUnitMeasurement(e.target.value)}
-                      className="mt-1 w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
-                    >
-                      {['units','kg','g','L','ml','boxes','cases','packs','bags','bottles','cans'].map((u) => (
-                        <option key={u} value={u}>{u}</option>
-                      ))}
-                    </select>
-                  </label>
+            {/* More options */}
+            <div>
+              <button
+                onClick={() => setShowAddMoreOptions((v) => !v)}
+                className="text-xs text-slate-400 hover:text-slate-200"
+              >
+                {showAddMoreOptions ? '▾ Fewer options' : '▸ More options (reorder, location, category)'}
+              </button>
+              {showAddMoreOptions && (
+                <div className="mt-3 grid grid-cols-2 gap-3">
                   <label className="block text-sm text-slate-300">
                     Reorder point
                     <input
                       type="number" min={0} step="0.01"
-                      value={newInventoryItemReorderPoint === 0 ? '' : newInventoryItemReorderPoint}
-                      onChange={(e) => setNewInventoryItemReorderPoint(parseFloat(e.target.value || '0'))}
-                      className="mt-1 w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      placeholder={String(newInventoryItemLowThreshold)}
+                      value={newInventoryItemReorderPoint ?? ''}
+                      onChange={(e) => setNewInventoryItemReorderPoint(e.target.value === '' ? null : toQty(e.target.value))}
+                      className={`mt-1 ${addItemInputClass}`}
                     />
                   </label>
                   <label className="block text-sm text-slate-300">
                     Reorder qty
                     <input
                       type="number" min={0} step="0.01"
-                      value={newInventoryItemReorderQty === 0 ? '' : newInventoryItemReorderQty}
-                      onChange={(e) => setNewInventoryItemReorderQty(parseFloat(e.target.value || '0'))}
-                      className="mt-1 w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      placeholder={String(Math.max(1, (newInventoryItemReorderPoint ?? newInventoryItemLowThreshold) * 2))}
+                      value={newInventoryItemReorderQty ?? ''}
+                      onChange={(e) => setNewInventoryItemReorderQty(e.target.value === '' ? null : toQty(e.target.value))}
+                      className={`mt-1 ${addItemInputClass}`}
                     />
                   </label>
-                  <label className="block col-span-2 text-sm text-slate-300">
+                  <label className={`block text-sm text-slate-300 ${selectedMenuItemId ? 'col-span-2' : ''}`}>
                     Storage location
                     <select
                       value={newInventoryItemLocation}
                       onChange={(e) => setNewInventoryItemLocation(e.target.value)}
-                      className="mt-1 w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      className={`mt-1 ${addItemInputClass}`}
                     >
                       <option value="">— None —</option>
                       {locations.map((loc) => (
@@ -3175,8 +3253,32 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                       ))}
                     </select>
                   </label>
+                  {!selectedMenuItemId && (
+                    <label className="block text-sm text-slate-300">
+                      Category
+                      <input
+                        placeholder="e.g. Cleaning"
+                        value={newInventoryItemCategory}
+                        onChange={(e) => setNewInventoryItemCategory(e.target.value)}
+                        className={`mt-1 ${addItemInputClass}`}
+                        list="standalone-category-suggestions"
+                      />
+                      <datalist id="standalone-category-suggestions">
+                        {inventoryCategories.filter((c) => c !== 'all').map((c) => (
+                          <option key={c} value={c} />
+                        ))}
+                      </datalist>
+                    </label>
+                  )}
+                  <p className="col-span-2 text-xs text-slate-500">
+                    Leave reorder fields empty to reorder at the alert level, ordering 2× that amount.
+                  </p>
                 </div>
-              </>
+              )}
+            </div>
+
+            {addItemError && (
+              <p className="text-sm text-red-400">{addItemError}</p>
             )}
 
             <div className="flex justify-end gap-2 pt-2 border-t border-slate-700/30">
@@ -3187,11 +3289,18 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                 Cancel
               </button>
               <button
-                onClick={handleCreateOtherInventoryItem}
-                disabled={addItemMode === 'menu' ? !selectedMenuItemId : !newInventoryItemName.trim()}
+                onClick={() => handleCreateOtherInventoryItem(true)}
+                disabled={!canSaveInventoryItem}
+                className="px-4 py-2 rounded-lg bg-slate-700 text-emerald-300 text-sm font-medium hover:bg-slate-600 transition disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Save & add another
+              </button>
+              <button
+                onClick={() => handleCreateOtherInventoryItem(false)}
+                disabled={!canSaveInventoryItem}
                 className="px-4 py-2 rounded-lg bg-emerald-500 text-white text-sm font-medium hover:bg-emerald-400 transition disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                {addItemMode === 'menu' ? 'Start Tracking' : 'Create Item'}
+                {isSavingInventoryItem ? 'Saving…' : 'Save'}
               </button>
             </div>
           </div>
@@ -3554,9 +3663,10 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                 type="number"
                 placeholder="Quantity"
                 value={wasteForm.qty}
-                onChange={(e) => setWasteForm((v) => ({ ...v, qty: parseInt(e.target.value || '0', 10) }))}
+                onChange={(e) => setWasteForm((v) => ({ ...v, qty: toQty(e.target.value) }))}
                 className="px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
-                min={1}
+                min={0}
+                step="0.01"
               />
             </div>
             <select

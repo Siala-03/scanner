@@ -66,7 +66,7 @@ function normalizeInventoryRecord(raw: any): InventoryRecord {
     menuItemId:        raw.menu_item_id   ?? raw.menuItemId   ?? '',
     stock:             currentQty,
     lowStockThreshold: raw.low_stock_threshold ?? raw.lowStockThreshold ?? 5,
-    reorderPoint:      raw.reorder_point   ?? raw.reorderPoint ?? 10,
+    reorderPoint:      raw.reorder_point   ?? raw.reorderPoint ?? 5,
     reorderQty:        raw.reorder_qty     ?? raw.reorderQty   ?? 20,
     unitCost:          cost,
     supplierId:        raw.supplier_id     ?? raw.supplierId   ?? undefined,
@@ -241,12 +241,12 @@ export async function fetchInventoryById(menuItemId: string): Promise<InventoryR
 export async function createInventoryRecord(record: Partial<InventoryRecord>): Promise<InventoryRecord> {
   const restaurantId = await resolveRestaurantId();
   const id = `inv-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  const stock = Math.round(Number(record.stock) || 0);
-  const lowStockThreshold = Math.round(Number(record.lowStockThreshold) || 5);
-  const reorderPoint = Math.round(Number(record.reorderPoint) || 10);
-  const reorderQty = Math.round(Number(record.reorderQty) || 20);
+  const stock = toDbDecimal(Number(record.stock) || 0);
+  const lowStockThreshold = toDbDecimal(Number(record.lowStockThreshold) || 5);
+  const reorderPoint = toDbDecimal(Number(record.reorderPoint) || 5);
+  const reorderQty = toDbDecimal(Number(record.reorderQty) || 20);
   const unitCost = toDbDecimal(record.unitCost, 0);
-  const qtyStart = Math.round(Number(record.qtyStart ?? record.stock) || stock);
+  const qtyStart = toDbDecimal(Number(record.qtyStart ?? record.stock) || stock);
   const price = toDbDecimal(record.price, 0);
 
   const insertPayload: Record<string, any> = {
@@ -331,13 +331,13 @@ export async function updateInventoryRecord(
     updated_at: new Date().toISOString(),
   };
 
-  if (record.stock               !== undefined) updateFields.stock               = Math.round(Number(record.stock) || 0);
-  if (record.lowStockThreshold   !== undefined) updateFields.low_stock_threshold = Math.round(Number(record.lowStockThreshold) || 5);
-  if (record.low_stock_threshold !== undefined) updateFields.low_stock_threshold = Math.round(Number(record.low_stock_threshold) || 5);
-  if (record.reorderPoint        !== undefined) updateFields.reorder_point       = Math.round(Number(record.reorderPoint) || 10);
-  if (record.reorder_point       !== undefined) updateFields.reorder_point       = Math.round(Number(record.reorder_point) || 10);
-  if (record.reorderQty          !== undefined) updateFields.reorder_qty         = Math.round(Number(record.reorderQty) || 20);
-  if (record.reorder_qty         !== undefined) updateFields.reorder_qty         = Math.round(Number(record.reorder_qty) || 20);
+  if (record.stock               !== undefined) updateFields.stock               = toDbDecimal(Number(record.stock) || 0);
+  if (record.lowStockThreshold   !== undefined) updateFields.low_stock_threshold = toDbDecimal(Number(record.lowStockThreshold) || 5);
+  if (record.low_stock_threshold !== undefined) updateFields.low_stock_threshold = toDbDecimal(Number(record.low_stock_threshold) || 5);
+  if (record.reorderPoint        !== undefined) updateFields.reorder_point       = toDbDecimal(Number(record.reorderPoint) || 5);
+  if (record.reorder_point       !== undefined) updateFields.reorder_point       = toDbDecimal(Number(record.reorder_point) || 5);
+  if (record.reorderQty          !== undefined) updateFields.reorder_qty         = toDbDecimal(Number(record.reorderQty) || 20);
+  if (record.reorder_qty         !== undefined) updateFields.reorder_qty         = toDbDecimal(Number(record.reorder_qty) || 20);
   if (record.unitCost            !== undefined) updateFields.unit_cost           = toDbDecimal(record.unitCost, 0);
   if (record.unit_cost           !== undefined) updateFields.unit_cost           = toDbDecimal(record.unit_cost, 0);
   if (record.cost                !== undefined) updateFields.unit_cost           = toDbDecimal(record.cost, 0);
@@ -352,8 +352,8 @@ export async function updateInventoryRecord(
   if (record.expiry_date         !== undefined) updateFields.expiry_date         = record.expiry_date  || null;
   if (record.purchaseDate        !== undefined) updateFields.purchase_date       = record.purchaseDate  || null;
   if (record.purchase_date       !== undefined) updateFields.purchase_date       = record.purchase_date || null;
-  if (record.qtyStart            !== undefined) updateFields.qty_start           = Math.round(Number(record.qtyStart) || 0);
-  if (record.qty_start           !== undefined) updateFields.qty_start           = Math.round(Number(record.qty_start) || 0);
+  if (record.qtyStart            !== undefined) updateFields.qty_start           = toDbDecimal(Number(record.qtyStart) || 0);
+  if (record.qty_start           !== undefined) updateFields.qty_start           = toDbDecimal(Number(record.qty_start) || 0);
   if (record.price               !== undefined) updateFields.price               = toDbDecimal(record.price, 0);
 
   // Try UPDATE first (existing record)
@@ -429,12 +429,12 @@ export async function updateInventoryRecord(
 
   // No existing row — INSERT with a generated id
   const id = `inv-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  const stock = Math.round(Number(record.stock) || 0);
-  const lowStockThreshold = Math.round(Number(record.lowStockThreshold ?? record.low_stock_threshold) || 5);
-  const reorderPoint = Math.round(Number(record.reorderPoint ?? record.reorder_point) || 10);
-  const reorderQty = Math.round(Number(record.reorderQty ?? record.reorder_qty) || 20);
+  const stock = toDbDecimal(Number(record.stock) || 0);
+  const lowStockThreshold = toDbDecimal(Number(record.lowStockThreshold ?? record.low_stock_threshold) || 5);
+  const reorderPoint = toDbDecimal(Number(record.reorderPoint ?? record.reorder_point) || 5);
+  const reorderQty = toDbDecimal(Number(record.reorderQty ?? record.reorder_qty) || 20);
   const unitCost = toDbDecimal(record.unitCost ?? record.unit_cost, 0);
-  const qtyStart = Math.round(Number(record.qtyStart ?? record.qty_start ?? record.stock) || stock);
+  const qtyStart = toDbDecimal(Number(record.qtyStart ?? record.qty_start ?? record.stock) || stock);
   const price = toDbDecimal(record.price, 0);
   const insertPayload: Record<string, any> = {
     id,
@@ -1205,7 +1205,7 @@ export async function receivePurchaseOrder(
             qty_start:           newQtyStart,
             restaurant_id:       restaurantId,
             low_stock_threshold: 5,
-            reorder_point:       10,
+            reorder_point:       5,
             reorder_qty:         20,
             unit_cost:           0,
             updated_at:          nowIso,
@@ -1260,7 +1260,7 @@ export async function receivePurchaseOrder(
           stock:               newStock,
           restaurant_id:       restaurantId,
           low_stock_threshold: 5,
-          reorder_point:       10,
+          reorder_point:       5,
           reorder_qty:         20,
           unit_cost:           0,
           updated_at:          nowIso,
