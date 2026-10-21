@@ -204,8 +204,7 @@ export function MenuManagement() {
       .filter((c) => categorySet.has(c.id))
       .map((c) => ({
         id: c.id,
-        label: c.name,
-        icon: c.emoji
+        label: c.name
       }));
     return [allTab, ...categoryTabs];
   }, [menuItemsState, categoryOptions]);
