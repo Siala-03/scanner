@@ -21,7 +21,6 @@ import {
   LinkIcon,
   ClockIcon,
 } from 'lucide-react';
-import { InventoryForecasting } from '../../components/manager/InventoryForecasting';
 import { PURCHASE_ORDERS_ENABLED } from '../../config/features';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -71,7 +70,8 @@ interface InventoryManagementProps {
   inventoryScope?: 'all' | 'minimart';
 }
 
-type Tab = 'overview' | 'purchase-orders' | 'suppliers' | 'waste' | 'forecasting' | 'locations';
+// 'waste' and 'locations' are sub-views of Stock, opened from its header buttons.
+type Tab = 'overview' | 'purchase-orders' | 'suppliers' | 'waste' | 'locations';
 
 const PO_STATUS_CONFIG: Record<PurchaseOrderStatus, { label: string; color: string; bg: string }> = {
   draft:     { label: 'Draft',     color: 'text-slate-400',  bg: 'bg-slate-500/10 border-slate-500/20' },
@@ -202,10 +202,6 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
     movements,
     waste,
     analytics,
-    forecasts,
-    forecastAlerts,
-    isGeneratingForecasts,
-    runForecasting,
     isLoading,
     refresh,
     upsertInventoryRecords,
@@ -1403,11 +1399,9 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
     { id: 'overview', label: 'Stock', icon: <PackageIcon className="w-4 h-4" />, badge: lowStockItems.length || undefined },
     { id: 'purchase-orders', label: 'Purchase Orders', icon: <TruckIcon className="w-4 h-4" />, badge: purchaseOrders.filter((po) => po.status !== 'received' && po.status !== 'cancelled').length || undefined },
     { id: 'suppliers', label: 'Suppliers', icon: <TruckIcon className="w-4 h-4" /> },
-    { id: 'waste', label: 'Waste', icon: <TrashIcon className="w-4 h-4" /> },
-    { id: 'forecasting', label: 'Forecasting', icon: <TrendingUpIcon className="w-4 h-4" />, badge: forecastAlerts.length || undefined },
-    { id: 'locations', label: 'Locations', icon: <MapPinIcon className="w-4 h-4" />, badge: locations.filter((l) => l.lowStockItems > 0).length || undefined },
   ];
   const tabs = allTabs.filter((t) => PURCHASE_ORDERS_ENABLED || t.id !== 'purchase-orders');
+  const isStockSubView = activeTab === 'waste' || activeTab === 'locations';
 
   return (
     <div className="dark min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
@@ -1428,6 +1422,18 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
               <Button variant="ghost" size="sm" onClick={refresh}>
                 <RefreshCcwIcon className="w-4 h-4" />
               </Button>
+              {activeTab === 'overview' && (
+                <>
+                  <Button variant="ghost" size="sm" onClick={() => setActiveTab('waste')}>
+                    <TrashIcon className="w-4 h-4" />
+                    <span className="hidden sm:inline">Waste</span>
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => setActiveTab('locations')}>
+                    <MapPinIcon className="w-4 h-4" />
+                    <span className="hidden sm:inline">Locations</span>
+                  </Button>
+                </>
+              )}
               {isManager && activeTab === 'overview' && (
                 <>
                   {/* Template */}
@@ -1528,7 +1534,7 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all ${
-                  activeTab === tab.id
+                  activeTab === tab.id || (tab.id === 'overview' && isStockSubView)
                     ? 'bg-amber-500 text-slate-900'
                     : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
                 }`}
@@ -1547,6 +1553,14 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
       </div>
 
       <div className="max-w-6xl mx-auto px-4 md:px-6 py-6">
+        {isStockSubView && (
+          <button
+            onClick={() => setActiveTab('overview')}
+            className="mb-4 text-sm text-slate-400 hover:text-white"
+          >
+            ← Back to Stock
+          </button>
+        )}
         {isLoading && (
           <div className="mb-4 rounded-xl border border-amber-400/30 bg-amber-500/10 p-3 text-amber-100">
             Loading inventory data from server. Please wait...
@@ -2797,20 +2811,6 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                 )}
               </div>
             </Card>
-          </motion.div>
-        )}
-
-        {/* ════════════════════════════════════════════════════════════════
-            TAB: FORECASTING
-        ════════════════════════════════════════════════════════════════ */}
-        {activeTab === 'forecasting' && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-            <InventoryForecasting
-              forecasts={forecasts}
-              alerts={forecastAlerts}
-              onGenerateForecasts={async () => { await runForecasting(); }}
-              isGenerating={isGeneratingForecasts}
-            />
           </motion.div>
         )}
 
