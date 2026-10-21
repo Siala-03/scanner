@@ -12,6 +12,7 @@ import type {
 } from '../types/inventory';
 export type { InventoryRecord };
 import { apiRequest } from './http';
+import { PURCHASE_ORDERS_ENABLED } from '../config/features';
 
 const API_BASE = import.meta.env.VITE_API_URL
   ? import.meta.env.VITE_API_URL.replace(/\/$/, '')
@@ -638,6 +639,7 @@ async function maybeAutoReorder(params: {
   overrideSupplierId?: string;
   overrideUnitCost?: number;
 }): Promise<void> {
+  if (!PURCHASE_ORDERS_ENABLED) return;
   const previousStock = Number(params.previous?.stock ?? NaN);
   const currentStock = Number(params.current?.stock ?? 0);
   const reorderPoint = Number(params.current?.reorder_point ?? params.current?.reorderPoint ?? params.previous?.reorder_point ?? 0);

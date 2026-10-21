@@ -22,6 +22,7 @@ import {
   ClockIcon,
 } from 'lucide-react';
 import { InventoryForecasting } from '../../components/manager/InventoryForecasting';
+import { PURCHASE_ORDERS_ENABLED } from '../../config/features';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { SearchBar } from '../../components/ui/SearchBar';
@@ -1398,7 +1399,7 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
     }
   };
 
-  const tabs: { id: Tab; label: string; icon: React.ReactNode; badge?: number }[] = [
+  const allTabs: { id: Tab; label: string; icon: React.ReactNode; badge?: number }[] = [
     { id: 'overview', label: 'Stock', icon: <PackageIcon className="w-4 h-4" />, badge: lowStockItems.length || undefined },
     { id: 'purchase-orders', label: 'Purchase Orders', icon: <TruckIcon className="w-4 h-4" />, badge: purchaseOrders.filter((po) => po.status !== 'received' && po.status !== 'cancelled').length || undefined },
     { id: 'suppliers', label: 'Suppliers', icon: <TruckIcon className="w-4 h-4" /> },
@@ -1406,6 +1407,7 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
     { id: 'forecasting', label: 'Forecasting', icon: <TrendingUpIcon className="w-4 h-4" />, badge: forecastAlerts.length || undefined },
     { id: 'locations', label: 'Locations', icon: <MapPinIcon className="w-4 h-4" />, badge: locations.filter((l) => l.lowStockItems > 0).length || undefined },
   ];
+  const tabs = allTabs.filter((t) => PURCHASE_ORDERS_ENABLED || t.id !== 'purchase-orders');
 
   return (
     <div className="dark min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
@@ -1593,7 +1595,9 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                 { label: 'Low Stock', value: analytics.lowStockCount, icon: <AlertTriangleIcon className="w-5 h-5 text-amber-400" />, color: 'text-amber-400' },
                 { label: 'Out of Stock', value: analytics.outOfStockCount, icon: <XCircleIcon className="w-5 h-5 text-red-400" />, color: 'text-red-400' },
                 { label: 'Below Reorder', value: analytics.belowReorderCount, icon: <TruckIcon className="w-5 h-5 text-indigo-400" />, color: 'text-indigo-400' },
-                { label: 'Past PO Value', value: formatPrice(pastPOValue), icon: <TruckIcon className="w-5 h-5 text-cyan-400" />, color: 'text-cyan-400' },
+                ...(PURCHASE_ORDERS_ENABLED
+                  ? [{ label: 'Past PO Value', value: formatPrice(pastPOValue), icon: <TruckIcon className="w-5 h-5 text-cyan-400" />, color: 'text-cyan-400' }]
+                  : []),
               ].map((kpi) => (
                 <Card key={kpi.label} className="bg-slate-800/50 border border-slate-700/50">
                   <div className="flex items-center gap-3">
@@ -2020,17 +2024,19 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                                   >
                                     <EditIcon className="w-4 h-4" />
                                   </button>
-                                  <button
-                                    onClick={() => {
-                                      setNewPO({ supplierId: suppliers[0]?.id ?? '', expectedDelivery: '', notes: `Auto reordering ${row.item.name} based on threshold` });
-                                      setNewPOItems([{ menuItemId: targetMenuItemId, orderedQty: Math.max((row.rec?.reorderQty ?? 5) - row.stock, 1), unit: '', unitCost: row.rec?.unitCost ?? 0 }]);
-                                      setShowNewPO(true);
-                                    }}
-                                    className="h-7 w-7 inline-flex items-center justify-center rounded-md border border-emerald-500/50 bg-emerald-500/20 text-emerald-100 hover:bg-emerald-500/32 transition"
-                                    title="Smart Reorder"
-                                  >
-                                    <PlusIcon className="w-4 h-4" />
-                                  </button>
+                                  {PURCHASE_ORDERS_ENABLED && (
+                                    <button
+                                      onClick={() => {
+                                        setNewPO({ supplierId: suppliers[0]?.id ?? '', expectedDelivery: '', notes: `Auto reordering ${row.item.name} based on threshold` });
+                                        setNewPOItems([{ menuItemId: targetMenuItemId, orderedQty: Math.max((row.rec?.reorderQty ?? 5) - row.stock, 1), unit: '', unitCost: row.rec?.unitCost ?? 0 }]);
+                                        setShowNewPO(true);
+                                      }}
+                                      className="h-7 w-7 inline-flex items-center justify-center rounded-md border border-emerald-500/50 bg-emerald-500/20 text-emerald-100 hover:bg-emerald-500/32 transition"
+                                      title="Smart Reorder"
+                                    >
+                                      <PlusIcon className="w-4 h-4" />
+                                    </button>
+                                  )}
                                   <button
                                     onClick={async () => {
                                       if (isLinked) {
