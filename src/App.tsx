@@ -14,7 +14,7 @@ function lazyWithReload<T extends React.ComponentType<any>>(
 }
 import { saveOfflineProfile } from './utils/offlineAuth';
 import { motion } from 'framer-motion';
-import { ArrowLeftIcon, QrCodeIcon, LogOutIcon, ChevronDownIcon, LockIcon } from 'lucide-react';
+import { ArrowLeftIcon, QrCodeIcon, LogOutIcon, ChevronDownIcon } from 'lucide-react';
 import { CartItem, OrderStatus, Customer } from './types';
 import type { ConfirmMergeFn } from './hooks/useOrders';
 import { setCurrency, CurrencyCode } from './utils/currency';
@@ -840,15 +840,8 @@ export function App() {
           </div>
         </div>
 
-        <div className="bg-slate-900 px-4 pb-4">
-          {waiterSessionActive ? (
-            <div className="max-w-6xl mx-auto py-4">
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs font-semibold text-amber-300">
-                <LockIcon className="w-3.5 h-3.5" />
-                Waiter session active — other tabs hidden until "Switch Waiter"
-              </span>
-            </div>
-          ) : (
+        <div className={waiterSessionActive ? 'hidden' : 'bg-slate-900 px-4 pb-4'}>
+          {waiterSessionActive ? null : (
           <div className="max-w-6xl mx-auto flex gap-2 py-4 overflow-x-auto">
             {/* Dashboard and Revenue tabs temporarily hidden — see SUPERVISOR_HOME comment above */}
             <Button

@@ -776,6 +776,16 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
     ? tableOccupancy[selectedTable as number]
     : undefined;
 
+  // Clears the checked-in waiter and returns to the waiter picker.
+  const switchWaiter = () => {
+    setSelectedStaffId('');
+    setCart([]);
+    setOrderNotes('');
+    setLastPlacedOrder(null);
+    setSuccessTable(null);
+    setStep('table-select');
+  };
+
   if (sharedTerminalMode && !selectedStaffId) {
     return (
       <>
@@ -866,30 +876,26 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
 
           {/* Header */}
           <div className="mb-6 flex items-center justify-between gap-3">
-            <div>
+            <div className="flex items-center gap-3">
+              {(sharedTerminalMode || onBack) && (
+                <button
+                  onClick={() => (sharedTerminalMode ? switchWaiter() : onBack?.())}
+                  className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
+                  aria-label="Back"
+                >
+                  <ChevronLeftIcon className="w-5 h-5" />
+                </button>
+              )}
+              <div>
               <h1 className="text-2xl font-bold text-white">Take Order</h1>
               <p className="mt-1 text-sm text-slate-400">
                 {sharedTerminalMode
-                  ? `Active waiter: ${selectedStaffName}. Select a table or choose Bar / Walk-up.`
+                  ? `${selectedStaffName} · tap ← to switch waiter`
                   : 'Select a table or choose Bar / Walk-up'}
               </p>
+              </div>
             </div>
             <div className="flex items-center gap-2">
-              {sharedTerminalMode && (
-                <button
-                  onClick={() => {
-                    setSelectedStaffId('');
-                    setCart([]);
-                    setOrderNotes('');
-                    setLastPlacedOrder(null);
-                    setSuccessTable(null);
-                    setStep('table-select');
-                  }}
-                  className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm font-semibold text-amber-300 hover:bg-amber-500/20 transition-colors"
-                >
-                  Switch Waiter
-                </button>
-              )}
               <button
                 onClick={() => setShowRecentOrders(true)}
                 className="flex items-center gap-2 rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 text-sm text-slate-300 hover:bg-slate-700 transition-colors"
@@ -1264,65 +1270,45 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
   return (
     <div className="min-h-screen bg-slate-950 pb-24 md:pb-0">
 
-      {/* Header */}
+      {/* Header: back, table, search and cart in one row; categories below.
+          Sticky so filtering stays reachable without scrolling back up. */}
       <div className="sticky top-0 z-30 border-b border-slate-700 bg-slate-900/95 backdrop-blur-sm px-4 py-3">
-        <div className="max-w-6xl mx-auto flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => { autoMergeRef.current = null; setExistingOrderForEntry(null); setStep('table-select'); setCart([]); }}
-              className="flex items-center gap-1.5 rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 text-sm text-slate-300 hover:bg-slate-700 transition-colors"
-            >
-              <ChevronLeftIcon className="w-4 h-4" />
-              Tables
-            </button>
-            <div>
-              <p className="font-semibold text-white">{tableLabel}</p>
-              {sharedTerminalMode && selectedStaffName && (
-                <p className="text-xs text-amber-300">Taking order as {selectedStaffName}</p>
-              )}
-              {tableOccupancyStatus && (
-                <p className={`text-xs ${tableOccupancyStatus === 'urgent' ? 'text-red-400' : 'text-amber-400'}`}>
-                  {tableOccupancyStatus === 'urgent'
-                    ? 'Urgent — orders waiting >15 min'
-                    : existingOrderForEntry
-                      ? 'Adding to the existing order'
-                      : 'Table occupied — starting a separate order'}
-                </p>
-              )}
-            </div>
+        <div className="max-w-6xl mx-auto flex items-center gap-3">
+          <button
+            onClick={() => { autoMergeRef.current = null; setExistingOrderForEntry(null); setStep('table-select'); setCart([]); }}
+            className="shrink-0 rounded-lg bg-slate-800 border border-slate-700 p-2 text-slate-300 hover:bg-slate-700 transition-colors"
+            aria-label="Back to tables"
+          >
+            <ChevronLeftIcon className="w-5 h-5" />
+          </button>
+          <div className="shrink-0 min-w-0">
+            <p className="font-semibold text-white leading-tight">{tableLabel}</p>
+            {(() => {
+              const statusText = tableOccupancyStatus === 'urgent'
+                ? 'Urgent'
+                : tableOccupancyStatus
+                  ? existingOrderForEntry ? 'Adding to order' : 'Separate order'
+                  : '';
+              const subtitle = [sharedTerminalMode ? selectedStaffName : '', statusText].filter(Boolean).join(' · ');
+              return subtitle ? (
+                <p className={`text-xs truncate ${tableOccupancyStatus === 'urgent' ? 'text-red-400' : 'text-amber-300'}`}>{subtitle}</p>
+              ) : null;
+            })()}
           </div>
 
-          {/* Mobile cart toggle */}
-          <button
-            onClick={() => setShowMobileCart(true)}
-            className="relative flex items-center gap-2 rounded-lg bg-amber-500 px-3 py-2 text-sm font-semibold text-slate-900 md:hidden"
-          >
-            <ShoppingCartIcon className="w-4 h-4" />
-            {cartCount > 0 && (
-              <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white">
-                {cartCount}
-              </span>
-            )}
-            {formatPrice(cartTotal)}
-          </button>
-        </div>
-
-        {/* Search + category tabs — part of the sticky header so filtering stays
-            reachable without scrolling back up through the menu grid */}
-        <div className="max-w-6xl mx-auto px-4 pb-3 md:px-4">
-          <div className="relative mb-3">
+          <div className="relative flex-1 min-w-0">
             <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search menu..."
-              className="w-full rounded-xl border border-slate-700 bg-slate-800 py-2.5 pl-9 pr-9 text-sm text-white placeholder-slate-500 focus:border-amber-500 focus:outline-none"
+              className="w-full rounded-lg border border-slate-700 bg-slate-800 py-2 pl-9 pr-8 text-sm text-white placeholder-slate-500 focus:border-amber-500 focus:outline-none"
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
                 aria-label="Clear search"
               >
                 <XIcon className="w-4 h-4" />
@@ -1330,6 +1316,22 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
             )}
           </div>
 
+          {/* Mobile cart toggle */}
+          <button
+            onClick={() => setShowMobileCart(true)}
+            className="relative shrink-0 flex items-center gap-2 rounded-lg bg-amber-500 px-3 py-2 text-sm font-semibold text-slate-900 md:hidden"
+          >
+            <ShoppingCartIcon className="w-4 h-4" />
+            {cartCount > 0 && (
+              <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white">
+                {cartCount}
+              </span>
+            )}
+            <span className="hidden min-[400px]:inline">{formatPrice(cartTotal)}</span>
+          </button>
+        </div>
+
+        <div className="max-w-6xl mx-auto pt-3">
           <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
             {categories.map((cat) => (
               <button
