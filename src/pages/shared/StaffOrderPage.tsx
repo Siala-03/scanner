@@ -1273,7 +1273,7 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
       {/* Header: back, table, search and cart in one row; categories below.
           Sticky so filtering stays reachable without scrolling back up. */}
       <div className="sticky top-0 z-30 border-b border-slate-700 bg-slate-900/95 backdrop-blur-sm px-4 py-3">
-        <div className="max-w-6xl mx-auto flex items-center gap-3">
+        <div className="w-full flex items-center gap-3">
           <button
             onClick={() => { autoMergeRef.current = null; setExistingOrderForEntry(null); setStep('table-select'); setCart([]); }}
             className="shrink-0 rounded-lg bg-slate-800 border border-slate-700 p-2 text-slate-300 hover:bg-slate-700 transition-colors"
@@ -1331,7 +1331,7 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
           </button>
         </div>
 
-        <div className="max-w-6xl mx-auto pt-3">
+        <div className="w-full pt-3">
           <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
             {categories.map((cat) => (
               <button
@@ -1350,7 +1350,7 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto flex gap-0 md:gap-6 p-0 md:p-4">
+      <div className="w-full flex gap-0 md:gap-6 p-0 md:p-4">
 
         {/* ── Menu panel ── */}
         <div className="flex-1 min-w-0 p-4 md:p-0">
@@ -1372,7 +1372,7 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
               )}
             </div>
           ) : (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {filteredItems.map((item) => {
                 const qty = getCartQty(item.id);
                 const outOfStock = !item.isAvailable;
