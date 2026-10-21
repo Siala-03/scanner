@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { PrinterIcon, DownloadIcon, PlusIcon, Trash2, GlobeIcon, CalendarIcon, CopyIcon, CheckIcon } from 'lucide-react';
+import { PrinterIcon, DownloadIcon, PlusIcon, Trash2, CopyIcon, CheckIcon } from 'lucide-react';
 import QRCode from 'react-qr-code';
 import { Button } from '../../components/ui/Button';
 
@@ -23,7 +23,7 @@ export function QRCodeGenerator({
   restaurantName
 }: QRCodeGeneratorProps) {
   const [isAddingTable, setIsAddingTable] = useState(false);
-  const [reservationLinkCopied, setReservationLinkCopied] = useState(false);
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
   const handleAddTable = async () => {
     try {
@@ -58,88 +58,28 @@ export function QRCodeGenerator({
   };
 
   const resolvedBaseUrl = baseUrl || window.location.origin;
+  const restaurantPath = restaurantId ? `${resolvedBaseUrl}/r/${encodeURIComponent(restaurantId)}` : resolvedBaseUrl;
+  const tableLink = (tableNum: number) => `${restaurantPath}/t/${tableNum}`;
+  const onlineLink = `${restaurantPath}/t/${ONLINE_TABLE}`;
+  const reservationLink = `${restaurantPath}/t/${ONLINE_TABLE}/reserve`;
+  const titleText = restaurantName || 'Restaurant';
+  const filePrefix = titleText.replace(/\s+/g, '_').toLowerCase();
 
-  const handleDownloadOnlineQR = () => {
-    if (!restaurantId) return;
-    const onlineLink = `${resolvedBaseUrl}/r/${encodeURIComponent(restaurantId)}/t/${ONLINE_TABLE}`;
-    const container = document.getElementById('qr-container-online') as HTMLDivElement | null;
-    if (!container) return;
-    const svg = container.querySelector('svg') as SVGSVGElement | null;
-    if (!svg) return;
-
-    const serializer = new XMLSerializer();
-    const source = serializer.serializeToString(svg);
-    const svgBlob = new Blob([source], { type: 'image/svg+xml;charset=utf-8' });
-    const url = URL.createObjectURL(svgBlob);
-
-    const img = new Image();
-    img.onload = () => {
-      const width = 420;
-      const height = 560;
-      const qrSize = 300;
-      const canvas = document.createElement('canvas');
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-
-      ctx.fillStyle = '#f0fdf4';
-      ctx.fillRect(0, 0, width, height);
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(16, 16, width - 32, height - 32);
-      ctx.strokeStyle = '#16a34a';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(16, 16, width - 32, height - 32);
-
-      ctx.fillStyle = '#15803d';
-      ctx.font = '700 22px Inter, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('Order Online', width / 2, 56);
-
-      ctx.fillStyle = '#166534';
-      ctx.font = '600 15px Inter, sans-serif';
-      ctx.fillText(restaurantName || 'Restaurant', width / 2, 80);
-
-      const qrX = (width - qrSize) / 2;
-      const qrY = 100;
-      ctx.drawImage(img, qrX, qrY, qrSize, qrSize);
-
-      ctx.fillStyle = '#15803d';
-      ctx.font = '600 13px Inter, sans-serif';
-      ctx.fillText('Scan to browse menu & place your order', width / 2, qrY + qrSize + 28);
-
-      ctx.fillStyle = '#16a34a';
-      ctx.font = '500 11px monospace';
-      const maxW = width - 68;
-      let linkText = onlineLink;
-      while (ctx.measureText(linkText).width > maxW && linkText.length > 0) {
-        linkText = linkText.slice(0, -1);
-      }
-      if (linkText !== onlineLink) linkText += '…';
-      ctx.fillText(linkText, width / 2, qrY + qrSize + 50);
-
-      URL.revokeObjectURL(url);
-      const link = document.createElement('a');
-      link.href = canvas.toDataURL('image/png');
-      link.download = `${(restaurantName || 'restaurant').replace(/\s+/g, '_').toLowerCase()}_online-order-qr.png`;
-      link.click();
-    };
-    img.src = url;
+  const handleCopy = (key: string, link: string) => {
+    navigator.clipboard.writeText(link);
+    setCopiedKey(key);
+    setTimeout(() => setCopiedKey((k) => (k === key ? null : k)), 2000);
   };
-  const validTables = tables.filter((tableNum) => typeof tableNum === 'number' && Number.isFinite(tableNum));
-  const qrTitle = restaurantName ? `${restaurantName} QR Codes` : 'Table QR Codes';
 
-  const handleDownload = (tableNum: number) => {
-    const container = document.getElementById(`qr-container-${tableNum}`) as HTMLDivElement | null;
-    if (!container) return;
-
-    const svg = container.querySelector('svg') as SVGSVGElement | null;
+  // Renders the QR inside `containerId` onto a printable card and downloads it as PNG.
+  // Every QR (tables, online ordering, reservations) uses the same card layout.
+  const downloadQrCard = (containerId: string, heading: string, caption: string, link: string, fileName: string) => {
+    const container = document.getElementById(containerId) as HTMLDivElement | null;
+    const svg = container?.querySelector('svg') as SVGSVGElement | null;
     if (!svg) return;
 
-    const serializer = new XMLSerializer();
-    const source = serializer.serializeToString(svg);
-    const svgBlob = new Blob([source], { type: 'image/svg+xml;charset=utf-8' });
-    const url = URL.createObjectURL(svgBlob);
+    const source = new XMLSerializer().serializeToString(svg);
+    const url = URL.createObjectURL(new Blob([source], { type: 'image/svg+xml;charset=utf-8' }));
 
     const img = new Image();
     img.onload = () => {
@@ -152,66 +92,98 @@ export function QRCodeGenerator({
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
 
-      const titleText = restaurantName || 'Company';
-      const qrLink = restaurantId
-        ? `${resolvedBaseUrl}/r/${encodeURIComponent(restaurantId)}/t/${tableNum}`
-        : `${resolvedBaseUrl}/t/${tableNum}`;
-
-      // Background
       ctx.fillStyle = '#f8fafc';
       ctx.fillRect(0, 0, width, height);
-
-      // Card background
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(16, 16, width - 32, height - 32);
       ctx.strokeStyle = '#d1d5db';
       ctx.lineWidth = 2;
       ctx.strokeRect(16, 16, width - 32, height - 32);
 
-      // Header text
       ctx.fillStyle = '#0f172a';
       ctx.font = '700 26px Inter, sans-serif';
       ctx.fillText(titleText, 34, 62);
 
       ctx.fillStyle = '#475569';
       ctx.font = '600 18px Inter, sans-serif';
-      ctx.fillText(`Table ${tableNum}`, 34, 94);
+      ctx.fillText(heading, 34, 94);
 
-      // QR image
-      const qrX = (width - qrSize) / 2;
       const qrY = 120;
-      ctx.drawImage(img, qrX, qrY, qrSize, qrSize);
+      ctx.drawImage(img, (width - qrSize) / 2, qrY, qrSize, qrSize);
 
-      // Footer text
       ctx.fillStyle = '#0f172a';
       ctx.font = '600 16px Inter, sans-serif';
-      ctx.fillText('Scan to order from this table', 34, qrY + qrSize + 32);
+      ctx.fillText(caption, 34, qrY + qrSize + 32);
 
       ctx.fillStyle = '#64748b';
       ctx.font = '400 12px Inter, sans-serif';
-      const linkText = qrLink;
       const maxWidth = width - 68;
-      const linkY = qrY + qrSize + 54;
-      if (ctx.measureText(linkText).width <= maxWidth) {
-        ctx.fillText(linkText, 34, linkY);
-      } else {
-        const ellipsis = '...';
-        let truncated = linkText;
-        while (ctx.measureText(truncated + ellipsis).width > maxWidth && truncated.length > 0) {
-          truncated = truncated.slice(0, -1);
-        }
-        ctx.fillText(`${truncated}${ellipsis}`, 34, linkY);
+      let linkText = link;
+      while (ctx.measureText(linkText + '...').width > maxWidth && linkText.length > 0) {
+        linkText = linkText.slice(0, -1);
       }
+      ctx.fillText(linkText === link ? link : `${linkText}...`, 34, qrY + qrSize + 54);
 
       URL.revokeObjectURL(url);
-      const pngUrl = canvas.toDataURL('image/png');
-      const link = document.createElement('a');
-      link.href = pngUrl;
-      link.download = `${titleText.replace(/\s+/g, '_').toLowerCase()}_table-${tableNum}.png`;
-      link.click();
+      const a = document.createElement('a');
+      a.href = canvas.toDataURL('image/png');
+      a.download = `${filePrefix}_${fileName}.png`;
+      a.click();
     };
     img.src = url;
   };
+
+  const validTables = tables.filter((tableNum) => typeof tableNum === 'number' && Number.isFinite(tableNum));
+  const qrTitle = restaurantName ? `${restaurantName} QR Codes` : 'Table QR Codes';
+
+  // Online ordering and reservations share the table-card look.
+  const shareCards = restaurantId
+    ? [
+        { key: 'online', heading: 'Order Online', caption: 'Scan to order online', link: onlineLink, fileName: 'online-order-qr' },
+        { key: 'reserve', heading: 'Book a Table', caption: 'Scan to book a table', link: reservationLink, fileName: 'reservation-qr' },
+      ]
+    : [];
+
+  const renderCard = (opts: { key: string; heading: string; caption: string; link: string; fileName: string; onDelete?: () => void }) => (
+    <div
+      key={opts.key}
+      className="bg-white p-3 sm:p-6 rounded-xl border border-slate-200 flex flex-col items-center justify-center text-center shadow-md hover:shadow-lg transition-shadow"
+    >
+      <h2 className="text-lg sm:text-2xl font-bold text-slate-900 mb-2">{opts.heading}</h2>
+      {restaurantName && (
+        <p className="text-xs sm:text-sm text-slate-500 mb-2 sm:mb-4">{restaurantName}</p>
+      )}
+      <div id={`qr-container-${opts.key}`} className="mb-3 sm:mb-4 p-1 sm:p-2 bg-white rounded">
+        <QRCode value={opts.link} size={140} level="H" />
+      </div>
+      <div className="flex items-center gap-2 mb-2 sm:mb-3">
+        <button
+          onClick={() => downloadQrCard(`qr-container-${opts.key}`, opts.heading, opts.caption, opts.link, opts.fileName)}
+          className="p-2 rounded-lg bg-amber-500 text-white hover:bg-amber-600 transition-colors"
+          title="Download QR"
+        >
+          <DownloadIcon className="w-4 h-4" />
+        </button>
+        <button
+          onClick={() => handleCopy(opts.key, opts.link)}
+          className="p-2 rounded-lg bg-slate-200 text-slate-700 hover:bg-slate-300 transition-colors"
+          title="Copy link"
+        >
+          {copiedKey === opts.key ? <CheckIcon className="w-4 h-4" /> : <CopyIcon className="w-4 h-4" />}
+        </button>
+        {opts.onDelete && (
+          <button
+            onClick={opts.onDelete}
+            className="p-2 rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors"
+            title="Delete QR"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+        )}
+      </div>
+      <p className="text-xs sm:text-sm text-slate-500 font-medium">{opts.caption}</p>
+    </div>
+  );
 
   return (
     <div className="dark bg-slate-900 p-3 md:p-6">
@@ -236,147 +208,32 @@ export function QRCodeGenerator({
           </div>
         </div>
 
-        {/* Online Ordering QR — Table 999 */}
-        {restaurantId && (
-          <div className="mb-6 p-4 rounded-xl border-2 border-green-500/40 bg-green-500/10">
-            <div className="flex flex-col sm:flex-row items-center gap-6">
-              <div id="qr-container-online" className="p-3 bg-white rounded-lg border border-green-200 flex-shrink-0">
-                <QRCode
-                  value={`${resolvedBaseUrl}/r/${encodeURIComponent(restaurantId)}/t/${ONLINE_TABLE}`}
-                  size={160}
-                  level="H"
-                />
-              </div>
-              <div className="flex-1 text-center sm:text-left">
-                <div className="flex items-center justify-center sm:justify-start gap-2 mb-1">
-                  <GlobeIcon className="w-5 h-5 text-green-400" />
-                  <h2 className="text-lg font-bold text-green-300">Online Ordering QR</h2>
-                  <span className="px-2 py-0.5 text-xs font-semibold rounded bg-green-500/20 text-green-300 border border-green-500/30">
-                    Table {ONLINE_TABLE}
-                  </span>
-                </div>
-                <p className="text-slate-400 text-sm mb-3">
-                  Share this QR code on social media or your website. Customers scan it to browse your menu and place orders online.
-                </p>
-                <div className="mb-4 px-3 py-2 rounded-lg bg-slate-800 border border-slate-600 font-mono text-xs text-green-300 break-all select-all">
-                  {`${resolvedBaseUrl}/r/${encodeURIComponent(restaurantId)}/t/${ONLINE_TABLE}`}
-                </div>
-                <button
-                  onClick={handleDownloadOnlineQR}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 hover:bg-green-500 text-white text-sm font-medium transition-colors"
-                >
-                  <DownloadIcon className="w-4 h-4" />
-                  Download Online QR
-                </button>
-              </div>
+        {shareCards.length > 0 && (
+          <>
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400 mb-3">Share online</h2>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6 mb-8">
+              {shareCards.map((c) => renderCard(c))}
             </div>
-          </div>
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400 mb-3">Tables</h2>
+          </>
         )}
 
-        {/* Reservation Link */}
-        {restaurantId && (
-          <div className="mb-6 p-4 rounded-xl border-2 border-indigo-500/40 bg-indigo-500/10">
-            <div className="flex flex-col sm:flex-row items-center gap-6">
-              <div className="p-3 bg-white rounded-lg border border-indigo-200 flex-shrink-0">
-                <QRCode
-                  value={`${resolvedBaseUrl}/r/${encodeURIComponent(restaurantId)}/t/${ONLINE_TABLE}/reserve`}
-                  size={160}
-                  level="H"
-                />
-              </div>
-              <div className="flex-1 text-center sm:text-left">
-                <div className="flex items-center justify-center sm:justify-start gap-2 mb-1">
-                  <CalendarIcon className="w-5 h-5 text-indigo-400" />
-                  <h2 className="text-lg font-bold text-indigo-300">Reservation Link</h2>
-                </div>
-                <p className="text-slate-400 text-sm mb-3">
-                  Share this link or QR code so customers can book a table directly. Opens the reservation form instantly.
-                </p>
-                <div className="flex items-center gap-2 mb-4">
-                  <div className="flex-1 px-3 py-2 rounded-lg bg-slate-800 border border-slate-600 font-mono text-xs text-indigo-300 break-all select-all">
-                    {`${resolvedBaseUrl}/r/${encodeURIComponent(restaurantId)}/t/${ONLINE_TABLE}/reserve`}
-                  </div>
-                  <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(`${resolvedBaseUrl}/r/${encodeURIComponent(restaurantId)}/t/${ONLINE_TABLE}/reserve`);
-                      setReservationLinkCopied(true);
-                      setTimeout(() => setReservationLinkCopied(false), 2000);
-                    }}
-                    className="p-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white transition-colors flex-shrink-0"
-                    title="Copy link"
-                  >
-                    {reservationLinkCopied ? <CheckIcon className="w-4 h-4" /> : <CopyIcon className="w-4 h-4" />}
-                  </button>
-                </div>
-                <p className="text-xs text-slate-500">
-                  Short form also works: <span className="font-mono text-indigo-400">{resolvedBaseUrl}/t/{ONLINE_TABLE}/reservation</span>
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* QR Grid */}
         {validTables.length === 0 ? (
           <p className="text-center text-slate-300 py-12 md:py-20">
             No tables created yet. Use the "Add Table" button above to generate a new table number and QR code.
           </p>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
-            {validTables.map((tableNum) => {
-              const qrLink = restaurantId
-                ? `${resolvedBaseUrl}/r/${encodeURIComponent(restaurantId)}/t/${tableNum}`
-                : `${resolvedBaseUrl}/t/${tableNum}`;
-              return (
-                <div
-                  key={tableNum}
-                  className="bg-white p-3 sm:p-6 rounded-xl border border-slate-200 flex flex-col items-center justify-center text-center shadow-md hover:shadow-lg transition-shadow"
-                >
-                  <h2 className="text-lg sm:text-2xl font-bold text-slate-900 mb-2">
-                    Table {tableNum}
-                  </h2>
-                  {restaurantName && (
-                    <p className="text-xs sm:text-sm text-slate-500 mb-2 sm:mb-4">{restaurantName}</p>
-                  )}
-
-                  {/* QR Code */}
-                  <div id={`qr-container-${tableNum}`} className="mb-3 sm:mb-4 p-1 sm:p-2 bg-white rounded">
-                    <QRCode
-                      value={qrLink}
-                      size={140}
-                      level="H"
-                    />
-                  </div>
-
-                  {/* Action Buttons */}
-                  <div className="flex items-center gap-2 mb-2 sm:mb-3">
-                    <button
-                      onClick={() => handleDownload(tableNum)}
-                      className="p-2 rounded-lg bg-amber-500 text-white hover:bg-amber-600 transition-colors"
-                      title="Download QR"
-                    >
-                      <DownloadIcon className="w-4 h-4" />
-                    </button>
-                    {onDeleteTable && (
-                      <button
-                        onClick={() => handleDeleteTable(tableNum)}
-                        className="p-2 rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors"
-                        title="Delete QR"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
-
-                  <p className="text-xs sm:text-sm text-slate-500 font-medium">
-                    Scan to order
-                  </p>
-                  <p className="text-[10px] sm:text-xs text-slate-400 mt-1 break-all font-mono hidden sm:block">
-                    {qrLink}
-                  </p>
-                </div>
-              );
-            })}
+            {validTables.map((tableNum) =>
+              renderCard({
+                key: String(tableNum),
+                heading: `Table ${tableNum}`,
+                caption: 'Scan to order from this table',
+                link: tableLink(tableNum),
+                fileName: `table-${tableNum}`,
+                onDelete: onDeleteTable ? () => handleDeleteTable(tableNum) : undefined,
+              })
+            )}
           </div>
         )}
       </div>
