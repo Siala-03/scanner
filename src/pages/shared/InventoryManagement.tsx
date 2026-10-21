@@ -245,7 +245,6 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
   // otherwise the typed name becomes a standalone inventory item.
   const [addMenuSearch, setAddMenuSearch] = useState('');
   const [selectedMenuItemId, setSelectedMenuItemId] = useState('');
-  const [showAddMoreOptions, setShowAddMoreOptions] = useState(false);
   const [isSavingInventoryItem, setIsSavingInventoryItem] = useState(false);
   const [isTrackingAllMenuItems, setIsTrackingAllMenuItems] = useState(false);
   const [addItemNotice, setAddItemNotice] = useState('');
@@ -1272,7 +1271,6 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
   React.useEffect(() => {
     if (showAddInventoryModal) {
       resetAddItemForm();
-      setShowAddMoreOptions(false);
       setAddItemNotice('');
     }
   }, [showAddInventoryModal]);
@@ -3230,71 +3228,61 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
               </label>
             </div>
 
-            {/* More options */}
-            <div>
-              <button
-                onClick={() => setShowAddMoreOptions((v) => !v)}
-                className="text-xs text-slate-400 hover:text-slate-200"
-              >
-                {showAddMoreOptions ? '▾ Fewer options' : '▸ More options (reorder, location, category)'}
-              </button>
-              {showAddMoreOptions && (
-                <div className="mt-3 grid grid-cols-2 gap-3">
-                  <label className="block text-sm text-slate-300">
-                    Reorder point
-                    <input
-                      type="number" min={0} step="0.01"
-                      placeholder={String(newInventoryItemLowThreshold)}
-                      value={newInventoryItemReorderPoint ?? ''}
-                      onChange={(e) => setNewInventoryItemReorderPoint(e.target.value === '' ? null : toQty(e.target.value))}
-                      className={`mt-1 ${addItemInputClass}`}
-                    />
-                  </label>
-                  <label className="block text-sm text-slate-300">
-                    Reorder qty
-                    <input
-                      type="number" min={0} step="0.01"
-                      placeholder={String(Math.max(1, (newInventoryItemReorderPoint ?? newInventoryItemLowThreshold) * 2))}
-                      value={newInventoryItemReorderQty ?? ''}
-                      onChange={(e) => setNewInventoryItemReorderQty(e.target.value === '' ? null : toQty(e.target.value))}
-                      className={`mt-1 ${addItemInputClass}`}
-                    />
-                  </label>
-                  <label className={`block text-sm text-slate-300 ${selectedMenuItemId ? 'col-span-2' : ''}`}>
-                    Storage location
-                    <select
-                      value={newInventoryItemLocation}
-                      onChange={(e) => setNewInventoryItemLocation(e.target.value)}
-                      className={`mt-1 ${addItemInputClass}`}
-                    >
-                      <option value="">— None —</option>
-                      {locations.map((loc) => (
-                        <option key={loc.id} value={loc.name}>{loc.name}</option>
-                      ))}
-                    </select>
-                  </label>
-                  {!selectedMenuItemId && (
-                    <label className="block text-sm text-slate-300">
-                      Category
-                      <input
-                        placeholder="e.g. Cleaning"
-                        value={newInventoryItemCategory}
-                        onChange={(e) => setNewInventoryItemCategory(e.target.value)}
-                        className={`mt-1 ${addItemInputClass}`}
-                        list="standalone-category-suggestions"
-                      />
-                      <datalist id="standalone-category-suggestions">
-                        {inventoryCategories.filter((c) => c !== 'all').map((c) => (
-                          <option key={c} value={c} />
-                        ))}
-                      </datalist>
-                    </label>
-                  )}
-                  <p className="col-span-2 text-xs text-slate-500">
-                    Leave reorder fields empty to reorder at the alert level, ordering 2× that amount.
-                  </p>
-                </div>
+            {/* Reorder, location, category */}
+            <div className="grid grid-cols-2 gap-3">
+              <label className="block text-sm text-slate-300">
+                Reorder point
+                <input
+                  type="number" min={0} step="0.01"
+                  placeholder={String(newInventoryItemLowThreshold)}
+                  value={newInventoryItemReorderPoint ?? ''}
+                  onChange={(e) => setNewInventoryItemReorderPoint(e.target.value === '' ? null : toQty(e.target.value))}
+                  className={`mt-1 ${addItemInputClass}`}
+                />
+              </label>
+              <label className="block text-sm text-slate-300">
+                Reorder qty
+                <input
+                  type="number" min={0} step="0.01"
+                  placeholder={String(Math.max(1, (newInventoryItemReorderPoint ?? newInventoryItemLowThreshold) * 2))}
+                  value={newInventoryItemReorderQty ?? ''}
+                  onChange={(e) => setNewInventoryItemReorderQty(e.target.value === '' ? null : toQty(e.target.value))}
+                  className={`mt-1 ${addItemInputClass}`}
+                />
+              </label>
+              <label className={`block text-sm text-slate-300 ${selectedMenuItemId ? 'col-span-2' : ''}`}>
+                Storage location
+                <select
+                  value={newInventoryItemLocation}
+                  onChange={(e) => setNewInventoryItemLocation(e.target.value)}
+                  className={`mt-1 ${addItemInputClass}`}
+                >
+                  <option value="">— None —</option>
+                  {locations.map((loc) => (
+                    <option key={loc.id} value={loc.name}>{loc.name}</option>
+                  ))}
+                </select>
+              </label>
+              {!selectedMenuItemId && (
+                <label className="block text-sm text-slate-300">
+                  Category
+                  <input
+                    placeholder="e.g. Cleaning"
+                    value={newInventoryItemCategory}
+                    onChange={(e) => setNewInventoryItemCategory(e.target.value)}
+                    className={`mt-1 ${addItemInputClass}`}
+                    list="standalone-category-suggestions"
+                  />
+                  <datalist id="standalone-category-suggestions">
+                    {inventoryCategories.filter((c) => c !== 'all').map((c) => (
+                      <option key={c} value={c} />
+                    ))}
+                  </datalist>
+                </label>
               )}
+              <p className="col-span-2 text-xs text-slate-500">
+                Leave reorder fields empty to reorder at the alert level, ordering 2× that amount.
+              </p>
             </div>
 
             {addItemError && (
