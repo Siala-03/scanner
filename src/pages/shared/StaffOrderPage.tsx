@@ -1436,7 +1436,7 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
         </div>
 
         {/* ── Desktop cart ── */}
-        <div className="hidden md:flex w-80 flex-shrink-0 flex-col">
+        <div className="hidden md:flex md:w-96 lg:w-[28rem] flex-shrink-0 flex-col">
           <CartPanel
             cart={cart}
             cartTotal={cartTotal}
