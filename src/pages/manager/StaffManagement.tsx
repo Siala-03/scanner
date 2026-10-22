@@ -739,10 +739,10 @@ export function StaffManagement({ onShowPerformance }: StaffManagementProps) {
           isOpen={isCredentialModalOpen}
           onClose={() => setIsCredentialModalOpen(false)}
           title={`Manage Access: ${selectedStaffForCreds?.name}`}
-          variant="light">
+          variant="dark">
 
           <div className="space-y-4">
-            <p className="text-sm text-slate-600 mb-4">
+            <p className="text-sm text-slate-400 mb-4">
               Set up login credentials for this staff member to access their
               portal.
             </p>
@@ -761,7 +761,7 @@ export function StaffManagement({ onShowPerformance }: StaffManagementProps) {
               placeholder="Enter new password" />
 
             {credSaveError && (
-              <div className="rounded-md bg-red-500/15 border border-red-500 text-red-600 px-3 py-2 text-sm">
+              <div className="rounded-md bg-red-500/15 border border-red-500 text-red-300 px-3 py-2 text-sm">
                 {credSaveError}
               </div>
             )}
@@ -783,8 +783,8 @@ export function StaffManagement({ onShowPerformance }: StaffManagementProps) {
             </div>
 
             {/* PIN section — independent of credentials */}
-            <div className="border-t border-slate-200 pt-4 mt-2">
-              <p className="text-sm font-semibold text-slate-700 mb-3">
+            <div className="border-t border-slate-600 pt-4 mt-2">
+              <p className="text-sm font-semibold text-slate-200 mb-3">
                 Shared Terminal PIN
                 <span className="ml-1.5 text-xs font-normal text-slate-400">4 digits, required on shared tablet</span>
               </p>
@@ -797,7 +797,7 @@ export function StaffManagement({ onShowPerformance }: StaffManagementProps) {
                     value={newPin}
                     onChange={(e) => { setNewPin(e.target.value.replace(/\D/g, '').slice(0, 4)); setCredSaveError(null); }}
                     placeholder={pinAlreadySet ? 'Enter new PIN to replace' : 'e.g. 1234'}
-                    className="w-full px-3 py-2.5 rounded-lg border border-slate-300 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 text-sm tracking-widest"
+                    className="w-full px-3 py-2.5 rounded-lg border border-slate-600 bg-slate-900 text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 text-sm tracking-widest"
                   />
                 </div>
                 <button
@@ -811,11 +811,11 @@ export function StaffManagement({ onShowPerformance }: StaffManagementProps) {
               </div>
               {pinAlreadySet && (
                 <div className="flex items-center justify-between mt-2">
-                  <p className="text-xs text-slate-500">A PIN is already set.</p>
+                  <p className="text-xs text-slate-400">A PIN is already set.</p>
                   <button
                     type="button"
                     onClick={() => { if (selectedStaffForCreds) { clearStaffPinRemote(selectedStaffForCreds.id).catch(() => {}); setPinAlreadySet(false); setNewPin(''); } }}
-                    className="text-xs text-red-500 hover:underline"
+                    className="text-xs text-red-400 hover:underline"
                   >
                     Remove PIN
                   </button>
@@ -840,7 +840,7 @@ export function StaffManagement({ onShowPerformance }: StaffManagementProps) {
               placeholder="e.g. Aline Mukamana"
             />
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
+              <label className="block text-sm font-medium text-slate-300 mb-1.5">
                 Role
               </label>
               <select
@@ -848,7 +848,7 @@ export function StaffManagement({ onShowPerformance }: StaffManagementProps) {
                 onChange={(e) =>
                   setAddForm((p) => ({ ...p, role: e.target.value as StaffRole }))
                 }
-                className="w-full px-4 py-2 rounded-lg bg-white border border-slate-100 text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                className="w-full px-4 py-2 rounded-lg bg-slate-900 border border-slate-600 text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
               >
                 <option value="waiter">Waiter</option>
                 <option value="cashier">Cashier</option>
