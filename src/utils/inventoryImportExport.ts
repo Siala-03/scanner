@@ -8,27 +8,32 @@ export interface InventoryImportRow {
   purchaseDate?: string;
   qtyStart?: number;
   stock: number;
-  lowStockThreshold: number;
-  reorderPoint: number;
-  reorderQty: number;
+  // Optional: only set when the file has the column, so re-importing doesn't
+  // wipe values the template doesn't include.
+  lowStockThreshold?: number;
+  reorderPoint?: number;
+  reorderQty?: number;
   unitCost: number;
   price?: number;
-  location: string;
+  location?: string;
   unitMeasurement: string;
 }
 
-const CSV_HEADERS = [
-  'Item_ID',
-  'Description',
-  'Category',
-  'Expiry_Date',
-  'Purchase_Date',
-  'Qty_Start',
-  'Current_Qty',
-  'Cost',
-  'Price',
-  'Location',
-];
+// Template columns: only what people actually fill in. Items are matched by
+// Name (menu items by their menu name), so no ID column is needed.
+// Expiry_Date is only included for minimart stock.
+function templateHeaders(includeExpiry: boolean): string[] {
+  return [
+    'Name',
+    'Category',
+    'Unit',
+    'Current_Qty',
+    'Cost',
+    'Price',
+    'Purchase_Date',
+    ...(includeExpiry ? ['Expiry_Date'] : []),
+  ];
+}
 
 function csvEsc(val: unknown): string {
   const s = String(val ?? '');
@@ -55,35 +60,32 @@ export function exportInventoryToCsv(
       stock: number;
       description?: string;
       category?: string;
-      qtyStart?: number;
       currentQty?: number;
       cost?: number;
       price?: number;
       expiryDate?: string;
       purchaseDate?: string;
-      lowStockThreshold: number;
-      reorderPoint: number;
-      reorderQty: number;
       unitCost: number;
-      location?: string;
       unitMeasurement?: string;
     };
-  }[]
+  }[],
+  options: { includeExpiry?: boolean } = {}
 ): void {
+  const includeExpiry = !!options.includeExpiry;
+  // Item_ID comes first so re-importing an export updates the exact same records.
   const lines = [
-    CSV_HEADERS.join(','),
+    ['Item_ID', ...templateHeaders(includeExpiry)].join(','),
     ...rows.map((r) =>
       [
         csvEsc(r.item.id),
-        csvEsc(r.rec?.description ?? r.item.name),
+        csvEsc(r.item.name || r.rec?.description || ''),
         csvEsc(r.rec?.category ?? r.item.category ?? ''),
-        csvEsc(r.rec?.expiryDate ?? ''),
-        csvEsc(r.rec?.purchaseDate ?? ''),
-        r.rec?.qtyStart ?? r.rec?.stock ?? 0,
+        csvEsc(r.rec?.unitMeasurement ?? 'units'),
         r.rec?.currentQty ?? r.rec?.stock ?? 0,
         r.rec?.cost ?? r.rec?.unitCost ?? 0,
         r.rec?.price ?? r.item.price ?? 0,
-        csvEsc(r.rec?.location ?? ''),
+        csvEsc(r.rec?.purchaseDate ?? ''),
+        ...(includeExpiry ? [csvEsc(r.rec?.expiryDate ?? '')] : []),
       ].join(',')
     ),
   ].join('\r\n');
@@ -94,13 +96,14 @@ export function exportInventoryToCsv(
   );
 }
 
-export function downloadInventoryTemplate(): void {
+export function downloadInventoryTemplate(options: { includeExpiry?: boolean } = {}): void {
+  const includeExpiry = !!options.includeExpiry;
   const examples = [
-    'item-example-001,Coca Cola,Beverages,2026-12-31,2026-05-01,24,24,500,700,Bar Fridge',
-    'item-example-002,Heineken Beer,Beverages,2027-02-28,2026-05-01,48,48,1200,1700,Fridge 2',
-    'item-example-003,Tomatoes,Produce,2026-05-10,2026-05-02,10,10,200,350,Dry Store',
-  ];
-  const csv = [CSV_HEADERS.join(','), ...examples].join('\n');
+    ['Coca Cola', 'Beverages', 'bottles', 24, 500, 700, '2026-05-01', '2026-12-31'],
+    ['Tomatoes', 'Produce', 'kg', 10, 1200, 0, '2026-05-02', '2026-05-10'],
+    ['Paper Napkins', 'Supplies', 'packs', 30, 800, 0, '2026-05-01', ''],
+  ].map((r) => (includeExpiry ? r : r.slice(0, 7)).join(','));
+  const csv = [templateHeaders(includeExpiry).join(','), ...examples].join('\n');
   dl(new Blob([csv], { type: 'text/csv' }), 'inventory-template.csv');
 }
 
@@ -109,15 +112,23 @@ function roundQty(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
+// Value of an optional numeric column, or undefined when the column is absent/blank.
+function optQty(v: unknown): number | undefined {
+  if (v === undefined || v === null || String(v).trim() === '') return undefined;
+  const n = Number(v);
+  return Number.isFinite(n) ? roundQty(n) : undefined;
+}
+
+function optText(v: unknown): string | undefined {
+  return v === undefined || v === null ? undefined : String(v);
+}
+
 function nk(k: string): string {
   return k.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
 function todayIso(): string {
   return new Date().toISOString().split('T')[0];
-}
-function expiryIso(): string {
-  return new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 }
 
 /** Normalise any common date string to YYYY-MM-DD for Postgres.
@@ -180,29 +191,29 @@ function parseCsvRows(content: string): InventoryImportRow[] {
     const row: Record<string, string> = {};
     headers.forEach((h, idx) => { row[h] = values[idx] ?? ''; });
 
-    const id = row.itemid || row.menuitemid || row.menuitemid || row.id || '';
+    const id = (row.itemid || row.menuitemid || row.id || row.name || '').trim();
     if (!id) continue;
 
     const stock = roundQty(parseFloat(row.currentqty ?? row.stock ?? row.qtystart ?? '0') || 0);
     const qtyStart = roundQty(parseFloat(row.qtystart ?? String(stock)) || stock);
-    const rawDescription = row.description ?? row.desc ?? row.details;
+    const rawDescription = row.name ?? row.description ?? row.desc ?? row.details;
     const rawCategory = row.category ?? row.cat ?? '';
 
     results.push({
       menuItemId: id,
       description: rawDescription === undefined ? undefined : String(rawDescription).trim(),
       category: rawCategory ? String(rawCategory).trim() : undefined,
-      expiryDate: normaliseDate(row.expirydate) || expiryIso(),
+      expiryDate: normaliseDate(row.expirydate) || undefined,
       purchaseDate: normaliseDate(row.purchasedate) || todayIso(),
       qtyStart,
       stock,
-      lowStockThreshold: roundQty(parseFloat(row.lowstockthreshold ?? row.threshold ?? '5') || 5),
-      reorderPoint: roundQty(parseFloat(row.reorderpoint ?? '5') || 5),
-      reorderQty: roundQty(parseFloat(row.reorderqty ?? '20') || 20),
+      lowStockThreshold: optQty(row.lowstockthreshold ?? row.threshold),
+      reorderPoint: optQty(row.reorderpoint),
+      reorderQty: optQty(row.reorderqty),
       unitCost: Math.round((parseFloat(row.cost ?? row.unitcost ?? '0') || 0) * 100) / 100,
       price: Math.round((parseFloat(row.price ?? '0') || 0) * 100) / 100,
-      location: row.location ?? '',
-      unitMeasurement: row.unitmeasurement ?? row.unit ?? 'units',
+      location: optText(row.location),
+      unitMeasurement: row.unitmeasurement || row.unit || 'units',
     });
   }
 
@@ -219,29 +230,29 @@ function parseExcelRows(buffer: ArrayBuffer): InventoryImportRow[] {
       const row: Record<string, any> = Object.fromEntries(
         Object.entries(raw).map(([k, v]) => [nk(k), v])
       );
-      const id = String(row.menuitemid || row.itemid || row.id || '');
+      const id = String(row.itemid || row.menuitemid || row.id || row.name || '').trim();
       if (!id) return null;
 
       const stock = roundQty(Number(row.currentqty ?? row.stock ?? row.qtystart ?? 0));
       const qtyStart = roundQty(Number(row.qtystart ?? stock));
-      const rawDescription = row.description ?? row.desc ?? row.details;
+      const rawDescription = row.name ?? row.description ?? row.desc ?? row.details;
       const rawCategory = row.category ?? row.cat ?? '';
 
       return {
         menuItemId: id,
         description: rawDescription === undefined ? undefined : String(rawDescription).trim(),
         category: rawCategory ? String(rawCategory).trim() : undefined,
-        expiryDate: normaliseDate(row.expirydate) || expiryIso(),
+        expiryDate: normaliseDate(row.expirydate) || undefined,
         purchaseDate: normaliseDate(row.purchasedate) || todayIso(),
         qtyStart,
         stock,
-        lowStockThreshold: roundQty(Number(row.lowstockthreshold ?? row.threshold ?? 5)),
-        reorderPoint: roundQty(Number(row.reorderpoint ?? 5)),
-        reorderQty: roundQty(Number(row.reorderqty ?? 20)),
+        lowStockThreshold: optQty(row.lowstockthreshold ?? row.threshold),
+        reorderPoint: optQty(row.reorderpoint),
+        reorderQty: optQty(row.reorderqty),
         unitCost: Math.round((Number(row.cost ?? row.unitcost ?? 0)) * 100) / 100,
         price: Math.round((Number(row.price ?? 0)) * 100) / 100,
-        location: String(row.location ?? ''),
-        unitMeasurement: String(row.unitmeasurement ?? row.unit ?? 'units'),
+        location: optText(row.location),
+        unitMeasurement: String(row.unitmeasurement || row.unit || 'units'),
       } as InventoryImportRow;
     })
     .filter((r): r is InventoryImportRow => r !== null);
@@ -262,19 +273,19 @@ export async function importInventoryFromFile(file: File): Promise<InventoryImpo
     const data: unknown = JSON.parse(await file.text());
     if (!Array.isArray(data)) throw new Error('JSON must be an array of objects');
     return (data as any[]).map((r, i) => ({
-      menuItemId: String(r.menu_item_id || r.menuItemId || r.id || `row-${i}`),
-      description: String(r.description ?? ''),
+      menuItemId: String(r.menu_item_id || r.menuItemId || r.id || r.name || `row-${i}`),
+      description: String(r.name ?? r.description ?? ''),
       category: String(r.category ?? r.cat ?? ''),
-      expiryDate: normaliseDate(r.expiry_date ?? r.expiryDate) || expiryIso(),
+      expiryDate: normaliseDate(r.expiry_date ?? r.expiryDate) || undefined,
       purchaseDate: normaliseDate(r.purchase_date ?? r.purchaseDate) || todayIso(),
       qtyStart: roundQty(Number(r.qty_start ?? r.qtyStart ?? r.current_qty ?? r.currentQty ?? r.stock ?? 0)),
       stock: roundQty(Number(r.current_qty ?? r.currentQty ?? r.stock ?? 0)),
-      lowStockThreshold: roundQty(Number(r.low_stock_threshold ?? r.lowStockThreshold ?? 5)),
-      reorderPoint: roundQty(Number(r.reorder_point ?? r.reorderPoint ?? 5)),
-      reorderQty: roundQty(Number(r.reorder_qty ?? r.reorderQty ?? 20)),
+      lowStockThreshold: optQty(r.low_stock_threshold ?? r.lowStockThreshold),
+      reorderPoint: optQty(r.reorder_point ?? r.reorderPoint),
+      reorderQty: optQty(r.reorder_qty ?? r.reorderQty),
       unitCost: Math.round((Number(r.cost ?? r.unit_cost ?? r.unitCost ?? 0)) * 100) / 100,
       price: Math.round((Number(r.price ?? r.selling_price ?? r.sellingPrice ?? 0)) * 100) / 100,
-      location: String(r.location ?? ''),
+      location: optText(r.location),
       unitMeasurement: String(r.unit_measurement ?? r.unitMeasurement ?? 'units'),
     }));
   }

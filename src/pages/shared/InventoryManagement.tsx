@@ -257,6 +257,8 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
   const [newInventoryItemReorderQty, setNewInventoryItemReorderQty] = useState<number | null>(null);
   const [newInventoryItemUnitCost, setNewInventoryItemUnitCost] = useState(0);
   const [newInventoryItemPrice, setNewInventoryItemPrice] = useState(0);
+  const todayDate = () => new Date().toISOString().split('T')[0];
+  const [newInventoryItemPurchaseDate, setNewInventoryItemPurchaseDate] = useState(todayDate);
   const [newInventoryItemUnitMeasurement, setNewInventoryItemUnitMeasurement] = useState('units');
 
   // ── Link inventory to product/menu modal state ──────────────────────────
@@ -469,6 +471,7 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
     setNewInventoryItemReorderQty(null);
     setNewInventoryItemUnitCost(0);
     setNewInventoryItemPrice(0);
+    setNewInventoryItemPurchaseDate(todayDate());
     setNewInventoryItemUnitMeasurement('units');
     setAddItemError('');
   };
@@ -501,6 +504,7 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
         reorderQty,
         unitCost: newInventoryItemUnitCost,
         price: newInventoryItemPrice,
+        ...(newInventoryItemPurchaseDate ? { purchaseDate: newInventoryItemPurchaseDate } : {}),
         unitMeasurement: newInventoryItemUnitMeasurement,
         location: newInventoryItemLocation,
         ...(!isMenuItem
@@ -721,9 +725,8 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
       unitCost: rec?.unitCost ?? 0,
       price: rec?.price ?? 0,
       location: rec?.location,
-      ...(isMinimartScope
-        ? { qtyStart: rec?.qtyStart, purchaseDate: rec?.purchaseDate, expiryDate: rec?.expiryDate }
-        : {}),
+      purchaseDate: rec?.purchaseDate,
+      ...(isMinimartScope ? { qtyStart: rec?.qtyStart, expiryDate: rec?.expiryDate } : {}),
     });
   };
 
@@ -1382,7 +1385,7 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
           rec,
         })),
     ];
-    exportInventoryToCsv(allRows);
+    exportInventoryToCsv(allRows, { includeExpiry: isMinimartScope });
     setIsExportInventoryOpen(false);
   };
 
@@ -1404,12 +1407,21 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
       for (const row of rows) {
         if (!row.menuItemId || !row.menuItemId.trim()) {
           failed++;
-          errors.push(`Row skipped: missing or empty Item ID`);
+          errors.push(`Row skipped: missing Name`);
           continue;
         }
 
         try {
-          const hasDescription = row.description !== undefined;
+          // Rows from the template carry a Name instead of an ID: match it to a menu
+          // item so sales deduct stock; otherwise it's a standalone item keyed by name.
+          const key = row.menuItemId.trim().toLowerCase();
+          const menuMatchId = menuItemMap[row.menuItemId]
+            ? row.menuItemId
+            : menuItems.find((m) => m.name.trim().toLowerCase() === key)?.id;
+          const targetId = menuMatchId ?? row.menuItemId;
+          // For menu items the Name column is just the menu name — never write it
+          // as a description. For standalone items the name *is* the description.
+          const hasDescription = row.description !== undefined && !menuMatchId;
           const descriptionValue = row.description ?? '';
           const hasCategory = row.category !== undefined;
           const categoryValue = row.category ?? '';
@@ -1421,7 +1433,7 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
             location: row.location,
           });
 
-          await apiUpdateInventoryRecord(row.menuItemId, {
+          await apiUpdateInventoryRecord(targetId, {
             stock:             row.stock,
             lowStockThreshold: row.lowStockThreshold,
             reorderPoint:      row.reorderPoint,
@@ -1437,10 +1449,6 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
             purchaseDate:      row.purchaseDate,
             qtyStart:          row.qtyStart,
           });
-
-          if (!isMinimartScope && hasDescription && menuItemMap[row.menuItemId]) {
-            await apiUpdateMenuItem(row.menuItemId, { description: descriptionValue } as any);
-          }
 
           successful++;
           console.log(`✓ Item ${row.menuItemId} imported successfully`);
@@ -1524,7 +1532,7 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
               {isManager && activeTab === 'overview' && (
                 <>
                   {/* Template */}
-                  <Button variant="ghost" size="sm" onClick={downloadInventoryTemplate}>
+                  <Button variant="ghost" size="sm" onClick={() => downloadInventoryTemplate({ includeExpiry: isMinimartScope })}>
                     <FileSpreadsheetIcon className="w-4 h-4" />
                     <span className="hidden sm:inline">Template</span>
                   </Button>
@@ -1780,7 +1788,7 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
             {/* Table */}
             <Card className="bg-slate-800/50 border border-slate-700/50" padding="none">
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[720px]">
+                <table className="w-full min-w-[900px]">
                   <thead className="bg-slate-700/40 border-b border-slate-700/50">
                     <tr>
                       {isManager && (
@@ -1809,10 +1817,12 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                         </th>
                       )}
                       <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Item</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Category</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Stock</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Unit Cost</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Price</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Value</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Purchase Date</th>
                       {isManager && <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Actions</th>}
                     </tr>
                   </thead>
@@ -1866,7 +1876,6 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                                   ) : null;
                                 })()}
                                 <div className="flex items-center gap-1.5 mt-0.5">
-                                  <p className="text-xs text-slate-500">{row.item.category.replace(/-/g, ' ')}</p>
                                   {expiryDays !== null && expiryDays <= 7 && (
                                     <span className="px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-red-500/15 text-red-300 border border-red-500/25">
                                       {expiryDays < 0 ? 'Expired' : expiryDays === 0 ? 'Expires today' : `Expires in ${expiryDays}d`}
@@ -1881,6 +1890,9 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                                 </div>
                               </div>
                             </button>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-slate-300 capitalize">
+                            {(row.rec?.category || row.item.category || '—').replace(/-/g, ' ')}
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-2">
@@ -1901,6 +1913,7 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                           <td className="px-4 py-3 text-sm text-slate-300">{formatPrice(row.rec?.unitCost ?? 0)}</td>
                           <td className="px-4 py-3 text-sm text-slate-300">{formatPrice(row.rec?.price ?? 0)}</td>
                           <td className="px-4 py-3 text-sm text-slate-300">{formatPrice((row.rec?.unitCost ?? 0) * row.stock)}</td>
+                          <td className="px-4 py-3 text-sm text-slate-300 whitespace-nowrap">{row.rec?.purchaseDate || '—'}</td>
                           {isManager && (
                             <td className="px-4 py-3">
                               <div className="flex items-center gap-1 whitespace-nowrap">
@@ -2979,6 +2992,15 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                       ))}
                     </select>
                   </label>
+                  <label className="block text-sm text-slate-300">
+                    Purchase date
+                    <input
+                      type="date"
+                      value={editValues.purchaseDate ?? ''}
+                      onChange={(e) => setEditValues((v) => ({ ...v, purchaseDate: e.target.value }))}
+                      className={`mt-1 ${addItemInputClass}`}
+                    />
+                  </label>
                   <label className="block col-span-2 text-sm text-slate-300">
                     Category
                     <input
@@ -2994,15 +3016,6 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                     <>
                       {numField('qtyStart', 'Start qty')}
                       <label className="block text-sm text-slate-300">
-                        Purchase date
-                        <input
-                          type="date"
-                          value={editValues.purchaseDate ?? ''}
-                          onChange={(e) => setEditValues((v) => ({ ...v, purchaseDate: e.target.value }))}
-                          className={`mt-1 ${addItemInputClass}`}
-                        />
-                      </label>
-                      <label className="block col-span-2 text-sm text-slate-300">
                         Expiry date
                         <input
                           type="date"
@@ -3215,7 +3228,7 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                   className={`mt-1 ${addItemInputClass}`}
                 />
               </label>
-              <label className={`block text-sm text-slate-300 ${selectedMenuItemId ? 'col-span-2' : ''}`}>
+              <label className="block text-sm text-slate-300">
                 Storage location
                 <select
                   value={newInventoryItemLocation}
@@ -3228,8 +3241,17 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                   ))}
                 </select>
               </label>
+              <label className="block text-sm text-slate-300">
+                Purchase date
+                <input
+                  type="date"
+                  value={newInventoryItemPurchaseDate}
+                  onChange={(e) => setNewInventoryItemPurchaseDate(e.target.value)}
+                  className={`mt-1 ${addItemInputClass}`}
+                />
+              </label>
               {!selectedMenuItemId && (
-                <label className="block text-sm text-slate-300">
+                <label className="block col-span-2 text-sm text-slate-300">
                   Category
                   <input
                     placeholder="e.g. Cleaning"
