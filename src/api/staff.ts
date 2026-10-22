@@ -160,6 +160,23 @@ export async function updateStaffRole(id: string, role: StaffRole): Promise<Staf
   return normalizeStaff(data);
 }
 
+export async function updateStaffDetails(
+  id: string,
+  details: { name: string; email: string; phone: string },
+): Promise<Staff> {
+  const restaurantId = getRestaurantId();
+  if (!restaurantId) throw new Error('No company selected');
+  const { data, error } = await supabase
+    .from('staff')
+    .update({ name: details.name, email: details.email, phone: details.phone })
+    .eq('id', id)
+    .eq('restaurant_id', restaurantId)
+    .select()
+    .single();
+  if (error) throw error;
+  return normalizeStaff(data);
+}
+
 export async function deleteStaff(id: string): Promise<{ success: boolean }> {
   await callEdgeFn('admin-staff', { method: 'DELETE', params: { staff_id: id } });
   return { success: true };

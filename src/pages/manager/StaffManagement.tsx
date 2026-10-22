@@ -13,7 +13,7 @@ import { addStaffCredential } from '../../data/staffData';
 import { useStaff } from '../../hooks/useStaff';
 import { useTables } from '../../hooks/useTables';
 import { signUpStaff } from '../../api/auth';
-import { updateStaffAssignments, updateStaffStatus, updateStaffRole, deleteStaff, updateStaffCredentials, fetchStaffCredentialsUsername } from '../../api/staff';
+import { updateStaffAssignments, updateStaffStatus, updateStaffRole, updateStaffDetails, deleteStaff, updateStaffCredentials, fetchStaffCredentialsUsername } from '../../api/staff';
 import { saveStaffPin, clearStaffPinRemote, fetchPinHashes } from '../../utils/staffPin';
 import { useKPIs } from '../../hooks/useKPIs';
 import { createKPI, updateKPI, deleteKPI } from '../../api/kpis';
@@ -50,6 +50,43 @@ export function StaffManagement({ onShowPerformance }: StaffManagementProps) {
   const [selectedRole, setSelectedRole] = useState<StaffRole | 'all'>('all');
   const [isCredentialModalOpen, setIsCredentialModalOpen] = useState(false);
   const [isAddStaffOpen, setIsAddStaffOpen] = useState(false);
+  // Edit Staff modal
+  const [editStaffTarget, setEditStaffTarget] = useState<Staff | null>(null);
+  const [editStaffForm, setEditStaffForm] = useState({ name: '', email: '', phone: '', role: 'waiter' as StaffRole });
+  const [isSavingStaffEdit, setIsSavingStaffEdit] = useState(false);
+  const [editStaffError, setEditStaffError] = useState<string | null>(null);
+
+  const openEditStaff = (member: Staff) => {
+    setEditStaffTarget(member);
+    setEditStaffForm({ name: member.name ?? '', email: member.email ?? '', phone: member.phone ?? '', role: member.role });
+    setEditStaffError(null);
+  };
+
+  const handleSaveStaffEdit = async () => {
+    if (!editStaffTarget) return;
+    if (!editStaffForm.name.trim()) {
+      setEditStaffError('Name is required');
+      return;
+    }
+    setIsSavingStaffEdit(true);
+    setEditStaffError(null);
+    try {
+      await updateStaffDetails(editStaffTarget.id, {
+        name: editStaffForm.name.trim(),
+        email: editStaffForm.email.trim(),
+        phone: editStaffForm.phone.trim(),
+      });
+      if (editStaffForm.role !== editStaffTarget.role) {
+        await updateStaffRole(editStaffTarget.id, editStaffForm.role);
+      }
+      await refetch();
+      setEditStaffTarget(null);
+    } catch (err: any) {
+      setEditStaffError(err?.message || 'Failed to save changes');
+    } finally {
+      setIsSavingStaffEdit(false);
+    }
+  };
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
   const [selectedStaffForCreds, setSelectedStaffForCreds] = useState<Staff | null>(null);
   const [selectedStaffForAssign, setSelectedStaffForAssign] = useState<Staff | null>(null);
@@ -446,7 +483,7 @@ export function StaffManagement({ onShowPerformance }: StaffManagementProps) {
                         {member.isOnDuty ? 'On Duty' : 'Off Duty'}
                       </Badge>
                       <div className="flex gap-0.5 shrink-0">
-                        <Button variant="ghost" size="sm" className="p-1.5">
+                        <Button variant="ghost" size="sm" className="p-1.5" onClick={() => openEditStaff(member)}>
                           <EditIcon className="w-3.5 h-3.5" />
                         </Button>
                         <Button 
@@ -825,6 +862,59 @@ export function StaffManagement({ onShowPerformance }: StaffManagementProps) {
                   </button>
                 </div>
               )}
+            </div>
+          </div>
+        </Modal>
+
+        {/* Edit Staff Modal */}
+        <Modal
+          isOpen={!!editStaffTarget}
+          onClose={() => setEditStaffTarget(null)}
+          title={`Edit ${editStaffTarget?.name ?? 'Staff'}`}
+          variant="dark"
+        >
+          <div className="space-y-4">
+            <Input
+              label="Full Name"
+              value={editStaffForm.name}
+              onChange={(e) => setEditStaffForm((p) => ({ ...p, name: e.target.value }))}
+            />
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-1.5">Role</label>
+              <select
+                value={editStaffForm.role}
+                onChange={(e) => setEditStaffForm((p) => ({ ...p, role: e.target.value as StaffRole }))}
+                className="w-full px-4 py-2 rounded-lg bg-slate-900 border border-slate-600 text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+              >
+                <option value="waiter">Waiter</option>
+                <option value="cashier">Cashier</option>
+                <option value="kitchen">Kitchen</option>
+                <option value="supervisor">Supervisor</option>
+                <option value="manager">Manager</option>
+              </select>
+            </div>
+            <Input
+              label="Email"
+              value={editStaffForm.email}
+              onChange={(e) => setEditStaffForm((p) => ({ ...p, email: e.target.value }))}
+            />
+            <Input
+              label="Phone"
+              value={editStaffForm.phone}
+              onChange={(e) => setEditStaffForm((p) => ({ ...p, phone: e.target.value }))}
+            />
+            {editStaffError && (
+              <div className="rounded-md bg-red-500/15 border border-red-500 text-red-300 px-3 py-2 text-sm">
+                {editStaffError}
+              </div>
+            )}
+            <div className="flex gap-3 pt-2">
+              <Button variant="secondary" fullWidth onClick={() => setEditStaffTarget(null)}>
+                Cancel
+              </Button>
+              <Button variant="primary" fullWidth onClick={handleSaveStaffEdit} disabled={isSavingStaffEdit}>
+                {isSavingStaffEdit ? 'Saving…' : 'Save Changes'}
+              </Button>
             </div>
           </div>
         </Modal>
