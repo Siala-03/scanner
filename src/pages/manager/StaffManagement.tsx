@@ -424,13 +424,13 @@ export function StaffManagement({ onShowPerformance }: StaffManagementProps) {
               }}>
 
                 <Card className="bg-slate-800 flex flex-col h-full">
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-full bg-slate-700 flex items-center justify-center text-white font-medium text-lg">
+                  <div className="flex items-start justify-between gap-2 mb-4">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-12 h-12 shrink-0 rounded-full bg-slate-700 flex items-center justify-center text-white font-medium text-lg">
                         {nameInitials(member.name)}
                       </div>
-                      <div>
-                        <h3 className="font-semibold text-gray-100">
+                      <div className="min-w-0">
+                        <h3 className="font-semibold text-gray-100 truncate">
                           {member.name}
                         </h3>
                         <p className="text-sm text-slate-400 capitalize">
@@ -438,12 +438,37 @@ export function StaffManagement({ onShowPerformance }: StaffManagementProps) {
                         </p>
                       </div>
                     </div>
-                    <Badge
-                    variant={member.isOnDuty ? 'ready' : 'served'}
-                    size="sm">
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Badge
+                      variant={member.isOnDuty ? 'ready' : 'served'}
+                      size="sm">
 
-                      {member.isOnDuty ? 'On Duty' : 'Off Duty'}
-                    </Badge>
+                        {member.isOnDuty ? 'On Duty' : 'Off Duty'}
+                      </Badge>
+                      <div className="flex gap-0.5 shrink-0">
+                        <Button variant="ghost" size="sm" className="p-1.5">
+                          <EditIcon className="w-3.5 h-3.5" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="p-1.5 text-red-400 hover:text-red-300"
+                          onClick={async () => {
+                            if (window.confirm(`Are you sure you want to delete ${member.name}?`)) {
+                              try {
+                                await deleteStaff(member.id);
+                                await refetch();
+                              } catch (err: any) {
+                                console.error('Failed to delete staff', err);
+                                alert(err.message || 'Failed to delete staff member');
+                              }
+                            }
+                          }}
+                        >
+                          <TrashIcon className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                    </div>
                   </div>
 
                   <div className="space-y-2 mb-4 text-sm text-slate-300 min-h-[80px]">
@@ -497,7 +522,7 @@ export function StaffManagement({ onShowPerformance }: StaffManagementProps) {
                     <Button
                       variant={member.isOnDuty ? 'danger' : 'secondary'}
                       size="sm"
-                      className="h-8 px-2.5 text-xs whitespace-nowrap shrink-0"
+                      className="h-8 px-2 text-xs whitespace-nowrap flex-1 min-w-0 justify-center"
                       onClick={async () => {
                         try {
                           await updateStaffStatus(member.id, !member.isOnDuty);
@@ -512,7 +537,7 @@ export function StaffManagement({ onShowPerformance }: StaffManagementProps) {
                     <Button
                       variant="secondary"
                       size="sm"
-                      className="h-8 px-2.5 text-xs whitespace-nowrap shrink-0"
+                      className="h-8 px-2 text-xs whitespace-nowrap flex-1 min-w-0 justify-center"
                       onClick={() => handleManageCredentials(member)}>
                       <KeyIcon className="w-3 h-3" />
                       <span className="hidden sm:inline">Credentials</span>
@@ -522,35 +547,12 @@ export function StaffManagement({ onShowPerformance }: StaffManagementProps) {
                         variant="primary"
                         size="sm"
                         onClick={() => openAssignTablesModal(member)}
-                        className="h-8 px-2.5 text-xs whitespace-nowrap shrink-0">
+                        className="h-8 px-2 text-xs whitespace-nowrap flex-1 min-w-0 justify-center">
                         <MapPinIcon className="w-3 h-3" />
                         <span className="hidden sm:inline">Assign Tables</span>
                         <span className="sm:hidden">Tables</span>
                       </Button>
                     )}
-                    <div className="flex gap-1 ml-auto shrink-0">
-                      <Button variant="ghost" size="sm" className="p-1.5">
-                        <EditIcon className="w-3.5 h-3.5" />
-                      </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="p-1.5 text-red-400 hover:text-red-300"
-                        onClick={async () => {
-                          if (window.confirm(`Are you sure you want to delete ${member.name}?`)) {
-                            try {
-                              await deleteStaff(member.id);
-                              await refetch();
-                            } catch (err: any) {
-                              console.error('Failed to delete staff', err);
-                              alert(err.message || 'Failed to delete staff member');
-                            }
-                          }
-                        }}
-                      >
-                        <TrashIcon className="w-3.5 h-3.5" />
-                      </Button>
-                    </div>
                   </div>
                 </Card>
               </motion.div>
