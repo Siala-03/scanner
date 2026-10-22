@@ -221,24 +221,34 @@ export function orderToReceiptData(
   order: Order,
   options: BuildReceiptOptions
 ): ReceiptData {
-  const orderNumber = order.orderNumber || order.id;
+  const o = order as any;
+  const orderNumber = order.orderNumber || o.order_number || order.id;
   const receiptId = orderNumber;
 
-  const items: ReceiptItemData[] = order.items.map(item => {
-    const unitPrice = item.unitPrice ?? item.menuItem?.price ?? 0;
-    const name = item.menuItemName ?? item.menuItem?.name ?? 'Unknown Item';
-    const totalPrice = item.totalPrice ?? (unitPrice * item.quantity);
+  // Orders loaded straight from the DB (e.g. the payment panel) carry snake_case
+  // item fields and may store items as a JSON string, so accept both shapes.
+  const rawItems: any[] = Array.isArray(order.items)
+    ? order.items
+    : typeof (order.items as unknown) === 'string'
+      ? (() => { try { const p = JSON.parse(order.items as unknown as string); return Array.isArray(p) ? p : []; } catch { return []; } })()
+      : [];
+
+  const items: ReceiptItemData[] = rawItems.map((item: any) => {
+    const quantity = Number(item.quantity ?? 1) || 1;
+    const unitPrice = Number(item.unitPrice ?? item.unit_price ?? item.menuItem?.price ?? item.price ?? 0) || 0;
+    const name = item.menuItemName || item.menu_item_name || item.menuItem?.name || item.name || 'Item';
+    const totalPrice = Number(item.totalPrice ?? item.total_price ?? unitPrice * quantity) || 0;
     return {
-      quantity: item.quantity,
+      quantity,
       name,
       unitPrice,
       totalPrice,
-      specialInstructions: item.specialInstructions,
-      category: item.menuItem?.category,
+      specialInstructions: item.specialInstructions ?? item.special_instructions ?? item.notes,
+      category: item.menuItem?.category ?? item.category,
     };
   });
 
-  const total = order.total ?? items.reduce((s, i) => s + i.totalPrice, 0);
+  const total = Number(order.total ?? o.total_amount ?? items.reduce((s, i) => s + i.totalPrice, 0)) || 0;
 
   const loyaltyCalc = calculateLoyaltyPoints(total);
   const loyaltyPoints = options.customerPointsBalance !== undefined ? {
@@ -261,12 +271,12 @@ export function orderToReceiptData(
     orderNumber,
     receiptId,
     orderType,
-    tableNumber: order.tableNumber,
+    tableNumber: order.tableNumber ?? o.table_number,
     serverName: options.serverName,
     orderDate: new Date(),
 
-    customerName: options.customerName || order.customerName,
-    customerId: order.customerId,
+    customerName: options.customerName || order.customerName || o.customer_name,
+    customerId: order.customerId ?? o.customer_id,
 
     items,
 
