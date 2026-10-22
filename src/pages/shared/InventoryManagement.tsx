@@ -1895,20 +1895,10 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                             {(row.rec?.category || row.item.category || '—').replace(/-/g, ' ')}
                           </td>
                           <td className="px-4 py-3">
-                            <div className="flex items-center gap-2">
-                              <span className={`text-sm font-bold ${row.isOut ? 'text-red-400' : row.isLow ? 'text-amber-400' : 'text-white'}`}>
-                                {row.stock}{unit}
-                              </span>
-                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase border ${
-                                row.isOut
-                                  ? 'bg-red-500/15 text-red-300 border-red-500/30'
-                                  : row.isLow
-                                    ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
-                                    : 'bg-emerald-500/10 text-emerald-300 border-emerald-500/25'
-                              }`}>
-                                {row.isOut ? 'Out' : row.isLow ? 'Low' : 'OK'}
-                              </span>
-                            </div>
+                            {/* Colour alone signals status: red = out, amber = low */}
+                            <span className={`text-sm font-bold ${row.isOut ? 'text-red-400' : row.isLow ? 'text-amber-400' : 'text-white'}`}>
+                              {row.stock}{unit}
+                            </span>
                           </td>
                           <td className="px-4 py-3 text-sm text-slate-300">{formatPrice(row.rec?.unitCost ?? 0)}</td>
                           <td className="px-4 py-3 text-sm text-slate-300">{formatPrice(row.rec?.price ?? 0)}</td>
