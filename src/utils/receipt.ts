@@ -962,9 +962,15 @@ export function printKitchenTicket(html: string, printerWidth: '58mm' | '80mm' =
  * Open receipt in a named 80mm-wide window.
  * The embedded script auto-prints and auto-closes when opened this way.
  */
-export function printReceipt(html: string, printerWidth: '58mm' | '80mm' = getPrinterWidth()): void {
+// `windowName` lets two documents (e.g. a bar chit and a receipt) print back to
+// back without the second overwriting the first's popup.
+export function printReceipt(
+  html: string,
+  printerWidth: '58mm' | '80mm' = getPrinterWidth(),
+  windowName = 'receipt_print',
+): void {
   const popupWidth = printerWidth === '58mm' ? 240 : 322;
-  const printWindow = window.open('', 'receipt_print', `width=${popupWidth},height=700,toolbar=0,scrollbars=1,status=0`);
+  const printWindow = window.open('', windowName, `width=${popupWidth},height=700,toolbar=0,scrollbars=1,status=0`);
   if (!printWindow) {
     throw new Error('Unable to open print window. Please allow pop-ups.');
   }

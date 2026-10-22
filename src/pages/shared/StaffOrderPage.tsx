@@ -156,15 +156,29 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
   const [searchQuery, setSearchQuery] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successTable, setSuccessTable] = useState<string | null>(null);
-  const [lastPlacedOrder, setLastPlacedOrder] = useState<Order | null>(null);
+  const [, setLastPlacedOrder] = useState<Order | null>(null);
   // Mirrors lastPlacedOrder synchronously (state updates from a .then() callback
   // aren't visible to a closure created at an earlier render) — printing awaits
   // orderSyncPromiseRef then reads this, so a receipt printed the instant the
   // success screen appears still reflects the merged/cumulative order, not the
   // locally-synthesized one-round placeholder.
   const lastPlacedOrderRef = useRef<Order | null>(null);
+  // Only the items from the round just placed — the bar chit should not repeat
+  // earlier rounds when the order merged into an existing tab.
+  const lastRoundOrderRef = useRef<Order | null>(null);
   const orderSyncPromiseRef = useRef<Promise<void> | null>(null);
   const [isPrintingReceipt, setIsPrintingReceipt] = useState(false);
+  // Auto-print choices made in the cart; remembered on this device.
+  const [autoPrintChit, setAutoPrintChit] = useState(() => {
+    try { return localStorage.getItem('takeOrder.autoPrintChit') === '1'; } catch { return false; }
+  });
+  const [autoPrintReceipt, setAutoPrintReceipt] = useState(() => {
+    try { return localStorage.getItem('takeOrder.autoPrintReceipt') === '1'; } catch { return false; }
+  });
+  const toggleAutoPrint = (key: 'chit' | 'receipt', value: boolean) => {
+    (key === 'chit' ? setAutoPrintChit : setAutoPrintReceipt)(value);
+    try { localStorage.setItem(key === 'chit' ? 'takeOrder.autoPrintChit' : 'takeOrder.autoPrintReceipt', value ? '1' : '0'); } catch { /* storage unavailable */ }
+  };
   const [showReceiptNoteModal, setShowReceiptNoteModal] = useState(false);
   const [receiptNote, setReceiptNote] = useState('');
   const [showMobileCart, setShowMobileCart] = useState(false);
@@ -504,7 +518,7 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
     return 'Supervisor';
   };
 
-  const printChitForOrder = (order: Order) => {
+  const printChitForOrder = (order: Order, windowName?: string) => {
     const label = order.tableNumber != null ? `Table ${order.tableNumber}` : 'Bar / Walk-up';
     try {
       printReceipt(buildChitHtml({
@@ -527,15 +541,19 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
         })),
         total: order.total,
         notes: (order as any).notes?.trim() || undefined,
-      }));
+      }), undefined, windowName);
     } catch {
       alert('Could not open print window. Please allow pop-ups in your browser.');
     }
   };
 
-  const handlePrintLastReceipt = () => {
-    if (!lastPlacedOrder || isPrintingReceipt) return;
-    void handlePrintSmart();
+  const handlePrintLastChit = async () => {
+    // Wait for the server so the chit carries the real order number.
+    if (orderSyncPromiseRef.current) await orderSyncPromiseRef.current;
+    const round = lastRoundOrderRef.current;
+    if (!round) return;
+    const synced = lastPlacedOrderRef.current;
+    printChitForOrder({ ...round, id: synced?.id ?? round.id, orderNumber: synced?.orderNumber ?? round.orderNumber }, 'chit_print');
   };
 
   const buildReceiptDataFor = (order: Order, notesOverride?: string): ReceiptData => orderToReceiptData(order, {
@@ -597,8 +615,10 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
 
   const handleDoneAfterSuccess = () => {
     setSuccessTable(null);
+    setShowMobileCart(false);
     setLastPlacedOrder(null);
     lastPlacedOrderRef.current = null;
+    lastRoundOrderRef.current = null;
     orderSyncPromiseRef.current = null;
     setExistingOrderForEntry(null);
     setStep('table-select');
@@ -691,9 +711,9 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
       setSuccessTable(label);
       setLastPlacedOrder(localOrder);
       lastPlacedOrderRef.current = localOrder;
+      lastRoundOrderRef.current = { ...localOrder, assignedWaiterId: selectedStaffId || undefined } as Order;
       setCart([]);
       setOrderNotes('');
-      setShowMobileCart(false);
       const idempotencyKey = submitKeyRef.current;
       submitKeyRef.current = crypto.randomUUID();
 
@@ -737,7 +757,8 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
           lastPlacedOrderRef.current = next;
           return next;
         });
-      }).catch((e) => {
+      });
+      orderSyncPromiseRef.current = orderSyncPromiseRef.current.catch((e) => {
         console.error('Background order sync failed:', e);
         const isTimeout = (e as any)?.code === 'TIMEOUT' || (e instanceof Error && e.message.includes('timed out'));
         setOrderSyncError(isTimeout
@@ -745,6 +766,15 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
           : 'Order failed to save to server. Please check the orders list.'
         );
       });
+
+      // Auto-print what was ticked in the cart: chit first, then the full table bill.
+      const printChit = autoPrintChit && restaurantInfo?.barChitEnabled !== false;
+      if (printChit || autoPrintReceipt) {
+        void (async () => {
+          if (printChit) await handlePrintLastChit();
+          if (autoPrintReceipt) await handlePrintSmart();
+        })();
+      }
     } catch (e) {
       console.error(e);
       alert('Failed to place order. Please try again.');
@@ -1451,14 +1481,15 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
             orderSyncError={orderSyncError}
             tableLabel={tableLabel}
             sharedTerminalMode={sharedTerminalMode}
-            canPrintReceipt={Boolean(lastPlacedOrder)}
-            isPrintingReceipt={isPrintingReceipt}
             existingOrder={existingOrderForEntry}
             onUpdateQty={updateQty}
             onNotesChange={setOrderNotes}
             onSelectedStaffIdChange={setSelectedStaffId}
             onSubmit={handleSubmit}
-            onPrintReceipt={handlePrintLastReceipt}
+            showBarChit={restaurantInfo?.barChitEnabled !== false}
+            autoPrintChit={autoPrintChit}
+            autoPrintReceipt={autoPrintReceipt}
+            onToggleAutoPrint={toggleAutoPrint}
             onDone={handleDoneAfterSuccess}
           />
         </div>
@@ -1489,14 +1520,15 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
               orderSyncError={orderSyncError}
               tableLabel={tableLabel}
               sharedTerminalMode={sharedTerminalMode}
-              canPrintReceipt={Boolean(lastPlacedOrder)}
-              isPrintingReceipt={isPrintingReceipt}
               existingOrder={existingOrderForEntry}
               onUpdateQty={updateQty}
               onNotesChange={setOrderNotes}
               onSelectedStaffIdChange={setSelectedStaffId}
-              onSubmit={() => { handleSubmit(); setShowMobileCart(false); }}
-              onPrintReceipt={handlePrintLastReceipt}
+              onSubmit={handleSubmit}
+              showBarChit={restaurantInfo?.barChitEnabled !== false}
+              autoPrintChit={autoPrintChit}
+              autoPrintReceipt={autoPrintReceipt}
+              onToggleAutoPrint={toggleAutoPrint}
               onDone={handleDoneAfterSuccess}
             />
           </div>
@@ -1568,14 +1600,15 @@ function CartPanel({
   orderSyncError,
   tableLabel,
   sharedTerminalMode,
-  canPrintReceipt,
-  isPrintingReceipt,
   existingOrder,
   onUpdateQty,
   onNotesChange,
   onSelectedStaffIdChange,
   onSubmit,
-  onPrintReceipt,
+  showBarChit,
+  autoPrintChit,
+  autoPrintReceipt,
+  onToggleAutoPrint,
   onDone,
 }: {
   cart: CartEntry[];
@@ -1591,14 +1624,15 @@ function CartPanel({
   orderSyncError: string | null;
   tableLabel: string;
   sharedTerminalMode: boolean;
-  canPrintReceipt: boolean;
-  isPrintingReceipt: boolean;
   existingOrder: { id: string; items: Order['items'] } | null;
   onUpdateQty: (id: string, delta: number) => void;
   onNotesChange: (v: string) => void;
   onSelectedStaffIdChange: (v: string) => void;
   onSubmit: () => void;
-  onPrintReceipt: () => void;
+  showBarChit: boolean;
+  autoPrintChit: boolean;
+  autoPrintReceipt: boolean;
+  onToggleAutoPrint: (key: 'chit' | 'receipt', value: boolean) => void;
   onDone: () => void;
 }) {
   const [showNotes, setShowNotes] = useState(false);
@@ -1615,16 +1649,6 @@ function CartPanel({
           </p>
         )}
         <div className="mt-2 w-full max-w-xs space-y-2">
-          {canPrintReceipt && (
-            <button
-              onClick={onPrintReceipt}
-              disabled={isPrintingReceipt}
-              className="w-full rounded-xl border border-emerald-500/40 bg-emerald-500/15 px-4 py-2.5 text-sm font-semibold text-emerald-300 hover:bg-emerald-500/25 disabled:opacity-50"
-            >
-              <PrinterIcon className="inline w-4 h-4 mr-1.5" />
-              {isPrintingReceipt ? 'Printing...' : 'Print Receipt'}
-            </button>
-          )}
           <button
             onClick={onDone}
             className="w-full rounded-xl bg-amber-500 px-4 py-2.5 text-sm font-semibold text-slate-900 hover:bg-amber-400"
@@ -1777,6 +1801,29 @@ function CartPanel({
             + Add a note (allergies, special requests)
           </button>
         )}
+      </div>
+
+      <div className="flex flex-wrap gap-x-5 gap-y-2 px-1 text-sm text-slate-300">
+        {showBarChit && (
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={autoPrintChit}
+              onChange={(e) => onToggleAutoPrint('chit', e.target.checked)}
+              className="h-4 w-4 accent-amber-500"
+            />
+            Print bar chit
+          </label>
+        )}
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={autoPrintReceipt}
+            onChange={(e) => onToggleAutoPrint('receipt', e.target.checked)}
+            className="h-4 w-4 accent-amber-500"
+          />
+          Print receipt
+        </label>
       </div>
 
       <button
