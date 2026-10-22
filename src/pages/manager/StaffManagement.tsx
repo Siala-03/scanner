@@ -314,16 +314,6 @@ export function StaffManagement({ onShowPerformance }: StaffManagementProps) {
                   {backendStaff.filter((s) => s.isOnDuty).length} staff on duty
                 </p>
               </div>
-              {onShowPerformance && (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  className="mt-3 sm:mt-0"
-                  onClick={onShowPerformance}
-                >
-                  View Staff Performance
-                </Button>
-              )}
             </div>
             {generatedCredentials && (
               <div className="mt-2 rounded-lg border border-emerald-400/30 bg-emerald-500/10 p-2 text-xs text-emerald-100">
@@ -354,10 +344,18 @@ export function StaffManagement({ onShowPerformance }: StaffManagementProps) {
               </div>
             )}
           </div>
-          <Button variant="primary" size="sm" onClick={() => setIsAddStaffOpen(true)}>
-            <PlusIcon className="w-4 h-4" />
-            <span className="hidden sm:inline">Add Staff</span>
-          </Button>
+          {/* Fixed height so the bordered secondary button matches the primary one */}
+          <div className="flex items-center gap-2">
+            {onShowPerformance && (
+              <Button variant="secondary" size="sm" className="h-9" onClick={onShowPerformance}>
+                View Staff Performance
+              </Button>
+            )}
+            <Button variant="primary" size="sm" className="h-9" onClick={() => setIsAddStaffOpen(true)}>
+              <PlusIcon className="w-4 h-4" />
+              <span className="hidden sm:inline">Add Staff</span>
+            </Button>
+          </div>
         </div>
 
         {/* Filters */}
