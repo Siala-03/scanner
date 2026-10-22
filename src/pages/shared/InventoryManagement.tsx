@@ -9,7 +9,6 @@ import {
   PlusIcon,
   EditIcon,
   TrashIcon,
-  CheckCircleIcon,
   XCircleIcon,
   StarIcon,
   MapPinIcon,
@@ -88,16 +87,6 @@ const ALERT_VISIBLE_MS = 30 * 1000;
 const DEFAULT_INVENTORY_ROWS_PER_PAGE = 25;
 
 // ── Small reusable components ────────────────────────────────────────────────
-
-function StockBar({ stock, threshold, max }: { stock: number; threshold: number; max: number }) {
-  const pct = max > 0 ? Math.min(100, (stock / max) * 100) : 0;
-  const color = stock === 0 ? 'bg-red-500' : stock <= threshold ? 'bg-amber-500' : 'bg-emerald-500';
-  return (
-    <div className="w-full h-1.5 bg-slate-700 rounded-full overflow-hidden">
-      <div className={`h-full rounded-full transition-all ${color}`} style={{ width: `${pct}%` }} />
-    </div>
-  );
-}
 
 function StatusPill({ status }: { status: PurchaseOrderStatus }) {
   const cfg = PO_STATUS_CONFIG[status];
@@ -661,13 +650,16 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
     if (editValues.category !== undefined && editValues.category !== (current as any).category) {
       updatePayload.category = editValues.category;
     }
+    if (editValues.unitMeasurement !== undefined && editValues.unitMeasurement !== current.unitMeasurement) {
+      updatePayload.unitMeasurement = editValues.unitMeasurement;
+    }
     if (isDescriptionChanged) {
       updatePayload.description = editValues.description;
     }
 
     if (Object.keys(updatePayload).length === 0 && !shouldUpdateMenuDescription && Object.keys(minimartMenuPayload).length === 0) {
-      alert('No changes made');
       setEditingRow(null);
+      setEditingRowData(null);
       setEditValues({});
       return;
     }
@@ -694,8 +686,8 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
         await refreshMenu();
       }
       
-      alert('Inventory item updated successfully');
       setEditingRow(null);
+      setEditingRowData(null);
       setEditValues({});
     } catch (err) {
       console.error('Failed to update inventory record:', err);
@@ -703,6 +695,101 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
       alert(`Failed to update inventory item: ${errorMessage}`);
       // Don't clear edit state on error so user can retry
     }
+  };
+
+  type InventoryRow = (typeof inventoryRows)[number];
+  // The row being edited in the Edit Item modal (editingRow holds its id).
+  const [editingRowData, setEditingRowData] = useState<InventoryRow | null>(null);
+
+  const openEditItem = (row: InventoryRow) => {
+    const targetMenuItemId = row.rec?.menuItemId || row.item.id;
+    const rec = inventoryMap[targetMenuItemId] || row.rec;
+    setEditingRow(row.item.id);
+    setEditingRowData(row);
+    const linked = menuItemMap[targetMenuItemId];
+    // Pre-fill with the stored values only (no invented defaults), so saving an
+    // untouched form is detected as "no changes" and nothing gets overwritten.
+    setEditValues({
+      // Mirrors how handleSaveRow reads the current description.
+      description: isMinimartScope ? rec?.description : (linked?.description ?? rec?.description ?? ''),
+      category: rec?.category,
+      stock: rec?.stock ?? 0,
+      unitMeasurement: rec?.unitMeasurement,
+      lowStockThreshold: rec?.lowStockThreshold ?? 0,
+      reorderPoint: rec?.reorderPoint ?? 0,
+      reorderQty: rec?.reorderQty ?? 0,
+      unitCost: rec?.unitCost ?? 0,
+      price: rec?.price ?? 0,
+      location: rec?.location,
+      ...(isMinimartScope
+        ? { qtyStart: rec?.qtyStart, purchaseDate: rec?.purchaseDate, expiryDate: rec?.expiryDate }
+        : {}),
+    });
+  };
+
+  const closeEditItem = () => {
+    setEditingRow(null);
+    setEditingRowData(null);
+    setEditValues({});
+  };
+
+  // Link a standalone record to the menu/products (so sales deduct stock), or unlink it.
+  const handleToggleMenuLink = async (row: InventoryRow) => {
+    const targetMenuItemId = row.rec?.menuItemId || row.item.id;
+    const linkedMenuItem = menuItemMap[targetMenuItemId];
+    const isLinked = !!(linkedMenuItem && row.rec);
+    if (isLinked) {
+      const linkedName = linkedMenuItem!.name;
+      if (!window.confirm(`Unlink this inventory record from "${linkedName}"?\nStock tracking will pause until re-linked.`)) return;
+      try {
+        await apiDelinkInventoryRecord(row.rec!.id);
+        await refresh();
+        closeEditItem();
+      } catch (err) {
+        alert('Failed to unlink: ' + getErrorMessage(err));
+      }
+      return;
+    }
+    if (!row.rec) return; // no inventory record — can't link
+    const recId = row.rec.id;
+    // row.item.id is the original standalone menuItemId (product code) for unlinked items
+    const originalCode = row.item.id;
+    const name = (row.rec.description || row.item.name || '').trim();
+    const price = row.rec.price ?? row.rec.unitCost ?? 0;
+    const category = row.item.category !== 'Other' ? row.item.category : (isMinimartScope ? 'General' : 'Food');
+    // If data is complete, auto-link without the Add-to-menu modal
+    if (name && price > 0) {
+      try {
+        setAutoLinking(recId);
+        const latestMenu = await fetchMenu().catch(() => menuItems as any[]);
+        const existing = latestMenu.find((m: any) => String(m?.name || '').trim().toLowerCase() === name.toLowerCase());
+        if (existing?.id) {
+          await apiRelinkInventoryRecord(recId, existing.id);
+        } else {
+          const payload: any = { name, price, category, is_available: true };
+          if (isMinimartScope) { payload.requires_kitchen = false; payload.prep_time = 0; }
+          const preservedSku = standaloneCodeToSku(originalCode);
+          if (preservedSku) payload.sku = preservedSku;
+          const newItem = await createMenuItem(payload);
+          await apiRelinkInventoryRecord(recId, newItem.id);
+        }
+        await refresh();
+        closeEditItem();
+      } catch (err) {
+        alert('Failed to link: ' + getErrorMessage(err));
+      } finally {
+        setAutoLinking(null);
+      }
+      return;
+    }
+    // Fallback to the Add-to-menu modal when name or price is missing
+    closeEditItem();
+    setAddToMenuItemId(recId);
+    setAddToMenuOriginalCode(originalCode);
+    setAddToMenuName(name);
+    setAddToMenuPrice(price);
+    setAddToMenuCategory(category);
+    setShowAddToMenuModal(true);
   };
 
   const handleDeleteInventoryItem = async (menuItemId: string) => {
@@ -1693,7 +1780,7 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
             {/* Table */}
             <Card className="bg-slate-800/50 border border-slate-700/50" padding="none">
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[1900px]">
+                <table className="w-full min-w-[720px]">
                   <thead className="bg-slate-700/40 border-b border-slate-700/50">
                     <tr>
                       {isManager && (
@@ -1721,38 +1808,22 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                           />
                         </th>
                       )}
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Product</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Description</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Category</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Expiry Date</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Purchase Date</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Age</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Start Qty</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Current Qty</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Item</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Stock</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Unit Cost</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Price</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Location</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Low Threshold</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Reorder Point</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Reorder Qty</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Stock Value</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Value</th>
                       {isManager && <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Actions</th>}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-700/30">
                     {paginatedInventoryRows.map((row) => {
-                      const isEditing = editingRow === row.item.id;
                       const targetMenuItemId = row.rec?.menuItemId || row.item.id;
-                      const linkedMenuItem = menuItemMap[targetMenuItemId];
-                      const rowInventoryRec = inventoryMap[targetMenuItemId] || row.rec;
-                      // isLinked: an inventory record exists AND it's linked to a menu item.
-                      // Without row.rec, there's no inventory record to delink/relink.
-                      const isLinked = !!(linkedMenuItem && row.rec);
-                      const maxStock = Math.max(row.rec?.reorderQty ?? row.stock * 2, row.stock, 1);
-                      const purchaseDate = row.rec?.purchaseDate ? new Date(row.rec.purchaseDate) : null;
-                      const ageDays = purchaseDate && !Number.isNaN(purchaseDate.getTime())
-                        ? Math.max(0, Math.floor((Date.now() - purchaseDate.getTime()) / (1000 * 60 * 60 * 24)))
+                      // Expiry only matters for minimart stock; flag it when within a week.
+                      const expiryDays = isMinimartScope && row.rec?.expiryDate
+                        ? Math.ceil((new Date(row.rec.expiryDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
                         : null;
+                      const unit = row.rec?.unitMeasurement && row.rec.unitMeasurement !== 'units' ? ` ${row.rec.unitMeasurement}` : '';
                       return (
                         <tr
                           key={row.item.id}
@@ -1796,6 +1867,11 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                                 })()}
                                 <div className="flex items-center gap-1.5 mt-0.5">
                                   <p className="text-xs text-slate-500">{row.item.category.replace(/-/g, ' ')}</p>
+                                  {expiryDays !== null && expiryDays <= 7 && (
+                                    <span className="px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-red-500/15 text-red-300 border border-red-500/25">
+                                      {expiryDays < 0 ? 'Expired' : expiryDays === 0 ? 'Expires today' : `Expires in ${expiryDays}d`}
+                                    </span>
+                                  )}
                                   {menuItemMap[row.item.id] && row.rec && (
                                     <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs bg-blue-500/15 text-blue-300 border border-blue-500/20">
                                       <LinkIcon className="w-2.5 h-2.5" />
@@ -1806,343 +1882,67 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
                               </div>
                             </button>
                           </td>
-                          <td className="px-4 py-3 text-sm text-slate-300">
-                            {isEditing ? (
-                              <input
-                                type="text"
-                                value={editValues.description ?? row.rec?.description ?? menuItemMap[row.item.id]?.description ?? ''}
-                                onChange={(e) => setEditValues((v) => ({ ...v, description: e.target.value }))}
-                                className="w-36 px-2 py-1 rounded bg-slate-900 border border-slate-600 text-white text-xs focus:outline-none focus:ring-1 focus:ring-amber-500"
-                              />
-                            ) : (
-                              row.rec?.description || menuItemMap[row.item.id]?.description || '—'
-                            )}
-                          </td>
-                          <td className="px-4 py-3 text-sm text-slate-300">
-                            {isEditing ? (
-                              <input
-                                type="text"
-                                value={editValues.category ?? row.rec?.category ?? ''}
-                                onChange={(e) => setEditValues((v) => ({ ...v, category: e.target.value }))}
-                                placeholder="e.g. Beverages, Produce"
-                                className="w-32 px-2 py-1 rounded bg-slate-900 border border-slate-600 text-white text-xs focus:outline-none focus:ring-1 focus:ring-amber-500"
-                              />
-                            ) : (
-                              row.rec?.category || '—'
-                            )}
-                          </td>
-                          <td className="px-4 py-3 text-sm text-slate-300">
-                            {isEditing ? (
-                              <input
-                                type="date"
-                                value={editValues.expiryDate ?? row.rec?.expiryDate ?? ''}
-                                onChange={(e) => setEditValues((v) => ({ ...v, expiryDate: e.target.value }))}
-                                className="w-36 px-2 py-1 rounded bg-slate-900 border border-slate-600 text-white text-xs focus:outline-none focus:ring-1 focus:ring-amber-500"
-                              />
-                            ) : (
-                              row.rec?.expiryDate || '—'
-                            )}
-                          </td>
-                          <td className="px-4 py-3 text-sm text-slate-300">
-                            {isEditing ? (
-                              <input
-                                type="date"
-                                value={editValues.purchaseDate ?? row.rec?.purchaseDate ?? ''}
-                                onChange={(e) => setEditValues((v) => ({ ...v, purchaseDate: e.target.value }))}
-                                className="w-36 px-2 py-1 rounded bg-slate-900 border border-slate-600 text-white text-xs focus:outline-none focus:ring-1 focus:ring-amber-500"
-                              />
-                            ) : (
-                              row.rec?.purchaseDate || '—'
-                            )}
-                          </td>
-                          <td className="px-4 py-3 text-sm text-slate-300">{ageDays !== null ? `${ageDays}d` : '—'}</td>
-                          <td className="px-4 py-3 text-sm text-slate-300">
-                            {isEditing ? (
-                              <input
-                                type="number"
-                                placeholder="0"
-                                value={editValues.qtyStart ?? row.rec?.qtyStart ?? row.stock}
-                                onChange={(e) => setEditValues((v) => ({ ...v, qtyStart: toQty(e.target.value) }))}
-                                className="w-20 px-2 py-1 rounded bg-slate-900 border border-slate-600 text-white text-xs focus:outline-none focus:ring-1 focus:ring-amber-500"
-                                min={0}
-                                step="0.01"
-                              />
-                            ) : (
-                              row.rec?.qtyStart ?? row.stock
-                            )}
-                          </td>
-                          <td className="px-4 py-3 min-w-[140px]">
-                            <div className="space-y-1">
-                              <div className="flex items-center justify-between">
-                                {isEditing ? (
-                                  <input
-                                    type="number"
-                                    placeholder="0"
-                                    value={(editValues.stock ?? row.stock) === 0 ? '' : (editValues.stock ?? row.stock)}
-                                    onChange={(e) => setEditValues((v) => ({ ...v, stock: parseFloat(e.target.value || '0') }))}
-                                    step="0.01"
-                                    className="w-20 px-2 py-1 rounded bg-slate-900 border border-slate-600 text-white text-sm focus:outline-none focus:ring-1 focus:ring-amber-500"
-                                    min={0}
-                                  />
-                                ) : (
-                                  <span className={`text-sm font-bold ${row.isOut ? 'text-red-400' : row.isLow ? 'text-amber-400' : 'text-white'}`}>
-                                    {row.stock}
-                                  </span>
-                                )}
-                                <span className="text-xs text-slate-500">/ {maxStock}</span>
-                              </div>
-                              <StockBar stock={row.stock} threshold={row.threshold} max={maxStock} />
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2">
+                              <span className={`text-sm font-bold ${row.isOut ? 'text-red-400' : row.isLow ? 'text-amber-400' : 'text-white'}`}>
+                                {row.stock}{unit}
+                              </span>
+                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase border ${
+                                row.isOut
+                                  ? 'bg-red-500/15 text-red-300 border-red-500/30'
+                                  : row.isLow
+                                    ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                                    : 'bg-emerald-500/10 text-emerald-300 border-emerald-500/25'
+                              }`}>
+                                {row.isOut ? 'Out' : row.isLow ? 'Low' : 'OK'}
+                              </span>
                             </div>
                           </td>
-                          <td className="px-4 py-3">
-                            {isEditing ? (
-                              <input
-                                type="number"
-                                placeholder="0"
-                                value={(editValues.unitCost ?? row.rec?.unitCost ?? 0) === 0 ? '' : (editValues.unitCost ?? row.rec?.unitCost ?? 0)}
-                                onChange={(e) => setEditValues((v) => ({ ...v, unitCost: parseFloat(e.target.value || '0') }))}
-                                step="0.01"
-                                className="w-24 px-2 py-1 rounded bg-slate-900 border border-slate-600 text-white text-xs focus:outline-none focus:ring-1 focus:ring-amber-500"
-                                min={0}
-                              />
-                            ) : (
-                              <span className="text-sm text-slate-300">{formatPrice(row.rec?.unitCost ?? 0)}</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3">
-                            {isEditing ? (
-                              <input
-                                type="number"
-                                placeholder="0"
-                                value={(editValues.price ?? row.rec?.price ?? 0) === 0 ? '' : (editValues.price ?? row.rec?.price ?? 0)}
-                                onChange={(e) => setEditValues((v) => ({ ...v, price: parseFloat(e.target.value || '0') }))}
-                                step="0.01"
-                                className="w-24 px-2 py-1 rounded bg-slate-900 border border-slate-600 text-white text-xs focus:outline-none focus:ring-1 focus:ring-amber-500"
-                                min={0}
-                              />
-                            ) : (
-                              <span className="text-sm text-slate-300">{formatPrice(row.rec?.price ?? 0)}</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3">
-                            {isEditing ? (
-                              <select
-                                value={editValues.location ?? row.rec?.location ?? ''}
-                                onChange={(e) => setEditValues((v) => ({ ...v, location: e.target.value }))}
-                                className="w-32 px-2 py-1 rounded bg-slate-900 border border-slate-600 text-white text-xs focus:outline-none focus:ring-1 focus:ring-amber-500"
-                              >
-                                <option value="">— None —</option>
-                                {locations.map((loc) => (
-                                  <option key={loc.id} value={loc.name}>{loc.name}</option>
-                                ))}
-                              </select>
-                            ) : (
-                              <span className="text-xs text-slate-400 flex items-center gap-1">
-                                <MapPinIcon className="w-3 h-3" />
-                                {row.rec?.location ?? '—'}
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            {isEditing ? (
-                              <input
-                                type="number"
-                                placeholder="0"
-                                value={(editValues.lowStockThreshold ?? row.rec?.lowStockThreshold ?? 0) === 0 ? '' : (editValues.lowStockThreshold ?? row.rec?.lowStockThreshold ?? 0)}
-                                onChange={(e) => setEditValues((v) => ({ ...v, lowStockThreshold: parseFloat(e.target.value || '0') }))}
-                                step="0.01"
-                                className="w-16 px-2 py-1 rounded bg-slate-900 border border-slate-600 text-white text-xs focus:outline-none focus:ring-1 focus:ring-amber-500"
-                                min={0}
-                              />
-                            ) : (
-                              <span className="text-xs text-slate-300">{row.rec?.lowStockThreshold ?? 0}</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            {isEditing ? (
-                              <input
-                                type="number"
-                                placeholder="0"
-                                value={(editValues.reorderPoint ?? row.rec?.reorderPoint ?? 0) === 0 ? '' : (editValues.reorderPoint ?? row.rec?.reorderPoint ?? 0)}
-                                onChange={(e) => setEditValues((v) => ({ ...v, reorderPoint: parseFloat(e.target.value || '0') }))}
-                                step="0.01"
-                                className="w-16 px-2 py-1 rounded bg-slate-900 border border-slate-600 text-white text-xs focus:outline-none focus:ring-1 focus:ring-amber-500"
-                                min={0}
-                              />
-                            ) : (
-                              <span className="text-xs text-slate-300">{row.rec?.reorderPoint ?? 0}</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            {isEditing ? (
-                              <input
-                                type="number"
-                                placeholder="0"
-                                value={(editValues.reorderQty ?? row.rec?.reorderQty ?? 0) === 0 ? '' : (editValues.reorderQty ?? row.rec?.reorderQty ?? 0)}
-                                onChange={(e) => setEditValues((v) => ({ ...v, reorderQty: parseFloat(e.target.value || '0') }))}
-                                step="0.01"
-                                className="w-16 px-2 py-1 rounded bg-slate-900 border border-slate-600 text-white text-xs focus:outline-none focus:ring-1 focus:ring-amber-500"
-                                min={0}
-                              />
-                            ) : (
-                              <span className="text-xs text-slate-300">{row.rec?.reorderQty ?? 0}</span>
-                            )}
-                          </td>
+                          <td className="px-4 py-3 text-sm text-slate-300">{formatPrice(row.rec?.unitCost ?? 0)}</td>
+                          <td className="px-4 py-3 text-sm text-slate-300">{formatPrice(row.rec?.price ?? 0)}</td>
                           <td className="px-4 py-3 text-sm text-slate-300">{formatPrice((row.rec?.unitCost ?? 0) * row.stock)}</td>
                           {isManager && (
-                            <td className="px-4 py-3 min-w-[240px]">
-                              {isEditing ? (
-                                <div className="flex items-center gap-1 whitespace-nowrap">
-                                  <button
-                                    onClick={() => handleSaveRow(targetMenuItemId, row.item.name)}
-                                    className="h-7 w-7 inline-flex items-center justify-center rounded-md border border-emerald-500/45 bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/30 transition"
-                                    title="Save"
-                                  >
-                                    <CheckCircleIcon className="w-4 h-4" />
-                                  </button>
-                                  <button
-                                    onClick={() => { setEditingRow(null); setEditValues({}); }}
-                                    className="h-7 w-7 inline-flex items-center justify-center rounded-md border border-slate-500/45 bg-slate-600/30 text-slate-100 hover:bg-slate-500/45 transition"
-                                    title="Cancel"
-                                  >
-                                    <XIcon className="w-4 h-4" />
-                                  </button>
-                                </div>
-                              ) : (
-                                <div className="flex items-center gap-1 whitespace-nowrap">
-                                  <button
-                                    onClick={() => openAuditTrail(targetMenuItemId, row.item.name)}
-                                    className="h-7 w-7 inline-flex items-center justify-center rounded-md border border-purple-500/50 bg-purple-500/20 text-purple-100 hover:bg-purple-500/32 transition"
-                                    title="Cost & stock history"
-                                  >
-                                    <ClockIcon className="w-4 h-4" />
-                                  </button>
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-1 whitespace-nowrap">
+                                <button
+                                  onClick={() => openAuditTrail(targetMenuItemId, row.item.name)}
+                                  className="h-7 w-7 inline-flex items-center justify-center rounded-md border border-slate-600 bg-slate-700/40 text-slate-200 hover:bg-slate-600/60 transition"
+                                  title="Cost & stock history"
+                                >
+                                  <ClockIcon className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() => openEditItem(row)}
+                                  className="h-7 w-7 inline-flex items-center justify-center rounded-md border border-amber-500/50 bg-amber-500/20 text-amber-100 hover:bg-amber-500/32 transition"
+                                  title="Edit"
+                                >
+                                  <EditIcon className="w-4 h-4" />
+                                </button>
+                                {PURCHASE_ORDERS_ENABLED && (
                                   <button
                                     onClick={() => {
-                                      const rec = rowInventoryRec;
-                                      setEditingRow(row.item.id);
-                                      setEditValues({
-                                        description: rec?.description ?? linkedMenuItem?.description ?? row.item.name ?? '',
-                                        category: rec?.category ?? '',
-                                        stock: rec?.stock ?? 0,
-                                        lowStockThreshold: rec?.lowStockThreshold ?? 0,
-                                        reorderPoint: rec?.reorderPoint ?? 0,
-                                        reorderQty: rec?.reorderQty ?? 0,
-                                        unitCost: rec?.unitCost ?? 0,
-                                        price: rec?.price ?? 0,
-                                        location: rec?.location ?? '',
-                                      });
+                                      setNewPO({ supplierId: suppliers[0]?.id ?? '', expectedDelivery: '', notes: `Auto reordering ${row.item.name} based on threshold` });
+                                      setNewPOItems([{ menuItemId: targetMenuItemId, orderedQty: Math.max((row.rec?.reorderQty ?? 5) - row.stock, 1), unit: '', unitCost: row.rec?.unitCost ?? 0 }]);
+                                      setShowNewPO(true);
                                     }}
-                                    className="h-7 w-7 inline-flex items-center justify-center rounded-md border border-amber-500/50 bg-amber-500/20 text-amber-100 hover:bg-amber-500/32 transition"
-                                    title="Edit"
+                                    className="h-7 w-7 inline-flex items-center justify-center rounded-md border border-emerald-500/50 bg-emerald-500/20 text-emerald-100 hover:bg-emerald-500/32 transition"
+                                    title="Smart Reorder"
                                   >
-                                    <EditIcon className="w-4 h-4" />
+                                    <PlusIcon className="w-4 h-4" />
                                   </button>
-                                  {PURCHASE_ORDERS_ENABLED && (
-                                    <button
-                                      onClick={() => {
-                                        setNewPO({ supplierId: suppliers[0]?.id ?? '', expectedDelivery: '', notes: `Auto reordering ${row.item.name} based on threshold` });
-                                        setNewPOItems([{ menuItemId: targetMenuItemId, orderedQty: Math.max((row.rec?.reorderQty ?? 5) - row.stock, 1), unit: '', unitCost: row.rec?.unitCost ?? 0 }]);
-                                        setShowNewPO(true);
-                                      }}
-                                      className="h-7 w-7 inline-flex items-center justify-center rounded-md border border-emerald-500/50 bg-emerald-500/20 text-emerald-100 hover:bg-emerald-500/32 transition"
-                                      title="Smart Reorder"
-                                    >
-                                      <PlusIcon className="w-4 h-4" />
-                                    </button>
-                                  )}
-                                  <button
-                                    onClick={async () => {
-                                      if (isLinked) {
-                                        const linkedName = linkedMenuItem!.name;
-                                        if (!window.confirm(`Unlink this inventory record from "${linkedName}"?\nStock tracking will pause until re-linked.`)) return;
-                                        try {
-                                          await apiDelinkInventoryRecord(row.rec!.id);
-                                          await refresh();
-                                          alert(`"${linkedName}" unlinked. Stock tracking paused until re-linked.`);
-                                        } catch (err) {
-                                          alert('Failed to unlink: ' + getErrorMessage(err));
-                                        }
-                                        return;
-                                      }
-                                      if (!row.rec) return; // no inventory record — can't link
-                                      const recId = row.rec.id;
-                                      // row.item.id is the original standalone menuItemId (product code) for unlinked items
-                                      const originalCode = row.item.id;
-                                      const name = (row.rec.description || row.item.name || '').trim();
-                                      const price = row.rec.price ?? row.rec.unitCost ?? 0;
-                                      const category = row.item.category !== 'Other' ? row.item.category : (isMinimartScope ? 'General' : 'Food');
-                                      // If data is complete, auto-link without modal
-                                      if (name && price > 0) {
-                                        try {
-                                          setAutoLinking(recId);
-                                          const latestMenu = await fetchMenu().catch(() => menuItems as any[]);
-                                          const existing = latestMenu.find((m: any) => String(m?.name || '').trim().toLowerCase() === name.toLowerCase());
-                                          if (existing?.id) {
-                                            await apiRelinkInventoryRecord(recId, existing.id);
-                                            await refresh();
-                                            alert(`Linked to existing ${isMinimartScope ? 'product' : 'menu item'} "${existing.name}". Sales will auto-deduct stock.`);
-                                          } else {
-                                            const payload: any = { name, price, category, is_available: true };
-                                            if (isMinimartScope) { payload.requires_kitchen = false; payload.prep_time = 0; }
-                                            const preservedSku = standaloneCodeToSku(originalCode);
-                                            if (preservedSku) payload.sku = preservedSku;
-                                            const newItem = await createMenuItem(payload);
-                                            await apiRelinkInventoryRecord(recId, newItem.id);
-                                            await refresh();
-                                            alert(`"${newItem.name}" added to ${isMinimartScope ? 'products' : 'menu'} and linked. Sales will auto-deduct stock.`);
-                                          }
-                                        } catch (err) {
-                                          alert('Failed to link: ' + getErrorMessage(err));
-                                        } finally {
-                                          setAutoLinking(null);
-                                        }
-                                        return;
-                                      }
-                                      // Fallback to modal when name or price is missing
-                                      setAddToMenuItemId(recId);
-                                      setAddToMenuOriginalCode(originalCode);
-                                      setAddToMenuName(name);
-                                      setAddToMenuPrice(price);
-                                      setAddToMenuCategory(category);
-                                      setShowAddToMenuModal(true);
-                                    }}
-                                    disabled={autoLinking === (row.rec?.id ?? row.item.id) || (!isLinked && !row.rec)}
-                                    className={`h-7 w-7 inline-flex items-center justify-center rounded-md border transition ${
-                                      autoLinking === (row.rec?.id ?? row.item.id)
-                                        ? 'text-slate-400 bg-slate-500/20 border-slate-500/30 cursor-not-allowed'
-                                        : !isLinked && !row.rec
-                                          ? 'text-slate-600 bg-slate-700/20 border-slate-600/30 cursor-not-allowed'
-                                          : isLinked
-                                            ? 'text-orange-200 bg-orange-500/20 border-orange-500/50 hover:bg-orange-500/35'
-                                            : 'text-blue-100 bg-blue-500/22 border-blue-500/55 hover:bg-blue-500/35'
-                                    }`}
-                                    title={
-                                      autoLinking === (row.rec?.id ?? row.item.id) ? 'Linking…'
-                                      : !isLinked && !row.rec ? 'Use "Add Item" to start tracking this item'
-                                      : isLinked ? `Unlink from ${isMinimartScope ? 'Product' : 'Menu Item'}`
-                                      : `Add to ${isMinimartScope ? 'Products' : 'Menu'}`
+                                )}
+                                <button
+                                  onClick={() => {
+                                    if (window.confirm(`Delete inventory record for ${row.item.name}? This action cannot be undone.`)) {
+                                      handleDeleteInventoryItem(targetMenuItemId);
                                     }
-                                  >
-                                    {autoLinking === (row.rec?.id ?? row.item.id)
-                                      ? <RefreshCcwIcon className="w-4 h-4 animate-spin" />
-                                      : isLinked
-                                        ? <XCircleIcon className="w-4 h-4" />
-                                        : <LinkIcon className="w-4 h-4" />}
-                                  </button>
-                                  <button
-                                    onClick={() => {
-                                      if (window.confirm(`Delete inventory record for ${row.item.name}? This action cannot be undone.`)) {
-                                        handleDeleteInventoryItem(targetMenuItemId);
-                                      }
-                                    }}
-                                    className="h-7 w-7 inline-flex items-center justify-center rounded-md border border-red-500/50 bg-red-500/20 text-red-100 hover:bg-red-500/32 transition"
-                                    title="Delete"
-                                  >
-                                    <TrashIcon className="w-4 h-4" />
-                                  </button>
-                                </div>
-                              )}
+                                  }}
+                                  className="h-7 w-7 inline-flex items-center justify-center rounded-md border border-red-500/50 bg-red-500/20 text-red-100 hover:bg-red-500/32 transition"
+                                  title="Delete"
+                                >
+                                  <TrashIcon className="w-4 h-4" />
+                                </button>
+                              </div>
                             </td>
                           )}
                         </tr>
@@ -3100,6 +2900,165 @@ export function InventoryManagement({ role, inventoryScope = 'all' }: InventoryM
             </div>
             </div>
           )}
+        </Modal>
+
+        {/* Edit Inventory Item Modal — replaces inline row editing */}
+        <Modal isOpen={!!editingRow && !!editingRowData} onClose={closeEditItem} title={`Edit ${editingRowData?.item.name ?? 'Item'}`}>
+          {editingRowData && (() => {
+            const row = editingRowData;
+            const targetMenuItemId = row.rec?.menuItemId || row.item.id;
+            const linkedMenuItem = menuItemMap[targetMenuItemId];
+            const isLinked = !!(linkedMenuItem && row.rec);
+            const isBusyLinking = autoLinking === (row.rec?.id ?? row.item.id);
+            const numField = (key: keyof InventoryRecord, label: string, step = '0.01') => (
+              <label className="block text-sm text-slate-300">
+                {label}
+                <input
+                  type="number" min={0} step={step}
+                  value={Number(editValues[key] ?? 0) === 0 ? '' : Number(editValues[key])}
+                  onChange={(e) => setEditValues((v) => ({ ...v, [key]: toQty(e.target.value) }))}
+                  className={`mt-1 ${addItemInputClass}`}
+                />
+              </label>
+            );
+            return (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="block col-span-2 text-sm text-slate-300">
+                    {linkedMenuItem ? 'Description' : 'Name'}
+                    <input
+                      value={editValues.description ?? ''}
+                      onChange={(e) => setEditValues((v) => ({ ...v, description: e.target.value }))}
+                      className={`mt-1 ${addItemInputClass}`}
+                    />
+                  </label>
+                  {numField('stock', 'Current stock')}
+                  <label className="block text-sm text-slate-300">
+                    Unit
+                    <select
+                      value={editValues.unitMeasurement ?? 'units'}
+                      onChange={(e) => setEditValues((v) => ({ ...v, unitMeasurement: e.target.value }))}
+                      className={`mt-1 ${addItemInputClass}`}
+                    >
+                      {['units','kg','g','L','ml','boxes','cases','packs','bags','bottles','cans'].map((u) => (
+                        <option key={u} value={u}>{u}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="block text-sm text-slate-300">
+                    Unit cost (RWF)
+                    <input
+                      type="number" min={0} step="0.01"
+                      value={(editValues.unitCost ?? 0) === 0 ? '' : editValues.unitCost}
+                      onChange={(e) => setEditValues((v) => ({ ...v, unitCost: parseFloat(e.target.value || '0') }))}
+                      className={`mt-1 ${addItemInputClass}`}
+                    />
+                  </label>
+                  <label className="block text-sm text-slate-300">
+                    Selling price (RWF)
+                    <input
+                      type="number" min={0} step="0.01"
+                      value={(editValues.price ?? 0) === 0 ? '' : editValues.price}
+                      onChange={(e) => setEditValues((v) => ({ ...v, price: parseFloat(e.target.value || '0') }))}
+                      className={`mt-1 ${addItemInputClass}`}
+                    />
+                  </label>
+                  {numField('lowStockThreshold', 'Alert me when below')}
+                  {numField('reorderPoint', 'Reorder point')}
+                  {numField('reorderQty', 'Reorder qty')}
+                  <label className="block text-sm text-slate-300">
+                    Storage location
+                    <select
+                      value={editValues.location ?? ''}
+                      onChange={(e) => setEditValues((v) => ({ ...v, location: e.target.value }))}
+                      className={`mt-1 ${addItemInputClass}`}
+                    >
+                      <option value="">— None —</option>
+                      {locations.map((loc) => (
+                        <option key={loc.id} value={loc.name}>{loc.name}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="block col-span-2 text-sm text-slate-300">
+                    Category
+                    <input
+                      value={editValues.category ?? ''}
+                      onChange={(e) => setEditValues((v) => ({ ...v, category: e.target.value }))}
+                      placeholder="e.g. Beverages, Produce"
+                      className={`mt-1 ${addItemInputClass}`}
+                      list="standalone-category-suggestions"
+                    />
+                  </label>
+                  {/* Batch fields from the minimart inventory sheet; restaurants don't use them */}
+                  {isMinimartScope && (
+                    <>
+                      {numField('qtyStart', 'Start qty')}
+                      <label className="block text-sm text-slate-300">
+                        Purchase date
+                        <input
+                          type="date"
+                          value={editValues.purchaseDate ?? ''}
+                          onChange={(e) => setEditValues((v) => ({ ...v, purchaseDate: e.target.value }))}
+                          className={`mt-1 ${addItemInputClass}`}
+                        />
+                      </label>
+                      <label className="block col-span-2 text-sm text-slate-300">
+                        Expiry date
+                        <input
+                          type="date"
+                          value={editValues.expiryDate ?? ''}
+                          onChange={(e) => setEditValues((v) => ({ ...v, expiryDate: e.target.value }))}
+                          className={`mt-1 ${addItemInputClass}`}
+                        />
+                      </label>
+                    </>
+                  )}
+                </div>
+
+                {/* Menu link */}
+                <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-700 bg-slate-800/60 px-3 py-2.5">
+                  <p className="text-xs text-slate-400">
+                    {isLinked
+                      ? <>Linked to <span className="text-slate-200">{linkedMenuItem!.name}</span> · sales deduct stock</>
+                      : row.rec
+                        ? <>Not on the {isMinimartScope ? 'product list' : 'menu'} · sales won't deduct stock</>
+                        : <>Not tracked yet</>}
+                  </p>
+                  {row.rec && (
+                    <button
+                      onClick={() => void handleToggleMenuLink(row)}
+                      disabled={isBusyLinking}
+                      className={`shrink-0 inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium transition disabled:opacity-50 ${
+                        isLinked
+                          ? 'border-orange-500/50 bg-orange-500/15 text-orange-200 hover:bg-orange-500/25'
+                          : 'border-blue-500/50 bg-blue-500/15 text-blue-100 hover:bg-blue-500/25'
+                      }`}
+                    >
+                      {isBusyLinking
+                        ? <RefreshCcwIcon className="w-3.5 h-3.5 animate-spin" />
+                        : isLinked ? <XCircleIcon className="w-3.5 h-3.5" /> : <LinkIcon className="w-3.5 h-3.5" />}
+                      {isLinked ? 'Unlink' : `Add to ${isMinimartScope ? 'products' : 'menu'}`}
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2 border-t border-slate-700/30">
+                  <button
+                    onClick={closeEditItem}
+                    className="px-4 py-2 rounded-lg bg-slate-700 text-slate-300 text-sm hover:bg-slate-600 transition"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => void handleSaveRow(targetMenuItemId, row.item.name)}
+                    className="px-4 py-2 rounded-lg bg-emerald-500 text-white text-sm font-medium hover:bg-emerald-400 transition"
+                  >
+                    Save
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
         </Modal>
 
         {/* Add Inventory Item Modal */}

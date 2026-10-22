@@ -64,9 +64,9 @@ describe('InventoryManagement', () => {
   it('renders the inventory table headers and items', async () => {
     render(<InventoryManagement role="manager" />);
 
-    expect(await screen.findByText('Product')).toBeInTheDocument();
-    expect(screen.getByText('Category')).toBeInTheDocument();
-    expect(screen.getByText('Current Qty')).toBeInTheDocument();
+    expect(await screen.findByText('Item')).toBeInTheDocument();
+    expect(screen.getByText('Stock', { selector: 'th' })).toBeInTheDocument();
+    expect(screen.getByText('Value')).toBeInTheDocument();
 
     await waitFor(() => {
       expect(screen.getByText('Tomato')).toBeInTheDocument();
