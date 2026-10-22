@@ -5,6 +5,7 @@ import {
   EditIcon,
   TrashIcon,
   KeyIcon,
+  MapPinIcon,
   ChevronDownIcon } from
 'lucide-react';
 import { Staff, StaffRole } from '../../types';
@@ -491,10 +492,12 @@ export function StaffManagement({ onShowPerformance }: StaffManagementProps) {
                     )}
                   </div>
 
-                  <div className="flex flex-wrap gap-2 pt-4 border-t border-slate-700 mt-auto">
+                  {/* One row: compact, equal-height buttons that never wrap */}
+                  <div className="flex flex-nowrap items-center gap-1.5 pt-4 border-t border-slate-700 mt-auto">
                     <Button
                       variant={member.isOnDuty ? 'danger' : 'secondary'}
                       size="sm"
+                      className="h-8 px-2.5 text-xs whitespace-nowrap shrink-0"
                       onClick={async () => {
                         try {
                           await updateStaffStatus(member.id, !member.isOnDuty);
@@ -509,6 +512,7 @@ export function StaffManagement({ onShowPerformance }: StaffManagementProps) {
                     <Button
                       variant="secondary"
                       size="sm"
+                      className="h-8 px-2.5 text-xs whitespace-nowrap shrink-0"
                       onClick={() => handleManageCredentials(member)}>
                       <KeyIcon className="w-3 h-3" />
                       <span className="hidden sm:inline">Credentials</span>
@@ -518,13 +522,13 @@ export function StaffManagement({ onShowPerformance }: StaffManagementProps) {
                         variant="primary"
                         size="sm"
                         onClick={() => openAssignTablesModal(member)}
-                        className="flex items-center gap-2">
-                        <span>🍽️</span>
+                        className="h-8 px-2.5 text-xs whitespace-nowrap shrink-0">
+                        <MapPinIcon className="w-3 h-3" />
                         <span className="hidden sm:inline">Assign Tables</span>
                         <span className="sm:hidden">Tables</span>
                       </Button>
                     )}
-                    <div className="flex gap-1 ml-auto">
+                    <div className="flex gap-1 ml-auto shrink-0">
                       <Button variant="ghost" size="sm" className="p-1.5">
                         <EditIcon className="w-3.5 h-3.5" />
                       </Button>
