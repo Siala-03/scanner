@@ -354,8 +354,6 @@ export function buildReceiptHtml(receipt: ReceiptData, printerWidth: '58mm' | '8
     change,
     deliveryAddress,
     loyaltyPoints,
-    notes,
-    specialInstructions,
     osdcVenueTin,
     osdcBranchId,
     osdcReceiptNo,
@@ -445,7 +443,6 @@ export function buildReceiptHtml(receipt: ReceiptData, printerWidth: '58mm' | '8
     .s-paid    { background: #d1fae5; color: #065f46; }
     .s-pending { background: #fef3c7; color: #92400e; }
 
-    .notes-box { border: 1.5px dashed #000; border-radius: 3px; padding: 3px 5px; font-size: ${printerWidth === '58mm' ? '7pt' : '8pt'}; color: #000; font-style: italic; line-height: 1.4; }
 
     .loyalty-box { border: 1.5px dashed #b8952a; border-radius: 3px; padding: 5px; text-align: center; background: #fffbf0; }
     .loyalty-box .pts { font-size: ${printerWidth === '58mm' ? '12pt' : '14pt'}; font-weight: 900 !important; color: #92400e; }
@@ -528,15 +525,6 @@ export function buildReceiptHtml(receipt: ReceiptData, printerWidth: '58mm' | '8
     ${receipt.deliveryProvider ? `${receipt.deliveryProvider} &middot; ` : ''}${deliveryAddress}
   </div>` : ''}
 
-  ${(notes || specialInstructions) ? `
-  <hr class="dashed">
-  <div style="font-size:8pt;font-weight:900;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px">Comment / Note</div>
-  <div class="notes-box">
-    ${notes ? `<div><strong>Order Note:</strong> ${notes}</div>` : ''}
-    ${notes && specialInstructions ? `<div style="height:4px"></div>` : ''}
-    ${specialInstructions ? `<div><strong>Special Instructions:</strong> ${specialInstructions}</div>` : ''}
-  </div>` : ''}
-
   ${loyaltyPoints && loyaltyPoints.pointsEarned > 0 ? `
   <hr class="dashed">
   <div class="loyalty-box">
@@ -611,7 +599,7 @@ export function buildChitHtml(data: ChitData, printerWidth: '58mm' | '80mm' = ge
   const {
     restaurantName, restaurantLogo, restaurantAddress, restaurantPhone,
     restaurantEmail, restaurantCity, restaurantCountry, restaurantMomoCode,
-    orderNumber, tableLabel, waiterName, items, total, notes,
+    orderNumber, tableLabel, waiterName, items, total,
   } = data;
   const now = data.time ?? new Date();
   const dateStr = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
@@ -674,8 +662,6 @@ export function buildChitHtml(data: ChitData, printerWidth: '58mm' | '80mm' = ge
     .items .price { width: 30%; text-align: right; white-space: nowrap; font-size: ${printerWidth === '58mm' ? '7pt' : '8.5pt'}; font-weight: 900 !important; overflow: hidden; }
     .note { font-size: ${printerWidth === '58mm' ? '6.5pt' : '7.5pt'}; color: #000; font-style: italic; margin-top: 1px; font-weight: 900 !important; }
 
-    .special-box { border: 1.5px solid #000; padding: 3px 5px; margin: 4px 0; font-size: ${printerWidth === '58mm' ? '7pt' : '8.5pt'}; font-weight: 900 !important; line-height: 1.4; }
-    .special-box .lbl { font-size: 6.5pt; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 1px; }
 
     .grand { width: 100%; border-collapse: collapse; margin-top: 4px; }
     .grand td { font-size: ${printerWidth === '58mm' ? '9.5pt' : '12pt'}; font-weight: 900 !important; padding: 2px 0; }
@@ -720,8 +706,6 @@ export function buildChitHtml(data: ChitData, printerWidth: '58mm' | '80mm' = ge
   </table>
 
   <hr class="dashed">
-
-  ${notes ? `<div class="special-box"><div class="lbl">&#9888; Note</div>${notes}</div>` : ''}
 
   <table class="items">
     <tbody>${itemsHtml}</tbody>
