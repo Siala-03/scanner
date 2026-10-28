@@ -51,8 +51,11 @@ export async function fetchStaff(): Promise<Staff[]> {
   const restaurantId = getRestaurantId();
   const role = localStorage.getItem('staffRole');
 
+  // Never list staff across tenants: without a restaurant context only a
+  // superadmin (on its own dashboard) may see everyone.
+  if (!restaurantId && role !== 'superadmin') return [];
   let query = supabase.from('staff').select('*').order('name');
-  if (role !== 'superadmin' && restaurantId) {
+  if (restaurantId) {
     query = query.eq('restaurant_id', restaurantId);
   }
 

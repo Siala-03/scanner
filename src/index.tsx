@@ -1,3 +1,5 @@
+// Must be first: makes login/tenant keys tab-scoped before any module reads them.
+import "./lib/tabSession";
 import "./index.css";
 import React, { Suspense } from "react";
 import { render } from "react-dom";
