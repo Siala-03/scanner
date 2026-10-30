@@ -1,17 +1,36 @@
 
-import React, { lazy, useCallback, useState, useEffect, useRef } from 'react';
+import React, { lazy, Suspense, useCallback, useState, useEffect, useRef } from 'react';
 
 // Auto-reload on stale chunk (happens after a redeploy invalidates old hash filenames)
 function lazyWithReload<T extends React.ComponentType<any>>(
   factory: () => Promise<{ default: T }>
-): React.LazyExoticComponent<T> {
-  return lazy(() =>
+): React.LazyExoticComponent<T> & { preload: () => void } {
+  const Comp = lazy(() =>
     factory().catch(() => {
       window.location.reload();
       return new Promise<{ default: T }>(() => {});
     })
-  );
+  ) as React.LazyExoticComponent<T> & { preload: () => void };
+  // Downloads the page's code ahead of time so opening it later is instant.
+  Comp.preload = () => { factory().catch(() => { /* retried on real navigation */ }); };
+  return Comp;
 }
+
+/** Fetch page bundles in the background once the browser is idle. */
+function preloadWhenIdle(pages: Array<{ preload: () => void }>) {
+  const run = () => pages.forEach((p) => p.preload());
+  const idle = (window as any).requestIdleCallback as ((cb: () => void) => void) | undefined;
+  if (idle) idle(run);
+  else setTimeout(run, 1500);
+}
+
+// Shown in the content area while a page's code loads, so the header and
+// navigation stay on screen instead of the whole app blanking out.
+const PageLoading = () => (
+  <div className="flex items-center justify-center py-24">
+    <div className="h-6 w-6 animate-spin rounded-full border-2 border-slate-700 border-t-amber-400" />
+  </div>
+);
 import { saveOfflineProfile } from './utils/offlineAuth';
 import { motion } from 'framer-motion';
 import { ArrowLeftIcon, QrCodeIcon, LogOutIcon, ChevronDownIcon } from 'lucide-react';
@@ -596,6 +615,25 @@ export function App() {
     setRouteResolved(true);
   }, []);
 
+  // Once signed in, quietly download the other pages this role can open.
+  useEffect(() => {
+    if (!authUser) return;
+    if (selectedRole === 'manager') {
+      preloadWhenIdle([
+        ManagerDashboard, MenuManagement, StaffManagement, StaffPerformance, AnalyticsPage, QRCodeGenerator,
+        CreditManagement, LoyaltyManagement, PromotionsManagement, ReservationsPage, SchedulingPage,
+        ReviewsPage, ExpenseApproval, OrderCancellationRequestsPanel, InventoryManagement, OrderHistoryPage,
+        RestaurantSettings, EbmSettings, ReportsPage,
+      ]);
+    } else if (selectedRole === 'supervisor') {
+      preloadWhenIdle([
+        SupervisorDashboard, RevenueReports, StaffPerformance, QRCodeGenerator, InventoryManagement,
+        OrderHistoryPage, SupervisorExpenseManagement, OnlineOrdersPage, StaffOrderPage,
+        PaymentApprovalPanel, AttendancePanel,
+      ]);
+    }
+  }, [authUser, selectedRole]);
+
   // Auto-open the sidebar group that contains the active manager page
   useEffect(() => {
     for (const group of MANAGER_NAV_GROUPS) {
@@ -919,6 +957,7 @@ export function App() {
           )}
         </div>
 
+        <Suspense fallback={<PageLoading />}>
         {supervisorPage === 'dashboard' && (
           <SupervisorDashboard
             restaurantName={restaurantName}
@@ -979,6 +1018,7 @@ export function App() {
             />
           </div>
         )}
+        </Suspense>
       </div>
     );
   }
@@ -1105,6 +1145,7 @@ export function App() {
           </aside>
 
           <main className="flex-1 bg-slate-900 text-slate-100 p-4 lg:p-6 min-h-[calc(100vh-73px)] overflow-x-auto">
+            <Suspense fallback={<PageLoading />}>
             {managerPage === 'dashboard' &&
               <ManagerDashboard
                 onNavigate={(page) => setManagerPage(page as ManagerPage)}
@@ -1169,6 +1210,7 @@ export function App() {
             {managerPage === 'ebm' && currentRestaurantId && (
               <EbmSettings restaurantId={currentRestaurantId} />
             )}
+            </Suspense>
           </main>
         </div>
       </div>
