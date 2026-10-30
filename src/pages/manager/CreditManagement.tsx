@@ -1,11 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import { useCredit } from '../../hooks/useCredit';
+import { fetchUnpaidOrders, confirmPayment } from '../../api/orders';
 import type { CustomerCreditAccount } from '../../types/credit';
 import { Staff } from '../../types';
 
 // One page: stats, the accounts list, and a detail view per account.
-// Orders are charged to credit at checkout (Payments → "Credit" method), so this
-// page is for opening accounts, recording repayments and occasional corrections.
+// Orders can be charged to credit here ("Charge an Order", picked from the
+// unpaid list) or at checkout (Payments → "Credit"); both mark the order paid
+// as Credit so it leaves the payments queue.
+
+// Unpaid orders come straight from the DB, so accept both field spellings.
+const orderNo = (o: any) => String(o.order_number ?? o.orderNumber ?? String(o.id).slice(-6).toUpperCase());
+const orderTable = (o: any) => o.table_number ?? o.tableNumber;
+const orderTotal = (o: any) => Number(o.total ?? o.total_amount ?? 0) || 0;
+const orderItems = (o: any): any[] => {
+  if (Array.isArray(o.items)) return o.items;
+  try { const p = JSON.parse(o.items); return Array.isArray(p) ? p : []; } catch { return []; }
+};
+const orderLabel = (o: any) => {
+  const t = orderTable(o);
+  return `#${orderNo(o)} · ${t == null || t === 999 ? (t === 999 ? 'Online' : 'Bar / Walk-up') : `Table ${t}`}`;
+};
 
 type TxType = 'charge' | 'payment' | 'adjustment';
 type PayMethod = 'cash' | 'mobile' | 'card' | 'bank_transfer';
@@ -69,6 +84,17 @@ const CreditManagement: React.FC = () => {
   const [txMethod, setTxMethod] = useState<PayMethod>('cash');
   const [txError, setTxError] = useState('');
   const [txSaving, setTxSaving] = useState(false);
+
+  // Charge-an-order modal
+  const [showOrderModal, setShowOrderModal] = useState(false);
+  const [unpaidOrders, setUnpaidOrders] = useState<any[]>([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [orderSearch, setOrderSearch] = useState('');
+  const [pickedOrder, setPickedOrder] = useState<any | null>(null);
+  const [chargeAccountId, setChargeAccountId] = useState('');
+  const [newAcc, setNewAcc] = useState({ name: '', phone: '', idNumber: '', limit: '' });
+  const [orderChargeError, setOrderChargeError] = useState('');
+  const [orderChargeSaving, setOrderChargeSaving] = useState(false);
 
   const {
     accounts,
@@ -180,6 +206,88 @@ const CreditManagement: React.FC = () => {
     }
   };
 
+  const openOrderModal = async (accountId = '') => {
+    setShowOrderModal(true);
+    setPickedOrder(null);
+    setOrderSearch('');
+    setChargeAccountId(accountId);
+    setNewAcc({ name: '', phone: '', idNumber: '', limit: '' });
+    setOrderChargeError('');
+    setOrdersLoading(true);
+    try {
+      setUnpaidOrders(await fetchUnpaidOrders());
+    } catch {
+      setOrderChargeError('Could not load unpaid orders.');
+    } finally {
+      setOrdersLoading(false);
+    }
+  };
+
+  const oq = orderSearch.trim().toLowerCase();
+  const visibleOrders = unpaidOrders.filter((o) => {
+    if (!oq) return true;
+    const t = orderTable(o);
+    return orderNo(o).toLowerCase().includes(oq) || (t != null && String(t) === oq) ||
+      String(o.customer_name ?? o.customerName ?? '').toLowerCase().includes(oq);
+  });
+
+  const chargeAccount = accounts.find((a) => a.id === chargeAccountId);
+  const pickedTotal = pickedOrder ? orderTotal(pickedOrder) : 0;
+  const orderChargeProblem = !pickedOrder
+    ? 'Pick an order'
+    : !chargeAccountId
+      ? 'Choose an account'
+      : chargeAccountId === 'new'
+        ? (!newAcc.name.trim() || !newAcc.phone.trim() || !newAcc.idNumber.trim())
+          ? 'Enter name, phone and ID for the new account'
+          : (parseFloat(newAcc.limit) || 0) < pickedTotal ? 'Credit limit must cover the order total' : null
+        : !chargeAccount
+          ? 'Choose an account'
+          : pickedTotal > chargeAccount.availableCredit
+            ? `Over limit — only ${formatCurrency(chargeAccount.availableCredit)} available`
+            : null;
+
+  const handleChargeOrder = async () => {
+    if (orderChargeProblem || !pickedOrder) return;
+    setOrderChargeSaving(true);
+    setOrderChargeError('');
+    try {
+      let account = chargeAccount;
+      if (chargeAccountId === 'new') {
+        account = await createAccount({
+          customerName: newAcc.name.trim(),
+          customerPhone: newAcc.phone.trim(),
+          creditLimit: parseFloat(newAcc.limit) || pickedTotal,
+          notes: `ID/Passport: ${newAcc.idNumber.trim()}`,
+        });
+      }
+      if (!account) throw new Error('No account selected');
+      await chargeCredit({
+        accountId: account.id,
+        customerId: String(account.customerId || ''),
+        amount: pickedTotal,
+        orderId: pickedOrder.id,
+        description: `Order #${orderNo(pickedOrder)}`,
+        performedBy: user?.id || '',
+        performedByName: user?.name || '',
+      });
+      // Mark the order paid as Credit so it leaves the payments queue.
+      await confirmPayment(pickedOrder.id, {
+        paymentType: '05',
+        paymentBreakdown: [{ method: 'Credit', amount: pickedTotal, reference: `Credit: ${account.customerName}` }],
+        confirmedBy: user?.id,
+        confirmedByName: user?.name,
+      });
+      setShowOrderModal(false);
+      await loadCreditData();
+      if (detailAccount?.id === account.id) await loadAccountTransactions(account.id);
+    } catch (err: any) {
+      setOrderChargeError(err?.message || 'Failed to charge the order. Check the account history before retrying.');
+    } finally {
+      setOrderChargeSaving(false);
+    }
+  };
+
   const idFromNotes = (notes?: string) => notes?.match(/ID\/Passport:\s*([^|]+)/)?.[1]?.trim();
 
   return (
@@ -189,16 +297,25 @@ const CreditManagement: React.FC = () => {
           <div>
             <h1 className="text-2xl md:text-3xl font-bold text-white">Credit</h1>
             <p className="text-sm text-slate-400 mt-1">
-              Orders are charged to credit at checkout under Payments → Credit. Record repayments here.
+              Charge unpaid orders to a customer's account, and record repayments.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => setShowCreateModal(true)}
-            className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-amber-400 transition"
-          >
-            New Account
-          </button>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setShowCreateModal(true)}
+              className="h-9 rounded-lg border border-slate-600 bg-slate-800 px-4 text-sm font-medium text-slate-200 hover:bg-slate-700 transition"
+            >
+              New Account
+            </button>
+            <button
+              type="button"
+              onClick={() => void openOrderModal()}
+              className="h-9 rounded-lg bg-amber-500 px-4 text-sm font-semibold text-slate-950 hover:bg-amber-400 transition"
+            >
+              Charge an Order
+            </button>
+          </div>
         </div>
 
         {loadError && (
@@ -319,6 +436,12 @@ const CreditManagement: React.FC = () => {
                 Record Payment
               </button>
               <button
+                onClick={() => void openOrderModal(detailAccount.id)}
+                className="rounded-lg border border-amber-500/50 bg-amber-500/15 px-4 py-2 text-sm font-medium text-amber-200 hover:bg-amber-500/25 transition"
+              >
+                Charge an Order
+              </button>
+              <button
                 onClick={() => openTransaction(detailAccount, 'charge')}
                 className="rounded-lg border border-slate-600 bg-slate-700 px-4 py-2 text-sm font-medium text-slate-200 hover:bg-slate-600 transition"
               >
@@ -357,6 +480,131 @@ const CreditManagement: React.FC = () => {
                 ))}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Charge an order */}
+      {showOrderModal && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 p-0 sm:p-4" onClick={() => setShowOrderModal(false)}>
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full sm:max-w-lg max-h-[90vh] overflow-y-auto space-y-4 rounded-t-2xl sm:rounded-2xl border border-slate-700 bg-slate-800 p-5"
+          >
+            <h3 className="text-lg font-semibold text-white">Charge an Order to Credit</h3>
+
+            {!pickedOrder ? (
+              <>
+                <input
+                  autoFocus
+                  value={orderSearch}
+                  onChange={(e) => setOrderSearch(e.target.value)}
+                  placeholder="Search order #, table or customer"
+                  className={inputClass}
+                />
+                {ordersLoading ? (
+                  <div className="flex justify-center py-8">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-amber-500" />
+                  </div>
+                ) : visibleOrders.length === 0 ? (
+                  <p className="text-sm text-slate-400 py-6 text-center">No unpaid orders{oq ? ' match your search' : ''}.</p>
+                ) : (
+                  <div className="max-h-80 overflow-y-auto divide-y divide-slate-700/60 rounded-lg border border-slate-700">
+                    {visibleOrders.map((o) => (
+                      <button
+                        key={o.id}
+                        onClick={() => setPickedOrder(o)}
+                        className="w-full flex items-center justify-between gap-3 px-3 py-2.5 text-left hover:bg-slate-700/40"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-slate-100">{orderLabel(o)}</p>
+                          <p className="text-xs text-slate-400 truncate">
+                            {orderItems(o).map((i: any) => `${i.quantity ?? 1}× ${i.menuItemName ?? i.menu_item_name ?? 'Item'}`).join(', ') || '—'}
+                          </p>
+                        </div>
+                        <span className="shrink-0 text-sm font-semibold text-amber-300">{formatCurrency(orderTotal(o))}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                <div className="rounded-lg border border-slate-700 bg-slate-900/60 p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-semibold text-slate-100">{orderLabel(pickedOrder)}</p>
+                    <button onClick={() => setPickedOrder(null)} className="text-xs text-slate-400 hover:text-white">Change</button>
+                  </div>
+                  <ul className="mt-2 space-y-1">
+                    {orderItems(pickedOrder).map((i: any, idx: number) => (
+                      <li key={idx} className="flex justify-between text-xs text-slate-300">
+                        <span>{i.quantity ?? 1}× {i.menuItemName ?? i.menu_item_name ?? 'Item'}</span>
+                        <span>{formatCurrency(Number(i.totalPrice ?? i.total_price ?? 0))}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="mt-2 flex justify-between border-t border-slate-700 pt-2 text-sm font-semibold">
+                    <span className="text-slate-400">Total</span>
+                    <span className="text-amber-300">{formatCurrency(pickedTotal)}</span>
+                  </div>
+                </div>
+
+                <label className="block text-sm text-slate-300">
+                  Charge to
+                  <select value={chargeAccountId} onChange={(e) => setChargeAccountId(e.target.value)} className={inputClass}>
+                    <option value="">Choose an account…</option>
+                    {accounts.filter((a) => a.status === 'active').map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.customerName}{a.customerPhone ? ` (${a.customerPhone})` : ''} — {formatCurrency(a.availableCredit)} available
+                      </option>
+                    ))}
+                    <option value="new">+ New credit account</option>
+                  </select>
+                </label>
+
+                {chargeAccountId === 'new' && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <label className="block col-span-2 text-sm text-slate-300">
+                      Customer name
+                      <input value={newAcc.name} onChange={(e) => setNewAcc({ ...newAcc, name: e.target.value })} className={inputClass} />
+                    </label>
+                    <label className="block text-sm text-slate-300">
+                      Phone
+                      <input type="tel" value={newAcc.phone} onChange={(e) => setNewAcc({ ...newAcc, phone: e.target.value })} className={inputClass} />
+                    </label>
+                    <label className="block text-sm text-slate-300">
+                      ID / Passport
+                      <input value={newAcc.idNumber} onChange={(e) => setNewAcc({ ...newAcc, idNumber: e.target.value })} className={inputClass} />
+                    </label>
+                    <label className="block col-span-2 text-sm text-slate-300">
+                      Credit limit (RWF)
+                      <input type="number" min="0" step="100" value={newAcc.limit} onChange={(e) => setNewAcc({ ...newAcc, limit: e.target.value })} placeholder={`At least ${formatCurrency(pickedTotal)}`} className={inputClass} />
+                    </label>
+                  </div>
+                )}
+
+                {orderChargeProblem && chargeAccountId && (
+                  <p className="text-xs text-amber-400">{orderChargeProblem}</p>
+                )}
+              </>
+            )}
+
+            {orderChargeError && (
+              <div className="rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200">{orderChargeError}</div>
+            )}
+
+            <div className="flex justify-end gap-2 pt-1">
+              <button onClick={() => setShowOrderModal(false)} className="rounded-lg bg-slate-700 px-4 py-2 text-sm text-slate-200 hover:bg-slate-600">Cancel</button>
+              {pickedOrder && (
+                <button
+                  onClick={() => void handleChargeOrder()}
+                  disabled={!!orderChargeProblem || orderChargeSaving}
+                  className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-amber-400 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {orderChargeSaving ? 'Charging…' : `Charge ${formatCurrency(pickedTotal)}`}
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}
