@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
+import { hashPassword } from '../_shared/password.ts';
 
 const db = createClient(
   Deno.env.get('SUPABASE_URL')!,
@@ -86,7 +87,7 @@ Deno.serve(async (req) => {
       .insert({
         staff_id: staffId,
         username,
-        password_hash: password,
+        password_hash: hashPassword(password),
         restaurant_id: targetRestaurantId ?? null,
       });
 
@@ -204,7 +205,7 @@ Deno.serve(async (req) => {
       // Row exists — update only the fields that were provided
       const updates: Record<string, string> = {};
       if (username) updates.username = username.trim();
-      if (password) updates.password_hash = password;
+      if (password) updates.password_hash = hashPassword(password);
 
       const { error } = await db
         .from('staff_credentials')
@@ -224,7 +225,7 @@ Deno.serve(async (req) => {
         .insert({
           staff_id: targetStaffId,
           username: username.trim(),
-          password_hash: password,
+          password_hash: hashPassword(password),
           restaurant_id: targetStaff.restaurant_id,
         });
       upsertError = error;

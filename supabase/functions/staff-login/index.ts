@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
+import { hashPassword, verifyPassword } from '../_shared/password.ts';
 
 const db = createClient(
   Deno.env.get('SUPABASE_URL')!,
@@ -74,7 +75,20 @@ Deno.serve(async (req) => {
       });
     }
 
-    const matchingCreds = credentials.filter((c: any) => c.password_hash === password);
+    const matchingCreds: any[] = [];
+    for (const c of credentials as any[]) {
+      const { valid, needsUpgrade } = verifyPassword(password, c.password_hash);
+      if (!valid) continue;
+      matchingCreds.push(c);
+      // Legacy plain-text password: replace it with a hash now that it matched.
+      if (needsUpgrade) {
+        await db
+          .from('staff_credentials')
+          .update({ password_hash: hashPassword(password) })
+          .eq('staff_id', c.staff_id)
+          .eq('restaurant_id', c.restaurant_id);
+      }
+    }
 
     if (matchingCreds.length === 0) {
       return new Response(JSON.stringify({ error: 'Invalid username or password' }), {
@@ -155,7 +169,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    if (creds.password_hash !== currentPassword) {
+    if (!verifyPassword(currentPassword, creds.password_hash).valid) {
       return new Response(JSON.stringify({ error: 'Current password is incorrect' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -164,7 +178,7 @@ Deno.serve(async (req) => {
 
     const { error: updateErr } = await db
       .from('staff_credentials')
-      .update({ password_hash: newPassword })
+      .update({ password_hash: hashPassword(newPassword) })
       .eq('staff_id', staffId);
 
     if (updateErr) {

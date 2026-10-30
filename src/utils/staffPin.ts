@@ -1,100 +1,107 @@
 /**
- * Staff PIN storage — PINs are stored as SHA-256 hashes inside the
- * restaurant's `settings.staff_pins` JSONB column so they work across
- * all devices without any schema migration or edge-function deployment.
+ * Staff PINs for the shared waiter terminal.
+ *
+ * PINs live server-side in the `staff_pins` table and are only reachable via
+ * the `staff-pin` Edge Function: the browser learns *which* staff have a PIN
+ * and whether an entered PIN is right — never the hashes. (They used to sit in
+ * the public restaurants.settings column as unsalted SHA-256.)
+ *
+ * Offline fallback: the last known PIN list, and a salted hash of each PIN
+ * that was verified online on this device, are cached locally so the terminal
+ * keeps working — and keeps asking for PINs — during an internet outage.
  */
-import { supabase } from '../lib/supabase';
+import { callEdgeFn } from '../lib/supabase';
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+const STATUS_CACHE_KEY = 'staffPinStatus';
+const VERIFIED_CACHE_KEY = 'staffPinVerified';
+const DEVICE_SALT_KEY = 'staffPinDeviceSalt';
+const OFFLINE_ITERATIONS = 100_000;
 
-async function hashPin(pin: string): Promise<string> {
-  const data = new TextEncoder().encode(pin);
-  const buf = await crypto.subtle.digest('SHA-256', data);
-  return Array.from(new Uint8Array(buf))
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
-}
-
-function getRestaurantId(): string | null {
-  if (typeof window === 'undefined') return null;
-  const direct = localStorage.getItem('restaurantId');
-  if (direct?.trim()) return direct;
+function readJson<T>(key: string, fallback: T): T {
   try {
-    const raw = localStorage.getItem('authUser');
-    if (raw) {
-      const u = JSON.parse(raw);
-      return u?.restaurantId || u?.restaurant_id || null;
-    }
-  } catch {}
-  return null;
+    const raw = localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as T) : fallback;
+  } catch {
+    return fallback;
+  }
 }
 
-async function loadPinMap(): Promise<Record<string, string>> {
-  const restaurantId = getRestaurantId();
-  if (!restaurantId) return {};
-  const { data } = await supabase
-    .from('restaurants')
-    .select('settings')
-    .eq('id', restaurantId)
-    .single();
-  return (data?.settings as any)?.staff_pins ?? {};
+function writeJson(key: string, value: unknown): void {
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* storage unavailable */ }
 }
 
-async function savePinMap(map: Record<string, string>): Promise<void> {
-  const restaurantId = getRestaurantId();
-  if (!restaurantId) return;
+/** A network failure (as opposed to the server answering with an error). */
+function isOffline(e: unknown): boolean {
+  return (typeof navigator !== 'undefined' && !navigator.onLine) || e instanceof TypeError;
+}
 
-  // Read-merge-write to avoid clobbering other settings keys
-  const { data } = await supabase
-    .from('restaurants')
-    .select('settings')
-    .eq('id', restaurantId)
-    .single();
+function deviceSalt(): Uint8Array<ArrayBuffer> {
+  let salt = readJson<number[] | null>(DEVICE_SALT_KEY, null);
+  if (!salt) {
+    salt = Array.from(crypto.getRandomValues(new Uint8Array(16)));
+    writeJson(DEVICE_SALT_KEY, salt);
+  }
+  return new Uint8Array(salt);
+}
 
-  const existing = (data?.settings as Record<string, unknown>) ?? {};
-  await supabase
-    .from('restaurants')
-    .update({ settings: { ...existing, staff_pins: map } })
-    .eq('id', restaurantId);
+async function offlineHash(staffId: string, pin: string): Promise<string> {
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(`${staffId}:${pin}`), 'PBKDF2', false, ['deriveBits']);
+  const bits = await crypto.subtle.deriveBits(
+    { name: 'PBKDF2', hash: 'SHA-256', salt: deviceSalt(), iterations: OFFLINE_ITERATIONS },
+    key,
+    256,
+  );
+  return btoa(String.fromCharCode(...new Uint8Array(bits)));
+}
+
+function staffPinCall(body: Record<string, unknown>): Promise<any> {
+  return callEdgeFn('staff-pin', { method: 'POST', body });
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
-/** Manager saves a 4-digit PIN for a staff member. */
+/** { staffId: true } for every staff member who has a PIN (cached for offline use). */
+export async function fetchPinStatus(): Promise<Record<string, boolean>> {
+  try {
+    const { pins } = await staffPinCall({ action: 'status' });
+    writeJson(STATUS_CACHE_KEY, pins ?? {});
+    return pins ?? {};
+  } catch {
+    return readJson<Record<string, boolean>>(STATUS_CACHE_KEY, {});
+  }
+}
+
+export type PinCheck = { valid: boolean; lockedSeconds?: number; offline?: boolean };
+
+/** Check a waiter's PIN with the server, falling back to this device's cache when offline. */
+export async function verifyStaffPin(staffId: string, pin: string): Promise<PinCheck> {
+  try {
+    const result: PinCheck = await staffPinCall({ action: 'verify', staffId, pin });
+    if (result.valid) {
+      const cache = readJson<Record<string, string>>(VERIFIED_CACHE_KEY, {});
+      cache[staffId] = await offlineHash(staffId, pin);
+      writeJson(VERIFIED_CACHE_KEY, cache);
+    }
+    return result;
+  } catch (e) {
+    if (!isOffline(e)) throw e;
+    const cached = readJson<Record<string, string>>(VERIFIED_CACHE_KEY, {})[staffId];
+    return { valid: !!cached && cached === (await offlineHash(staffId, pin)), offline: true };
+  }
+}
+
+/** Manager sets (or replaces) a 4-digit PIN for a staff member. */
 export async function saveStaffPin(staffId: string, pin: string): Promise<void> {
-  const hash = await hashPin(pin);
-  const map = await loadPinMap();
-  map[staffId] = hash;
-  await savePinMap(map);
+  await staffPinCall({ action: 'set', staffId, pin });
+  const cache = readJson<Record<string, string>>(VERIFIED_CACHE_KEY, {});
+  delete cache[staffId];
+  writeJson(VERIFIED_CACHE_KEY, cache);
 }
 
 /** Manager removes a PIN. */
 export async function clearStaffPinRemote(staffId: string): Promise<void> {
-  const map = await loadPinMap();
-  delete map[staffId];
-  await savePinMap(map);
+  await staffPinCall({ action: 'clear', staffId });
+  const cache = readJson<Record<string, string>>(VERIFIED_CACHE_KEY, {});
+  delete cache[staffId];
+  writeJson(VERIFIED_CACHE_KEY, cache);
 }
-
-/**
- * Returns { staffId: sha256Hash } for every staff member with a PIN.
- * Used by the waiter selection screen on mount.
- */
-export async function fetchPinHashes(): Promise<Record<string, string>> {
-  try {
-    return await loadPinMap();
-  } catch {
-    return {};
-  }
-}
-
-/** Verify a PIN against a known hash (hash was already fetched from server). */
-export async function verifyPinAgainstHash(pin: string, storedHash: string): Promise<boolean> {
-  const hash = await hashPin(pin);
-  return hash === storedHash;
-}
-
-// ── Legacy shims (keep StaffManagement compiling without changes) ─────────────
-
-export function hasStaffPin(_staffId: string): boolean { return false; }
-export function clearStaffPin(_staffId: string): void {}
-export async function verifyStaffPin(_staffId: string, _pin: string): Promise<boolean> { return false; }

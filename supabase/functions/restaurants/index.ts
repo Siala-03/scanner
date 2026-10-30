@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { hashPassword } from '../_shared/password.ts';
 import { cors, err, optionsResponse } from '../_shared/cors.ts';
 import { authenticate, requireRole } from '../_shared/auth.ts';
 
@@ -103,7 +104,7 @@ Deno.serve(async (req: Request) => {
       const { error: credError } = await db.from('staff_credentials').insert({
         staff_id: managerId,
         username: managerUsername,
-        password_hash: managerPassword,
+        password_hash: hashPassword(managerPassword),
         restaurant_id: restaurantId,
       });
 
