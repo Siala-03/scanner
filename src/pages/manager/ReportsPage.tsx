@@ -38,11 +38,12 @@ const PAYMENT_METHOD_LABELS: Record<string, string> = {
   '03': 'Cheque', cheque: 'Cheque', check: 'Cheque',
   '04': 'MoMo', 'mobile money': 'MoMo', momo: 'MoMo',
   '99': 'Other', other: 'Other',
+    '05': 'Credit', credit: 'Credit',
   'bank transfer': 'Bank Transfer', bank_transfer: 'Bank Transfer',
 };
 
 const PAYMENT_METHOD_COLORS: Record<string, string> = {
-  Cash: '#10b981', Card: '#3b82f6', MoMo: '#f59e0b',
+  Cash: '#10b981', Card: '#3b82f6', MoMo: '#f59e0b', Credit: '#ef4444',
   Other: '#6b7280', Cheque: '#8b5cf6', 'Bank Transfer': '#06b6d4',
 };
 

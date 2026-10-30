@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   CheckCircleIcon, ClockIcon, BanknoteIcon, CreditCardIcon,
   SmartphoneIcon, RefreshCwIcon, UserIcon, PlusIcon, XIcon,
-  WifiOffIcon, CircleEllipsisIcon,
+  WifiOffIcon, CircleEllipsisIcon, WalletIcon,
 } from 'lucide-react';
 import { fetchUnpaidOrders, confirmPayment, fetchOrderCancellationRequests, requestOrderCancellation } from '../../api/orders';
 import { VoidReasonModal } from '../shared/VoidReasonModal';
@@ -14,6 +14,8 @@ import { flushPendingPayments } from '../../utils/offlineSync';
 import { OfflineBanner } from '../ui/OfflineBanner';
 import { orderToReceiptData, buildReceiptHtml, printReceipt, buildKitchenTicketHtml, printKitchenTicket } from '../../utils/receipt';
 import { PrinterIcon } from 'lucide-react';
+import { getCreditAccounts, createCreditAccount, addCreditCharge } from '../../api/credit';
+import type { CustomerCreditAccount } from '../../types/credit';
 
 interface Order {
   id: string;
@@ -39,7 +41,22 @@ const PAYMENT_METHODS = [
   { code: '02', label: 'Card',  icon: CreditCardIcon },
   { code: '04', label: 'MoMo',  icon: SmartphoneIcon },
   { code: '99', label: 'Other', icon: CircleEllipsisIcon },
+  // Charged to a customer credit account (settled later on the Credit page)
+  { code: '05', label: 'Credit', icon: WalletIcon },
 ];
+
+const CREDIT_CODE = '05';
+
+/** Which credit account an order's credit portion goes to ('new' = create one). */
+interface CreditSelection {
+  accountId: string;
+  name: string;
+  phone: string;
+  idNumber: string;
+  limit: string;
+}
+
+const emptyCreditSelection = (): CreditSelection => ({ accountId: '', name: '', phone: '', idNumber: '', limit: '' });
 
 interface SplitEntry {
   code: string;
@@ -130,6 +147,64 @@ export function PaymentApprovalPanel({ restaurantId, restaurantName, restaurantI
   const [justQueued,   setJustQueued]   = useState<Set<string>>(new Set());
   const [isOnline,     setIsOnline]     = useState(() => navigator.onLine);
   const ordersRef = useRef<Order[]>([]); // keeps last-known list for offline fallback
+  const [creditAccounts, setCreditAccounts] = useState<CustomerCreditAccount[]>([]);
+  const [creditSelMap, setCreditSelMap] = useState<Record<string, CreditSelection>>({});
+  // Orders whose credit charge already went through, so a retried confirm doesn't charge twice.
+  const creditChargedRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    getCreditAccounts()
+      .then((accs) => setCreditAccounts(accs.filter((a) => a.status === 'active')))
+      .catch(() => { /* credit is optional; the picker just stays empty */ });
+  }, [restaurantId]);
+
+  const patchCreditSel = (orderId: string, patch: Partial<CreditSelection>) => {
+    setCreditSelMap((prev) => ({ ...prev, [orderId]: { ...(prev[orderId] ?? emptyCreditSelection()), ...patch } }));
+  };
+
+  /** null when the credit part of this order is ready to charge, otherwise why not. */
+  const creditProblem = (orderId: string, amount: number): string | null => {
+    const sel = creditSelMap[orderId] ?? emptyCreditSelection();
+    if (!isOnline) return 'Credit needs an internet connection';
+    if (!sel.accountId) return 'Choose a credit account';
+    if (sel.accountId === 'new') {
+      if (!sel.name.trim() || !sel.phone.trim() || !sel.idNumber.trim()) return 'Enter name, phone and ID for the new account';
+      if ((parseFloat(sel.limit) || 0) < amount) return 'Credit limit must cover this amount';
+      return null;
+    }
+    const acc = creditAccounts.find((a) => a.id === sel.accountId);
+    if (!acc) return 'Choose a credit account';
+    if (amount > acc.availableCredit) return `Over limit — only ${formatPrice(acc.availableCredit)} available`;
+    return null;
+  };
+
+  /** Charge the credit portion of an order to the selected (or a new) account. */
+  const chargeOrderToCredit = async (order: Order, amount: number) => {
+    if (creditChargedRef.current.has(order.id)) return;
+    const sel = creditSelMap[order.id] ?? emptyCreditSelection();
+    let account = creditAccounts.find((a) => a.id === sel.accountId);
+    if (sel.accountId === 'new') {
+      account = await createCreditAccount({
+        customerName: sel.name.trim(),
+        customerPhone: sel.phone.trim(),
+        creditLimit: parseFloat(sel.limit) || amount,
+        notes: `ID/Passport: ${sel.idNumber.trim()}`,
+      });
+    }
+    if (!account) throw new Error('No credit account selected');
+    const label = order.orderNumber ?? order.order_number ?? order.id.slice(-6).toUpperCase();
+    const { account: updated } = await addCreditCharge({
+      accountId: account.id,
+      customerId: account.customerId || '',
+      amount,
+      orderId: order.id,
+      description: `Order #${label}`,
+      performedBy: staffId || '',
+      performedByName: staffName || '',
+    });
+    creditChargedRef.current.add(order.id);
+    setCreditAccounts((prev) => [updated, ...prev.filter((a) => a.id !== updated.id)]);
+  };
 
   // When a parent-supplied orders array is provided, derive display state from it
   // directly — no separate API call needed.
@@ -363,12 +438,18 @@ export function PaymentApprovalPanel({ restaurantId, restaurantName, restaurantI
     const resolved = resolveAmounts(splits, order.total);
     const primary = resolved.reduce((a, b) => a.effectiveAmount >= b.effectiveAmount ? a : b);
     const note = buildNote(splits, order.total);
+    const creditPart = resolved.find((s) => s.code === CREDIT_CODE);
+    const creditSel = creditSelMap[order.id];
+    const creditAccountName = creditSel?.accountId === 'new'
+      ? creditSel.name.trim()
+      : creditAccounts.find((a) => a.id === creditSel?.accountId)?.customerName;
     const paymentBreakdown = resolved
       .filter((s) => s.effectiveAmount > 0)
       .map((s) => ({
         method: s.label,
         amount: s.effectiveAmount,
         ...(s.momoRef ? { reference: s.momoRef } : {}),
+        ...(s.code === CREDIT_CODE && creditAccountName ? { reference: `Credit: ${creditAccountName}` } : {}),
       }));
     const paymentData = {
       paymentType:     primary.code,
@@ -380,6 +461,7 @@ export function PaymentApprovalPanel({ restaurantId, restaurantName, restaurantI
     };
 
     // ── Offline path ──────────────────────────────────────────────────────
+    // (Credit is blocked offline by creditProblem — it needs the live balance.)
     if (!isOnline) {
       try {
         const sessionRes = await supabase.auth.getSession().catch(() => ({ data: { session: null } }));
@@ -408,6 +490,9 @@ export function PaymentApprovalPanel({ restaurantId, restaurantName, restaurantI
     // ── Online path ───────────────────────────────────────────────────────
     setConfirming(order.id);
     try {
+      if (creditPart && creditPart.effectiveAmount > 0) {
+        await chargeOrderToCredit(order, creditPart.effectiveAmount);
+      }
       await confirmPayment(order.id, paymentData);
 
       // EBM fiscalization disabled — CORS issues with backend routing
@@ -512,7 +597,11 @@ export function PaymentApprovalPanel({ restaurantId, restaurantName, restaurantI
             const valid     = splitsValid(splits, order.total);
             const momoEntry = splits.find((s) => s.code === '04');
             const momoRefMissing = !!momoEntry && !momoEntry.momoRef.trim();
-            const canConfirm = valid && !momoRefMissing;
+            const creditAmount = resolveAmounts(splits, order.total).find((s) => s.code === CREDIT_CODE)?.effectiveAmount ?? 0;
+            const hasCredit = splits.some((s) => s.code === CREDIT_CODE);
+            const creditIssue = hasCredit ? creditProblem(order.id, creditAmount) : null;
+            const creditSel = creditSelMap[order.id] ?? emptyCreditSelection();
+            const canConfirm = valid && !momoRefMissing && !creditIssue;
             const cancellationRequested = pendingCancelRequests.has(order.id);
 
             return (
@@ -650,8 +739,62 @@ export function PaymentApprovalPanel({ restaurantId, restaurantName, restaurantI
                     </div>
                   )}
 
+                  {/* Credit account picker */}
+                  {hasCredit && (
+                    <div className="space-y-1.5 rounded-lg border border-slate-700 bg-slate-900/40 p-2">
+                      <select
+                        value={creditSel.accountId}
+                        onChange={(e) => patchCreditSel(order.id, { accountId: e.target.value })}
+                        className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-indigo-500"
+                      >
+                        <option value="">Charge {formatPrice(creditAmount)} to…</option>
+                        {creditAccounts.map((a) => (
+                          <option key={a.id} value={a.id}>
+                            {a.customerName}{a.customerPhone ? ` (${a.customerPhone})` : ''} — {formatPrice(a.availableCredit)} available
+                          </option>
+                        ))}
+                        <option value="new">+ New credit account</option>
+                      </select>
+                      {creditSel.accountId === 'new' && (
+                        <div className="grid grid-cols-2 gap-1.5">
+                          <input
+                            value={creditSel.name}
+                            onChange={(e) => patchCreditSel(order.id, { name: e.target.value })}
+                            placeholder="Customer name"
+                            className="col-span-2 bg-slate-700 border border-slate-600 rounded-lg px-3 py-1.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                          />
+                          <input
+                            type="tel"
+                            value={creditSel.phone}
+                            onChange={(e) => patchCreditSel(order.id, { phone: e.target.value })}
+                            placeholder="Phone"
+                            className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-1.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                          />
+                          <input
+                            value={creditSel.idNumber}
+                            onChange={(e) => patchCreditSel(order.id, { idNumber: e.target.value })}
+                            placeholder="ID / Passport"
+                            className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-1.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                          />
+                          <input
+                            type="number"
+                            min="0"
+                            step="100"
+                            value={creditSel.limit}
+                            onChange={(e) => patchCreditSel(order.id, { limit: e.target.value })}
+                            placeholder={`Credit limit (min ${formatPrice(creditAmount)})`}
+                            className="col-span-2 bg-slate-700 border border-slate-600 rounded-lg px-3 py-1.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                          />
+                        </div>
+                      )}
+                      {creditIssue && creditSel.accountId && (
+                        <p className="text-xs text-amber-400">{creditIssue}</p>
+                      )}
+                    </div>
+                  )}
+
                   {/* Single-method note field */}
-                  {!isMulti && splits[0]?.code !== '04' && (
+                  {!isMulti && splits[0]?.code !== '04' && splits[0]?.code !== CREDIT_CODE && (
                     <input
                       type="text"
                       value={splits[0]?.momoRef || ''}
