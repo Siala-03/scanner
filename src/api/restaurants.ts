@@ -32,6 +32,7 @@ export interface RestaurantReceiptSettings {
   currency?: string; // e.g. 'RWF' | 'KShs' | 'UGX'
   momoCode?: string;
   printerWidth?: '58mm' | '80mm';
+  barChitEnabled?: boolean; // when false, hides Bar Chit button on waiter terminal
 }
 
 export async function fetchRestaurants(): Promise<Restaurant[]> {

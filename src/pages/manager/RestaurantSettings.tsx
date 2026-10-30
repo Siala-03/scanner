@@ -336,6 +336,24 @@ export function RestaurantSettings({ restaurantId, restaurantName, onNameChange,
         <p className="text-xs text-slate-500">
           Match this to your thermal printer's physical paper roll width. Affects all receipt, chit and kitchen ticket printouts.
         </p>
+
+        {/* Bar Chit toggle */}
+        <div className="flex items-start justify-between gap-4 pt-2 border-t border-slate-700/50">
+          <div>
+            <p className="text-sm font-semibold text-slate-200">Bar Chit</p>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Show a "Bar Chit" print button on the waiter order terminal. Disable for restaurants that do not use a bar printer.
+            </p>
+          </div>
+          <button
+            onClick={() => setSettings((prev) => ({ ...prev, barChitEnabled: prev.barChitEnabled === false ? true : false }))}
+            className={`relative shrink-0 w-11 h-6 rounded-full transition-colors ${settings.barChitEnabled !== false ? 'bg-amber-500' : 'bg-slate-600'}`}
+            role="switch"
+            aria-checked={settings.barChitEnabled !== false}
+          >
+            <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${settings.barChitEnabled !== false ? 'translate-x-5' : 'translate-x-0'}`} />
+          </button>
+        </div>
       </div>
 
       {/* ── Receipt Preview hint ── */}
