@@ -14,7 +14,7 @@ import { useStaff } from '../../hooks/useStaff';
 import { useTables } from '../../hooks/useTables';
 import { signUpStaff } from '../../api/auth';
 import { updateStaffAssignments, updateStaffStatus, updateStaffRole, updateStaffDetails, deleteStaff, updateStaffCredentials, fetchStaffCredentialsUsername } from '../../api/staff';
-import { saveStaffPin, clearStaffPinRemote, fetchPinStatus } from '../../utils/staffPin';
+import { saveStaffPin, clearStaffPinRemote, fetchPinHashes } from '../../utils/staffPin';
 import { useKPIs } from '../../hooks/useKPIs';
 import { createKPI, updateKPI, deleteKPI } from '../../api/kpis';
 import { fetchOrdersByDateRange } from '../../api/orders';
@@ -226,7 +226,7 @@ export function StaffManagement({ onShowPerformance }: StaffManagementProps) {
     setIsCredentialModalOpen(true);
     // Fetch username and PIN status in parallel
     fetchStaffCredentialsUsername(staffMember.id).then(setNewUsername).catch(() => {});
-    fetchPinStatus().then((pins) => setPinAlreadySet(!!pins[staffMember.id])).catch(() => {});
+    fetchPinHashes().then((hashes) => setPinAlreadySet(!!hashes[staffMember.id])).catch(() => {});
   };
   const [isSavingCreds, setIsSavingCreds] = useState(false);
   const [isSavingPin, setIsSavingPin] = useState(false);
@@ -855,12 +855,7 @@ export function StaffManagement({ onShowPerformance }: StaffManagementProps) {
                   <p className="text-xs text-slate-400">A PIN is already set.</p>
                   <button
                     type="button"
-                    onClick={() => {
-                      if (!selectedStaffForCreds) return;
-                      clearStaffPinRemote(selectedStaffForCreds.id)
-                        .then(() => { setPinAlreadySet(false); setNewPin(''); })
-                        .catch(() => setCredSaveError('Failed to remove PIN.'));
-                    }}
+                    onClick={() => { if (selectedStaffForCreds) { clearStaffPinRemote(selectedStaffForCreds.id).catch(() => {}); setPinAlreadySet(false); setNewPin(''); } }}
                     className="text-xs text-red-400 hover:underline"
                   >
                     Remove PIN

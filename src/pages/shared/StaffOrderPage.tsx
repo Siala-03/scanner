@@ -21,7 +21,7 @@ import { findMergeableInOrders, normalizeOrderPayload } from '../../hooks/useOrd
 import { useOrdersContext } from '../../contexts/OrdersContext';
 import { OpenTabModal } from '../../components/shared/OpenTabModal';
 import { StaffPinModal } from '../../components/shared/StaffPinModal';
-import { fetchPinStatus } from '../../utils/staffPin';
+import { fetchPinHashes } from '../../utils/staffPin';
 import { supabase } from '../../lib/supabase';
 import { fetchKitchenOrders } from '../../api/orders';
 import { formatPrice } from '../../utils/currency';
@@ -134,8 +134,7 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
   const [selectedStaffId, setSelectedStaffId] = useState('');
   const [pendingPinStaff, setPendingPinStaff] = useState<{ id: string; name: string } | null>(null);
   // Map of staffId → SHA-256 pin hash, fetched from server when in shared terminal mode
-  // staffId → true for staff who must enter a PIN on the shared terminal
-  const [pinStaff, setPinStaff] = useState<Record<string, boolean>>({});
+  const [pinHashes, setPinHashes] = useState<Record<string, string>>({});
 
   // Notify the host (e.g. supervisor nav) whenever a waiter checks in/out here.
   useEffect(() => {
@@ -150,7 +149,7 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
   // Fetch PIN hashes from server so we know which waiters require a PIN
   useEffect(() => {
     if (!sharedTerminalMode) return;
-    fetchPinStatus().then(setPinStaff).catch(() => {});
+    fetchPinHashes().then(setPinHashes).catch(() => {});
   }, [sharedTerminalMode]);
 
   const [activeCategory, setActiveCategory] = useState('all');
@@ -854,7 +853,7 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
                   <button
                     key={option.id}
                     onClick={() => {
-                      if (pinStaff[option.id]) {
+                      if (pinHashes[option.id]) {
                         setPendingPinStaff({ id: option.id, name: option.name });
                       } else {
                         setSelectedStaffId(option.id);
@@ -869,7 +868,7 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
                       <p className="truncate text-xl font-bold text-white">{option.name}</p>
                       <p className="mt-0.5 text-xs uppercase tracking-[0.18em] text-slate-400">{option.role || 'waiter'}</p>
                     </div>
-                    {pinStaff[option.id] && (
+                    {pinHashes[option.id] && (
                       <div className="ml-auto shrink-0 text-slate-500">
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
@@ -887,7 +886,7 @@ export function StaffOrderPage({ restaurantName, restaurantInfo, staffName, shar
       {pendingPinStaff && (
         <StaffPinModal
           staffName={pendingPinStaff.name}
-          staffId={pendingPinStaff.id}
+          pinHash={pinHashes[pendingPinStaff.id] ?? ''}
           onSuccess={() => {
             setSelectedStaffId(pendingPinStaff.id);
             setPendingPinStaff(null);
