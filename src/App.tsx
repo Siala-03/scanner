@@ -239,8 +239,11 @@ export function App() {
 
   // Load auth state from localStorage on mount
   useEffect(() => {
-    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-    const isValidUuid = (v: unknown): v is string => typeof v === 'string' && UUID_RE.test(v);
+    // Restaurant IDs are either UUIDs or generated codes like "REST-M3X9K2-ABCDE"
+    // (see the restaurants Edge Function), so accept any real ID. Requiring a UUID
+    // logged every user of a code-ID restaurant out on each page refresh.
+    const isValidRestaurantId = (v: unknown): v is string =>
+      typeof v === 'string' && v.trim() !== '' && v !== 'undefined' && v !== 'null';
 
     const savedAuthUser = localStorage.getItem('authUser');
     const savedSelectedRole = localStorage.getItem('selectedRole');
@@ -249,10 +252,10 @@ export function App() {
       try {
         const user = JSON.parse(savedAuthUser);
         const rawId = user.restaurantId || user.restaurant_id || savedRestaurantId || null;
-        // Reject legacy non-UUID restaurant IDs — user must re-login to get a fresh UUID
-        const restoredRestaurantId = isValidUuid(rawId) ? rawId : null;
+        // A corrupted ID (e.g. the string "undefined") can't be used — force a re-login.
+        const restoredRestaurantId = isValidRestaurantId(rawId) ? rawId : null;
         if (!restoredRestaurantId && rawId) {
-          console.warn('[auth] Legacy restaurant ID detected — clearing session to force re-login:', rawId);
+          console.warn('[auth] Invalid restaurant ID in saved session — clearing to force re-login:', rawId);
           localStorage.removeItem('authUser');
           localStorage.removeItem('selectedRole');
           localStorage.removeItem('restaurantId');
