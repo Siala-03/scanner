@@ -24,6 +24,32 @@ function preloadWhenIdle(pages: Array<{ preload: () => void }>) {
   else setTimeout(run, 1500);
 }
 
+/**
+ * Reload the app, first asking the service worker to fetch the latest build —
+ * installed tablets have no browser refresh button, and a plain reload can
+ * keep serving the cached version.
+ */
+async function refreshApp() {
+  try {
+    const reg = await navigator.serviceWorker?.getRegistration();
+    await reg?.update();
+  } catch {
+    /* offline or no service worker — reload anyway */
+  }
+  window.location.reload();
+}
+
+const RefreshAppButton = () => (
+  <button
+    onClick={() => void refreshApp()}
+    className="p-2 rounded-lg bg-slate-700/60 hover:bg-slate-600 text-slate-200 hover:text-white transition-colors"
+    aria-label="Refresh"
+    title="Refresh"
+  >
+    <RefreshCwIcon className="w-5 h-5" />
+  </button>
+);
+
 // Shown in the content area while a page's code loads, so the header and
 // navigation stay on screen instead of the whole app blanking out.
 const PageLoading = () => (
@@ -33,7 +59,7 @@ const PageLoading = () => (
 );
 import { saveOfflineProfile } from './utils/offlineAuth';
 import { motion } from 'framer-motion';
-import { ArrowLeftIcon, QrCodeIcon, LogOutIcon, ChevronDownIcon } from 'lucide-react';
+import { ArrowLeftIcon, QrCodeIcon, LogOutIcon, ChevronDownIcon, RefreshCwIcon } from 'lucide-react';
 import { CartItem, OrderStatus, Customer } from './types';
 import type { ConfirmMergeFn } from './hooks/useOrders';
 import { setCurrency, CurrencyCode } from './utils/currency';
@@ -866,6 +892,7 @@ export function App() {
                 <div className="text-xs sm:text-sm text-slate-400">{restaurantName || 'Company'}</div>
               </div>
               <div className="ml-auto flex items-center gap-2">
+                <RefreshAppButton />
                 <button
                   onClick={handleLogout}
                   className="p-2 rounded-lg bg-slate-700/60 hover:bg-red-600 text-slate-200 hover:text-white transition-colors"
@@ -1051,6 +1078,7 @@ export function App() {
               </div>
             </div>
             <div className="flex items-center gap-2">
+              <RefreshAppButton />
               <button
                 onClick={handleLogout}
                 className="p-2 rounded-lg bg-slate-700/60 hover:bg-red-600 text-slate-200 hover:text-white transition-colors"
