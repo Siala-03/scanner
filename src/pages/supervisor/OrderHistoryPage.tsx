@@ -98,11 +98,12 @@ export function OrderHistoryPage({ onBack, existingOrders, restaurantName = '', 
 
   // Calculate summary statistics
   const stats = useMemo(() => {
-    const isConfirmed = (o: Order) =>
-      (o as any).paymentStatus === 'confirmed' || (o as any).payment_status === 'confirmed';
+    const isConfirmed = (o: Order) => {
+      const ps = (o as any).paymentStatus ?? (o as any).payment_status;
+      return ps === 'confirmed' || ps === 'paid';
+    };
 
     const nonCancelled = orders.filter(o => o.status !== 'cancelled');
-    const servedOrders = orders.filter(o => o.status === 'served');
 
     const confirmedRevenue = nonCancelled
       .filter(isConfirmed)
@@ -117,8 +118,9 @@ export function OrderHistoryPage({ onBack, existingOrders, restaurantName = '', 
       confirmedRevenue,
       unconfirmedRevenue,
       totalRevenue: confirmedRevenue + unconfirmedRevenue,
-      pendingCount: orders.filter(o => o.status === 'pending').length,
-      servedCount: servedOrders.length,
+      // Payment-based, matching the Status column: paid vs. still awaiting payment.
+      pendingCount: nonCancelled.filter(o => !isConfirmed(o)).length,
+      servedCount: nonCancelled.filter(isConfirmed).length,
     };
   }, [orders, exactTotalCount]);
 
@@ -296,7 +298,7 @@ export function OrderHistoryPage({ onBack, existingOrders, restaurantName = '', 
             <Card className="bg-slate-800/50 backdrop-blur border border-slate-700/50 p-4">
               <div className="flex items-center gap-2 mb-1">
                 <FileTextIcon className="w-4 h-4 text-green-400" />
-                <span className="text-xs text-slate-400 uppercase">Served</span>
+                <span className="text-xs text-slate-400 uppercase">Paid</span>
               </div>
               <p className="text-2xl font-bold text-green-400">{stats.servedCount}</p>
             </Card>

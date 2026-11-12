@@ -2,7 +2,6 @@ import { useState, useMemo, useEffect, ReactNode } from 'react';
 import { Pagination } from '../ui/Pagination';
 import { ChevronUpIcon, ChevronDownIcon, SearchIcon, CalendarIcon, DownloadIcon, FilterIcon } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { StatusBadge } from '../ui/Badge';
 import { useStaff } from '../../hooks/useStaff';
 import { formatPrice } from '../../utils/currency';
 
@@ -14,6 +13,21 @@ interface OrdersHistoryTableProps {
 
 type SortField = 'id' | 'tableNumber' | 'total' | 'createdAt' | 'status';
 type SortDirection = 'asc' | 'desc';
+
+// History shows whether an order has been paid, not where it is in the kitchen.
+type PaymentState = 'paid' | 'pending' | 'cancelled';
+
+export function getPaymentState(order: any): PaymentState {
+  if (order.status === 'cancelled') return 'cancelled';
+  const ps = order.paymentStatus ?? order.payment_status;
+  return ps === 'confirmed' || ps === 'paid' ? 'paid' : 'pending';
+}
+
+const PAYMENT_BADGE: Record<PaymentState, { label: string; className: string }> = {
+  paid: { label: 'Paid', className: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' },
+  pending: { label: 'Pending', className: 'bg-amber-500/15 text-amber-300 border-amber-500/30' },
+  cancelled: { label: 'Cancelled', className: 'bg-red-500/15 text-red-300 border-red-500/30' },
+};
 
 export function OrdersHistoryTable({ orders, onSelectOrder, onExport }: OrdersHistoryTableProps) {
   const [sortConfig, setSortConfig] = useState<{ field: SortField; direction: SortDirection }>({
@@ -72,11 +86,8 @@ export function OrdersHistoryTable({ orders, onSelectOrder, onExport }: OrdersHi
   // Status options
   const statusOptions: { value: string; label: string }[] = [
     { value: 'all', label: 'All Statuses' },
+    { value: 'paid', label: 'Paid' },
     { value: 'pending', label: 'Pending' },
-    { value: 'verified', label: 'Verified' },
-    { value: 'preparing', label: 'Preparing' },
-    { value: 'ready', label: 'Ready' },
-    { value: 'served', label: 'Served' },
     { value: 'cancelled', label: 'Cancelled' }
   ];
 
@@ -97,7 +108,7 @@ export function OrdersHistoryTable({ orders, onSelectOrder, onExport }: OrdersHi
     
     // Status filter
     if (statusFilter !== 'all') {
-      result = result.filter(order => order.status === statusFilter);
+      result = result.filter(order => getPaymentState(order) === statusFilter);
     }
     
     // Waiter filter
@@ -133,7 +144,7 @@ export function OrdersHistoryTable({ orders, onSelectOrder, onExport }: OrdersHi
         case 'total':
           return (a.total - b.total) * direction;
         case 'status':
-          return a.status.localeCompare(b.status) * direction;
+          return getPaymentState(a).localeCompare(getPaymentState(b)) * direction;
         case 'createdAt':
           return (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) * direction;
         default:
@@ -371,7 +382,14 @@ export function OrdersHistoryTable({ orders, onSelectOrder, onExport }: OrdersHi
                       {formatPrice(order.total)}
                     </td>
                     <td className="px-4 py-3">
-                      <StatusBadge status={order.status} />
+                      {(() => {
+                        const badge = PAYMENT_BADGE[getPaymentState(order)];
+                        return (
+                          <span className={`inline-flex px-2 py-0.5 rounded-full border text-xs font-semibold ${badge.className}`}>
+                            {badge.label}
+                          </span>
+                        );
+                      })()}
                     </td>
                     <td className="px-4 py-3 text-sm text-slate-400">
                       <div>{createdAt.toLocaleDateString()}</div>
