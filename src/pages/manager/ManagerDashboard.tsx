@@ -21,6 +21,8 @@ interface ManagerDashboardProps {
   activeOrders: number;
   servedOrders: number;
   todaysRevenue: number;
+  /** Management consumption today (Mgt payments) — excluded from revenue */
+  todaysMgtConsumption?: number;
   ordersByHour: { hour: string; orders: number; revenue: number }[];
   statusBreakdown: { status: string; count: number }[];
   pendingPaymentCount?: number;
@@ -38,7 +40,7 @@ const statusColors: Record<string, string> = {
   served: '#22c55e'
 };
 
-export function ManagerDashboard({ onNavigate, totalOrders, activeOrders, servedOrders, todaysRevenue, ordersByHour, statusBreakdown, pendingPaymentCount = 0, pendingPaymentTotal = 0, confirmedPaymentCount = 0, confirmedPaymentTotal = 0, restaurantId }: ManagerDashboardProps) {
+export function ManagerDashboard({ onNavigate, totalOrders, activeOrders, servedOrders, todaysRevenue, todaysMgtConsumption = 0, ordersByHour, statusBreakdown, pendingPaymentCount = 0, pendingPaymentTotal = 0, confirmedPaymentCount = 0, confirmedPaymentTotal = 0, restaurantId }: ManagerDashboardProps) {
   const { forecasts, forecastAlerts, isGeneratingForecasts, runForecasting, analytics, inventory } = useInventoryData();
   const [notifications, setNotifications] = useState<PaymentNotification[]>([]);
 
@@ -116,7 +118,7 @@ export function ManagerDashboard({ onNavigate, totalOrders, activeOrders, served
         </div>
 
         {/* Order KPIs */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-4">
           <div className="rounded-xl border border-slate-700 p-3 bg-slate-800/70">
             <div className="text-xs uppercase tracking-wide text-slate-400">Orders Today</div>
             <div className="mt-2 text-2xl font-semibold text-gray-100">{totalOrders}</div>
@@ -136,6 +138,11 @@ export function ManagerDashboard({ onNavigate, totalOrders, activeOrders, served
             <div className="text-xs uppercase tracking-wide text-emerald-400">Revenue Today</div>
             <div className="mt-2 text-2xl font-semibold text-emerald-400">{formatPrice(todaysRevenue)}</div>
             <div className="text-xs text-slate-300 mt-1">Confirmed payments only</div>
+          </div>
+          <div className="rounded-xl border border-purple-500/30 p-3 bg-purple-500/5">
+            <div className="text-xs uppercase tracking-wide text-purple-300">Mgt Consumption Today</div>
+            <div className="mt-2 text-2xl font-semibold text-purple-400">{formatPrice(todaysMgtConsumption)}</div>
+            <div className="text-xs text-slate-300 mt-1">Not counted as revenue</div>
           </div>
         </div>
 

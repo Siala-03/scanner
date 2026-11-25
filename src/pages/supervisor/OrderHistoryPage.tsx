@@ -11,6 +11,7 @@ import { VoidReasonModal } from '../../components/shared/VoidReasonModal';
 import type { RestaurantReceiptSettings } from '../../api/restaurants';
 import { buildReceiptHtml, orderToReceiptData, printReceipt, buildKitchenTicketHtml, printKitchenTicket } from '../../utils/receipt';
 import { downloadCsv, buildOrdersCsv } from '../../utils/csv';
+import { revenueAmount } from '../../utils/payments';
 
 // Type alias to handle both API and local Order types
 type Order = OrderType & {
@@ -105,9 +106,10 @@ export function OrderHistoryPage({ onBack, existingOrders, restaurantName = '', 
 
     const nonCancelled = orders.filter(o => o.status !== 'cancelled');
 
+    // Mgt consumption isn't revenue
     const confirmedRevenue = nonCancelled
       .filter(isConfirmed)
-      .reduce((sum, o) => sum + (typeof o.total === 'number' ? o.total : 0), 0);
+      .reduce((sum, o) => sum + revenueAmount(o), 0);
 
     const unconfirmedRevenue = nonCancelled
       .filter(o => !isConfirmed(o))

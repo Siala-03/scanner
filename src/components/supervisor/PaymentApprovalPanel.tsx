@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   CheckCircleIcon, ClockIcon, BanknoteIcon, CreditCardIcon,
   SmartphoneIcon, RefreshCwIcon, UserIcon, PlusIcon, XIcon,
-  WifiOffIcon, CircleEllipsisIcon, WalletIcon,
+  WifiOffIcon, BriefcaseIcon, WalletIcon,
 } from 'lucide-react';
 import { fetchUnpaidOrders, confirmPayment, fetchOrderCancellationRequests, requestOrderCancellation } from '../../api/orders';
 import { VoidReasonModal } from '../shared/VoidReasonModal';
@@ -40,12 +40,15 @@ const PAYMENT_METHODS = [
   { code: '01', label: 'Cash',  icon: BanknoteIcon  },
   { code: '02', label: 'Card',  icon: CreditCardIcon },
   { code: '04', label: 'MoMo',  icon: SmartphoneIcon },
-  { code: '99', label: 'Other', icon: CircleEllipsisIcon },
+  // Management consumption ("Other" before; historic code 99 still reads as Other)
+  { code: '06', label: 'Mgt', icon: BriefcaseIcon },
   // Charged to a customer credit account (settled later on the Credit page)
   { code: '05', label: 'Credit', icon: WalletIcon },
 ];
 
 const CREDIT_CODE = '05';
+const MGT_CODE = '06';
+const MGT_ROLES = ['manager', 'supervisor', 'superadmin'];
 
 /** Which credit account an order's credit portion goes to ('new' = create one). */
 interface CreditSelection {
@@ -137,6 +140,8 @@ export function PaymentApprovalPanel({ restaurantId, restaurantName, restaurantI
     externalOrders ? filterPending(externalOrders) as Order[] : []
   );
   const [staffMap,     setStaffMap]     = useState<Record<string, string>>({});
+  // Managers/supervisors who can be recorded as consuming an order (Mgt payment)
+  const [mgtStaff,     setMgtStaff]     = useState<{ id: string; name: string }[]>([]);
   const [loading,      setLoading]      = useState(!externalOrders);
   const [confirming,   setConfirming]   = useState<string | null>(null);
   const [cancelling,   setCancelling]   = useState<string | null>(null);
@@ -268,13 +273,19 @@ export function PaymentApprovalPanel({ restaurantId, restaurantName, restaurantI
     if (!restaurantId) return;
     supabase
       .from('staff')
-      .select('id, name')
+      .select('id, name, role')
       .eq('restaurant_id', restaurantId)
       .then(({ data }) => {
         if (data) {
           const map: Record<string, string> = {};
           data.forEach((s: any) => { map[s.id] = s.name; });
           setStaffMap(map);
+          setMgtStaff(
+            data
+              .filter((s: any) => MGT_ROLES.includes(s.role))
+              .map((s: any) => ({ id: s.id, name: s.name }))
+              .sort((a: any, b: any) => a.name.localeCompare(b.name)),
+          );
         }
       });
   }, [restaurantId]);
@@ -601,7 +612,9 @@ export function PaymentApprovalPanel({ restaurantId, restaurantName, restaurantI
             const hasCredit = splits.some((s) => s.code === CREDIT_CODE);
             const creditIssue = hasCredit ? creditProblem(order.id, creditAmount) : null;
             const creditSel = creditSelMap[order.id] ?? emptyCreditSelection();
-            const canConfirm = valid && !momoRefMissing && !creditIssue;
+            const mgtEntry = splits.find((s) => s.code === MGT_CODE);
+            const mgtNameMissing = !!mgtEntry && !mgtEntry.momoRef.trim();
+            const canConfirm = valid && !momoRefMissing && !creditIssue && !mgtNameMissing;
             const cancellationRequested = pendingCancelRequests.has(order.id);
 
             return (
@@ -714,6 +727,22 @@ export function PaymentApprovalPanel({ restaurantId, restaurantName, restaurantI
                           </div>
                         )}
 
+                        {entry.code === MGT_CODE && (
+                          <div className={isMulti ? 'pl-14' : ''}>
+                            {/* Stored as the payment reference, e.g. "Consumed by: Aline" */}
+                            <select
+                              value={entry.momoRef}
+                              onChange={(e) => setMomoRef(order.id, entry.code, e.target.value)}
+                              className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-indigo-500"
+                            >
+                              <option value="">Consumed by… (required)</option>
+                              {mgtStaff.map((m) => (
+                                <option key={m.id} value={`Consumed by: ${m.name}`}>{m.name}</option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+
                         {entry.code === '04' && (
                           <div className={isMulti ? 'pl-14' : ''}>
                             <input
@@ -794,7 +823,7 @@ export function PaymentApprovalPanel({ restaurantId, restaurantName, restaurantI
                   )}
 
                   {/* Single-method note field */}
-                  {!isMulti && splits[0]?.code !== '04' && splits[0]?.code !== CREDIT_CODE && (
+                  {!isMulti && splits[0]?.code !== '04' && splits[0]?.code !== CREDIT_CODE && splits[0]?.code !== MGT_CODE && (
                     <input
                       type="text"
                       value={splits[0]?.momoRef || ''}
@@ -851,6 +880,9 @@ export function PaymentApprovalPanel({ restaurantId, restaurantName, restaurantI
                         <><CheckCircleIcon className="w-3.5 h-3.5" /> Confirm Payment</>
                       )}
                     </button>
+                    {mgtNameMissing && valid && !momoRefMissing && (
+                      <p className="text-xs text-amber-400 text-center mt-1">Choose who consumed this order</p>
+                    )}
                     {momoRefMissing && valid && (
                       <p className="text-xs text-amber-400 text-center mt-1">Enter MoMo transaction ref above to confirm</p>
                     )}

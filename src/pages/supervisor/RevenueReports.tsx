@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { revenueAmount } from '../../utils/payments';
 import { motion } from 'framer-motion';
 import {
   BarChart,
@@ -109,7 +110,7 @@ export function RevenueReports() {
   const filteredByRange = filteredOrders;
 
   const servedInRange = filteredByRange.filter(o => o.status === 'served');
-  const totalRevenue = servedInRange.reduce((sum, order) => sum + order.total, 0);
+  const totalRevenue = servedInRange.reduce((sum, order) => sum + revenueAmount(order), 0); // excludes Mgt
   const totalOrders = filteredByRange.length;
   const servedCount = servedInRange.length;
   const dailyRevenue = [...Array(7)].map((_, idx) => {
@@ -118,7 +119,7 @@ export function RevenueReports() {
     const dayKey = day.toDateString();
     const revenue = filteredByRange
       .filter((o) => o.status === 'served' && new Date((o as any).created_at || o.createdAt).toDateString() === dayKey)
-      .reduce((sum, o) => sum + o.total, 0);
+      .reduce((sum, o) => sum + revenueAmount(o), 0);
     return { date: dayKey, revenue };
   });
 

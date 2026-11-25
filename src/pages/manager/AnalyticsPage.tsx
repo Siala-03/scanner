@@ -10,6 +10,7 @@ import { Card } from '../../components/ui/Card';
 import { formatPrice } from '../../utils/currency';
 import { SectionConfigModal } from '../../components/manager/SectionConfigModal';
 import type { SectionGroup } from '../../components/manager/SectionConfigModal';
+import { mgtAmount, revenueAmount } from '../../utils/payments';
 
 // ─── Section defaults (first-time seed) ──────────────────────────────────────
 
@@ -203,12 +204,14 @@ export function AnalyticsPage() {
     let confirmedRevenue = 0;
     let unconfirmedRevenue = 0;
     let orderCount = 0;
+    let mgtConsumption = 0;
     const periodCustomers = new Set<string>();
 
     filteredOrders.forEach((o) => {
       orderCount += 1;
       if (isConfirmed(o)) {
-        confirmedRevenue += o.total ?? o.total_price ?? 0;
+        confirmedRevenue += revenueAmount(o); // Mgt consumption isn't revenue
+        mgtConsumption += mgtAmount(o);
       } else if (o.status !== 'cancelled') {
         unconfirmedRevenue += o.total ?? o.total_price ?? 0;
       }
@@ -227,6 +230,7 @@ export function AnalyticsPage() {
       orders: orderCount,
       avgOrderValue: orderCount > 0 ? confirmedRevenue / orderCount : 0,
       newCustomers,
+      mgtConsumption,
     };
   }, [orders, filteredOrders, periodWindow, filterMode]);
 
@@ -242,7 +246,7 @@ export function AnalyticsPage() {
           const d = parseOrderDate(o);
           if (!d || d.getHours() !== hour) return;
           cnt++;
-          if (isConfirmed(o)) revenue += o.total ?? 0;
+          if (isConfirmed(o)) revenue += revenueAmount(o);
         });
         return { label: `${hour}:00`, revenue, orders: cnt };
       });
@@ -260,7 +264,7 @@ export function AnalyticsPage() {
         });
         return {
           label: day.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
-          revenue: bucket.filter(isConfirmed).reduce((s, o) => s + (o.total ?? 0), 0),
+          revenue: bucket.filter(isConfirmed).reduce((s, o) => s + revenueAmount(o), 0),
           orders: bucket.length,
         };
       });
@@ -290,7 +294,7 @@ export function AnalyticsPage() {
 
       rows.push({
         label,
-        revenue: bucket.filter(isConfirmed).reduce((sum, o) => sum + (o.total ?? 0), 0),
+        revenue: bucket.filter(isConfirmed).reduce((sum, o) => sum + revenueAmount(o), 0),
         orders: bucket.length,
       });
 
@@ -407,6 +411,7 @@ export function AnalyticsPage() {
     '04': 'MoMo',    'mobile money': 'MoMo', momo: 'MoMo',
     '99': 'Other',   other: 'Other',
     '05': 'Credit', credit: 'Credit',
+    '06': 'Mgt', mgt: 'Mgt',
     'bank transfer': 'Bank Transfer', bank_transfer: 'Bank Transfer',
   };
 
@@ -415,6 +420,7 @@ export function AnalyticsPage() {
     'Card':          '#3b82f6',
     'MoMo':          '#f59e0b',
     'Credit':        '#ef4444',
+    'Mgt':           '#a855f7',
     'Other':         '#6b7280',
     'Cheque':        '#8b5cf6',
     'Bank Transfer': '#06b6d4',
@@ -724,8 +730,8 @@ export function AnalyticsPage() {
           </Card>
         </div>
 
-        {/* ── Revenue breakdown: confirmed vs awaiting ──────────────────── */}
-        <div className="grid grid-cols-2 gap-3 mb-4">
+        {/* ── Revenue breakdown: confirmed vs awaiting, plus Mgt consumption ── */}
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
           <Card className="bg-slate-800 p-4">
             <p className="text-xs text-slate-400 mb-1">Confirmed Revenue</p>
             <p className="text-2xl font-bold text-teal-400">{formatPrice(periodMetrics.confirmedRevenue)}</p>
@@ -735,6 +741,11 @@ export function AnalyticsPage() {
             <p className={`text-xs mb-1 ${periodMetrics.unconfirmedRevenue > 0 ? 'text-orange-300' : 'text-slate-400'}`}>Awaiting Payment</p>
             <p className={`text-2xl font-bold ${periodMetrics.unconfirmedRevenue > 0 ? 'text-orange-400' : 'text-slate-500'}`}>{formatPrice(periodMetrics.unconfirmedRevenue)}</p>
             <p className="text-xs text-slate-500 mt-1">Not yet confirmed</p>
+          </Card>
+          <Card className="bg-slate-800 p-4 border border-purple-500/30">
+            <p className="text-xs text-purple-300 mb-1">Mgt Consumption</p>
+            <p className="text-2xl font-bold text-purple-400">{formatPrice(periodMetrics.mgtConsumption)}</p>
+            <p className="text-xs text-slate-500 mt-1">Consumed by management · not revenue</p>
           </Card>
         </div>
 

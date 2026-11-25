@@ -6,8 +6,9 @@ import {
 import {
   CalendarIcon, DownloadIcon, TrendingUpIcon, TrendingDownIcon,
   ShoppingCartIcon, DollarSignIcon, UsersIcon, CreditCardIcon,
-  XCircleIcon, ReceiptIcon, FileTextIcon, ChevronDownIcon,
+  XCircleIcon, ReceiptIcon, FileTextIcon, ChevronDownIcon, BriefcaseIcon,
 } from 'lucide-react';
+import { mgtAmount, revenueAmount, revenueShare } from '../../utils/payments';
 import { fetchOrdersByDateRange } from '../../api/orders';
 import { fetchExpenses, fetchExpenseCategories } from '../../api/expenses';
 import { fetchWaiters } from '../../api/staff';
@@ -39,11 +40,12 @@ const PAYMENT_METHOD_LABELS: Record<string, string> = {
   '04': 'MoMo', 'mobile money': 'MoMo', momo: 'MoMo',
   '99': 'Other', other: 'Other',
     '05': 'Credit', credit: 'Credit',
+    '06': 'Mgt', mgt: 'Mgt',
   'bank transfer': 'Bank Transfer', bank_transfer: 'Bank Transfer',
 };
 
 const PAYMENT_METHOD_COLORS: Record<string, string> = {
-  Cash: '#10b981', Card: '#3b82f6', MoMo: '#f59e0b', Credit: '#ef4444',
+  Cash: '#10b981', Card: '#3b82f6', MoMo: '#f59e0b', Credit: '#ef4444', Mgt: '#a855f7',
   Other: '#6b7280', Cheque: '#8b5cf6', 'Bank Transfer': '#06b6d4',
 };
 
@@ -265,10 +267,11 @@ export function ReportsPage({ restaurantName = '' }: { restaurantName?: string }
   // ─── 1. Executive Summary ─────────────────────────────────────────────────
 
   const metrics = useMemo(() => {
-    let confirmedRevenue = 0, unconfirmedRevenue = 0, orderCount = 0;
+    // Management consumption (Mgt payments) is not revenue; it's reported on its own.
+    let confirmedRevenue = 0, unconfirmedRevenue = 0, orderCount = 0, mgtConsumption = 0;
     filteredOrders.forEach((o) => {
       orderCount++;
-      if (isConfirmed(o)) { confirmedRevenue += o.total ?? 0; }
+      if (isConfirmed(o)) { confirmedRevenue += revenueAmount(o); mgtConsumption += mgtAmount(o); }
       else if (o.status !== 'cancelled') { unconfirmedRevenue += o.total ?? 0; }
     });
     const totalExpenses = expenses.reduce((s, e) => s + (e.amount ?? 0), 0);
@@ -280,6 +283,7 @@ export function ReportsPage({ restaurantName = '' }: { restaurantName?: string }
       orders: orderCount,
       avgOrderValue: orderCount > 0 ? confirmedRevenue / orderCount : 0,
       expenses: totalExpenses,
+      mgtConsumption,
     };
   }, [filteredOrders, expenses]);
 
@@ -287,7 +291,7 @@ export function ReportsPage({ restaurantName = '' }: { restaurantName?: string }
     let confirmedRevenue = 0, unconfirmedRevenue = 0, orderCount = 0;
     filteredPriorOrders.forEach((o) => {
       orderCount++;
-      if (isConfirmed(o)) { confirmedRevenue += o.total ?? 0; }
+      if (isConfirmed(o)) { confirmedRevenue += revenueAmount(o); }
       else if (o.status !== 'cancelled') { unconfirmedRevenue += o.total ?? 0; }
     });
     return {
@@ -305,7 +309,7 @@ export function ReportsPage({ restaurantName = '' }: { restaurantName?: string }
       return Array.from({ length: 18 }, (_, i) => {
         const hour = i + 6;
         let revenue = 0, cnt = 0;
-        filteredOrders.forEach((o) => { const d = parseOrderDate(o); if (!d || d.getHours() !== hour) return; cnt++; if (isConfirmed(o)) revenue += o.total ?? 0; });
+        filteredOrders.forEach((o) => { const d = parseOrderDate(o); if (!d || d.getHours() !== hour) return; cnt++; if (isConfirmed(o)) revenue += revenueAmount(o); });
         return { label: `${hour}:00`, revenue, orders: cnt };
       });
     }
@@ -315,7 +319,7 @@ export function ReportsPage({ restaurantName = '' }: { restaurantName?: string }
         const s = new Date(day); s.setHours(0, 0, 0, 0);
         const e = new Date(day); e.setHours(23, 59, 59, 999);
         const bucket = filteredOrders.filter((o) => { const d = parseOrderDate(o); return d ? d >= s && d <= e : false; });
-        return { label: day.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric' }), revenue: bucket.filter(isConfirmed).reduce((sum, o) => sum + (o.total ?? 0), 0), orders: bucket.length };
+        return { label: day.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric' }), revenue: bucket.filter(isConfirmed).reduce((sum, o) => sum + revenueAmount(o), 0), orders: bucket.length };
       });
     }
     const rangeDays = Math.ceil((periodWindow.end.getTime() - periodWindow.start.getTime()) / 86_400_000);
@@ -327,7 +331,7 @@ export function ReportsPage({ restaurantName = '' }: { restaurantName?: string }
       const e = new Date(cursor); e.setDate(e.getDate() + step - 1); e.setHours(23, 59, 59, 999);
       if (e > periodWindow.end) e.setTime(periodWindow.end.getTime());
       const bucket = filteredOrders.filter((o) => { const d = parseOrderDate(o); return d ? d >= s && d <= e : false; });
-      rows.push({ label: s.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), revenue: bucket.filter(isConfirmed).reduce((sum, o) => sum + (o.total ?? 0), 0), orders: bucket.length });
+      rows.push({ label: s.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), revenue: bucket.filter(isConfirmed).reduce((sum, o) => sum + revenueAmount(o), 0), orders: bucket.length });
       cursor.setDate(cursor.getDate() + step);
     }
     return rows;
@@ -340,10 +344,11 @@ export function ReportsPage({ restaurantName = '' }: { restaurantName?: string }
     let total = 0;
     filteredOrders.forEach((o) => {
       if (!isConfirmed(o)) return;
+      const share = revenueShare(o);
       normalizeItems(o.items).forEach((item: any) => {
         const mid = item.menuItemId ?? item.menu_item_id;
         const cat = menuById[mid]?.category ?? item.category ?? item.menuItem?.category ?? 'other';
-        const rev = Number(item.totalPrice ?? item.total_price ?? ((item.unitPrice ?? item.unit_price ?? 0) * (item.quantity ?? 1))) || 0;
+        const rev = (Number(item.totalPrice ?? item.total_price ?? ((item.unitPrice ?? item.unit_price ?? 0) * (item.quantity ?? 1))) || 0) * share;
         const existing = map.get(cat) ?? { category: cat, revenue: 0, qty: 0 };
         existing.revenue += rev; existing.qty += Number(item.quantity ?? 1);
         map.set(cat, existing); total += rev;
@@ -358,6 +363,7 @@ export function ReportsPage({ restaurantName = '' }: { restaurantName?: string }
     const stats = new Map<string, { name: string; revenue: number; qty: number; orders: number }>();
     filteredOrders.forEach((o) => {
       if (!isConfirmed(o)) return;
+      const share = revenueShare(o);
       const seenKeys = new Set<string>();
       normalizeItems(o.items).forEach((item: any) => {
         const mid = item.menuItemId ?? item.menu_item_id ?? '';
@@ -365,7 +371,7 @@ export function ReportsPage({ restaurantName = '' }: { restaurantName?: string }
         const name = menuById[mid]?.name ?? item.menuItemName ?? item.menu_item_name ?? key;
         const qty = Number(item.quantity ?? 1) || 1;
         const up = Number(item.unitPrice ?? item.unit_price ?? menuById[mid]?.price ?? 0);
-        const rev = Number(item.totalPrice ?? item.total_price ?? up * qty) || 0;
+        const rev = (Number(item.totalPrice ?? item.total_price ?? up * qty) || 0) * share;
         const s = stats.get(key) ?? { name, revenue: 0, qty: 0, orders: 0 };
         s.revenue += rev; s.qty += qty;
         if (!seenKeys.has(key)) { s.orders += 1; seenKeys.add(key); }
@@ -517,6 +523,7 @@ export function ReportsPage({ restaurantName = '' }: { restaurantName?: string }
     rows.push(['Total Orders', String(metrics.orders)]);
     rows.push(['Avg Order Value', String(Math.round(metrics.avgOrderValue))]);
     rows.push(['Total Expenses', String(Math.round(metrics.expenses))]);
+    rows.push(['Management Consumption (not revenue)', String(Math.round(metrics.mgtConsumption))]);
 
     sep('REVENUE & ORDERS TREND');
     rows.push(['Period', 'Revenue', 'Orders']);
@@ -635,13 +642,14 @@ export function ReportsPage({ restaurantName = '' }: { restaurantName?: string }
       </div>
 
       {/* ── 1. Executive Summary ── */}
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3">
         <KPICard icon={<DollarSignIcon className="w-5 h-5" />} label="Total Revenue" value={formatPrice(metrics.totalRevenue)} delta={revDelta} accent="emerald" />
         <KPICard icon={<DollarSignIcon className="w-5 h-5" />} label="Confirmed" value={formatPrice(metrics.confirmedRevenue)} accent="teal" />
         <KPICard icon={<DollarSignIcon className="w-5 h-5" />} label="Awaiting Payment" value={formatPrice(metrics.unconfirmedRevenue)} accent="orange" />
         <KPICard icon={<ShoppingCartIcon className="w-5 h-5" />} label="Orders" value={String(metrics.orders)} delta={ordDelta} accent="blue" />
         <KPICard icon={<TrendingUpIcon className="w-5 h-5" />} label="Avg Order" value={formatPrice(metrics.avgOrderValue)} delta={avgDelta} accent="amber" />
         <KPICard icon={<ReceiptIcon className="w-5 h-5" />} label="Expenses" value={formatPrice(metrics.expenses)} accent="red" />
+        <KPICard icon={<BriefcaseIcon className="w-5 h-5" />} label="Mgt Consumption" value={formatPrice(metrics.mgtConsumption)} accent="purple" />
       </div>
 
       {/* ── 2. Revenue & Orders Trend ── */}
@@ -964,6 +972,7 @@ function KPICard({ icon, label, value, delta, accent }: {
     : accent === 'amber' ? 'border-amber-500/30'
     : accent === 'orange'? 'border-orange-500/30'
     : accent === 'red'   ? 'border-red-500/30'
+    : accent === 'purple'? 'border-purple-500/30'
     : 'border-slate-700';
   const iconColor =
     accent === 'emerald' ? 'text-emerald-400'
@@ -972,6 +981,7 @@ function KPICard({ icon, label, value, delta, accent }: {
     : accent === 'amber' ? 'text-amber-400'
     : accent === 'orange'? 'text-orange-400'
     : accent === 'red'   ? 'text-red-400'
+    : accent === 'purple'? 'text-purple-400'
     : 'text-slate-400';
   return (
     <div className={`bg-slate-800/60 rounded-xl border ${borderColor} p-4 hover:bg-slate-800/80 transition-colors`}>

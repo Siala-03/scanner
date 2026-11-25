@@ -75,6 +75,7 @@ import { SupplierUser, getSupplierMe, clearSupplierToken } from './api/supplier'
 import { fetchRestaurantPublic, fetchReceiptSettings, type OutletType } from './api/restaurants';
 import type { RestaurantReceiptSettings } from './api/restaurants';
 import { usePullToRefresh } from './hooks/usePullToRefresh';
+import { mgtAmount, revenueAmount } from './utils/payments';
 
 // ── Lazy-loaded pages — each role only downloads its own bundle ───────────────
 const CustomerApp              = lazyWithReload(() => import('./pages/customer/CustomerApp').then(m => ({ default: m.CustomerApp })));
@@ -373,7 +374,15 @@ export function App() {
         (isSameDay((order as any).paymentConfirmedAt ?? (order as any).payment_confirmed_at ?? order.updatedAt, today) ||
          isSameDay(order.createdAt, today))
     )
-    .reduce((sum, order) => sum + (typeof order.total === 'number' ? order.total : 0), 0);
+    .reduce((sum, order) => sum + revenueAmount(order), 0); // Mgt consumption isn't revenue
+  const managerTodaysMgt = orders
+    .filter(
+      (order) =>
+        isPaymentConfirmed(order) &&
+        (isSameDay((order as any).paymentConfirmedAt ?? (order as any).payment_confirmed_at ?? order.updatedAt, today) ||
+         isSameDay(order.createdAt, today))
+    )
+    .reduce((sum, order) => sum + mgtAmount(order), 0);
 
   // Payment pending / confirmed counts (all time, for dashboard cards)
   const pendingPaymentOrders = orders.filter(
@@ -381,7 +390,7 @@ export function App() {
   );
   const confirmedPaymentOrders = orders.filter(isPaymentConfirmed);
   const pendingPaymentTotal = pendingPaymentOrders.reduce((s, o) => s + (typeof o.total === 'number' ? o.total : 0), 0);
-  const confirmedPaymentTotal = confirmedPaymentOrders.reduce((s, o) => s + (typeof o.total === 'number' ? o.total : 0), 0);
+  const confirmedPaymentTotal = confirmedPaymentOrders.reduce((s, o) => s + revenueAmount(o), 0);
 
   const getHourKey = (date: Date) => `${date.getHours().toString().padStart(2, '0')}:00`;
   const chartHours = Array.from({ length: 12 }, (_, i) => {
@@ -1184,6 +1193,7 @@ export function App() {
                 activeOrders={managerActiveOrders}
                 servedOrders={managerServedOrders}
                 todaysRevenue={managerTodaysRevenue}
+                todaysMgtConsumption={managerTodaysMgt}
                 ordersByHour={ordersByHour}
                 statusBreakdown={statusBreakdown}
                 pendingPaymentCount={pendingPaymentOrders.length}
