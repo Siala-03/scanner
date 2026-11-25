@@ -149,17 +149,28 @@ export async function fetchOrdersByDateRange(startDate: string, endDate: string,
   const restaurant = restaurantId || getRestaurantId();
   if (!restaurant) return [];
 
-  const { data, error } = await db
-    .from('orders')
-    .select('*')
-    .eq('restaurant_id', restaurant)
-    .gte('created_at', startDate)
-    .lte('created_at', endDate)
-    .order('created_at', { ascending: false })
-    .limit(100000);
-
-  if (error) return [];
-  return (data ?? []) as Order[];
+  // Supabase caps every response at 1,000 rows (a larger .limit() is silently
+  // ignored), so page through the range. MAX_ROWS guards against runaway loads.
+  const PAGE = 1000;
+  const MAX_ROWS = 50_000;
+  const rows: Order[] = [];
+  for (let from = 0; from < MAX_ROWS; from += PAGE) {
+    const { data, error } = await db
+      .from('orders')
+      .select('*')
+      .eq('restaurant_id', restaurant)
+      .gte('created_at', startDate)
+      .lte('created_at', endDate)
+      .order('created_at', { ascending: false })
+      .range(from, from + PAGE - 1);
+    if (error) {
+      if (rows.length === 0) throw error; // let the caller show a load error
+      break;
+    }
+    rows.push(...((data ?? []) as Order[]));
+    if (!data || data.length < PAGE) break;
+  }
+  return rows;
 }
 
 export async function fetchKitchenOrders(restaurantId?: string): Promise<Order[]> {

@@ -5,7 +5,7 @@ import type { Order as OrderType, OrderStatus } from '../../types';
 import { Card } from '../../components/ui/Card';
 import { OrdersHistoryTable } from '../../components/supervisor/OrdersHistoryTable';
 import { OrderDetailModal } from '../../components/waiter/OrderDetailModal';
-import { fetchOrders, cancelOrder, fetchCancellationRequestByOrderId, fetchOrderCount } from '../../api/orders';
+import { fetchOrdersByDateRange, cancelOrder, fetchCancellationRequestByOrderId, fetchOrderCount } from '../../api/orders';
 import type { CancellationDetails } from '../../components/waiter/OrderDetailModal';
 import { VoidReasonModal } from '../../components/shared/VoidReasonModal';
 import type { RestaurantReceiptSettings } from '../../api/restaurants';
@@ -26,6 +26,19 @@ interface OrderHistoryPageProps {
   existingOrders?: Order[];
   restaurantName?: string;
   receiptSettings?: RestaurantReceiptSettings;
+}
+
+// How far back Order History loads. Older orders stay in Reports.
+const HISTORY_DAYS = 90;
+
+/** Newest data wins: live orders replace or extend the loaded history. */
+function mergeLiveOrders(history: Order[], live?: Order[]): Order[] {
+  if (!live || live.length === 0) return history;
+  const byId = new Map(history.map((o) => [o.id, o]));
+  live.forEach((o) => byId.set(o.id, o));
+  return Array.from(byId.values()).sort(
+    (a, b) => new Date(b.createdAt as any).getTime() - new Date(a.createdAt as any).getTime(),
+  );
 }
 
 export function OrderHistoryPage({ onBack, existingOrders, restaurantName = '', receiptSettings = {} }: OrderHistoryPageProps) {
@@ -66,24 +79,12 @@ export function OrderHistoryPage({ onBack, existingOrders, restaurantName = '', 
         // does not apply to count-only queries, so this is always accurate.
         fetchOrderCount().then(c => setExactTotalCount(c)).catch(() => {});
 
-        // Use existing orders first (from parent state)
-        if (existingOrders && existingOrders.length > 0) {
-          setOrders(existingOrders);
-          setUsingLocalData(false);
-          setError(null);
-          setLoading(false);
-          return;
-        }
-
-        // Fetch from API
-        const allOrders = await fetchOrders('all');
-        if (allOrders.length > 0) {
-          setOrders(convertOrders(allOrders));
-          setUsingLocalData(false);
-        } else {
-          setOrders([]);
-          setUsingLocalData(false);
-        }
+        // History needs more than the live order list (which only holds the last
+        // 48 hours), so load the last HISTORY_DAYS from the server.
+        const since = new Date(Date.now() - HISTORY_DAYS * 24 * 60 * 60 * 1000).toISOString();
+        const history = convertOrders(await fetchOrdersByDateRange(since, new Date().toISOString()));
+        setOrders(mergeLiveOrders(history, existingOrders));
+        setUsingLocalData(false);
         setError(null);
       } catch (err) {
         console.warn('Failed to fetch orders from API:', err);
@@ -95,6 +96,14 @@ export function OrderHistoryPage({ onBack, existingOrders, restaurantName = '', 
       }
     }
     loadOrders();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Keep recent orders live: fold the parent's realtime list into the loaded history.
+  useEffect(() => {
+    if (existingOrders && existingOrders.length > 0) {
+      setOrders((prev) => mergeLiveOrders(prev, existingOrders));
+    }
   }, [existingOrders]);
 
   // Calculate summary statistics

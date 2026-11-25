@@ -4,7 +4,7 @@ import {
   ResponsiveContainer, PieChart, Pie, Cell, Legend,
 } from 'recharts';
 import { CalendarIcon, Settings2Icon } from 'lucide-react';
-import { fetchOrders, fetchOrdersByDateRange } from '../../api/orders';
+import { fetchOrdersByDateRange } from '../../api/orders';
 import { useMenu } from '../../hooks/useMenu';
 import { Card } from '../../components/ui/Card';
 import { formatPrice } from '../../utils/currency';
@@ -139,7 +139,11 @@ export function AnalyticsPage() {
             customEnd + 'T23:59:59.999Z',
           );
         } else {
-          data = await fetchOrders();
+          // Load the whole period (fetchOrders only returns the last 48 h), plus
+          // 60 days before it so new-vs-returning customers can be detected.
+          const { start, end } = getPeriodWindow(filterMode, customStart, customEnd);
+          const from = new Date(start.getTime() - 60 * 24 * 60 * 60 * 1000);
+          data = await fetchOrdersByDateRange(from.toISOString(), end.toISOString());
         }
         if (active) setOrders(data);
       } catch (e) {
