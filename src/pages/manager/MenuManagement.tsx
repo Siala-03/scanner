@@ -22,7 +22,7 @@ import { formatPrice } from '../../utils/currency';
 import { useMenu } from '../../hooks/useMenu';
 import { exportMenuToCsv, exportMenuToJson, importMenuFromFile, saveCustomMenu, downloadMenuTemplate } from '../../utils/menuImportExport';
 import { fetchInventory, updateInventoryRecord as apiUpdateInventoryRecord } from '../../api/inventory';
-import { deleteMenuItem as apiDeleteMenuItem } from '../../api/menu';
+import { deleteMenuItem as apiDeleteMenuItem, logMenuPriceChange } from '../../api/menu';
 
 // Default categories with emojis from dummy data
 const defaultCategories: MenuCategoryInfo[] = [
@@ -35,6 +35,8 @@ const defaultCategories: MenuCategoryInfo[] = [
   { id: 'dinner', name: 'Dinner', emoji: '🍽️' },
   { id: 'desserts', name: 'Desserts', emoji: '🍰' },
   { id: 'snacks', name: 'Snacks', emoji: '🥨' },
+  // Per-bottle fee for customers' own bottles, e.g. "Corkage – Johnnie Walker"
+  { id: 'corkage', name: 'Corkage', emoji: '🍾' },
 ];
 
 // Tab type with optional emoji icon
@@ -284,12 +286,25 @@ export function MenuManagement() {
       };
       updatedItems = [newItem, ...menuItemsState];
     }
-    
+
+    // Price audit: who set the starting price, or changed it (e.g. corkage per bottle).
+    const savedId = editingItem ? editingItem.id : updatedItems[0].id;
+    const newPrice = Number(itemData.price ?? editingItem?.price ?? 0);
+    const priceChanged = !editingItem || Number(editingItem.price) !== newPrice;
+
     // Save locally then sync backend
     saveCustomMenu(updatedItems);
     setIsSaving(true);
     try {
       await saveMenu(updatedItems);
+      if (priceChanged) {
+        await logMenuPriceChange({
+          menuItemId: savedId,
+          menuItemName: itemData.name || editingItem?.name || savedId,
+          oldPrice: editingItem ? Number(editingItem.price) : null,
+          newPrice,
+        });
+      }
       await refresh();
     } catch (err) {
       console.error('Failed to save menu:', err);

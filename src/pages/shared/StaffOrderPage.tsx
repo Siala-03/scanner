@@ -90,7 +90,7 @@ const CATEGORY_LABELS: Record<string, string> = {
 };
 
 const DRINK_CATEGORIES = new Set([
-  'alcoholic-drinks', 'beers', 'wine', 'soft-drinks',
+  'corkage', 'alcoholic-drinks', 'beers', 'wine', 'soft-drinks',
   'drinks', 'beverages', 'cocktails', 'bar',
 ]);
 const SUPERVISOR_SOURCE_TAG = '[source:supervisor-take-order]';

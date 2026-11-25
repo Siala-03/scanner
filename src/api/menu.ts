@@ -267,22 +267,82 @@ export async function updateMenuItem(id: string, updates: Partial<MenuItem> & { 
 
   // Log price change for audit trail
   if (hasNewPrice && oldPrice !== null && oldPrice !== updates.price) {
-    const staffId = typeof window !== 'undefined' ? localStorage.getItem('staffId') : null;
+    await logMenuPriceChange({ menuItemId: id, menuItemName: res.data?.name || id, oldPrice, newPrice: Number(updates.price) });
+  }
+
+  return res.data as MenuItem;
+}
+
+/**
+ * Record who set or changed a menu price (e.g. a bottle's corkage fee).
+ * Stored in stock_movements as `PRICE_CHANGE|old=…|new=…|by=Name`, so no extra
+ * table is needed; `old` is empty when the item was first created.
+ * Never throws — a failed audit write must not block saving the menu.
+ */
+export async function logMenuPriceChange(entry: {
+  menuItemId: string;
+  menuItemName: string;
+  oldPrice: number | null;
+  newPrice: number;
+}): Promise<void> {
+  try {
+    const restaurantId = await resolveRestaurantId();
+    if (!restaurantId || typeof window === 'undefined') return;
+    const staffId = localStorage.getItem('staffId') || 'system';
+    let staffName = '';
+    try { staffName = JSON.parse(localStorage.getItem('authUser') || '{}')?.name || ''; } catch { /* no saved user */ }
+    const by = staffName.replace(/\|/g, '/');
     await supabase.from('stock_movements').insert({
       id: `mov-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      menu_item_id: id,
-      menu_item_name: res.data?.name || id,
+      menu_item_id: entry.menuItemId,
+      menu_item_name: entry.menuItemName,
       type: 'adjustment',
       qty: 0,
       stock_before: 0,
       balance_after: 0,
-      performed_by: staffId || 'system',
-      notes: `PRICE_CHANGE|old=${oldPrice}|new=${updates.price}`,
+      performed_by: staffId,
+      notes: `PRICE_CHANGE|old=${entry.oldPrice ?? ''}|new=${entry.newPrice}|by=${by}`,
       restaurant_id: restaurantId,
-    }).then(null, (err: any) => console.warn('[updateMenuItem] Price audit log failed:', err));
+    });
+  } catch (err) {
+    console.warn('[logMenuPriceChange] Price audit log failed:', err);
   }
+}
 
-  return res.data as MenuItem;
+export interface MenuPriceChange {
+  oldPrice: number | null;
+  newPrice: number;
+  byName: string;
+  at: string;
+}
+
+/** Latest price changes for a menu item, newest first. */
+export async function fetchMenuPriceHistory(menuItemId: string, limit = 10): Promise<MenuPriceChange[]> {
+  const restaurantId = await resolveRestaurantId();
+  if (!restaurantId) return [];
+  const { data, error } = await supabase
+    .from('stock_movements')
+    .select('notes, performed_by, timestamp, created_at')
+    .eq('restaurant_id', restaurantId)
+    .eq('menu_item_id', menuItemId)
+    .like('notes', 'PRICE_CHANGE|%')
+    .order('timestamp', { ascending: false })
+    .limit(limit);
+  if (error || !data) return [];
+  return data.map((row: any) => {
+    const fields = Object.fromEntries(
+      String(row.notes).split('|').slice(1).map((p: string) => {
+        const i = p.indexOf('=');
+        return [p.slice(0, i), p.slice(i + 1)];
+      }),
+    );
+    return {
+      oldPrice: fields.old === '' || fields.old === undefined ? null : Number(fields.old),
+      newPrice: Number(fields.new),
+      byName: fields.by || '',
+      at: row.timestamp || row.created_at,
+    };
+  });
 }
 
 export async function deleteMenuItem(id: string): Promise<void> {

@@ -45,7 +45,7 @@ import { OfflineBanner } from '../../components/ui/OfflineBanner';
 // ─── Kitchen detection ────────────────────────────────────────────────────────
 // Blacklist: these categories are bar/beverage only — everything else goes to kitchen.
 const DRINK_CATEGORIES = new Set([
-  'alcoholic-drinks', 'beers', 'wine', 'soft-drinks',
+  'corkage', 'alcoholic-drinks', 'beers', 'wine', 'soft-drinks',
   'drinks', 'beverages', 'cocktails', 'bar',
 ]);
 const SUPERVISOR_SOURCE_TAG = '[source:supervisor-take-order]';

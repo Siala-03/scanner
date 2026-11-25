@@ -3,6 +3,8 @@ import { MenuItem, MenuCategory, MenuCategoryInfo, ModifierGroup, ModifierItem }
 import { Modal } from '../ui/Modal';
 import { Input, TextArea } from '../ui/Input';
 import { Button } from '../ui/Button';
+import { fetchMenuPriceHistory, type MenuPriceChange } from '../../api/menu';
+import { formatPrice } from '../../utils/currency';
 
 function uid(): string {
   return `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
@@ -17,7 +19,7 @@ interface MenuItemEditorProps {
 }
 // Categories that go to bar/service only — everything else goes to kitchen
 const DRINK_CATEGORIES = new Set([
-  'beers', 'wine', 'alcoholic-drinks', 'soft-drinks', 'coffee',
+  'corkage', 'beers', 'wine', 'alcoholic-drinks', 'soft-drinks', 'coffee',
   'tea', 'juices', 'cocktails', 'mocktails', 'non-alcoholic', 'water', 'drinks', 'beverages',
 ]);
 
@@ -65,6 +67,16 @@ export function MenuItemEditor({
     requiresKitchen: true,
   });
   const [modifierGroups, setModifierGroups] = useState<ModifierGroup[]>([]);
+  // Who set or changed this item's price, newest first (audit trail)
+  const [priceHistory, setPriceHistory] = useState<MenuPriceChange[]>([]);
+
+  useEffect(() => {
+    setPriceHistory([]);
+    if (!isOpen || !item?.id) return;
+    let cancelled = false;
+    fetchMenuPriceHistory(item.id, 5).then((rows) => { if (!cancelled) setPriceHistory(rows); });
+    return () => { cancelled = true; };
+  }, [isOpen, item?.id]);
   const [categoryMode, setCategoryMode] = useState<'existing' | 'new'>('existing');
   const [newCategory, setNewCategory] = useState({ id: '', name: '', emoji: '🍽️' });
 
@@ -244,6 +256,22 @@ export function MenuItemEditor({
             placeholder="15" />
 
         </div>
+
+        {priceHistory.length > 0 && (
+          <div className="-mt-2 rounded-lg border border-slate-700 bg-slate-900/40 px-3 py-2">
+            <p className="text-xs font-medium text-slate-400 mb-1">Price history</p>
+            <ul className="space-y-0.5">
+              {priceHistory.map((h, i) => (
+                <li key={i} className="text-xs text-slate-300">
+                  {h.oldPrice == null
+                    ? <>Set to <span className="text-white font-medium">{formatPrice(h.newPrice)}</span></>
+                    : <>{formatPrice(h.oldPrice)} → <span className="text-white font-medium">{formatPrice(h.newPrice)}</span></>}
+                  <span className="text-slate-500"> · {h.byName || 'unknown'} · {h.at ? new Date(h.at).toLocaleDateString() : ''}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         <div>
           <label className="block text-sm font-medium text-slate-300 mb-2">
